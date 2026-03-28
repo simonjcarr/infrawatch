@@ -36,7 +36,6 @@ export function LoginForm() {
     const result = await signIn.email({
       email: values.email,
       password: values.password,
-      callbackURL: '/dashboard',
     })
 
     if (result.error) {
@@ -45,7 +44,6 @@ export function LoginForm() {
     }
 
     router.push('/dashboard')
-    router.refresh()
   }
 
   return (

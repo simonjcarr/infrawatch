@@ -15,6 +15,13 @@
       "when": 1774701085504,
       "tag": "0001_normal_rafael_vega",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774714009263,
+      "tag": "0002_real_hawkeye",
+      "breakpoints": true
     }
   ]
 }

@@ -57,7 +57,7 @@ export function Topbar() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/profile')}>
             <User className="size-4 mr-2" />
             Profile
           </DropdownMenuItem>

@@ -37,21 +37,21 @@ interface NavItem {
 
 const primaryNav: NavItem[] = [
   { title: 'Overview', href: '/dashboard', icon: BarChart3 },
-  { title: 'Hosts', href: '/dashboard/hosts', icon: Server },
-  { title: 'Checks & Alerts', href: '/dashboard/alerts', icon: Bell },
-  { title: 'Certificates', href: '/dashboard/certificates', icon: ShieldCheck },
-  { title: 'Service Accounts', href: '/dashboard/service-accounts', icon: Key },
+  { title: 'Hosts', href: '/hosts', icon: Server },
+  { title: 'Checks & Alerts', href: '/alerts', icon: Bell },
+  { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
+  { title: 'Service Accounts', href: '/service-accounts', icon: Key },
 ]
 
 const toolingNav: NavItem[] = [
-  { title: 'Air-gap Bundlers', href: '/dashboard/bundlers', icon: Package },
-  { title: 'Runbooks', href: '/dashboard/runbooks', icon: BookOpen },
-  { title: 'Scheduled Tasks', href: '/dashboard/tasks', icon: Activity },
+  { title: 'Air-gap Bundlers', href: '/bundlers', icon: Package },
+  { title: 'Runbooks', href: '/runbooks', icon: BookOpen },
+  { title: 'Scheduled Tasks', href: '/tasks', icon: Activity },
 ]
 
 const adminNav: NavItem[] = [
-  { title: 'Team', href: '/dashboard/team', icon: Users },
-  { title: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { title: 'Team', href: '/team', icon: Users },
+  { title: 'Settings', href: '/settings', icon: Settings },
 ]
 
 function NavGroup({ label, items }: { label: string; items: NavItem[] }) {

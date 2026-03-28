@@ -1,14 +1,24 @@
 import type { Metadata } from 'next'
+import { getRequiredSession } from '@/lib/auth/session'
+import { getOrgUsers } from '@/lib/actions/users'
+import { TeamClient } from './team-client'
 
 export const metadata: Metadata = {
   title: 'Team',
 }
 
-export default function TeamPage() {
+export default async function TeamPage() {
+  const session = await getRequiredSession()
+  const orgId = session.user.organisationId!
+  const { members, pendingInvites } = await getOrgUsers(orgId)
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-foreground mb-2">Team</h1>
-      <p className="text-muted-foreground">This section is coming soon.</p>
-    </div>
+    <TeamClient
+      orgId={orgId}
+      currentUserId={session.user.id}
+      currentUserRole={session.user.role}
+      initialMembers={members}
+      initialPendingInvites={pendingInvites}
+    />
   )
 }

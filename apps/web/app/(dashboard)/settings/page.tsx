@@ -1,14 +1,25 @@
 import type { Metadata } from 'next'
+import { getRequiredSession } from '@/lib/auth/session'
+import { db } from '@/lib/db'
+import { organisations } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
+import { SettingsClient } from './settings-client'
 
 export const metadata: Metadata = {
   title: 'Settings',
 }
 
-export default function SettingsPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-foreground mb-2">Settings</h1>
-      <p className="text-muted-foreground">This section is coming soon.</p>
-    </div>
-  )
+export default async function SettingsPage() {
+  const session = await getRequiredSession()
+  const orgId = session.user.organisationId!
+
+  const org = await db.query.organisations.findFirst({
+    where: eq(organisations.id, orgId),
+  })
+
+  if (!org) return null
+
+  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
+
+  return <SettingsClient org={org} isAdmin={isAdmin} />
 }

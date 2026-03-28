@@ -1,14 +1,28 @@
 import type { Metadata } from 'next'
+import { getRequiredSession } from '@/lib/auth/session'
+import { listHosts, listPendingAgents } from '@/lib/actions/agents'
+import { HostsClient } from './hosts-client'
 
 export const metadata: Metadata = {
   title: 'Hosts',
 }
 
-export default function HostsPage() {
+export default async function HostsPage() {
+  const session = await getRequiredSession()
+  const orgId = session.user.organisationId!
+
+  const [hostsWithAgents, pendingAgents] = await Promise.all([
+    listHosts(orgId),
+    listPendingAgents(orgId),
+  ])
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-foreground mb-2">Hosts</h1>
-      <p className="text-muted-foreground">This section is coming soon.</p>
-    </div>
+    <HostsClient
+      orgId={orgId}
+      currentUserId={session.user.id}
+      currentUserRole={session.user.role}
+      initialHosts={hostsWithAgents}
+      initialPendingAgents={pendingAgents}
+    />
   )
 }

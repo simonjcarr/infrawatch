@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/infrawatch/proto/agent/v1;agentv1";
+
+// PlatformInfo carries host platform details reported by the agent.
+message PlatformInfo {
+  string os = 1;
+  string arch = 2;
+  string os_version = 3;
+  repeated string ip_addresses = 4;
+}
+
+// AgentInfo identifies the agent binary itself.
+message AgentInfo {
+  string agent_id = 1;   // empty on first registration
+  string version = 2;
+  string hostname = 3;
+}

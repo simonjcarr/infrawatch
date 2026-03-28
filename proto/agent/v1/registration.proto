@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "agent/v1/agent.proto";
+
+option go_package = "github.com/infrawatch/proto/agent/v1;agentv1";
+
+message RegisterRequest {
+  string org_token = 1;    // enrolment token from UI
+  string public_key = 2;   // PEM-encoded Ed25519 public key
+  PlatformInfo platform_info = 3;
+  AgentInfo agent_info = 4;
+}
+
+message RegisterResponse {
+  string agent_id = 1;
+  string status = 2;     // "pending" | "active" | "revoked"
+  string message = 3;
+  string jwt_token = 4;  // only populated when status == "active"
+}

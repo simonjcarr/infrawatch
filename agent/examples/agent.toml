@@ -1,0 +1,27 @@
+# Infrawatch Agent Configuration
+# Copy this file to /etc/infrawatch/agent.toml and fill in your values.
+# Environment variables (INFRAWATCH_ prefix) override these settings.
+
+[ingest]
+# Address of the Infrawatch ingest service (host:port)
+address = "infrawatch.yourdomain.com:9443"
+
+# Path to the server's CA certificate for TLS verification.
+# Leave empty to use the system's default CA bundle.
+# For dev/self-signed: set to the path of deploy/dev-tls/server.crt
+ca_cert_file = ""
+
+[agent]
+# Enrolment token from the Infrawatch UI (Settings → Agent Enrolment)
+# Can also be set via INFRAWATCH_ORG_TOKEN environment variable.
+org_token = ""
+
+# Directory where the agent stores its identity keypair and state.
+# Must be writable by the user running the agent.
+data_dir = "/var/lib/infrawatch/agent"
+
+# Agent binary version (set automatically at build time; override if needed)
+version = "0.1.0"
+
+# How often to send a heartbeat to the ingest service (seconds)
+heartbeat_interval_secs = 30

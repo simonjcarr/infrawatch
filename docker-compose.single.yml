@@ -34,5 +34,31 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       NODE_ENV: production
 
+  ingest:
+    build:
+      context: .
+      dockerfile: apps/ingest/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "9443:9443"   # gRPC (TLS)
+      - "8080:8080"   # JWKS + healthz HTTP
+    environment:
+      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
+      INGEST_TLS_CERT: /etc/infrawatch/tls/server.crt
+      INGEST_TLS_KEY: /etc/infrawatch/tls/server.key
+      INGEST_JWT_KEY_FILE: /var/lib/infrawatch/jwt_key.pem
+    volumes:
+      - ./deploy/dev-tls:/etc/infrawatch/tls:ro
+      - ingest_data:/var/lib/infrawatch
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   db_data:
+  ingest_data:

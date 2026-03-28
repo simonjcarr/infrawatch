@@ -52,6 +52,7 @@ const toolingNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { title: 'Team', href: '/team', icon: Users },
   { title: 'Settings', href: '/settings', icon: Settings },
+  { title: 'Agent Enrolment', href: '/settings/agents', icon: Server },
 ]
 
 function NavGroup({ label, items }: { label: string; items: NavItem[] }) {

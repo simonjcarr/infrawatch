@@ -5,7 +5,10 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "type-check": "turbo run type-check"
+    "type-check": "turbo run type-check",
+    "proto": "make proto",
+    "go:build": "make go-build",
+    "go:test": "make go-test"
   },
   "packageManager": "pnpm@10.6.5",
   "engines": {

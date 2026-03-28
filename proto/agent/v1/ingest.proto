@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "agent/v1/registration.proto";
+import "agent/v1/heartbeat.proto";
+
+option go_package = "github.com/infrawatch/proto/agent/v1;agentv1";
+
+service IngestService {
+  // Register an agent with the server. Idempotent — re-registering returns
+  // the existing agent_id and current status.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Heartbeat is a bidirectional stream. Agent sends metrics on interval;
+  // server can push back commands (revocation, config reload, etc.).
+  rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse);
+}

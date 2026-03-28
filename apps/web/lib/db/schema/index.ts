@@ -1,3 +1,6 @@
 export * from './organisations'
 export * from './auth'
 export * from './invitations'
+export * from './agents'
+export * from './hosts'
+export * from './resource_tags'

@@ -9,7 +9,7 @@ COPY agent/go.mod agent/go.mod
 COPY apps/ingest/ apps/ingest/
 
 # Download dependencies
-RUN go work sync && go mod download -modfile=apps/ingest/go.mod
+RUN go work sync && go mod download
 
 # Build
 RUN go build -o /dist/ingest ./apps/ingest/cmd/ingest

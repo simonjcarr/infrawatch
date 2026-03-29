@@ -6,15 +6,17 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # --- Dependencies stage ---
 FROM base AS deps
 WORKDIR /app
-COPY apps/web/package.json ./package.json
-COPY pnpm-lock.yaml ./
+# Copy workspace root files so pnpm understands the monorepo structure
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy only the web package.json to leverage Docker layer caching
+COPY apps/web/package.json ./apps/web/
 RUN pnpm install --frozen-lockfile
 
 # --- Builder stage ---
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY apps/web/ .
+COPY apps/web/ ./apps/web/
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -24,6 +26,7 @@ ARG BETTER_AUTH_SECRET=build-time-placeholder
 ARG BETTER_AUTH_URL=http://localhost:3000
 ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
 
+WORKDIR /app/apps/web
 RUN pnpm run build
 
 # --- Runner stage ---
@@ -36,13 +39,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/apps/web/public ./public
 
 # Set up prerender cache ownership
 RUN mkdir .next && chown nextjs:nodejs .next
 
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
 
 USER nextjs
 

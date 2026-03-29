@@ -1,4 +1,4 @@
-# Getting Started
+# Getting Started.
 
 This guide walks you through getting Infrawatch running — from zero to a real agent showing up as online in the host inventory.
 

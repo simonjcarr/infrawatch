@@ -16,6 +16,8 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# Workspace config required so pnpm resolves node_modules from the workspace root
+COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/ ./apps/web/
 
 ENV NEXT_TELEMETRY_DISABLED=1

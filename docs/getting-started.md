@@ -1,8 +1,11 @@
 # Getting Started
 
-This guide walks you through getting Infrawatch running locally — from a fresh clone to a real agent showing up as online in the host inventory.
+This guide walks you through getting Infrawatch running — from zero to a real agent showing up as online in the host inventory.
 
-**What you'll have at the end:** a running stack (PostgreSQL + ingest service + web UI), a registered and approved agent, and the host appearing in `/hosts` with live heartbeat data.
+There are two ways to run Infrawatch:
+
+- **[Option A — Pre-built images from GHCR](#option-a--pre-built-images-from-ghcr)** — Fastest. No clone required, just a `docker-compose.yml` and an env file.
+- **[Option B — Build from source](#option-b--build-from-source)** — For development or if you want to modify the code.
 
 ---
 
@@ -16,18 +19,148 @@ That's it. No local Go, Node.js, or pnpm required.
 
 ---
 
-## Step 1 — Clone the repository
+## Option A — Pre-built images from GHCR
+
+The fastest way to get Infrawatch running. Images are published to the GitHub Container Registry on every push to `main`.
+
+### Step 1 — Create a working directory
+
+```bash
+mkdir infrawatch && cd infrawatch
+```
+
+### Step 2 — Generate dev TLS certificates
+
+The ingest service (gRPC) requires TLS. Generate a self-signed certificate using Docker:
+
+```bash
+mkdir -p deploy/dev-tls
+docker run --rm \
+  -v "$(pwd)/deploy/dev-tls:/out" \
+  alpine/openssl req -x509 \
+  -newkey rsa:4096 \
+  -keyout /out/server.key \
+  -out /out/server.crt \
+  -days 365 \
+  -nodes \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,DNS:ingest,IP:127.0.0.1"
+```
+
+### Step 3 — Create the docker-compose file
+
+Create `docker-compose.yml` with the following content:
+
+```yaml
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: infrawatch
+      POSTGRES_PASSWORD: infrawatch
+      POSTGRES_DB: infrawatch
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infrawatch -d infrawatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: ghcr.io/simonjcarr/infrawatch/web:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NODE_ENV: production
+
+  ingest:
+    image: ghcr.io/simonjcarr/infrawatch/ingest:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "9443:9443"   # gRPC (TLS)
+      - "8080:8080"   # JWKS + healthz HTTP
+    environment:
+      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
+      INGEST_TLS_CERT: /etc/infrawatch/tls/server.crt
+      INGEST_TLS_KEY: /etc/infrawatch/tls/server.key
+      INGEST_JWT_KEY_FILE: /var/lib/infrawatch/jwt_key.pem
+    volumes:
+      - ./deploy/dev-tls:/etc/infrawatch/tls:ro
+      - ingest_data:/var/lib/infrawatch
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+  ingest_data:
+```
+
+### Step 4 — Create the env file
+
+Create a `.env` file in the same directory:
+
+```env
+BETTER_AUTH_SECRET=change-this-to-a-long-random-string
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+> Generate a strong secret with: `openssl rand -hex 32`
+
+### Step 5 — Start the stack
+
+```bash
+docker compose up -d
+```
+
+Pull the latest images and start all three services. Wait until healthy:
+
+```bash
+docker compose ps
+```
+
+All three should show `healthy` or `running`.
+
+### Step 6 — Run database migrations
+
+Migrations run inside the web container using the bundled drizzle-kit:
+
+```bash
+docker compose exec web sh -c "cd /app && node_modules/.bin/drizzle-kit migrate"
+```
+
+### Step 7 — Continue from [Create your account](#step-create-your-account)
+
+---
+
+## Option B — Build from source
+
+### Step 1 — Clone the repository
 
 ```bash
 git clone https://github.com/simonjcarr/infrawatch infrawatch
 cd infrawatch
 ```
 
----
-
-## Step 2 — Generate dev TLS certificates
-
-The ingest service (gRPC) requires TLS. For local development, generate a self-signed certificate:
+### Step 2 — Generate dev TLS certificates
 
 ```bash
 make dev-tls
@@ -35,11 +168,7 @@ make dev-tls
 
 This creates `deploy/dev-tls/server.crt` and `deploy/dev-tls/server.key`. These files are gitignored — regenerate them after a clean checkout.
 
----
-
-## Step 3 — Configure environment variables
-
-Copy the example env file:
+### Step 3 — Configure environment variables
 
 ```bash
 cp apps/web/.env.example apps/web/.env.local
@@ -54,44 +183,28 @@ BETTER_AUTH_URL=http://localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
----
-
-## Step 4 — Start the stack
+### Step 4 — Start the stack
 
 ```bash
 docker compose -f docker-compose.single.yml up -d
 ```
 
-This starts:
+This builds the web and ingest images locally and starts:
 - **`db`** — PostgreSQL + TimescaleDB on port 5432
 - **`web`** — Next.js web UI on port 3000
 - **`ingest`** — gRPC ingest service on port 9443, JWKS/health on port 8080
 
-Wait for all services to be healthy:
+### Step 5 — Run database migrations
 
 ```bash
-docker compose -f docker-compose.single.yml ps
+docker compose -f docker-compose.single.yml exec web sh -c "cd /app && node_modules/.bin/drizzle-kit migrate"
 ```
 
-All three should show `healthy` or `running`.
+### Step 6 — Continue from [Create your account](#step-create-your-account)
 
 ---
 
-## Step 5 — Run database migrations
-
-The schema needs to be applied to the database. From the `apps/web` directory:
-
-```bash
-cd apps/web
-pnpm db:migrate
-cd ../..
-```
-
-> **Note:** You need `apps/web/.env.local` present with a valid `DATABASE_URL` for this to work. If using Docker, make sure the `db` container is running first.
-
----
-
-## Step 6 — Create your account
+## Step: Create your account
 
 Open [http://localhost:3000](http://localhost:3000) in a browser.
 
@@ -101,7 +214,7 @@ Open [http://localhost:3000](http://localhost:3000) in a browser.
 
 ---
 
-## Step 7 — Create an enrolment token
+## Step: Create an enrolment token
 
 An enrolment token is what the agent uses to register itself with your organisation.
 
@@ -114,7 +227,7 @@ An enrolment token is what the agent uses to register itself with your organisat
 
 ---
 
-## Step 8 — Build the agent
+## Step: Build the agent
 
 ```bash
 make agent
@@ -124,9 +237,9 @@ This uses Docker to compile the Go agent and produces `dist/agent`.
 
 ---
 
-## Step 9 — Configure the agent
+## Step: Configure the agent
 
-Create a config file for the agent. Copy the example:
+Copy the example config:
 
 ```bash
 cp agent/examples/agent.toml /tmp/agent.toml
@@ -137,83 +250,82 @@ Edit `/tmp/agent.toml`:
 ```toml
 [ingest]
 address = "localhost:9443"
-ca_cert_file = "deploy/dev-tls/server.crt"   # path to the dev cert generated in Step 2
+ca_cert_file = "deploy/dev-tls/server.crt"   # path to the dev cert
 
 [agent]
-org_token = "YOUR_TOKEN_FROM_STEP_7"          # paste the token here
+org_token = "YOUR_ENROLMENT_TOKEN"            # paste the token here
 data_dir = "/tmp/infrawatch-agent"
 version = "0.1.0"
 heartbeat_interval_secs = 30
 ```
 
-The `ca_cert_file` tells the agent to trust the self-signed dev certificate. Without it, TLS verification will fail against a self-signed cert.
+The `ca_cert_file` tells the agent to trust the self-signed dev certificate. Without it, TLS verification will fail.
 
 ---
 
-## Step 10 — Run the agent
+## Step: Run the agent
 
 ```bash
 ./dist/agent -config /tmp/agent.toml
 ```
 
-You should see output like:
+You should see:
 
 ```
 time=... level=INFO msg="agent identity ready" data_dir=/tmp/infrawatch-agent
 time=... level=INFO msg="registering agent" address=localhost:9443
-time=... level=INFO msg="registration response" status=active agent_id=abc123... message="agent registered and auto-approved"
+time=... level=INFO msg="registration response" status=active agent_id=abc123...
 time=... level=INFO msg="agent registered and active" agent_id=abc123...
 time=... level=INFO msg="starting heartbeat" interval_secs=30
 time=... level=INFO msg="heartbeat stream opened" agent_id=abc123...
 ```
 
-If you **did not** enable auto-approve on the token, the status will be `pending` and the agent will poll every 30 seconds. See [Step 11a](#step-11a--approve-the-agent-manually) below.
+If you did **not** enable auto-approve, the agent will show `pending` and poll every 30 seconds — see [Approve the agent manually](#approve-the-agent-manually) below.
 
 ---
 
-## Step 11 — Verify in the UI
+## Step: Verify in the UI
 
 Open [http://localhost:3000/hosts](http://localhost:3000/hosts).
 
 Your host should appear in the **Host Inventory** table with:
 - Status badge: **Online** (green)
 - Last seen: a few seconds ago
-- Memory % populated (CPU requires two samples — will be added in a later session)
 
 ---
 
-## Step 11a — Approve the agent manually
+## Approve the agent manually
 
-If you did **not** use auto-approve, the agent will show up in the **Pending Agent Approval** panel on the Hosts page (amber section at the top). Click **Approve** next to your agent.
+If you did **not** use auto-approve, the agent appears in the **Pending Agent Approval** panel on the Hosts page (amber section at the top). Click **Approve**.
 
-The agent will pick this up on its next poll cycle (within 30 seconds), receive a JWT, and begin heartbeating. The host will then appear in the inventory as **Online**.
+The agent picks this up within 30 seconds, receives a JWT, and begins heartbeating. The host will then show as **Online**.
 
 ---
 
 ## Stopping everything
 
-Stop the agent with `Ctrl+C` — it will gracefully close the heartbeat stream and the host status will change to **Offline**.
+Stop the agent with `Ctrl+C` — it gracefully closes the heartbeat stream and the host status changes to **Offline**.
 
 Stop the Docker stack:
 
 ```bash
+# Option A (GHCR images)
+docker compose down
+
+# Option B (built from source)
 docker compose -f docker-compose.single.yml down
 ```
 
-To also remove the database volume (fresh start):
-
-```bash
-docker compose -f docker-compose.single.yml down -v
-```
+To also remove database volumes (fresh start), add `-v`.
 
 ---
 
 ## Troubleshooting
 
 **Agent can't connect to ingest service**
-- Check the ingest container is running: `docker compose -f docker-compose.single.yml ps`
-- Check the address in your agent config matches where ingest is listening (`localhost:9443`)
-- Make sure `ca_cert_file` points to the correct dev cert
+- Check ingest is running: `docker compose ps`
+- Verify the address in your agent config matches where ingest is listening (`localhost:9443`)
+- Ensure `ca_cert_file` points to the correct dev cert
 
 **`invalid or expired enrolment token`**
 - The token may have been revoked or expired. Create a new one in the UI.
@@ -222,8 +334,8 @@ docker compose -f docker-compose.single.yml down -v
 - The agent has not been approved yet. Check the pending panel on the Hosts page.
 
 **Migrations failed**
-- Ensure the `db` Docker container is running and `DATABASE_URL` in `.env.local` is correct
-- Try `pnpm db:push` in `apps/web` for a quick schema push without migration tracking (dev only)
+- Ensure the `db` container is running before running migrations
+- Check that `DATABASE_URL` is correct
 
 **`certificate signed by unknown authority`**
 - Set `ca_cert_file` in the agent config to point to `deploy/dev-tls/server.crt`

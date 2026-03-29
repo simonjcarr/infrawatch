@@ -6,14 +6,15 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # --- Dependencies stage ---
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+COPY apps/web/package.json ./package.json
+COPY pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # --- Builder stage ---
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY apps/web/ .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 

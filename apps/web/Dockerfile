@@ -18,8 +18,8 @@ RUN node -e "\
 const {execFileSync}=require('child_process');\
 const path=require('path');\
 const opts={paths:['/app/apps/web']};\
-const dm=path.dirname(require.resolve('drizzle-orm/package.json',opts));\
-const pg=path.dirname(require.resolve('postgres/package.json',opts));\
+const dm=path.dirname(require.resolve('drizzle-orm',opts));\
+const pg=path.dirname(require.resolve('postgres',opts));\
 execFileSync('mkdir',['-p','/migrate-deps']);\
 execFileSync('cp',['-rL',dm,'/migrate-deps/drizzle-orm']);\
 execFileSync('cp',['-rL',pg,'/migrate-deps/postgres']);\

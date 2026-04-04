@@ -20,8 +20,5 @@ org_token = ""
 # Must be writable by the user running the agent.
 data_dir = "/var/lib/infrawatch/agent"
 
-# Agent binary version (set automatically at build time; override if needed)
-version = "0.1.0"
-
 # How often to send a heartbeat to the ingest service (seconds)
 heartbeat_interval_secs = 30

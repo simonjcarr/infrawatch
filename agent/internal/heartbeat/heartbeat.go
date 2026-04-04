@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/infrawatch/agent/internal/updater"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
 
@@ -17,15 +18,17 @@ type Runner struct {
 	client   agentv1.IngestServiceClient
 	agentID  string
 	jwtToken string
+	version  string
 	interval time.Duration
 }
 
 // New creates a new heartbeat Runner.
-func New(client agentv1.IngestServiceClient, agentID, jwtToken string, intervalSecs int) *Runner {
+func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, intervalSecs int) *Runner {
 	return &Runner{
 		client:   client,
 		agentID:  agentID,
 		jwtToken: jwtToken,
+		version:  version,
 		interval: time.Duration(intervalSecs) * time.Second,
 	}
 }
@@ -97,6 +100,7 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 		DiskPercent:   disk,
 		UptimeSeconds: uptime,
 		TimestampUnix: time.Now().Unix(),
+		AgentVersion:  r.version,
 	}
 
 	if err := stream.Send(req); err != nil {
@@ -116,6 +120,17 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 	}
 	if resp.Command != "" {
 		slog.Info("received server command", "command", resp.Command)
+	}
+	if resp.UpdateAvailable && resp.DownloadURL != "" {
+		slog.Info("agent update available, downloading",
+			"current", r.version,
+			"latest", resp.LatestVersion,
+		)
+		if err := updater.Update(resp.LatestVersion, resp.DownloadURL); err != nil {
+			// Log and continue — a failed update must never crash the agent.
+			slog.Warn("self-update failed, continuing with current version", "err", err)
+		}
+		// If Update succeeds it re-execs and never returns.
 	}
 
 	return nil

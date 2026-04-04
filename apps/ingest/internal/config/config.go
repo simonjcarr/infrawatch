@@ -10,12 +10,25 @@ import (
 
 // Config is the ingest service configuration loaded from a YAML file.
 type Config struct {
-	GRPCPort    int       `yaml:"grpc_port"`
-	HTTPPort    int       `yaml:"http_port"`
-	DatabaseURL string    `yaml:"database_url"`
-	TLS         TLSConfig `yaml:"tls"`
-	JWT         JWTConfig `yaml:"jwt"`
-	Queue       QueueConfig `yaml:"queue"`
+	GRPCPort    int                   `yaml:"grpc_port"`
+	HTTPPort    int                   `yaml:"http_port"`
+	DatabaseURL string                `yaml:"database_url"`
+	TLS         TLSConfig             `yaml:"tls"`
+	JWT         JWTConfig             `yaml:"jwt"`
+	Queue       QueueConfig           `yaml:"queue"`
+	Agent       AgentDistributionConfig `yaml:"agent"`
+}
+
+// AgentDistributionConfig controls agent version management.
+type AgentDistributionConfig struct {
+	// LatestVersion is the latest agent version string (e.g. "v0.2.0").
+	// When an agent heartbeats with a different version, update_available is set.
+	// Set via INGEST_LATEST_AGENT_VERSION. Leave empty to disable update signalling.
+	LatestVersion string `yaml:"latest_version"`
+	// DownloadBaseURL is the base URL of the Infrawatch web app, used to construct
+	// the agent download URL returned to agents. E.g. "https://infrawatch.example.com".
+	// Set via INGEST_AGENT_DOWNLOAD_BASE_URL.
+	DownloadBaseURL string `yaml:"download_base_url"`
 }
 
 type TLSConfig struct {
@@ -96,5 +109,11 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("INGEST_JWT_KEY_FILE"); v != "" {
 		cfg.JWT.KeyFile = v
+	}
+	if v := os.Getenv("INGEST_LATEST_AGENT_VERSION"); v != "" {
+		cfg.Agent.LatestVersion = v
+	}
+	if v := os.Getenv("INGEST_AGENT_DOWNLOAD_BASE_URL"); v != "" {
+		cfg.Agent.DownloadBaseURL = v
 	}
 }

@@ -45,11 +45,15 @@ type HeartbeatRequest struct {
 	DiskPercent   float32 `json:"disk_percent"`
 	UptimeSeconds int64   `json:"uptime_seconds"`
 	TimestampUnix int64   `json:"timestamp_unix"`
+	AgentVersion  string  `json:"agent_version"`
 }
 
 // HeartbeatResponse is sent back by the server on each heartbeat tick.
 type HeartbeatResponse struct {
-	Ok             bool   `json:"ok"`
-	Command        string `json:"command"`
-	CommandPayload []byte `json:"command_payload"`
+	Ok              bool   `json:"ok"`
+	Command         string `json:"command"`
+	CommandPayload  []byte `json:"command_payload"`
+	LatestVersion   string `json:"latest_version"`
+	UpdateAvailable bool   `json:"update_available"`
+	DownloadURL     string `json:"download_url"`
 }

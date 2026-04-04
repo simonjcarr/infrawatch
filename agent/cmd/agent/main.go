@@ -16,6 +16,9 @@ import (
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
 
+// version is injected at build time via -ldflags "-X main.version=<tag>".
+var version = "dev"
+
 func main() {
 	configPath := flag.String("config", "/etc/infrawatch/agent.toml", "Path to agent TOML config file")
 	flag.Parse()
@@ -66,7 +69,7 @@ func main() {
 	// Register if not already active
 	if state.JWTToken == "" {
 		slog.Info("registering agent", "address", cfg.Ingest.Address)
-		registrar := registration.New(client, keypair, cfg.Agent.OrgToken, cfg.Agent.Version)
+		registrar := registration.New(client, keypair, cfg.Agent.OrgToken, version)
 		newState, err := registrar.Register(ctx, state.AgentID)
 		if err != nil {
 			slog.Error("registration failed", "err", err)
@@ -83,8 +86,8 @@ func main() {
 	}
 
 	// Start heartbeat loop
-	slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs)
-	hb := heartbeat.New(client, state.AgentID, state.JWTToken, cfg.Agent.HeartbeatIntervalSecs)
+	slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
+	hb := heartbeat.New(client, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs)
 	if err := hb.Run(ctx); err != nil && err != context.Canceled {
 		slog.Error("heartbeat error", "err", err)
 		os.Exit(1)

@@ -1,0 +1,99 @@
+name: Agent release
+
+# Runs on every push to main.
+#
+# Step 1 — release-please examines conventional commits since the last
+#           agent/v* tag and opens (or updates) a Release PR showing the
+#           computed next version and a generated CHANGELOG.
+#
+# Step 2 — when that Release PR is merged, release-please creates the tag
+#           and GitHub Release, then the build matrix kicks in and uploads
+#           the compiled binaries.
+#
+# Commit conventions that drive the version bump:
+#   fix(agent): …        → patch  (0.1.0 → 0.1.1)
+#   feat(agent): …       → minor  (0.1.0 → 0.2.0)
+#   feat(agent)!: …      → major  (0.1.0 → 1.0.0)
+#   BREAKING CHANGE: …   → major  (in commit body/footer)
+#
+# Commits touching files under agent/ are also picked up even without a
+# scope, but scoping with (agent) keeps the changelog clean in a monorepo.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ── Release PR management ────────────────────────────────────────────────
+  release-please:
+    name: Create or update release PR
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs['agent--release_created'] }}
+      tag_name:        ${{ steps.release.outputs['agent--tag_name'] }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # ── Binary build matrix ──────────────────────────────────────────────────
+  # Only runs when the release PR is merged (i.e. a real release was created).
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64, asset_suffix: linux-amd64   }
+          - { goos: linux,   goarch: arm64, asset_suffix: linux-arm64   }
+          - { goos: darwin,  goarch: amd64, asset_suffix: darwin-amd64  }
+          - { goos: darwin,  goarch: arm64, asset_suffix: darwin-arm64  }
+          - { goos: windows, goarch: amd64, asset_suffix: windows-amd64, exe_suffix: .exe }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: |
+            agent/go.sum
+            go.work.sum
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          VERSION="${TAG#agent/}"
+          mkdir -p dist
+          go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${VERSION}" \
+            -o "dist/infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
+            ./agent/cmd/agent
+
+      - name: Checksum and upload to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          sha256sum "infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
+            > "infrawatch-agent-${{ matrix.asset_suffix }}.sha256"
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
+            "infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
+            "infrawatch-agent-${{ matrix.asset_suffix }}.sha256"

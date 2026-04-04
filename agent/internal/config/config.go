@@ -27,8 +27,6 @@ type AgentConfig struct {
 	OrgToken string `toml:"org_token"`
 	// DataDir is where the agent stores its keypair and state.
 	DataDir string `toml:"data_dir"`
-	// Version is the agent binary version string.
-	Version string `toml:"version"`
 	// HeartbeatIntervalSecs is how often the agent sends a heartbeat.
 	HeartbeatIntervalSecs int `toml:"heartbeat_interval_secs"`
 }
@@ -54,7 +52,6 @@ func defaults() *Config {
 		},
 		Agent: AgentConfig{
 			DataDir:               "/var/lib/infrawatch/agent",
-			Version:               "0.1.0",
 			HeartbeatIntervalSecs: 30,
 		},
 	}

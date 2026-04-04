@@ -66,7 +66,7 @@ func main() {
 
 	// Build handlers
 	regHandler := handlers.NewRegisterHandler(pool, issuer)
-	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q)
+	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, cfg.Agent.LatestVersion, cfg.Agent.DownloadBaseURL)
 
 	// Start JWKS HTTP server
 	go func() {

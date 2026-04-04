@@ -11,10 +11,14 @@ message HeartbeatRequest {
   float disk_percent = 4;
   int64 uptime_seconds = 5;
   int64 timestamp_unix = 6;
+  string agent_version = 7;
 }
 
 message HeartbeatResponse {
   bool ok = 1;
   string command = 2;         // server-push command type (empty = no command)
   bytes command_payload = 3;
+  string latest_version = 4;  // latest known agent version
+  bool update_available = 5;  // true when agent_version != latest_version
+  string download_url = 6;    // base URL to fetch the updated binary from
 }

@@ -21,14 +21,22 @@ import (
 
 // HeartbeatHandler implements the Heartbeat streaming RPC.
 type HeartbeatHandler struct {
-	pool      *pgxpool.Pool
-	issuer    *auth.JWTIssuer
-	publisher queue.Publisher
+	pool            *pgxpool.Pool
+	issuer          *auth.JWTIssuer
+	publisher       queue.Publisher
+	latestVersion   string
+	downloadBaseURL string
 }
 
 // NewHeartbeatHandler creates a HeartbeatHandler.
-func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher) *HeartbeatHandler {
-	return &HeartbeatHandler{pool: pool, issuer: issuer, publisher: pub}
+func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, latestVersion, downloadBaseURL string) *HeartbeatHandler {
+	return &HeartbeatHandler{
+		pool:            pool,
+		issuer:          issuer,
+		publisher:       pub,
+		latestVersion:   latestVersion,
+		downloadBaseURL: downloadBaseURL,
+	}
 }
 
 // Heartbeat handles the bidirectional heartbeat stream.
@@ -136,17 +144,36 @@ func (h *HeartbeatHandler) processHeartbeat(
 
 	// Publish to queue
 	payload, _ := json.Marshal(map[string]interface{}{
-		"agent_id":  agentID,
-		"org_id":    orgID,
-		"timestamp": now.Unix(),
-		"cpu":       req.CpuPercent,
-		"memory":    req.MemoryPercent,
-		"disk":      req.DiskPercent,
-		"uptime":    req.UptimeSeconds,
+		"agent_id":      agentID,
+		"org_id":        orgID,
+		"timestamp":     now.Unix(),
+		"cpu":           req.CpuPercent,
+		"memory":        req.MemoryPercent,
+		"disk":          req.DiskPercent,
+		"uptime":        req.UptimeSeconds,
+		"agent_version": req.AgentVersion,
 	})
 	if err := h.publisher.Publish(queue.Message{Topic: queue.TopicMetricsRaw, Payload: payload}); err != nil {
 		slog.Warn("publishing metric to queue", "err", err)
 	}
 
-	return stream.Send(&agentv1.HeartbeatResponse{Ok: true})
+	resp := &agentv1.HeartbeatResponse{Ok: true}
+
+	// Signal an update when the agent is running a different version than the
+	// configured latest, and the agent is not a dev build.
+	if h.latestVersion != "" &&
+		req.AgentVersion != "" &&
+		req.AgentVersion != "dev" &&
+		req.AgentVersion != h.latestVersion {
+		resp.UpdateAvailable = true
+		resp.LatestVersion = h.latestVersion
+		resp.DownloadURL = h.downloadBaseURL + "/api/agent/download"
+		slog.Info("signalling agent update",
+			"agent_id", agentID,
+			"current", req.AgentVersion,
+			"latest", h.latestVersion,
+		)
+	}
+
+	return stream.Send(resp)
 }

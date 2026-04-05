@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.5.0...agent/v0.5.1) (2026-04-05)
+
+
+### Bug Fixes
+
+* **agent,ingest:** populate OS and architecture on hosts ([7cdd25b](https://github.com/simonjcarr/infrawatch/commit/7cdd25bb2d3d24ca45cab4e44d32f0d3ceaf2cd4))
+
 ## [0.5.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.4.0...agent/v0.5.0) (2026-04-05)
 
 

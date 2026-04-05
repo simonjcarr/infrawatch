@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.4.0...agent/v0.5.0) (2026-04-05)
+
+
+### Features
+
+* **agent,ingest,web:** collect real system metrics and add host detail page ([da19fae](https://github.com/simonjcarr/infrawatch/commit/da19faed79f6ec70c55aa478032710a1a56412ad))
+* **agent:** add tls_skip_verify option and improve install config merging ([5ff70a5](https://github.com/simonjcarr/infrawatch/commit/5ff70a5034a689de56758392049b70416d91792f))
+
 ## [0.4.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.3.0...agent/v0.4.0) (2026-04-05)
 
 

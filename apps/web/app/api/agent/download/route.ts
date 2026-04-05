@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import fs from 'fs'
+import path from 'path'
 
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER ?? ''
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME ?? ''
+const AGENT_DIST_DIR = process.env.AGENT_DIST_DIR ?? './data/agent-dist'
 
 interface GitHubAsset {
   name: string
@@ -19,21 +22,16 @@ const SUPPORTED_OS = ['linux', 'darwin', 'windows']
 const SUPPORTED_ARCH = ['amd64', 'arm64']
 
 /**
- * Proxies an agent binary download from the latest GitHub Release.
- * Query params: os (linux|darwin|windows), arch (amd64|arm64)
+ * Serves agent binaries for the requested OS/arch.
  *
- * The agent always downloads through this endpoint — it never hits GitHub
- * directly. This allows the download source to change without updating agents,
- * and supports air-gapped deployments in the future.
+ * Resolution order:
+ *   1. Local filesystem at AGENT_DIST_DIR — serves immediately (air-gap safe)
+ *   2. GitHub Releases proxy — fetches, caches to AGENT_DIST_DIR, then serves
+ *   3. Neither available — 503 with instructions
+ *
+ * Query params: os (linux|darwin|windows), arch (amd64|arm64)
  */
 export async function GET(request: NextRequest) {
-  if (!GITHUB_REPO_OWNER || !GITHUB_REPO_NAME) {
-    return NextResponse.json(
-      { error: 'GITHUB_REPO_OWNER and GITHUB_REPO_NAME must be set' },
-      { status: 503 }
-    )
-  }
-
   const { searchParams } = new URL(request.url)
   const os = searchParams.get('os')
   const arch = searchParams.get('arch')
@@ -51,6 +49,28 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const suffix = os === 'windows' ? '.exe' : ''
+  const assetName = `infrawatch-agent-${os}-${arch}${suffix}`
+  const localPath = path.join(AGENT_DIST_DIR, assetName)
+
+  // ── 1. Serve from local cache if present ──────────────────────────────────
+  if (fs.existsSync(localPath)) {
+    return streamLocalFile(localPath, assetName)
+  }
+
+  // ── 2. Fetch from GitHub and cache locally ────────────────────────────────
+  if (!GITHUB_REPO_OWNER || !GITHUB_REPO_NAME) {
+    return NextResponse.json(
+      {
+        error:
+          `Binary not found locally and GitHub is not configured. ` +
+          `Either set GITHUB_REPO_OWNER + GITHUB_REPO_NAME env vars, ` +
+          `or place the binary at: ${localPath}`,
+      },
+      { status: 503 }
+    )
+  }
+
   const ghHeaders: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
@@ -59,7 +79,6 @@ export async function GET(request: NextRequest) {
     ghHeaders['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`
   }
 
-  // Find the latest agent release (tag prefix agent/v*)
   const releasesRes = await fetch(
     `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases?per_page=20`,
     { headers: ghHeaders, next: { revalidate: 300 } }
@@ -75,14 +94,10 @@ export async function GET(request: NextRequest) {
   const agentRelease = releases.find((r) => r.tag_name.startsWith('agent/v'))
 
   if (!agentRelease) {
-    return NextResponse.json({ error: 'No agent release found' }, { status: 404 })
+    return NextResponse.json({ error: 'No agent release found on GitHub' }, { status: 404 })
   }
 
-  // Asset name: infrawatch-agent-{os}-{arch}[.exe]
-  const suffix = os === 'windows' ? '.exe' : ''
-  const assetName = `infrawatch-agent-${os}-${arch}${suffix}`
   const asset = agentRelease.assets.find((a) => a.name === assetName)
-
   if (!asset) {
     return NextResponse.json(
       { error: `Binary not found for ${os}/${arch} in release ${agentRelease.tag_name}` },
@@ -90,22 +105,37 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Proxy the binary through this server — clients never touch GitHub directly.
-  const binaryRes = await fetch(asset.browser_download_url, {
-    headers: ghHeaders,
-  })
+  const binaryRes = await fetch(asset.browser_download_url, { headers: ghHeaders })
   if (!binaryRes.ok || !binaryRes.body) {
-    return NextResponse.json(
-      { error: 'Failed to fetch binary from GitHub' },
-      { status: 502 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch binary from GitHub' }, { status: 502 })
   }
 
-  return new NextResponse(binaryRes.body, {
+  const binaryBuffer = Buffer.from(await binaryRes.arrayBuffer())
+
+  // Cache to local filesystem for future requests (and air-gap use)
+  try {
+    await fs.promises.mkdir(AGENT_DIST_DIR, { recursive: true })
+    await fs.promises.writeFile(localPath, binaryBuffer, { mode: 0o755 })
+  } catch {
+    // Cache failure is non-fatal — still serve the binary
+  }
+
+  return new NextResponse(binaryBuffer, {
     headers: {
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${assetName}"`,
-      ...(asset.size ? { 'Content-Length': String(asset.size) } : {}),
+      'Content-Length': String(binaryBuffer.length),
+    },
+  })
+}
+
+function streamLocalFile(localPath: string, assetName: string): NextResponse {
+  const buffer = fs.readFileSync(localPath)
+  return new NextResponse(buffer, {
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${assetName}"`,
+      'Content-Length': String(buffer.length),
     },
   })
 }

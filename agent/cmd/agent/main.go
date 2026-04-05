@@ -13,6 +13,7 @@ import (
 	"github.com/infrawatch/agent/internal/config"
 	"github.com/infrawatch/agent/internal/heartbeat"
 	"github.com/infrawatch/agent/internal/identity"
+	"github.com/infrawatch/agent/internal/install"
 	"github.com/infrawatch/agent/internal/registration"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
@@ -24,11 +25,30 @@ func main() {
 	configPath := flag.String("config", "/etc/infrawatch/agent.toml", "Path to agent TOML config file")
 	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and INFRAWATCH_ORG_TOKEN)")
 	addressFlag := flag.String("address", "", "Ingest address host:port (overrides config file and INFRAWATCH_INGEST_ADDRESS)")
+	installFlag := flag.Bool("install", false, "Install agent as a system service and exit (requires --token)")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
+
+	// ── Install mode: self-install as a system service, then exit ─────────────
+	if *installFlag {
+		if *tokenFlag == "" {
+			slog.Error("--token is required when using --install")
+			os.Exit(1)
+		}
+		// Determine ingest address: flag > default
+		ingestAddr := "localhost:9443"
+		if *addressFlag != "" {
+			ingestAddr = strings.TrimSpace(*addressFlag)
+		}
+		if err := install.Run(*tokenFlag, ingestAddr); err != nil {
+			slog.Error("install failed", "err", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {

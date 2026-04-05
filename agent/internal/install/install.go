@@ -7,114 +7,45 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 )
 
-const (
-	destBinary  = "/usr/local/bin/infrawatch-agent"
-	configDir   = "/etc/infrawatch"
-	configFile  = "/etc/infrawatch/agent.toml"
-	dataDir     = "/var/lib/infrawatch/agent"
-	systemdUnit = "/etc/systemd/system/infrawatch-agent.service"
-)
-
-// Run performs a full system installation:
-//   - Verifies the process is running as root
-//   - Copies the running binary to /usr/local/bin/infrawatch-agent
-//   - Creates required directories
-//   - Writes /etc/infrawatch/agent.toml with orgToken and ingestAddress
-//   - Writes /etc/systemd/system/infrawatch-agent.service
-//   - Runs: systemctl daemon-reload && systemctl enable --now infrawatch-agent
+// Run performs a full system installation for the current OS.
+// It must be called as root (Linux/macOS) or Administrator (Windows).
 func Run(orgToken, ingestAddress string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return installLinux(orgToken, ingestAddress)
+	case "darwin":
+		return installDarwin(orgToken, ingestAddress)
+	case "windows":
+		return installWindows(orgToken, ingestAddress)
+	default:
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	}
+}
+
+// ── Linux / systemd ───────────────────────────────────────────────────────────
+
+func installLinux(orgToken, ingestAddress string) error {
 	if os.Getuid() != 0 {
 		return fmt.Errorf("install must be run as root (try: sudo ./infrawatch-agent --install ...)")
 	}
 
-	if err := copyBinary(); err != nil {
+	const dest = "/usr/local/bin/infrawatch-agent"
+	const dataDir = "/var/lib/infrawatch/agent"
+
+	if err := copyBinary(dest); err != nil {
 		return fmt.Errorf("copying binary: %w", err)
 	}
-
-	if err := createDirs(); err != nil {
+	if err := mkdirs("/etc/infrawatch", dataDir); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
-
-	if err := writeConfig(orgToken, ingestAddress); err != nil {
+	if err := writeConfig("/etc/infrawatch/agent.toml", orgToken, ingestAddress, dataDir); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 
-	if err := writeSystemdUnit(); err != nil {
-		return fmt.Errorf("writing systemd unit: %w", err)
-	}
-
-	if err := enableService(); err != nil {
-		return fmt.Errorf("enabling service: %w", err)
-	}
-
-	slog.Info("agent installed successfully",
-		"binary", destBinary,
-		"config", configFile,
-		"service", "infrawatch-agent",
-	)
-	fmt.Println()
-	fmt.Println("Infrawatch agent installed and started.")
-	fmt.Println("Check status:  systemctl status infrawatch-agent")
-	fmt.Println("View logs:     journalctl -u infrawatch-agent -f")
-
-	return nil
-}
-
-func copyBinary() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("resolving current executable: %w", err)
-	}
-
-	src, err := os.Open(exe)
-	if err != nil {
-		return fmt.Errorf("opening source binary: %w", err)
-	}
-	defer src.Close()
-
-	dst, err := os.OpenFile(destBinary, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
-	if err != nil {
-		return fmt.Errorf("creating destination binary: %w", err)
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		return fmt.Errorf("copying binary data: %w", err)
-	}
-
-	slog.Info("binary installed", "path", destBinary)
-	return nil
-}
-
-func createDirs() error {
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeConfig(orgToken, ingestAddress string) error {
-	content := fmt.Sprintf(`[ingest]
-address = %q
-
-[agent]
-org_token = %q
-data_dir   = %q
-`, ingestAddress, orgToken, dataDir)
-
-	if err := os.WriteFile(configFile, []byte(content), 0o600); err != nil {
-		return err
-	}
-	slog.Info("config written", "path", configFile)
-	return nil
-}
-
-func writeSystemdUnit() error {
 	unit := `[Unit]
 Description=Infrawatch Agent
 After=network-online.target
@@ -130,25 +61,215 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `
-	if err := os.WriteFile(systemdUnit, []byte(unit), 0o644); err != nil {
-		return err
+	if err := writeFile("/etc/systemd/system/infrawatch-agent.service", unit, 0o644); err != nil {
+		return fmt.Errorf("writing systemd unit: %w", err)
 	}
-	slog.Info("systemd unit written", "path", systemdUnit)
-	return nil
-}
 
-func enableService() error {
-	cmds := [][]string{
+	for _, args := range [][]string{
 		{"systemctl", "daemon-reload"},
 		{"systemctl", "enable", "--now", "infrawatch-agent"},
-	}
-	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+	} {
+		if err := run(args[0], args[1:]...); err != nil {
 			return fmt.Errorf("running %v: %w", args, err)
 		}
 	}
+
+	printSuccess("systemctl status infrawatch-agent", "journalctl -u infrawatch-agent -f")
 	return nil
+}
+
+// ── macOS / launchd ───────────────────────────────────────────────────────────
+
+func installDarwin(orgToken, ingestAddress string) error {
+	if os.Getuid() != 0 {
+		return fmt.Errorf("install must be run as root (try: sudo ./infrawatch-agent --install ...)")
+	}
+
+	const dest = "/usr/local/bin/infrawatch-agent"
+	const dataDir = "/var/lib/infrawatch/agent"
+	const plistPath = "/Library/LaunchDaemons/com.infrawatch.agent.plist"
+
+	if err := copyBinary(dest); err != nil {
+		return fmt.Errorf("copying binary: %w", err)
+	}
+	if err := mkdirs("/etc/infrawatch", dataDir, "/var/log"); err != nil {
+		return fmt.Errorf("creating directories: %w", err)
+	}
+	if err := writeConfig("/etc/infrawatch/agent.toml", orgToken, ingestAddress, dataDir); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	plist := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.infrawatch.agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/infrawatch-agent</string>
+        <string>-config</string>
+        <string>/etc/infrawatch/agent.toml</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/infrawatch-agent.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/infrawatch-agent.log</string>
+</dict>
+</plist>
+`
+	if err := writeFile(plistPath, plist, 0o644); err != nil {
+		return fmt.Errorf("writing launchd plist: %w", err)
+	}
+
+	if err := run("launchctl", "load", "-w", plistPath); err != nil {
+		return fmt.Errorf("loading launchd service: %w", err)
+	}
+
+	printSuccess(
+		"launchctl list com.infrawatch.agent",
+		"tail -f /var/log/infrawatch-agent.log",
+	)
+	return nil
+}
+
+// ── Windows / Service Control Manager ────────────────────────────────────────
+
+func installWindows(orgToken, ingestAddress string) error {
+	if !isAdmin() {
+		return fmt.Errorf("install must be run as Administrator")
+	}
+
+	binDir := filepath.Join(`C:\Program Files`, "infrawatch")
+	cfgDir := filepath.Join(`C:\ProgramData`, "infrawatch")
+	dataDir := filepath.Join(cfgDir, "agent")
+	dest := filepath.Join(binDir, "infrawatch-agent.exe")
+	cfgFile := filepath.Join(cfgDir, "agent.toml")
+
+	if err := mkdirs(binDir, cfgDir, dataDir); err != nil {
+		return fmt.Errorf("creating directories: %w", err)
+	}
+	if err := copyBinary(dest); err != nil {
+		return fmt.Errorf("copying binary: %w", err)
+	}
+	if err := writeConfig(cfgFile, orgToken, ingestAddress, dataDir); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	binPath := fmt.Sprintf(`"%s" -config "%s"`, dest, cfgFile)
+	if err := run("sc.exe", "create", "InfrawatchAgent",
+		"binPath=", binPath,
+		"DisplayName=", "Infrawatch Agent",
+		"start=", "auto",
+	); err != nil {
+		return fmt.Errorf("creating Windows service: %w", err)
+	}
+	if err := run("sc.exe", "description", "InfrawatchAgent",
+		"Infrawatch infrastructure monitoring agent",
+	); err != nil {
+		// Non-fatal — description is cosmetic
+		slog.Warn("setting service description", "err", err)
+	}
+	if err := run("sc.exe", "start", "InfrawatchAgent"); err != nil {
+		return fmt.Errorf("starting Windows service: %w", err)
+	}
+
+	printSuccess("sc query InfrawatchAgent", `Get-EventLog -LogName Application -Source InfrawatchAgent`)
+	return nil
+}
+
+// isAdmin returns true if the process has administrator/root privileges.
+// On Windows, attempts to open a handle that requires admin rights.
+// On Linux/macOS this function is never called (Getuid check is used instead).
+func isAdmin() bool {
+	f, err := os.Open(`\\.\PHYSICALDRIVE0`)
+	if err != nil {
+		return false
+	}
+	f.Close()
+	return true
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+func copyBinary(dest string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving current executable: %w", err)
+	}
+
+	src, err := os.Open(exe)
+	if err != nil {
+		return fmt.Errorf("opening source binary: %w", err)
+	}
+	defer src.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return err
+	}
+
+	dst, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	if err != nil {
+		return fmt.Errorf("creating destination: %w", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("copying binary data: %w", err)
+	}
+
+	slog.Info("binary installed", "path", dest)
+	return nil
+}
+
+func mkdirs(dirs ...string) error {
+	for _, d := range dirs {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeConfig(path, orgToken, ingestAddress, dataDir string) error {
+	content := fmt.Sprintf(`[ingest]
+address = %q
+
+[agent]
+org_token = %q
+data_dir   = %q
+`, ingestAddress, orgToken, dataDir)
+
+	if err := writeFile(path, content, 0o600); err != nil {
+		return err
+	}
+	slog.Info("config written", "path", path)
+	return nil
+}
+
+func writeFile(path, content string, mode os.FileMode) error {
+	if err := os.WriteFile(path, []byte(content), mode); err != nil {
+		return err
+	}
+	slog.Info("file written", "path", path)
+	return nil
+}
+
+func run(name string, args ...string) error {
+	cmd := exec.Command(name, args...) //nolint:gosec
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func printSuccess(statusCmd, logsCmd string) {
+	fmt.Println()
+	fmt.Println("Infrawatch agent installed and started.")
+	fmt.Printf("Check status:  %s\n", statusCmd)
+	fmt.Printf("View logs:     %s\n", logsCmd)
 }

@@ -38,7 +38,6 @@ func main() {
 			slog.Error("--token is required when using --install")
 			os.Exit(1)
 		}
-		// Determine ingest address: flag > default
 		ingestAddr := "localhost:9443"
 		if *addressFlag != "" {
 			ingestAddr = strings.TrimSpace(*addressFlag)
@@ -50,6 +49,7 @@ func main() {
 		os.Exit(0)
 	}
 
+	// ── Normal agent mode ──────────────────────────────────────────────────────
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		slog.Error("loading config", "err", err)
@@ -68,60 +68,57 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load or generate identity keypair
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	if err := runService(ctx, cancel, func(ctx context.Context) error {
+		return runAgent(ctx, cfg)
+	}); err != nil && err != context.Canceled {
+		slog.Error("agent error", "err", err)
+		os.Exit(1)
+	}
+
+	slog.Info("agent shutdown complete")
+}
+
+func runAgent(ctx context.Context, cfg *config.Config) error {
 	keypair, err := identity.LoadOrGenerate(cfg.Agent.DataDir)
 	if err != nil {
-		slog.Error("loading agent keypair", "err", err)
-		os.Exit(1)
+		return err
 	}
 	slog.Info("agent identity ready", "data_dir", cfg.Agent.DataDir)
 
-	// Load persisted state (agent ID + JWT from prior registration)
 	state, err := identity.LoadState(cfg.Agent.DataDir)
 	if err != nil {
-		slog.Error("loading agent state", "err", err)
-		os.Exit(1)
+		return err
 	}
 
-	// Build gRPC connection
 	conn, err := agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile)
 	if err != nil {
 		slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
-		os.Exit(1)
+		return err
 	}
 	defer conn.Close()
 
 	client := agentv1.NewIngestServiceClient(conn)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	// Register if not already active
 	if state.JWTToken == "" {
 		slog.Info("registering agent", "address", cfg.Ingest.Address)
 		registrar := registration.New(client, keypair, cfg.Agent.OrgToken, version)
 		newState, err := registrar.Register(ctx, state.AgentID)
 		if err != nil {
-			slog.Error("registration failed", "err", err)
-			os.Exit(1)
+			return err
 		}
 		state = newState
 		if err := identity.SaveState(cfg.Agent.DataDir, state); err != nil {
-			slog.Error("saving agent state", "err", err)
-			os.Exit(1)
+			return err
 		}
 		slog.Info("agent registered and active", "agent_id", state.AgentID)
 	} else {
 		slog.Info("agent already registered", "agent_id", state.AgentID)
 	}
 
-	// Start heartbeat loop
 	slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
 	hb := heartbeat.New(client, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs)
-	if err := hb.Run(ctx); err != nil && err != context.Canceled {
-		slog.Error("heartbeat error", "err", err)
-		os.Exit(1)
-	}
-
-	slog.Info("agent shutdown complete")
+	return hb.Run(ctx)
 }

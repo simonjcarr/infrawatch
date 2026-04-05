@@ -10,7 +10,6 @@ interface GitHubAsset {
   name: string
   browser_download_url: string
   size: number
-  content_type: string
 }
 
 interface GitHubRelease {
@@ -25,9 +24,13 @@ const SUPPORTED_ARCH = ['amd64', 'arm64']
  * Serves agent binaries for the requested OS/arch.
  *
  * Resolution order:
- *   1. Local filesystem at AGENT_DIST_DIR — serves immediately (air-gap safe)
- *   2. GitHub Releases proxy — fetches, caches to AGENT_DIST_DIR, then serves
- *   3. Neither available — 503 with instructions
+ *   1. Versioned local file (infrawatch-agent-linux-amd64-v0.3.0) — always fresh
+ *   2. GitHub Releases — fetches latest, writes versioned file, serves it
+ *   3. Unversioned fallback (manually placed air-gap binary)
+ *   4. 503 if nothing available
+ *
+ * Versioned filenames mean a new GitHub release is automatically picked up
+ * on the next request without any cache invalidation step.
  *
  * Query params: os (linux|darwin|windows), arch (amd64|arm64)
  */
@@ -50,92 +53,108 @@ export async function GET(request: NextRequest) {
   }
 
   const suffix = os === 'windows' ? '.exe' : ''
-  const assetName = `infrawatch-agent-${os}-${arch}${suffix}`
-  const localPath = path.join(AGENT_DIST_DIR, assetName)
+  const baseName = `infrawatch-agent-${os}-${arch}${suffix}`
 
-  // ── 1. Serve from local cache if present ──────────────────────────────────
-  if (fs.existsSync(localPath)) {
-    return streamLocalFile(localPath, assetName)
+  // ── 1 + 2: Try GitHub (get latest version, check versioned local file) ────
+  if (GITHUB_REPO_OWNER && GITHUB_REPO_NAME) {
+    const release = await fetchLatestRelease()
+    if (release) {
+      const version = release.tag_name.replace('agent/', '')
+      const versionedName = `infrawatch-agent-${os}-${arch}-${version}${suffix}`
+      const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
+
+      if (fs.existsSync(versionedPath)) {
+        return streamFile(versionedPath, baseName)
+      }
+
+      // Not cached locally — fetch from GitHub and store
+      const asset = release.assets.find((a) => a.name === baseName)
+      if (asset) {
+        const binary = await fetchBinaryFromGitHub(asset.browser_download_url)
+        if (binary) {
+          await cacheLocally(versionedPath, binary)
+          return new NextResponse(binary, buildHeaders(baseName, binary.byteLength))
+        }
+      }
+    }
   }
 
-  // ── 2. Fetch from GitHub and cache locally ────────────────────────────────
-  if (!GITHUB_REPO_OWNER || !GITHUB_REPO_NAME) {
-    return NextResponse.json(
-      {
-        error:
-          `Binary not found locally and GitHub is not configured. ` +
-          `Either set GITHUB_REPO_OWNER + GITHUB_REPO_NAME env vars, ` +
-          `or place the binary at: ${localPath}`,
-      },
-      { status: 503 }
-    )
+  // ── 3: Unversioned fallback (manually placed binaries for air-gap) ────────
+  const unversionedPath = path.join(AGENT_DIST_DIR, baseName)
+  if (fs.existsSync(unversionedPath)) {
+    return streamFile(unversionedPath, baseName)
   }
 
-  const ghHeaders: Record<string, string> = {
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  }
-  if (process.env.GITHUB_TOKEN) {
-    ghHeaders['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`
-  }
-
-  const releasesRes = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases?per_page=20`,
-    { headers: ghHeaders, next: { revalidate: 300 } }
-  )
-  if (!releasesRes.ok) {
-    return NextResponse.json(
-      { error: `GitHub API error: ${releasesRes.status}` },
-      { status: 502 }
-    )
-  }
-
-  const releases: GitHubRelease[] = await releasesRes.json()
-  const agentRelease = releases.find((r) => r.tag_name.startsWith('agent/v'))
-
-  if (!agentRelease) {
-    return NextResponse.json({ error: 'No agent release found on GitHub' }, { status: 404 })
-  }
-
-  const asset = agentRelease.assets.find((a) => a.name === assetName)
-  if (!asset) {
-    return NextResponse.json(
-      { error: `Binary not found for ${os}/${arch} in release ${agentRelease.tag_name}` },
-      { status: 404 }
-    )
-  }
-
-  const binaryRes = await fetch(asset.browser_download_url, { headers: ghHeaders })
-  if (!binaryRes.ok || !binaryRes.body) {
-    return NextResponse.json({ error: 'Failed to fetch binary from GitHub' }, { status: 502 })
-  }
-
-  const binaryBuffer = Buffer.from(await binaryRes.arrayBuffer())
-
-  // Cache to local filesystem for future requests (and air-gap use)
-  try {
-    await fs.promises.mkdir(AGENT_DIST_DIR, { recursive: true })
-    await fs.promises.writeFile(localPath, binaryBuffer, { mode: 0o755 })
-  } catch {
-    // Cache failure is non-fatal — still serve the binary
-  }
-
-  return new NextResponse(binaryBuffer, {
-    headers: {
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${assetName}"`,
-      'Content-Length': String(binaryBuffer.length),
+  // ── 4: Nothing available ──────────────────────────────────────────────────
+  return NextResponse.json(
+    {
+      error:
+        `No binary found for ${os}/${arch}. ` +
+        (GITHUB_REPO_OWNER
+          ? 'GitHub release may not include this platform yet.'
+          : `Set GITHUB_REPO_OWNER + GITHUB_REPO_NAME, or place the binary at: ${unversionedPath}`),
     },
-  })
+    { status: 503 }
+  )
 }
 
-function streamLocalFile(localPath: string, assetName: string): NextResponse {
-  const buffer = fs.readFileSync(localPath)
-  return new NextResponse(buffer, {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const ghHeaders: Record<string, string> = {
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
+  ...(process.env.GITHUB_TOKEN
+    ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+    : {}),
+}
+
+async function fetchLatestRelease(): Promise<GitHubRelease | null> {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases?per_page=20`,
+      { headers: ghHeaders, next: { revalidate: 300 } }
+    )
+    if (!res.ok) return null
+    const releases: GitHubRelease[] = await res.json()
+    return releases.find((r) => r.tag_name.startsWith('agent/v')) ?? null
+  } catch {
+    return null
+  }
+}
+
+async function fetchBinaryFromGitHub(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const res = await fetch(url, { headers: ghHeaders })
+    if (!res.ok || !res.body) return null
+    return res.arrayBuffer()
+  } catch {
+    return null
+  }
+}
+
+async function cacheLocally(filePath: string, data: ArrayBuffer): Promise<void> {
+  try {
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
+    await fs.promises.writeFile(filePath, Buffer.from(data), { mode: 0o755 })
+  } catch {
+    // Cache failure is non-fatal
+  }
+}
+
+function streamFile(filePath: string, downloadName: string): NextResponse {
+  const buffer = fs.readFileSync(filePath)
+  return new NextResponse(buffer, buildHeaders(downloadName, buffer.byteLength))
+}
+
+function buildHeaders(
+  downloadName: string,
+  length: number
+): ConstructorParameters<typeof NextResponse>[1] {
+  return {
     headers: {
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${assetName}"`,
-      'Content-Length': String(buffer.length),
+      'Content-Disposition': `attachment; filename="${downloadName}"`,
+      'Content-Length': String(length),
     },
-  })
+  }
 }

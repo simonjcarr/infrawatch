@@ -37,15 +37,37 @@ type RegisterResponse struct {
 	JwtToken  string `json:"jwt_token"`
 }
 
+// DiskInfo describes a single mounted filesystem.
+type DiskInfo struct {
+	MountPoint  string  `json:"mount_point"`
+	Device      string  `json:"device"`
+	FsType      string  `json:"fs_type"`
+	TotalBytes  uint64  `json:"total_bytes"`
+	UsedBytes   uint64  `json:"used_bytes"`
+	FreeBytes   uint64  `json:"free_bytes"`
+	PercentUsed float32 `json:"percent_used"`
+}
+
+// NetworkInterface describes a single network adapter.
+type NetworkInterface struct {
+	Name        string   `json:"name"`
+	IpAddresses []string `json:"ip_addresses"`
+	MacAddress  string   `json:"mac_address"`
+	IsUp        bool     `json:"is_up"`
+}
+
 // HeartbeatRequest is sent by the agent on each heartbeat interval.
 type HeartbeatRequest struct {
-	AgentId       string  `json:"agent_id"`
-	CpuPercent    float32 `json:"cpu_percent"`
-	MemoryPercent float32 `json:"memory_percent"`
-	DiskPercent   float32 `json:"disk_percent"`
-	UptimeSeconds int64   `json:"uptime_seconds"`
-	TimestampUnix int64   `json:"timestamp_unix"`
-	AgentVersion  string  `json:"agent_version"`
+	AgentId           string             `json:"agent_id"`
+	CpuPercent        float32            `json:"cpu_percent"`
+	MemoryPercent     float32            `json:"memory_percent"`
+	DiskPercent       float32            `json:"disk_percent"`
+	UptimeSeconds     int64              `json:"uptime_seconds"`
+	TimestampUnix     int64              `json:"timestamp_unix"`
+	AgentVersion      string             `json:"agent_version"`
+	OsVersion         string             `json:"os_version"`
+	Disks             []DiskInfo         `json:"disks"`
+	NetworkInterfaces []NetworkInterface `json:"network_interfaces"`
 }
 
 // HeartbeatResponse is sent back by the server on each heartbeat tick.

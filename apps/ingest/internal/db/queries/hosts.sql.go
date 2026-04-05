@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -32,7 +33,7 @@ func GetHostByAgentID(ctx context.Context, pool *pgxpool.Pool, agentID string) (
 }
 
 // UpdateHostVitals overwrites the latest vitals on the host row for a given agent.
-func UpdateHostVitals(ctx context.Context, pool *pgxpool.Pool, agentID string, cpu, mem, disk float32, uptime int64, ipAddresses []string) error {
+func UpdateHostVitals(ctx context.Context, pool *pgxpool.Pool, agentID string, cpu, mem, disk float32, uptime int64, ipAddresses []string, osVersion, disksJSON, netJSON string) error {
 	const q = `
 		UPDATE hosts
 		SET cpu_percent    = $2,
@@ -40,14 +41,28 @@ func UpdateHostVitals(ctx context.Context, pool *pgxpool.Pool, agentID string, c
 		    disk_percent   = $4,
 		    uptime_seconds = $5,
 		    ip_addresses   = $6::jsonb,
+		    os_version     = COALESCE(NULLIF($7, ''), os_version),
+		    metadata       = jsonb_build_object(
+		                       'disks',              $8::jsonb,
+		                       'network_interfaces', $9::jsonb
+		                     ),
 		    status         = 'online',
 		    last_seen_at   = NOW(),
 		    updated_at     = NOW()
 		WHERE agent_id = $1 AND deleted_at IS NULL
 	`
 	ipJSON := buildIPJSON(ipAddresses)
-	_, err := pool.Exec(ctx, q, agentID, cpu, mem, disk, uptime, ipJSON)
+	_, err := pool.Exec(ctx, q, agentID, cpu, mem, disk, uptime, ipJSON, osVersion, disksJSON, netJSON)
 	return err
+}
+
+// MarshalToJSONString marshals v to a JSON string, returning "[]" on error.
+func MarshalToJSONString(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }
 
 func buildIPJSON(ips []string) string {

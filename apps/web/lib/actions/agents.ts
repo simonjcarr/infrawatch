@@ -186,3 +186,25 @@ export async function getActiveEnrolmentToken(token: string) {
     ),
   })
 }
+
+export async function getHost(orgId: string, hostId: string): Promise<HostWithAgent | null> {
+  const rows = await db
+    .select()
+    .from(hosts)
+    .leftJoin(agents, eq(hosts.agentId, agents.id))
+    .where(
+      and(
+        eq(hosts.id, hostId),
+        eq(hosts.organisationId, orgId),
+        isNull(hosts.deletedAt),
+      ),
+    )
+    .limit(1)
+
+  if (rows.length === 0) return null
+  const row = rows[0]!
+  return {
+    ...row.hosts,
+    agent: row.agents ?? null,
+  }
+}

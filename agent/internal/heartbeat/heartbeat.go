@@ -6,7 +6,10 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"net"
 	"os"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/infrawatch/agent/internal/updater"
@@ -20,6 +23,11 @@ type Runner struct {
 	jwtToken string
 	version  string
 	interval time.Duration
+
+	// CPU two-sample state
+	prevCPUTotal   uint64
+	prevCPUIdle    uint64
+	prevCPUSampled bool
 }
 
 // New creates a new heartbeat Runner.
@@ -91,16 +99,19 @@ func (r *Runner) runStream(ctx context.Context) error {
 }
 
 func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) error {
-	cpu, mem, disk, uptime := collectMetrics()
+	cpu, mem, disk, uptime, osVersion, disks, nets := r.collectMetrics()
 
 	req := &agentv1.HeartbeatRequest{
-		AgentId:       r.agentID,
-		CpuPercent:    cpu,
-		MemoryPercent: mem,
-		DiskPercent:   disk,
-		UptimeSeconds: uptime,
-		TimestampUnix: time.Now().Unix(),
-		AgentVersion:  r.version,
+		AgentId:           r.agentID,
+		CpuPercent:        cpu,
+		MemoryPercent:     mem,
+		DiskPercent:       disk,
+		UptimeSeconds:     uptime,
+		TimestampUnix:     time.Now().Unix(),
+		AgentVersion:      r.version,
+		OsVersion:         osVersion,
+		Disks:             disks,
+		NetworkInterfaces: nets,
 	}
 
 	if err := stream.Send(req); err != nil {
@@ -136,13 +147,27 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 	return nil
 }
 
-// collectMetrics reads basic system metrics using /proc on Linux.
-// Returns best-effort values; on unsupported platforms returns zeros.
-func collectMetrics() (cpu, mem, disk float32, uptimeSecs int64) {
+// collectMetrics gathers all system metrics. Returns best-effort values;
+// on unsupported platforms or read errors individual values will be zero/empty.
+func (r *Runner) collectMetrics() (cpu, mem, disk float32, uptimeSecs int64, osVersion string, disks []agentv1.DiskInfo, nets []agentv1.NetworkInterface) {
 	uptimeSecs = readUptime()
-	cpu = readCPUPercent()
+	cpu = r.readCPUPercent()
 	mem = readMemPercent()
-	disk = readDiskPercent("/")
+	disks = readAllDisks()
+	osVersion = readOsVersion()
+	nets = readNetworkInterfaces()
+
+	// Aggregate disk percent from root mount for backward compatibility
+	for _, d := range disks {
+		if d.MountPoint == "/" {
+			disk = d.PercentUsed
+			break
+		}
+	}
+	// If no root mount found, use first disk
+	if disk == 0 && len(disks) > 0 {
+		disk = disks[0].PercentUsed
+	}
 	return
 }
 
@@ -156,10 +181,44 @@ func readUptime() int64 {
 	return int64(upSecs)
 }
 
-func readCPUPercent() float32 {
-	// Simple single-sample CPU % from /proc/stat is not meaningful without
-	// two samples. Return 0 until a proper two-sample collector is added.
-	return 0
+// readCPUPercent returns the CPU usage percentage using a two-sample delta
+// from /proc/stat. Returns 0 on the first call (stores the baseline sample).
+func (r *Runner) readCPUPercent() float32 {
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0
+	}
+
+	var user, nice, system, idle, iowait, irq, softirq, steal uint64
+	for _, line := range splitLines(string(data)) {
+		if !strings.HasPrefix(line, "cpu ") {
+			continue
+		}
+		_, _ = fmt.Sscanf(line, "cpu %d %d %d %d %d %d %d %d",
+			&user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal)
+		break
+	}
+
+	total := user + nice + system + idle + iowait + irq + softirq + steal
+	idleTotal := idle + iowait
+
+	if !r.prevCPUSampled {
+		r.prevCPUTotal = total
+		r.prevCPUIdle = idleTotal
+		r.prevCPUSampled = true
+		return 0
+	}
+
+	totalDelta := total - r.prevCPUTotal
+	idleDelta := idleTotal - r.prevCPUIdle
+
+	r.prevCPUTotal = total
+	r.prevCPUIdle = idleTotal
+
+	if totalDelta == 0 {
+		return 0
+	}
+	return float32(totalDelta-idleDelta) / float32(totalDelta) * 100
 }
 
 func readMemPercent() float32 {
@@ -186,10 +245,122 @@ func readMemPercent() float32 {
 	return float32(used) / float32(total) * 100
 }
 
-func readDiskPercent(path string) float32 {
-	// syscall.Statfs is not available on all platforms via this package.
-	// A full implementation will use golang.org/x/sys/unix.Statfs.
-	return 0
+// pseudoFSTypes is the set of filesystem types that are not real storage.
+var pseudoFSTypes = map[string]bool{
+	"tmpfs": true, "devtmpfs": true, "proc": true, "sysfs": true,
+	"devpts": true, "cgroup": true, "cgroup2": true, "pstore": true,
+	"debugfs": true, "tracefs": true, "securityfs": true, "hugetlbfs": true,
+	"mqueue": true, "fusectl": true, "configfs": true, "ramfs": true,
+	"bpf": true, "overlay": true, "squashfs": true, "nsfs": true,
+}
+
+// readAllDisks reads /proc/mounts and calls syscall.Statfs on each real filesystem.
+func readAllDisks() []agentv1.DiskInfo {
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var result []agentv1.DiskInfo
+
+	for _, line := range splitLines(string(data)) {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		device, mountPoint, fsType := fields[0], fields[1], fields[2]
+
+		if pseudoFSTypes[fsType] {
+			continue
+		}
+		if seen[mountPoint] {
+			continue
+		}
+		seen[mountPoint] = true
+
+		var stat syscall.Statfs_t
+		if err := syscall.Statfs(mountPoint, &stat); err != nil {
+			continue
+		}
+		if stat.Blocks == 0 {
+			continue
+		}
+
+		total := stat.Blocks * uint64(stat.Bsize)
+		free := stat.Bfree * uint64(stat.Bsize)
+		used := total - free
+		var pct float32
+		if total > 0 {
+			pct = float32(used) / float32(total) * 100
+		}
+
+		result = append(result, agentv1.DiskInfo{
+			MountPoint:  mountPoint,
+			Device:      device,
+			FsType:      fsType,
+			TotalBytes:  total,
+			UsedBytes:   used,
+			FreeBytes:   free,
+			PercentUsed: pct,
+		})
+	}
+	return result
+}
+
+// readOsVersion parses /etc/os-release for the PRETTY_NAME field.
+func readOsVersion() string {
+	data, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return ""
+	}
+	for _, line := range splitLines(string(data)) {
+		if !strings.HasPrefix(line, "PRETTY_NAME=") {
+			continue
+		}
+		val := strings.TrimPrefix(line, "PRETTY_NAME=")
+		val = strings.Trim(val, `"`)
+		return val
+	}
+	return ""
+}
+
+// readNetworkInterfaces collects non-loopback network interfaces.
+func readNetworkInterfaces() []agentv1.NetworkInterface {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+
+	var result []agentv1.NetworkInterface
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		var ips []string
+		for _, addr := range addrs {
+			// addr.String() returns CIDR notation; extract just the IP
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				continue
+			}
+			ips = append(ips, ip.String())
+		}
+
+		result = append(result, agentv1.NetworkInterface{
+			Name:        iface.Name,
+			IpAddresses: ips,
+			MacAddress:  iface.HardwareAddr.String(),
+			IsUp:        iface.Flags&net.FlagUp != 0,
+		})
+	}
+	return result
 }
 
 func splitLines(s string) []string {

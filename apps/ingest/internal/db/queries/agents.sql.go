@@ -38,29 +38,29 @@ func GetAgentByPublicKey(ctx context.Context, pool *pgxpool.Pool, publicKey stri
 }
 
 // InsertAgent inserts a new agent row and returns the generated ID.
-func InsertAgent(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID string) (string, error) {
+func InsertAgent(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch string) (string, error) {
 	const q = `
-		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id)
-		VALUES (gen_cuid(), $1, $2, $3, $4, $5)
+		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id, os, arch)
+		VALUES (gen_cuid(), $1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
 	`
 	var id string
-	err := pool.QueryRow(ctx, q, orgID, hostname, publicKey, status, nullableString(tokenID)).Scan(&id)
+	err := pool.QueryRow(ctx, q, orgID, hostname, publicKey, status, nullableString(tokenID), nullableString(agentOS), nullableString(agentArch)).Scan(&id)
 	if err != nil {
 		// gen_cuid() may not exist; fall back to a simple cuid-like value from the app
-		return insertAgentWithID(ctx, pool, orgID, hostname, publicKey, status, tokenID)
+		return insertAgentWithID(ctx, pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch)
 	}
 	return id, nil
 }
 
-func insertAgentWithID(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID string) (string, error) {
+func insertAgentWithID(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch string) (string, error) {
 	const q = `
-		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id, os, arch)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
 	id := newCUID()
-	_, err := pool.Exec(ctx, q, id, orgID, hostname, publicKey, status, nullableString(tokenID))
+	_, err := pool.Exec(ctx, q, id, orgID, hostname, publicKey, status, nullableString(tokenID), nullableString(agentOS), nullableString(agentArch))
 	return id, err
 }
 
@@ -78,10 +78,10 @@ func ApproveAgent(ctx context.Context, pool *pgxpool.Pool, agentID string) error
 	return err
 }
 
-// UpdateAgentHeartbeat updates the last_heartbeat_at timestamp for an agent.
-func UpdateAgentHeartbeat(ctx context.Context, pool *pgxpool.Pool, agentID string, t time.Time) error {
-	const q = `UPDATE agents SET last_heartbeat_at = $1, status = 'active', updated_at = NOW() WHERE id = $2`
-	_, err := pool.Exec(ctx, q, t, agentID)
+// UpdateAgentHeartbeat updates the last_heartbeat_at timestamp and version for an agent.
+func UpdateAgentHeartbeat(ctx context.Context, pool *pgxpool.Pool, agentID string, t time.Time, version string) error {
+	const q = `UPDATE agents SET last_heartbeat_at = $1, version = $2, status = 'active', updated_at = NOW() WHERE id = $3`
+	_, err := pool.Exec(ctx, q, t, nullableString(version), agentID)
 	return err
 }
 

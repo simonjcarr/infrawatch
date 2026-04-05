@@ -131,13 +131,23 @@ func (h *HeartbeatHandler) processHeartbeat(
 	now := time.Now()
 
 	// Update DB
-	if err := queries.UpdateAgentHeartbeat(ctx, h.pool, agentID, now); err != nil {
+	if err := queries.UpdateAgentHeartbeat(ctx, h.pool, agentID, now, req.AgentVersion); err != nil {
 		slog.Warn("updating agent heartbeat", "err", err)
 	}
 
+	// Extract IP addresses from network interfaces
+	var ipAddresses []string
+	for _, iface := range req.NetworkInterfaces {
+		ipAddresses = append(ipAddresses, iface.IpAddresses...)
+	}
+
+	disksJSON := marshalJSON(req.Disks)
+	netJSON := marshalJSON(req.NetworkInterfaces)
+
 	if err := queries.UpdateHostVitals(ctx, h.pool, agentID,
 		req.CpuPercent, req.MemoryPercent, req.DiskPercent,
-		req.UptimeSeconds, nil,
+		req.UptimeSeconds, ipAddresses,
+		req.OsVersion, disksJSON, netJSON,
 	); err != nil {
 		slog.Warn("updating host vitals", "err", err)
 	}
@@ -152,6 +162,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 		"disk":          req.DiskPercent,
 		"uptime":        req.UptimeSeconds,
 		"agent_version": req.AgentVersion,
+		"os_version":    req.OsVersion,
 	})
 	if err := h.publisher.Publish(queue.Message{Topic: queue.TopicMetricsRaw, Payload: payload}); err != nil {
 		slog.Warn("publishing metric to queue", "err", err)
@@ -176,4 +187,13 @@ func (h *HeartbeatHandler) processHeartbeat(
 	}
 
 	return stream.Send(resp)
+}
+
+// marshalJSON encodes v as a JSON string, returning "[]" on error.
+func marshalJSON(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }

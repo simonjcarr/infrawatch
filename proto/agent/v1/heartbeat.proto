@@ -4,14 +4,34 @@ package agent.v1;
 
 option go_package = "github.com/infrawatch/proto/agent/v1;agentv1";
 
+message DiskInfo {
+  string mount_point  = 1;
+  string device       = 2;
+  string fs_type      = 3;
+  uint64 total_bytes  = 4;
+  uint64 used_bytes   = 5;
+  uint64 free_bytes   = 6;
+  float  percent_used = 7;
+}
+
+message NetworkInterface {
+  string          name         = 1;
+  repeated string ip_addresses = 2;
+  string          mac_address  = 3;
+  bool            is_up        = 4;
+}
+
 message HeartbeatRequest {
-  string agent_id = 1;
-  float cpu_percent = 2;
-  float memory_percent = 3;
-  float disk_percent = 4;
-  int64 uptime_seconds = 5;
-  int64 timestamp_unix = 6;
-  string agent_version = 7;
+  string    agent_id      = 1;
+  float     cpu_percent   = 2;
+  float     memory_percent = 3;
+  float     disk_percent  = 4;
+  int64     uptime_seconds = 5;
+  int64     timestamp_unix = 6;
+  string    agent_version = 7;
+  string    os_version    = 8;
+  repeated DiskInfo          disks              = 9;
+  repeated NetworkInterface  network_interfaces = 10;
 }
 
 message HeartbeatResponse {

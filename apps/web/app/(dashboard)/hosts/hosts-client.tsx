@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { CheckCircle, Clock, WifiOff, XCircle, Server, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -237,7 +238,12 @@ export function HostsClient({
                 {hostsData.map((host) => (
                   <TableRow key={host.id}>
                     <TableCell className="font-medium">
-                      {host.displayName ?? host.hostname}
+                      <Link
+                        href={`/hosts/${host.id}`}
+                        className="hover:underline text-foreground"
+                      >
+                        {host.displayName ?? host.hostname}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {host.os ?? '—'}

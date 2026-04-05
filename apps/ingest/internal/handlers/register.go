@@ -85,8 +85,13 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	}
 
 	// Step 3: Insert new agent
+	var agentOS, agentArch string
+	if req.PlatformInfo != nil {
+		agentOS = req.PlatformInfo.Os
+		agentArch = req.PlatformInfo.Arch
+	}
 	agentStatus := "pending"
-	agentID, err := queries.InsertAgent(ctx, h.pool, orgID, hostname, req.PublicKey, agentStatus, token.ID)
+	agentID, err := queries.InsertAgent(ctx, h.pool, orgID, hostname, req.PublicKey, agentStatus, token.ID, agentOS, agentArch)
 	if err != nil {
 		slog.Error("inserting agent", "err", err)
 		return nil, status.Error(codes.Internal, "failed to register agent")

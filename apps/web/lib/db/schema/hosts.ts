@@ -3,6 +3,28 @@ import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
 import { agents } from './agents'
 
+export interface DiskInfo {
+  mount_point: string
+  device: string
+  fs_type: string
+  total_bytes: number
+  used_bytes: number
+  free_bytes: number
+  percent_used: number
+}
+
+export interface NetworkInterface {
+  name: string
+  ip_addresses: string[]
+  mac_address: string
+  is_up: boolean
+}
+
+export interface HostMetadata {
+  disks: DiskInfo[]
+  network_interfaces: NetworkInterface[]
+}
+
 export const hosts = pgTable('hosts', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   organisationId: text('organisation_id')
@@ -27,7 +49,7 @@ export const hosts = pgTable('hosts', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
-  metadata: jsonb('metadata'),
+  metadata: jsonb('metadata').$type<HostMetadata>(),
 })
 
 export type Host = typeof hosts.$inferSelect

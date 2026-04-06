@@ -10,4 +10,4 @@
  *
  * Format must match the GitHub release tag without the "agent/" prefix.
  */
-export const REQUIRED_AGENT_VERSION = 'v0.1.0'
+export const REQUIRED_AGENT_VERSION = 'v0.9.0'

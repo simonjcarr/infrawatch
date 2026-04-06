@@ -252,7 +252,12 @@ func (h *HeartbeatHandler) processHeartbeat(
 		case "list_services":
 			resultJSON, _ = json.Marshal(map[string]any{"services": qr.Services})
 		}
-		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryID, qr.Status, qr.Error, resultJSON); err != nil {
+		// The agent uses "ok"/"error"; normalise to the DB values "complete"/"error".
+		dbStatus := qr.Status
+		if dbStatus == "ok" {
+			dbStatus = "complete"
+		}
+		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryID, dbStatus, qr.Error, resultJSON); err != nil {
 			slog.Warn("completing agent query", "query_id", qr.QueryID, "err", err)
 		}
 	}

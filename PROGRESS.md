@@ -9,11 +9,91 @@
 **Phase 1 — Agent & Host Inventory**
 
 ## Current Status
-🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end with metric history and check definitions. Agent collects real system metrics and runs configured checks (port/process/http), streaming results via gRPC heartbeat. Ingest persists metrics and check results to TimescaleDB hypertables. Web UI shows live data via SSE, historical graphs, and a Checks tab for creating/managing/reviewing check definitions per host. mTLS and Redpanda deferred.
+🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end with metric history, check definitions, and ad-hoc server queries. Agent distributes as a single binary with one-command install (curl | sh), self-updates via ingest-signalled version checks, and runs as a systemd/launchd/SCM service. Agent collects real system metrics and runs configured checks (port/process/http), streaming results via gRPC heartbeat. Ingest persists metrics and check results to TimescaleDB hypertables. Web UI shows live data via SSE, historical graphs, a Checks tab for managing check definitions, and a "Query server" button that does live port/service discovery. mTLS and Redpanda deferred.
 
 ---
 
 ## What Has Been Built
+
+### Session 7 — Ad-hoc agent queries (port and service discovery)
+
+**`agent_queries` schema** (`apps/web/lib/db/schema/agent-queries.ts`)
+- `agent_queries` table: org_id, host_id, query_type (`list_ports` | `list_services`), status (`pending` | `complete` | `error`), result jsonb, error_message, expires_at (2-minute TTL), requested/completed timestamps
+
+**API routes** (`apps/web/app/api/hosts/[id]/queries/`)
+- `POST /api/hosts/[id]/queries` — creates a pending query, returns query ID; auth-guarded with org membership check
+- `GET /api/hosts/[id]/queries/[queryId]` — polls query status and returns result when complete; 1-second client poll interval
+
+**Ingest: push pending queries to open streams** (`apps/ingest/internal/handlers/heartbeat.go`)
+- Polls DB every 2 s for pending queries scoped to the connected host
+- Pushes queries into `HeartbeatResponse.PendingQueries`; agent processes and returns results in ~2–3 s rather than waiting for the 30 s heartbeat
+- Saves completed results back to `agent_queries`, updating status from `pending` → `complete` (or `error`)
+- Normalises agent-returned status `"ok"` → `"complete"` so UI renders correctly
+
+**Agent query executor** (`agent/internal/queries/`)
+- Handles `list_ports`: reads `/proc/net/tcp`, `/proc/net/tcp6`, `/proc/net/udp`, `/proc/net/udp6`; resolves inode → process name via `/proc/<pid>/fd/`; returns port, protocol, optional process name
+- Handles `list_services`: reads systemd unit files and status via `systemctl list-units`; returns service name, description, status
+- Responses drain into each heartbeat request alongside check results
+
+**UI — "Query server" in Add Check dialog** (`apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`)
+- "Query server" button in the Add Check dialog triggers `list_ports` or `list_services` depending on check type
+- Polls the GET endpoint every second until complete; renders a clickable list of discovered ports/services
+- Clicking a result auto-populates the port/name field in the check config form
+
+**Build state**
+- `npm run build` — zero errors ✅
+- `go build ./agent/...` — compiles ✅
+- `go build ./apps/ingest/...` — compiles ✅
+
+---
+
+### Session 3b — Agent distribution, self-update, and one-command install
+
+_(Built between Sessions 3 and 4; not previously documented)_
+
+**Automated releases via release-please + GitHub Actions** (`.github/workflows/agent-release.yml`, `release-please-config.json`)
+- Conventional commits on `agent/` paths trigger release-please PRs
+- On merge, GitHub Actions builds agent binaries for all platforms (linux/darwin/windows × amd64/arm64) with build-time version injection (`-ldflags "-X main.version=<tag>"`)
+- Binaries uploaded as release artifacts under `agent/vX.Y.Z` tags
+
+**Server-hosted binaries and version-aware cache** (`apps/web/app/api/agent/download/route.ts`)
+- `GET /api/agent/download?os=X&arch=Y` — fetches from GitHub Releases on first request, caches locally in `AGENT_DIST_DIR`
+- Filenames are versioned (`infrawatch-agent-linux-amd64-v0.5.0`); new releases picked up automatically without cache invalidation
+- 5-minute TTL check against GitHub for latest version
+- Enables air-gapped deployments — server is the single binary source
+
+**Prewarm agent binary cache on server startup** (`apps/web/instrumentation.ts`, `apps/web/lib/agent/cache-prewarm.ts`)
+- `instrumentation.ts` server hook downloads all platform binaries (6 combinations) in parallel on startup
+- Already-cached versions skipped; failures logged but never prevent server start
+- Fresh servers are immediately ready to serve installs without a cold-cache delay on first request
+
+**One-command install** (`apps/web/app/api/agent/install/route.ts`, `agent/cmd/agent/main.go`)
+- `curl -fsSL "https://server/api/agent/install?token=TOKEN" | sh` — complete zero-touch setup
+- Shell script detects OS/arch, downloads versioned binary, runs `--install --token TOKEN`
+- Agent `--install` flag: copies binary to system path, writes TOML config, installs service unit, starts service
+- Also supports `-address` CLI flag and `INFRAWATCH_ORG_TOKEN` / `INFRAWATCH_INGEST_ADDRESS` env vars for config-less operation
+- Enrolment token dialog shows the ready-to-run curl command as the primary action
+
+**Multi-platform service install** (`agent/internal/install/install.go`, `agent/cmd/agent/service_windows.go`)
+- **Linux:** systemd unit written to `/etc/systemd/system/infrawatch-agent.service`, `systemctl enable --now`
+- **macOS:** launchd plist written to `/Library/LaunchDaemons/com.infrawatch.agent.plist`, `launchctl load`
+- **Windows:** binary copied to `C:\Program Files\infrawatch\`; service installed via `sc.exe` with proper Stop/Shutdown signal handling
+
+**Agent self-update** (`agent/internal/updater/updater.go`, `apps/ingest/internal/handlers/heartbeat.go`)
+- Ingest compares agent version in each heartbeat against configured latest version
+- When a newer version exists, ingest sets `update_available` + `download_url` in `HeartbeatResponse`
+- Agent calls `updater.Update(version, downloadURL)`: downloads to temp file, atomically replaces running binary, re-execs with same args; cleans up temp on failure
+
+**Other fixes in this period**
+- `tls_skip_verify` config option added to agent for self-signed ingest certs in dev
+- Fixed: re-inviting a soft-deleted user restores them rather than attempting re-registration
+
+**Build state**
+- `npm run build` — zero errors ✅
+- `go build ./agent/...` — compiles ✅
+- `go build ./apps/ingest/...` — compiles ✅
+
+---
 
 ### Session 6 — Check definition system (port/process/http)
 
@@ -336,11 +416,11 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 7 — Alert rule builder + alert state machine**
+**Session 8 — Alert rule builder + alert state machine**
 
-Check definitions are working. The next step is alerting — when checks fail (or metrics exceed thresholds), operators should receive alerts.
+Check definitions, metric history, and ad-hoc server queries are working. The next step is alerting — when checks fail (or metrics exceed thresholds), operators should receive alerts.
 
-1. **Alert rules schema** — `alert_rules` table (org_id, host_id nullable for tag-based, name, condition: check_status | metric_threshold, config jsonb, severity: info/warn/critical, enabled); `alert_instances` table (rule_id, host_id, org_id, triggered_at, resolved_at, status: firing/resolved, message)
+1. **Alert rules schema** — `alert_rules` table (org_id, host_id nullable for tag-based, name, condition: `check_status` | `metric_threshold`, config jsonb, severity: info/warn/critical, enabled); `alert_instances` table (rule_id, host_id, org_id, triggered_at, resolved_at, status: firing/resolved, message)
 2. **Alert evaluation** — on each ingest heartbeat, evaluate enabled alert rules for the host; fire when condition met and no active instance exists; resolve when condition no longer met
 3. **Alert list UI** — `/alerts` page showing active/recent alerts, severity badge, acknowledgement button
 4. **Notification channels (basic)** — webhook-based notification on alert fire/resolve (email deferred)
@@ -351,6 +431,7 @@ Check definitions are working. The next step is alerting — when checks fail (o
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
 - Run migration `0006_icy_trish_tilby.sql` in production to create `checks` + `check_results` tables
+- Run migration for `agent_queries` table in production
 
 ---
 
@@ -379,7 +460,10 @@ Check definitions are working. The next step is alerting — when checks fail (o
 - [x] Heartbeat + online/offline detection
 - [x] Host inventory UI
 - [ ] mTLS identity (deferred)
-- [ ] Agent self-update mechanism (deferred)
+- [x] Agent self-update mechanism (ingest-signalled, atomic binary swap)
+- [x] Agent one-command install (curl | sh, systemd/launchd/SCM)
+- [x] Server-hosted binaries with version-aware cache + prewarm
+- [x] Automated agent releases (release-please + GitHub Actions)
 - [ ] Redpanda integration (deferred)
 - [ ] Metrics consumer (deferred)
 - [x] Real-time status indicators (SSE stream + useHostStream hook)
@@ -388,6 +472,7 @@ Check definitions are working. The next step is alerting — when checks fail (o
 ### Phase 2 — Monitoring & Alerting
 - [x] Check definition system
 - [x] Check types — port, process, http (shell/file deferred)
+- [x] Ad-hoc agent queries (list_ports, list_services — used in check creation UI)
 - [ ] TimescaleDB continuous aggregates
 - [ ] Metric retention policies
 - [x] Metric graphs (Recharts)

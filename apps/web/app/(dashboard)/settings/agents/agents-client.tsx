@@ -38,6 +38,7 @@ import type { AgentEnrolmentToken } from '@/lib/db/schema'
 const createTokenSchema = z.object({
   label: z.string().min(1, 'Label is required').max(100),
   autoApprove: z.boolean(),
+  skipVerify: z.boolean(),
   maxUses: z.string().optional(),
   expiresInDays: z.string().optional(),
 })
@@ -108,10 +109,11 @@ export function AgentsSettingsClient({
     formState: { errors },
   } = useForm<CreateTokenForm>({
     resolver: zodResolver(createTokenSchema),
-    defaultValues: { label: '', autoApprove: false },
+    defaultValues: { label: '', autoApprove: false, skipVerify: true },
   })
 
   const autoApprove = watch('autoApprove')
+  const skipVerify = watch('skipVerify')
 
   const createMutation = useMutation({
     mutationFn: (data: CreateTokenForm) =>
@@ -122,13 +124,16 @@ export function AgentsSettingsClient({
         expiresInDays:
           data.expiresInDays !== '' && data.expiresInDays ? Number(data.expiresInDays) : undefined,
       }),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       if ('error' in result) return
       queryClient.invalidateQueries({ queryKey: ['enrolment-tokens', orgId] })
       setNewTokenValue(result.token)
-      setNewInstallCommand(
-        `curl -fsSL "${window.location.origin}/api/agent/install?token=${result.token}" | sudo bash`,
-      )
+      const installUrl = new URL(`${window.location.origin}/api/agent/install`)
+      installUrl.searchParams.set('token', result.token)
+      if (variables.skipVerify) {
+        installUrl.searchParams.set('skip_verify', 'true')
+      }
+      setNewInstallCommand(`curl -fsSL "${installUrl.toString()}" | sudo bash`)
       reset()
     },
   })
@@ -337,6 +342,24 @@ export function AgentsSettingsClient({
                   <p className="text-xs text-muted-foreground">
                     Agents registered with this token are automatically approved without manual
                     review.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="skipVerify"
+                  className="h-4 w-4 rounded border-border"
+                  checked={skipVerify}
+                  onChange={(e) => setValue('skipVerify', e.target.checked)}
+                />
+                <div>
+                  <Label htmlFor="skipVerify" className="font-normal cursor-pointer">
+                    Accept self-signed certificates
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable if your ingest service uses a self-signed or private CA certificate.
                   </p>
                 </div>
               </div>

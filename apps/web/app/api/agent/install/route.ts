@@ -13,8 +13,9 @@ import { NextRequest, NextResponse } from 'next/server'
  *   sudo ./infrawatch-agent --install --token <TOKEN>
  *
  * Query parameters:
- *   token  - Enrolment token from the Infrawatch UI
- *   ingest - gRPC ingest address host:port (default: <server-hostname>:9443)
+ *   token       - Enrolment token from the Infrawatch UI
+ *   ingest      - gRPC ingest address host:port (default: <server-hostname>:9443)
+ *   skip_verify - Set to "true" to disable TLS certificate verification (for self-signed certs)
  */
 export async function GET(request: NextRequest) {
   const host = request.headers.get('host') ?? 'localhost'
@@ -26,9 +27,10 @@ export async function GET(request: NextRequest) {
 
   const bareHost = host.split(':')[0]
   const ingestAddress = searchParams.get('ingest') ?? `${bareHost}:9443`
+  const skipVerify = searchParams.get('skip_verify') === 'true'
 
   const script = token
-    ? buildAutoInstallScript(serverURL, token, ingestAddress)
+    ? buildAutoInstallScript(serverURL, token, ingestAddress, skipVerify)
     : buildDownloadScript(serverURL, ingestAddress)
 
   return new NextResponse(script, {
@@ -39,7 +41,13 @@ export async function GET(request: NextRequest) {
   })
 }
 
-function buildAutoInstallScript(serverURL: string, token: string, ingestAddress: string): string {
+function buildAutoInstallScript(
+  serverURL: string,
+  token: string,
+  ingestAddress: string,
+  skipVerify: boolean,
+): string {
+  const tlsFlag = skipVerify ? ' --tls-skip-verify' : ''
   return `#!/bin/sh
 set -e
 
@@ -64,7 +72,7 @@ chmod +x infrawatch-agent
 echo "Binary downloaded."
 
 # ── Self-install ───────────────────────────────────────────────────────────────
-sudo ./infrawatch-agent --install --token "${token}" --address "${ingestAddress}"
+sudo ./infrawatch-agent --install --token "${token}" --address "${ingestAddress}"${tlsFlag}
 `
 }
 

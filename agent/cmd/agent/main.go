@@ -27,6 +27,7 @@ func main() {
 	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and INFRAWATCH_ORG_TOKEN)")
 	addressFlag := flag.String("address", "", "Ingest address host:port (overrides config file and INFRAWATCH_INGEST_ADDRESS)")
 	installFlag := flag.Bool("install", false, "Install agent as a system service and exit (requires --token)")
+	tlsSkipVerifyFlag := flag.Bool("tls-skip-verify", false, "Skip TLS certificate verification — use when ingest uses a self-signed cert (insecure)")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -39,7 +40,7 @@ func main() {
 			slog.Error("--token is required when using --install")
 			os.Exit(1)
 		}
-		if err := install.Run(*tokenFlag, strings.TrimSpace(*addressFlag)); err != nil {
+		if err := install.Run(*tokenFlag, strings.TrimSpace(*addressFlag), *tlsSkipVerifyFlag); err != nil {
 			slog.Error("install failed", "err", err)
 			os.Exit(1)
 		}
@@ -58,6 +59,9 @@ func main() {
 	}
 	if *addressFlag != "" {
 		cfg.Ingest.Address = strings.TrimSpace(*addressFlag)
+	}
+	if *tlsSkipVerifyFlag {
+		cfg.Ingest.TLSSkipVerify = true
 	}
 
 	if cfg.Agent.OrgToken == "" {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.5.1...agent/v0.6.0) (2026-04-06)
+
+
+### Features
+
+* **checks:** add check definition system with port, process, and HTTP checks ([76d0a01](https://github.com/simonjcarr/infrawatch/commit/76d0a0169e6a659e950b188aee3bf615f59bee26))
+* **checks:** add check definition system with port, process, and HTTP checks ([d33c458](https://github.com/simonjcarr/infrawatch/commit/d33c458c1d759d252fdba0b327f343058eec2e9e))
+
 ## [0.5.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.5.0...agent/v0.5.1) (2026-04-05)
 
 

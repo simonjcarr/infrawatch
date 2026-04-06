@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER ?? ''
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME ?? ''
@@ -21,16 +22,13 @@ const SUPPORTED_OS = ['linux', 'darwin', 'windows']
 const SUPPORTED_ARCH = ['amd64', 'arm64']
 
 /**
- * Serves agent binaries for the requested OS/arch.
+ * Serves the agent binary for the required version (pinned in lib/agent/version.ts).
  *
  * Resolution order:
- *   1. Versioned local file (infrawatch-agent-linux-amd64-v0.3.0) — always fresh
- *   2. GitHub Releases — fetches latest, writes versioned file, serves it
- *   3. Unversioned fallback (manually placed air-gap binary)
+ *   1. Versioned local file (infrawatch-agent-linux-amd64-v0.1.0) — served immediately if cached
+ *   2. GitHub Release for the required version — downloads, caches, then serves
+ *   3. Unversioned fallback (manually built via `make agent`) — for local dev without releases
  *   4. 503 if nothing available
- *
- * Versioned filenames mean a new GitHub release is automatically picked up
- * on the next request without any cache invalidation step.
  *
  * Query params: os (linux|darwin|windows), arch (amd64|arm64)
  */
@@ -54,20 +52,19 @@ export async function GET(request: NextRequest) {
 
   const suffix = os === 'windows' ? '.exe' : ''
   const baseName = `infrawatch-agent-${os}-${arch}${suffix}`
+  const versionedName = `infrawatch-agent-${os}-${arch}-${REQUIRED_AGENT_VERSION}${suffix}`
+  const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
 
-  // ── 1 + 2: Try GitHub (get latest version, check versioned local file) ────
+  // ── 1: Already cached locally ─────────────────────────────────────────────
+  if (fs.existsSync(versionedPath)) {
+    return streamFile(versionedPath, baseName)
+  }
+
+  // ── 2: Fetch from GitHub release for the required version ─────────────────
   if (GITHUB_REPO_OWNER && GITHUB_REPO_NAME) {
-    const release = await fetchLatestRelease()
+    const tag = `agent/${REQUIRED_AGENT_VERSION}`
+    const release = await fetchRelease(tag)
     if (release) {
-      const version = release.tag_name.replace('agent/', '')
-      const versionedName = `infrawatch-agent-${os}-${arch}-${version}${suffix}`
-      const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
-
-      if (fs.existsSync(versionedPath)) {
-        return streamFile(versionedPath, baseName)
-      }
-
-      // Not cached locally — fetch from GitHub and store
       const asset = release.assets.find((a) => a.name === baseName)
       if (asset) {
         const binary = await fetchBinaryFromGitHub(asset.browser_download_url)
@@ -79,7 +76,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── 3: Unversioned fallback (manually placed binaries for air-gap) ────────
+  // ── 3: Unversioned fallback (locally built via `make agent`) ──────────────
   const unversionedPath = path.join(AGENT_DIST_DIR, baseName)
   if (fs.existsSync(unversionedPath)) {
     return streamFile(unversionedPath, baseName)
@@ -89,10 +86,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       error:
-        `No binary found for ${os}/${arch}. ` +
+        `No binary available for ${os}/${arch} (required version: ${REQUIRED_AGENT_VERSION}). ` +
         (GITHUB_REPO_OWNER
-          ? 'GitHub release may not include this platform yet.'
-          : `Set GITHUB_REPO_OWNER + GITHUB_REPO_NAME, or place the binary at: ${unversionedPath}`),
+          ? `Ensure a GitHub release exists for tag "agent/${REQUIRED_AGENT_VERSION}".`
+          : `Set GITHUB_REPO_OWNER + GITHUB_REPO_NAME, or run \`make agent\` to build locally.`),
     },
     { status: 503 }
   )
@@ -108,15 +105,14 @@ const ghHeaders: Record<string, string> = {
     : {}),
 }
 
-async function fetchLatestRelease(): Promise<GitHubRelease | null> {
+async function fetchRelease(tag: string): Promise<GitHubRelease | null> {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases?per_page=20`,
-      { headers: ghHeaders, next: { revalidate: 300 } }
+      `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/tags/${encodeURIComponent(tag)}`,
+      { headers: ghHeaders }
     )
     if (!res.ok) return null
-    const releases: GitHubRelease[] = await res.json()
-    return releases.find((r) => r.tag_name.startsWith('agent/v')) ?? null
+    return (await res.json()) as GitHubRelease
   } catch {
     return null
   }

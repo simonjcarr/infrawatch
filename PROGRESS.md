@@ -9,11 +9,67 @@
 **Phase 1 — Agent & Host Inventory**
 
 ## Current Status
-🟡 Phase 1 in progress — Go agent + proto + gRPC ingest service built; registration flow + host UI complete. mTLS, Redpanda, metrics consumer, and check definitions deferred.
+🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end. Agent collects real system metrics (CPU, memory, disk, uptime, disks, network interfaces), streams via gRPC heartbeat, ingest updates the DB, and the web UI shows live data via SSE. mTLS, Redpanda, metrics consumer, and check definitions deferred.
 
 ---
 
 ## What Has Been Built
+
+### Session 4 — Real system metrics, host detail page, SSE real-time streaming
+
+**Agent metrics collection** (`agent/internal/heartbeat/heartbeat.go`)
+- CPU % — two-sample `/proc/stat` delta (first call returns 0 as baseline; accurate from second sample onward)
+- Memory % — `/proc/meminfo` (MemTotal − MemAvailable) / MemTotal × 100
+- Disk % — `/proc/mounts` + `syscall.Statfs` per mount; pseudo-filesystems (tmpfs, devtmpfs, cgroup, proc, etc.) excluded
+- Uptime — `/proc/uptime` first field converted to seconds
+- OS version — `/etc/os-release` PRETTY_NAME field
+- Per-disk inventory — `DiskInfo` structs (mount point, device, fs_type, total/used/free bytes, percent_used) sent in every heartbeat
+- Network interfaces — `NetworkInterface` structs (name, MAC, IP addresses, is_up) via `net.Interfaces()`; loopback excluded
+- OS / arch sent via heartbeat (`runtime.GOOS`, `runtime.GOARCH`)
+
+**Ingest: HeartbeatHandler updates** (`apps/ingest/internal/handlers/heartbeat.go`)
+- Persists disks and network_interfaces into `hosts.metadata` (JSONB) on every heartbeat
+- Writes `os` and `arch` back to `hosts` table (were missing before)
+- Syncs host status to `offline` when the gRPC stream closes
+- Allows `offline` agents to reconnect and transition back to `active`
+
+**Host detail page** (`apps/web/app/(dashboard)/hosts/[id]/`)
+- `page.tsx` — server component, fetches host via `getHost(orgId, hostId)`, 404 if not found
+- `host-detail-client.tsx` — tabbed UI:
+  - **Overview tab**: CPU / memory / disk gauges (green ≤ 70 %, amber ≤ 90 %, red > 90 %); system info panel (hostname, OS, version, arch, uptime, IPs); agent info panel (status badge, version, agent ID, last heartbeat, registration date)
+  - **Storage tab**: per-disk table (mount point, device, filesystem, total/used/free, usage %) from `host.metadata.disks`
+  - **Network tab**: interface table (name, MAC, IPs extracted from CIDR, Up/Down badge) from `host.metadata.network_interfaces`
+
+**SSE streaming** (`apps/web/app/api/hosts/[id]/stream/route.ts`)
+- GET `/api/hosts/{id}/stream` — requires valid session and org membership
+- Sends initial snapshot immediately on connection
+- Polls DB every 5 s and pushes `update` events as SSE JSON
+- Sends `error` event if host not found; closes cleanly on client disconnect (abort signal)
+
+**useHostStream hook** (`apps/web/hooks/use-host-stream.ts`)
+- `'use client'` hook consumed by `HostDetailClient`
+- Opens `EventSource` to `/api/hosts/{hostId}/stream`
+- Writes each `update` event directly into React Query cache key `['host', orgId, hostId]`
+- Closes on unmount; auto-reconnects on remount
+
+**Server action added**
+- `getHost(orgId, hostId)` in `lib/actions/agents.ts` — single-host fetch with agent LEFT JOIN
+
+**Agent example config** (`agent/examples/agent.toml`)
+- Reference config file for operators
+
+**Bug fixes**
+- OS and architecture now correctly populated on `hosts` table at registration and heartbeat
+- Host status synced to `offline` when heartbeat stream closes
+- Offline agents can reconnect without manual intervention
+
+**Build state**
+- `npm run build` — zero errors ✅
+- `go build ./agent/...` — compiles ✅
+- `go build ./apps/ingest/...` — compiles ✅
+- End-to-end smoke test passed — agent registers, approves, heartbeats, web UI updates live ✅
+
+---
 
 ### Session 3 — Go agent, proto definitions, gRPC ingest, host inventory UI
 
@@ -188,13 +244,12 @@
 ## Known Issues / Technical Debt
 
 - `codec.go` is a development stub — replace with protoc-generated files by running `make proto` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`)
-- `newCUID()` in ingest DB queries uses `math/rand` — replace with a proper cuid2 Go library
-- `readCPUPercent()` in agent heartbeat always returns 0 — requires two-sample measurement to be accurate
-- No database migration has been run for the new schema tables (agents, hosts, resource_tags, agent_enrolment_tokens, agent_status_history) — run `pnpm db:generate && pnpm db:migrate` in `apps/web`
+- `newCUID()` in ingest DB queries uses `math/rand` — replace with a proper cuid2 Go library before production
 - Docker Compose does not auto-run migrations on startup
 - `gen_cuid()` SQL function does not exist in PostgreSQL — `InsertAgent` has a fallback but the primary query will fail and fall through. The fallback is correct.
-- mTLS client certificates deferred — TLS builder is structured for it; add in next agent session
+- mTLS client certificates deferred — TLS builder is structured for it; deliberately deferred until Phase 1 metrics work is complete
 - The `go.work.sum` file is gitignored — developers must run `go work sync` after cloning
+- CPU % on first heartbeat is always 0 — by design (two-sample baseline); accurate from second heartbeat onward
 
 ---
 
@@ -206,18 +261,22 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 4 — Database migration, integration smoke test, mTLS, agent config example**
+**Session 5 — Metrics history, TimescaleDB hypertables, metric graphs**
 
-1. Run `pnpm db:generate && pnpm db:migrate` and verify schema lands correctly
-2. Generate dev TLS: `make dev-tls`
-3. `docker compose -f docker-compose.single.yml up`
-4. Create enrolment token in UI
-5. Configure and run `./dist/agent` — verify pending agent appears
-6. Approve in UI — verify agent becomes active and heartbeats
-7. Add mTLS client cert verification to ingest TLS builder
-8. Add agent example config file: `agent/examples/agent.toml`
-9. Fix `newCUID()` in ingest queries to use a real cuid2 equivalent
-10. Fix CPU percent collection (two-sample measurement)
+The pipeline is working end-to-end. The next step is to persist metric history (not just the latest snapshot) and surface it as graphs in the UI.
+
+1. **TimescaleDB hypertable** — create `host_metrics` table (host_id, org_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds); convert to hypertable; add 30-day retention policy
+2. **Metrics consumer** (`consumers/metrics/`) — reads from `TopicMetricsRaw` queue, inserts into `host_metrics`; for now the in-process queue is fine
+3. **Server action** — `getHostMetrics(orgId, hostId, range)` — returns time-series rows for a given time window (1h, 24h, 7d)
+4. **Metrics tab** on host detail page — Recharts line chart for CPU %, memory %, disk % over time; time-range selector
+5. **Fix `newCUID()`** — replace `math/rand` stub in ingest DB queries with a proper cuid2 Go library (`github.com/lucsky/cuid` or equivalent)
+6. **mTLS** (deferred again if metrics work is prioritised — record the decision)
+
+**Outstanding technical debt (carry forward):**
+- `newCUID()` in `apps/ingest/internal/db/queries/` still uses `math/rand` — must be replaced before production
+- `codec.go` is a JSON stub — replace with protoc-generated files (`make proto` requires protoc + plugins)
+- No DB migration has been explicitly confirmed as run — verify `host_metrics` hypertable lands correctly
+- `go.work.sum` is gitignored — developers must run `go work sync` after cloning
 
 ---
 
@@ -249,8 +308,8 @@ _None._
 - [ ] Agent self-update mechanism (deferred)
 - [ ] Redpanda integration (deferred)
 - [ ] Metrics consumer (deferred)
-- [ ] Real-time status indicators
-- [ ] Integration smoke test (end-to-end agent → UI)
+- [x] Real-time status indicators (SSE stream + useHostStream hook)
+- [x] Integration smoke test (end-to-end agent → UI)
 
 ### Phase 2 — Monitoring & Alerting
 - [ ] Check definition system

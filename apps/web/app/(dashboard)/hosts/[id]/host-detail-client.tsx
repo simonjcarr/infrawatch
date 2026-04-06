@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/table'
 import { getHost } from '@/lib/actions/agents'
 import type { HostWithAgent } from '@/lib/actions/agents'
+import { useHostStream } from '@/hooks/use-host-stream'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
 
 type Tab = 'overview' | 'storage' | 'network'
@@ -132,6 +133,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 export function HostDetailClient({ host: initialHost, orgId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+
+  useHostStream({ hostId: initialHost.id, orgId })
 
   const { data: host } = useQuery({
     queryKey: ['host', orgId, initialHost.id],

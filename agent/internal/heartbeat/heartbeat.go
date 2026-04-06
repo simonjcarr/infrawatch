@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/infrawatch/agent/internal/checks"
 	"github.com/infrawatch/agent/internal/updater"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
@@ -24,6 +25,7 @@ type Runner struct {
 	jwtToken string
 	version  string
 	interval time.Duration
+	executor *checks.Executor
 
 	// CPU two-sample state
 	prevCPUTotal   uint64
@@ -32,13 +34,14 @@ type Runner struct {
 }
 
 // New creates a new heartbeat Runner.
-func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, intervalSecs int) *Runner {
+func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor) *Runner {
 	return &Runner{
 		client:   client,
 		agentID:  agentID,
 		jwtToken: jwtToken,
 		version:  version,
 		interval: time.Duration(intervalSecs) * time.Second,
+		executor: executor,
 	}
 }
 
@@ -81,7 +84,7 @@ func (r *Runner) runStream(ctx context.Context) error {
 	defer ticker.Stop()
 
 	// Send first heartbeat immediately
-	if err := r.sendHeartbeat(stream); err != nil {
+	if err := r.sendHeartbeat(ctx, stream); err != nil {
 		return err
 	}
 
@@ -92,14 +95,14 @@ func (r *Runner) runStream(ctx context.Context) error {
 			return ctx.Err()
 
 		case <-ticker.C:
-			if err := r.sendHeartbeat(stream); err != nil {
+			if err := r.sendHeartbeat(ctx, stream); err != nil {
 				return err
 			}
 		}
 	}
 }
 
-func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) error {
+func (r *Runner) sendHeartbeat(ctx context.Context, stream agentv1.IngestService_HeartbeatClient) error {
 	cpu, mem, disk, uptime, osVersion, disks, nets := r.collectMetrics()
 
 	req := &agentv1.HeartbeatRequest{
@@ -115,6 +118,7 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 		Arch:              runtime.GOARCH,
 		Disks:             disks,
 		NetworkInterfaces: nets,
+		CheckResults:      r.executor.DrainResults(),
 	}
 
 	if err := stream.Send(req); err != nil {
@@ -134,6 +138,9 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 	}
 	if resp.Command != "" {
 		slog.Info("received server command", "command", resp.Command)
+	}
+	if len(resp.Checks) > 0 {
+		r.executor.UpdateDefinitions(ctx, resp.Checks)
 	}
 	if resp.UpdateAvailable && resp.DownloadURL != "" {
 		slog.Info("agent update available, downloading",

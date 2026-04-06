@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	agentgrpc "github.com/infrawatch/agent/internal/grpc"
+	"github.com/infrawatch/agent/internal/checks"
 	"github.com/infrawatch/agent/internal/config"
 	"github.com/infrawatch/agent/internal/heartbeat"
 	"github.com/infrawatch/agent/internal/identity"
@@ -115,6 +116,7 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 	}
 
 	slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
-	hb := heartbeat.New(client, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs)
+	executor := checks.NewExecutor()
+	hb := heartbeat.New(client, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)
 	return hb.Run(ctx)
 }

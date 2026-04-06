@@ -41,8 +41,9 @@ import { getHost, getHostMetrics, getAgentOfflinePeriods } from '@/lib/actions/a
 import type { HostWithAgent, MetricsRange, OfflinePeriod } from '@/lib/actions/agents'
 import { useHostStream } from '@/hooks/use-host-stream'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
+import { ChecksTab } from './checks-tab'
 
-type Tab = 'overview' | 'storage' | 'network' | 'metrics'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks'
 
 interface Props {
   host: HostWithAgent
@@ -267,6 +268,9 @@ export function HostDetailClient({ host: initialHost, orgId }: Props) {
         </TabButton>
         <TabButton active={activeTab === 'metrics'} onClick={() => setActiveTab('metrics')}>
           Metrics
+        </TabButton>
+        <TabButton active={activeTab === 'checks'} onClick={() => setActiveTab('checks')}>
+          Checks
         </TabButton>
       </div>
 
@@ -546,6 +550,11 @@ export function HostDetailClient({ host: initialHost, orgId }: Props) {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Checks Tab */}
+      {activeTab === 'checks' && (
+        <ChecksTab orgId={orgId} hostId={initialHost.id} />
       )}
 
       {/* Network Tab */}

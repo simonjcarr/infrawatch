@@ -56,6 +56,23 @@ type NetworkInterface struct {
 	IsUp        bool     `json:"is_up"`
 }
 
+// CheckDefinition is pushed from the server to instruct the agent to run a check.
+type CheckDefinition struct {
+	CheckID         string `json:"check_id"`
+	CheckType       string `json:"check_type"`
+	ConfigJSON      string `json:"config_json"`
+	IntervalSeconds int32  `json:"interval_seconds"`
+}
+
+// CheckResult is reported by the agent after executing a check.
+type CheckResult struct {
+	CheckID    string `json:"check_id"`
+	Status     string `json:"status"`
+	Output     string `json:"output"`
+	DurationMs int32  `json:"duration_ms"`
+	RanAtUnix  int64  `json:"ran_at_unix"`
+}
+
 // HeartbeatRequest is sent by the agent on each heartbeat interval.
 type HeartbeatRequest struct {
 	AgentId           string             `json:"agent_id"`
@@ -70,14 +87,16 @@ type HeartbeatRequest struct {
 	Arch              string             `json:"arch"`
 	Disks             []DiskInfo         `json:"disks"`
 	NetworkInterfaces []NetworkInterface `json:"network_interfaces"`
+	CheckResults      []CheckResult      `json:"check_results"`
 }
 
 // HeartbeatResponse is sent back by the server on each heartbeat tick.
 type HeartbeatResponse struct {
-	Ok              bool   `json:"ok"`
-	Command         string `json:"command"`
-	CommandPayload  []byte `json:"command_payload"`
-	LatestVersion   string `json:"latest_version"`
-	UpdateAvailable bool   `json:"update_available"`
-	DownloadURL     string `json:"download_url"`
+	Ok              bool              `json:"ok"`
+	Command         string            `json:"command"`
+	CommandPayload  []byte            `json:"command_payload"`
+	LatestVersion   string            `json:"latest_version"`
+	UpdateAvailable bool              `json:"update_available"`
+	DownloadURL     string            `json:"download_url"`
+	Checks          []CheckDefinition `json:"checks"`
 }

@@ -21,6 +21,21 @@ message NetworkInterface {
   bool            is_up        = 4;
 }
 
+message CheckDefinition {
+  string check_id        = 1;
+  string check_type      = 2;  // "port" | "process" | "http"
+  string config_json     = 3;  // JSON-encoded type-specific config
+  int32  interval_seconds = 4;
+}
+
+message CheckResult {
+  string check_id    = 1;
+  string status      = 2;  // "pass" | "fail" | "error"
+  string output      = 3;
+  int32  duration_ms = 4;
+  int64  ran_at_unix = 5;
+}
+
 message HeartbeatRequest {
   string    agent_id      = 1;
   float     cpu_percent   = 2;
@@ -34,6 +49,7 @@ message HeartbeatRequest {
   string    arch          = 12;
   repeated DiskInfo          disks              = 9;
   repeated NetworkInterface  network_interfaces = 10;
+  repeated CheckResult       check_results      = 13;
 }
 
 message HeartbeatResponse {
@@ -43,4 +59,5 @@ message HeartbeatResponse {
   string latest_version = 4;  // latest known agent version
   bool update_available = 5;  // true when agent_version != latest_version
   string download_url = 6;    // base URL to fetch the updated binary from
+  repeated CheckDefinition checks = 7;
 }

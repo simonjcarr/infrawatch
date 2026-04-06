@@ -59,7 +59,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 	}
 
 	// Validate JWT
-	agentID, orgID, err := h.issuer.ValidateAgentToken(first.AgentId)
+	agentID, _, err := h.issuer.ValidateAgentToken(first.AgentId)
 	if err != nil {
 		// AgentId field carries the JWT token for authentication on first message
 		// If that fails, try treating it as an agent ID (backwards compat)
@@ -68,9 +68,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 			return status.Error(codes.Unauthenticated, "invalid or missing JWT")
 		}
 		slog.Debug("JWT validation failed, using agent_id directly", "agent_id", agentID, "err", err)
-		orgID = ""
 	}
-	_ = orgID
 
 	// Verify agent is active
 	agent, err := queries.GetAgentByID(ctx, h.pool, agentID)
@@ -95,10 +93,17 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 		agent.Status = "active"
 	}
 
+	// Resolve host ID once for the lifetime of this stream
+	hostID, err := queries.GetHostByAgentID(ctx, h.pool, agentID)
+	if err != nil {
+		slog.Warn("resolving host for agent", "agent_id", agentID, "err", err)
+		hostID = ""
+	}
+
 	slog.Info("heartbeat stream started", "agent_id", agentID)
 
 	// Process first message
-	if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, first); err != nil {
+	if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, hostID, first); err != nil {
 		return err
 	}
 
@@ -116,7 +121,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 			break
 		}
 
-		if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, req); err != nil {
+		if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, hostID, req); err != nil {
 			return err
 		}
 	}
@@ -139,7 +144,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 func (h *HeartbeatHandler) processHeartbeat(
 	ctx context.Context,
 	stream agentv1.IngestService_HeartbeatServer,
-	agentID, orgID string,
+	agentID, orgID, hostID string,
 	req *agentv1.HeartbeatRequest,
 ) error {
 	now := time.Now()
@@ -171,6 +176,20 @@ func (h *HeartbeatHandler) processHeartbeat(
 		req.CpuPercent, req.MemoryPercent, req.DiskPercent, req.UptimeSeconds,
 	); err != nil {
 		slog.Warn("inserting host metric", "err", err)
+	}
+
+	// Persist incoming check results
+	if hostID != "" {
+		for _, result := range req.CheckResults {
+			ranAt := time.Unix(result.RanAtUnix, 0)
+			if err := queries.InsertCheckResult(ctx, h.pool,
+				result.CheckID, hostID, orgID,
+				result.Status, result.Output,
+				result.DurationMs, ranAt,
+			); err != nil {
+				slog.Warn("inserting check result", "check_id", result.CheckID, "err", err)
+			}
+		}
 	}
 
 	// Publish to queue (for consumers/metrics in standard/ha deployments)
@@ -205,6 +224,25 @@ func (h *HeartbeatHandler) processHeartbeat(
 			"current", req.AgentVersion,
 			"latest", h.latestVersion,
 		)
+	}
+
+	// Push active check definitions to the agent
+	if hostID != "" {
+		checkRows, err := queries.GetChecksForHost(ctx, h.pool, hostID)
+		if err != nil {
+			slog.Warn("fetching checks for host", "host_id", hostID, "err", err)
+		} else {
+			defs := make([]agentv1.CheckDefinition, 0, len(checkRows))
+			for _, row := range checkRows {
+				defs = append(defs, agentv1.CheckDefinition{
+					CheckID:         row.ID,
+					CheckType:       row.CheckType,
+					ConfigJSON:      row.ConfigJSON,
+					IntervalSeconds: int32(row.IntervalSeconds),
+				})
+			}
+			resp.Checks = defs
+		}
 	}
 
 	return stream.Send(resp)

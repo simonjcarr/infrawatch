@@ -9,11 +9,51 @@
 **Phase 1 — Agent & Host Inventory**
 
 ## Current Status
-🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end with metric history. Agent collects real system metrics and streams via gRPC heartbeat. Ingest persists each heartbeat to a TimescaleDB hypertable (`host_metrics`). Web UI shows live data via SSE and historical CPU/memory/disk graphs with 1h/24h/7d range selector. mTLS, Redpanda, and check definitions deferred.
+🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end with metric history and check definitions. Agent collects real system metrics and runs configured checks (port/process/http), streaming results via gRPC heartbeat. Ingest persists metrics and check results to TimescaleDB hypertables. Web UI shows live data via SSE, historical graphs, and a Checks tab for creating/managing/reviewing check definitions per host. mTLS and Redpanda deferred.
 
 ---
 
 ## What Has Been Built
+
+### Session 6 — Check definition system (port/process/http)
+
+**Proto additions** (`proto/agent/v1/heartbeat.proto` + `proto/gen/go/agent/v1/messages.go`)
+- New `CheckDefinition` message: check_id, check_type, config_json (string), interval_seconds
+- New `CheckResult` message: check_id, status (pass/fail/error), output, duration_ms, ran_at_unix
+- `HeartbeatRequest` gains `check_results` field; `HeartbeatResponse` gains `checks` field
+
+**`checks` + `check_results` schema** (`apps/web/lib/db/schema/checks.ts`)
+- `checks` table: org/host scoped, check_type, config jsonb, enabled, interval_seconds, soft delete, metadata
+- `check_results` hypertable: check_id, host_id, org_id, ran_at (partition key), status, output, duration_ms
+- Migration `0006_icy_trish_tilby.sql` — includes TimescaleDB hypertable + 30-day retention, graceful degradation wrapped in `DO $$` block
+
+**Ingest handler updates** (`apps/ingest/internal/handlers/heartbeat.go`)
+- Resolves `hostID` once at stream start via `GetHostByAgentID` (cached for stream lifetime)
+- Persists each `CheckResult` from `HeartbeatRequest` into `check_results` via `InsertCheckResult`
+- Queries `GetChecksForHost(hostID)` on every heartbeat and pushes active check definitions in `HeartbeatResponse.Checks`
+
+**Agent check executor** (`agent/internal/checks/`)
+- `executor.go` — manages per-check goroutines with agent-level context (survives stream reconnects); reconciles definitions on each heartbeat; accumulates results for drain
+- `port.go` — TCP dial with 5s timeout
+- `process.go` — scans `/proc/<pid>/comm` and `/proc/<pid>/cmdline` to find process by name
+- `http.go` — GET with 10s timeout, checks expected status code (default 200)
+- `heartbeat.go` updated to drain check results into each request and update definitions from each response
+
+**Web server actions** (`apps/web/lib/actions/checks.ts`)
+- `getChecks`, `createCheck`, `updateCheck`, `deleteCheck`, `getCheckResults` — all Zod-validated, org-scoped
+
+**Checks tab** (`apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`)
+- Expandable check rows: name, type badge, status badge, last run time
+- Enable/disable toggle, delete button, inline result history
+- "Add Check" dialog with type-specific config fields
+- shadcn `Select` + `Switch` components added
+
+**Build state**
+- `npm run build` — zero errors ✅
+- `go build ./agent/...` — compiles ✅
+- `go build ./apps/ingest/...` — compiles ✅
+
+---
 
 ### Session 5 — Metric history, TimescaleDB hypertable, metric graphs
 
@@ -296,21 +336,21 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 6 — Check definition system**
+**Session 7 — Alert rule builder + alert state machine**
 
-Metric history is working. The next step is the check definition system — the mechanism by which operators define what the agent should monitor beyond basic heartbeat vitals.
+Check definitions are working. The next step is alerting — when checks fail (or metrics exceed thresholds), operators should receive alerts.
 
-1. **Check definition schema** — `checks` table (org_id, host_id or tag-based targeting, check_type, config jsonb, enabled, interval_seconds); `check_results` hypertable (check_id, host_id, org_id, ran_at, status: pass/fail/error, output, duration_ms)
-2. **Check types** — `port` (TCP connectivity), `process` (is a process running), `http` (internal HTTP health check) — at minimum these three; `shell` can be deferred
-3. **Agent-side check execution** — agent receives check definitions via `HeartbeatResponse.command` field or a new `GetChecks` RPC; executes checks; returns results in next heartbeat or a dedicated RPC
-4. **Check results persistence** — ingest handler receives check results and inserts into `check_results` hypertable
-5. **Checks UI** — list of checks per host, create/edit check dialog, latest result status badge, link to result history
+1. **Alert rules schema** — `alert_rules` table (org_id, host_id nullable for tag-based, name, condition: check_status | metric_threshold, config jsonb, severity: info/warn/critical, enabled); `alert_instances` table (rule_id, host_id, org_id, triggered_at, resolved_at, status: firing/resolved, message)
+2. **Alert evaluation** — on each ingest heartbeat, evaluate enabled alert rules for the host; fire when condition met and no active instance exists; resolve when condition no longer met
+3. **Alert list UI** — `/alerts` page showing active/recent alerts, severity badge, acknowledgement button
+4. **Notification channels (basic)** — webhook-based notification on alert fire/resolve (email deferred)
+5. **Alert badge on host detail** — count of active alerts shown in the host detail header
 
 **Outstanding technical debt (carry forward):**
 - `codec.go` is a JSON stub — replace with protoc-generated files (`make proto` requires protoc + plugins)
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
-- DB migrations have not been explicitly confirmed as run in production — verify `host_metrics` hypertable lands correctly on next deploy
+- Run migration `0006_icy_trish_tilby.sql` in production to create `checks` + `check_results` tables
 
 ---
 
@@ -346,11 +386,11 @@ Metric history is working. The next step is the check definition system — the 
 - [x] Integration smoke test (end-to-end agent → UI)
 
 ### Phase 2 — Monitoring & Alerting
-- [ ] Check definition system
-- [ ] Check types (shell/port/process/http/file)
+- [x] Check definition system
+- [x] Check types — port, process, http (shell/file deferred)
 - [ ] TimescaleDB continuous aggregates
 - [ ] Metric retention policies
-- [ ] Metric graphs (Recharts)
+- [x] Metric graphs (Recharts)
 - [ ] Alert rule builder
 - [ ] Alert state machine
 - [ ] Notification channels (email/webhook/Slack)

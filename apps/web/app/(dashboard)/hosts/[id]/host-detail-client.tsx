@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import {
   ArrowLeft,
   CheckCircle,
@@ -13,8 +13,20 @@ import {
   AlertTriangle,
   Clock,
   XCircle,
+  Activity,
 } from 'lucide-react'
 import Link from 'next/link'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceArea,
+} from 'recharts'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -25,12 +37,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getHost } from '@/lib/actions/agents'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import { getHost, getHostMetrics, getAgentOfflinePeriods } from '@/lib/actions/agents'
+import type { HostWithAgent, MetricsRange, OfflinePeriod } from '@/lib/actions/agents'
 import { useHostStream } from '@/hooks/use-host-stream'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
 
-type Tab = 'overview' | 'storage' | 'network'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics'
 
 interface Props {
   host: HostWithAgent
@@ -133,6 +145,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 export function HostDetailClient({ host: initialHost, orgId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [metricsRange, setMetricsRange] = useState<MetricsRange>('24h')
 
   useHostStream({ hostId: initialHost.id, orgId })
 
@@ -142,6 +155,45 @@ export function HostDetailClient({ host: initialHost, orgId }: Props) {
     initialData: initialHost,
     refetchInterval: 30_000,
   })
+
+  const { data: metricsData = [], isLoading: metricsLoading } = useQuery({
+    queryKey: ['host-metrics', orgId, initialHost.id, metricsRange],
+    queryFn: () => getHostMetrics(orgId, initialHost.id, metricsRange),
+    enabled: activeTab === 'metrics',
+    refetchInterval: 60_000,
+  })
+
+  const { data: offlinePeriods = [] } = useQuery<OfflinePeriod[]>({
+    queryKey: ['host-offline-periods', orgId, initialHost.id, metricsRange],
+    queryFn: () =>
+      initialHost.agentId
+        ? getAgentOfflinePeriods(orgId, initialHost.agentId, metricsRange)
+        : Promise.resolve([]),
+    enabled: activeTab === 'metrics' && !!initialHost.agentId,
+    refetchInterval: 60_000,
+  })
+
+  const tickFormat = metricsRange === '7d' ? 'MMM d HH:mm' : 'HH:mm'
+
+  // Use numeric ms timestamps so we can control the X-axis domain precisely.
+  // Zero-boundary points are injected at the start and end of each offline period
+  // so the lines visually drop to 0 when the agent goes offline and rise again on
+  // reconnect. A sentinel null point at Date.now() keeps the right edge current.
+  const offlineBoundaries = offlinePeriods.flatMap((p) => [
+    { time: p.start, cpu: 0, memory: 0, disk: 0 },
+    ...(p.end != null ? [{ time: p.end, cpu: 0, memory: 0, disk: 0 }] : []),
+  ])
+
+  const chartData = [
+    ...metricsData.map((row) => ({
+      time: new Date(row.recordedAt).getTime(),
+      cpu: row.cpuPercent != null ? parseFloat(row.cpuPercent.toFixed(1)) : null,
+      memory: row.memoryPercent != null ? parseFloat(row.memoryPercent.toFixed(1)) : null,
+      disk: row.diskPercent != null ? parseFloat(row.diskPercent.toFixed(1)) : null,
+    })),
+    ...offlineBoundaries,
+    { time: Date.now(), cpu: null, memory: null, disk: null },
+  ].sort((a, b) => a.time - b.time)
 
   if (!host) return null
 
@@ -212,6 +264,9 @@ export function HostDetailClient({ host: initialHost, orgId }: Props) {
               {networkInterfaces.length}
             </span>
           )}
+        </TabButton>
+        <TabButton active={activeTab === 'metrics'} onClick={() => setActiveTab('metrics')}>
+          Metrics
         </TabButton>
       </div>
 
@@ -370,6 +425,127 @@ export function HostDetailClient({ host: initialHost, orgId }: Props) {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Metrics Tab */}
+      {activeTab === 'metrics' && (
+        <div className="space-y-4">
+          {/* Range selector */}
+          <div className="flex items-center gap-2">
+            {(['1h', '24h', '7d'] as MetricsRange[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setMetricsRange(r)}
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                  metricsRange === r
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-muted-foreground border-border hover:text-foreground'
+                }`}
+              >
+                {r === '1h' ? 'Last hour' : r === '24h' ? 'Last 24 hours' : 'Last 7 days'}
+              </button>
+            ))}
+          </div>
+
+          {metricsLoading ? (
+            <Card>
+              <CardContent className="py-16 text-center text-muted-foreground text-sm">
+                Loading metrics…
+              </CardContent>
+            </Card>
+          ) : chartData.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Activity className="size-10 mx-auto text-muted-foreground/40 mb-3" />
+                <p className="text-muted-foreground font-medium">No metric history yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Data will appear once the agent starts sending heartbeats.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="size-4 text-muted-foreground" />
+                  CPU, Memory &amp; Disk Usage (%)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis
+                      dataKey="time"
+                      type="number"
+                      scale="time"
+                      domain={['dataMin', () => Date.now()]}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tickLine={false}
+                      tickFormatter={(ts: number) => format(new Date(ts), tickFormat)}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tickLine={false}
+                      tickFormatter={(v: number) => `${v}%`}
+                      width={40}
+                    />
+                    <Tooltip
+                      formatter={(value) => [`${value}%`]}
+                      labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                        color: 'hsl(var(--popover-foreground))',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Legend
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }}
+                    />
+                    {offlinePeriods.map((period, i) => (
+                      <ReferenceArea
+                        key={i}
+                        x1={period.start}
+                        x2={period.end ?? Date.now()}
+                        fill="hsl(220, 13%, 60%)"
+                        fillOpacity={0.15}
+                        label={{ value: 'Offline', position: 'insideTop', fontSize: 11, fill: 'hsl(220, 13%, 30%)', fontWeight: 500 }}
+                      />
+                    ))}
+                    <Line
+                      type="monotone"
+                      dataKey="cpu"
+                      name="CPU"
+                      stroke="hsl(221, 83%, 53%)"
+                      dot={false}
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="memory"
+                      name="Memory"
+                      stroke="hsl(142, 71%, 45%)"
+                      dot={false}
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="disk"
+                      name="Disk"
+                      stroke="hsl(38, 92%, 50%)"
+                      dot={false}
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Network Tab */}

@@ -166,7 +166,14 @@ func (h *HeartbeatHandler) processHeartbeat(
 		slog.Warn("updating host vitals", "err", err)
 	}
 
-	// Publish to queue
+	// Persist metric history row
+	if err := queries.InsertHostMetricByAgentID(ctx, h.pool, orgID, agentID, now,
+		req.CpuPercent, req.MemoryPercent, req.DiskPercent, req.UptimeSeconds,
+	); err != nil {
+		slog.Warn("inserting host metric", "err", err)
+	}
+
+	// Publish to queue (for consumers/metrics in standard/ha deployments)
 	payload, _ := json.Marshal(map[string]interface{}{
 		"agent_id":      agentID,
 		"org_id":        orgID,

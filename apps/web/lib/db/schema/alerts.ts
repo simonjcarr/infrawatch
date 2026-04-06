@@ -24,6 +24,19 @@ export interface WebhookChannelConfig {
   secret?: string
 }
 
+export interface SmtpChannelConfig {
+  host: string
+  port: number
+  secure: boolean
+  username?: string
+  password?: string
+  fromAddress: string
+  fromName?: string
+  toAddresses: string[]
+}
+
+export type NotificationChannelType = 'webhook' | 'smtp'
+
 export const alertRules = pgTable('alert_rules', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   organisationId: text('organisation_id').notNull().references(() => organisations.id),
@@ -63,8 +76,8 @@ export const notificationChannels = pgTable('notification_channels', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   organisationId: text('organisation_id').notNull().references(() => organisations.id),
   name: text('name').notNull(),
-  type: text('type').notNull().$type<'webhook'>(),
-  config: jsonb('config').notNull().$type<WebhookChannelConfig>(),
+  type: text('type').notNull().$type<NotificationChannelType>(),
+  config: jsonb('config').notNull().$type<WebhookChannelConfig | SmtpChannelConfig>(),
   enabled: boolean('enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

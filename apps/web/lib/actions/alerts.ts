@@ -12,6 +12,7 @@ import type {
   AlertRuleConfig,
   NotificationChannel,
   WebhookChannelConfig,
+  SmtpChannelConfig,
 } from '@/lib/db/schema'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,14 +51,30 @@ const updateAlertRuleSchema = z.object({
   config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema]).optional(),
 })
 
-const createNotificationChannelSchema = z.object({
-  name: z.string().min(1).max(100),
-  type: z.literal('webhook'),
-  config: z.object({
-    url: z.string().url(),
-    secret: z.string().optional(),
+const createNotificationChannelSchema = z.discriminatedUnion('type', [
+  z.object({
+    name: z.string().min(1).max(100),
+    type: z.literal('webhook'),
+    config: z.object({
+      url: z.string().url(),
+      secret: z.string().optional(),
+    }),
   }),
-})
+  z.object({
+    name: z.string().min(1).max(100),
+    type: z.literal('smtp'),
+    config: z.object({
+      host: z.string().min(1),
+      port: z.number().int().min(1).max(65535),
+      secure: z.boolean(),
+      username: z.string().optional(),
+      password: z.string().optional(),
+      fromAddress: z.string().email(),
+      fromName: z.string().optional(),
+      toAddresses: z.array(z.string().email()).min(1),
+    }),
+  }),
+])
 
 // ─── Alert Rules ──────────────────────────────────────────────────────────────
 
@@ -257,9 +274,10 @@ export async function getActiveAlertCountsForHosts(
 
 // ─── Notification Channels ────────────────────────────────────────────────────
 
-export type NotificationChannelSafe = Omit<NotificationChannel, 'config'> & {
-  config: { url: string; hasSecret: boolean }
-}
+export type NotificationChannelSafe = Omit<NotificationChannel, 'config' | 'type'> & (
+  | { type: 'webhook'; config: { url: string; hasSecret: boolean } }
+  | { type: 'smtp'; config: { host: string; port: number; fromAddress: string; toAddresses: string[]; hasPassword: boolean } }
+)
 
 export async function getNotificationChannels(orgId: string): Promise<NotificationChannelSafe[]> {
   const rows = await db.query.notificationChannels.findMany({
@@ -270,13 +288,31 @@ export async function getNotificationChannels(orgId: string): Promise<Notificati
     orderBy: notificationChannels.createdAt,
   })
 
-  return rows.map((ch) => ({
-    ...ch,
-    config: {
-      url: (ch.config as WebhookChannelConfig).url,
-      hasSecret: !!((ch.config as WebhookChannelConfig).secret),
-    },
-  }))
+  return rows.map((ch) => {
+    if (ch.type === 'smtp') {
+      const cfg = ch.config as SmtpChannelConfig
+      return {
+        ...ch,
+        type: 'smtp' as const,
+        config: {
+          host: cfg.host,
+          port: cfg.port,
+          fromAddress: cfg.fromAddress,
+          toAddresses: cfg.toAddresses,
+          hasPassword: !!(cfg.password),
+        },
+      }
+    }
+    const cfg = ch.config as WebhookChannelConfig
+    return {
+      ...ch,
+      type: 'webhook' as const,
+      config: {
+        url: cfg.url,
+        hasSecret: !!(cfg.secret),
+      },
+    }
+  })
 }
 
 export async function createNotificationChannel(
@@ -296,7 +332,7 @@ export async function createNotificationChannel(
         organisationId: orgId,
         name: data.name,
         type: data.type,
-        config: data.config as WebhookChannelConfig,
+        config: data.config as WebhookChannelConfig | SmtpChannelConfig,
       })
       .returning({ id: notificationChannels.id })
 

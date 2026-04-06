@@ -7,6 +7,7 @@ import {
   Bell,
   BellOff,
   CheckCircle2,
+  Mail,
   Plus,
   Trash2,
   Webhook,
@@ -199,6 +200,160 @@ function AddWebhookDialog({
   )
 }
 
+// ─── SMTP Dialog ──────────────────────────────────────────────────────────────
+
+const smtpFormSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  host: z.string().min(1, 'Host is required'),
+  port: z.number().int().min(1).max(65535),
+  secure: z.boolean(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  fromAddress: z.string().email('Must be a valid email'),
+  fromName: z.string().optional(),
+  toAddresses: z.string().min(1, 'At least one recipient required'),
+})
+
+type SmtpFormValues = z.infer<typeof smtpFormSchema>
+
+function AddSmtpDialog({
+  orgId,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  orgId: string
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<SmtpFormValues>({
+    resolver: zodResolver(smtpFormSchema),
+    defaultValues: { port: 587, secure: false },
+  })
+
+  const secure = watch('secure')
+
+  async function onSubmit(values: SmtpFormValues) {
+    const toAddresses = values.toAddresses
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean)
+
+    const result = await createNotificationChannel(orgId, {
+      name: values.name,
+      type: 'smtp',
+      config: {
+        host: values.host,
+        port: values.port,
+        secure: values.secure,
+        username: values.username || undefined,
+        password: values.password || undefined,
+        fromAddress: values.fromAddress,
+        fromName: values.fromName || undefined,
+        toAddresses,
+      },
+    })
+    if ('error' in result) return
+    reset()
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add SMTP Channel</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="smtp-name">Name</Label>
+            <Input id="smtp-name" placeholder="e.g. Ops Alerts" {...register('name')} />
+            {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 space-y-1.5">
+              <Label htmlFor="smtp-host">Host</Label>
+              <Input id="smtp-host" placeholder="smtp.example.com" {...register('host')} />
+              {errors.host && <p className="text-sm text-red-600">{errors.host.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-port">Port</Label>
+              <Input id="smtp-port" type="number" placeholder="587" {...register('port', { valueAsNumber: true })} />
+              {errors.port && <p className="text-sm text-red-600">{errors.port.message}</p>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="smtp-secure"
+              type="checkbox"
+              className="h-4 w-4 rounded border-input"
+              checked={secure}
+              onChange={(e) => setValue('secure', e.target.checked)}
+            />
+            <Label htmlFor="smtp-secure" className="font-normal cursor-pointer">
+              Use TLS/SSL
+            </Label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-username">
+                Username <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input id="smtp-username" placeholder="user@example.com" {...register('username')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-password">
+                Password <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input id="smtp-password" type="password" placeholder="••••••••" {...register('password')} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-from">From address</Label>
+              <Input id="smtp-from" placeholder="alerts@example.com" {...register('fromAddress')} />
+              {errors.fromAddress && <p className="text-sm text-red-600">{errors.fromAddress.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-fromname">
+                From name <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input id="smtp-fromname" placeholder="Infrawatch Alerts" {...register('fromName')} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="smtp-to">Recipients</Label>
+            <Input
+              id="smtp-to"
+              placeholder="ops@example.com, team@example.com"
+              {...register('toAddresses')}
+            />
+            <p className="text-xs text-muted-foreground">Comma-separated list of email addresses</p>
+            {errors.toAddresses && <p className="text-sm text-red-600">{errors.toAddresses.message}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Add Channel
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 interface AlertsClientProps {
@@ -221,6 +376,7 @@ export function AlertsClient({
   const qc = useQueryClient()
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all')
   const [addWebhookOpen, setAddWebhookOpen] = useState(false)
+  const [addSmtpOpen, setAddSmtpOpen] = useState(false)
 
   const { data: activeAlerts = [] } = useQuery({
     queryKey: ['alerts', orgId, 'firing'],
@@ -428,18 +584,27 @@ export function AlertsClient({
               Notification Channels
             </CardTitle>
             <CardDescription className="mt-1">
-              Webhook endpoints that receive alert fired/resolved events
+              Channels that receive alert fired/resolved events
             </CardDescription>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="shrink-0"
-            onClick={() => setAddWebhookOpen(true)}
-          >
-            <Plus className="size-3.5 mr-1" />
-            Add Webhook
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddWebhookOpen(true)}
+            >
+              <Plus className="size-3.5 mr-1" />
+              Add Webhook
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddSmtpOpen(true)}
+            >
+              <Plus className="size-3.5 mr-1" />
+              Add SMTP
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {channels.length === 0 ? (
@@ -451,8 +616,8 @@ export function AlertsClient({
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Secret</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -460,11 +625,27 @@ export function AlertsClient({
                 {channels.map((ch) => (
                   <TableRow key={ch.id}>
                     <TableCell className="font-medium">{ch.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground font-mono max-w-xs truncate">
-                      {ch.config.url}
+                    <TableCell>
+                      {ch.type === 'smtp' ? (
+                        <Badge variant="outline" className="gap-1">
+                          <Mail className="size-3" />
+                          SMTP
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1">
+                          <Webhook className="size-3" />
+                          Webhook
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {ch.config.hasSecret ? '••••••••' : '—'}
+                      {ch.type === 'smtp' ? (
+                        <span>
+                          {ch.config.host}:{ch.config.port} → {ch.config.toAddresses.join(', ')}
+                        </span>
+                      ) : (
+                        <span className="font-mono truncate block max-w-xs">{ch.config.url}</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -489,6 +670,12 @@ export function AlertsClient({
         orgId={orgId}
         open={addWebhookOpen}
         onOpenChange={setAddWebhookOpen}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+      />
+      <AddSmtpDialog
+        orgId={orgId}
+        open={addSmtpOpen}
+        onOpenChange={setAddSmtpOpen}
         onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
       />
     </div>

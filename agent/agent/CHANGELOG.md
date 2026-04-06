@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.8.0...agent/v0.9.0) (2026-04-06)
+
+
+### Features
+
+* **agent:** agent install, TLS, cross-platform builds, and auto-download ([b12296d](https://github.com/simonjcarr/infrawatch/commit/b12296d9229c0f9d0128c2dd7df9be0378dba609))
+
+
+### Bug Fixes
+
+* **agent:** build all platform binaries to the correct dist directory ([ce54b74](https://github.com/simonjcarr/infrawatch/commit/ce54b741429c2822189f14677954e218aea93dc9))
+
 ## [0.8.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.7.0...agent/v0.8.0) (2026-04-06)
 
 

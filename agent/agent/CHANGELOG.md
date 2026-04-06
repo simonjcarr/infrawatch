@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.7.0...agent/v0.8.0) (2026-04-06)
+
+
+### Features
+
+* **agent:** add --tls-skip-verify flag to agent install flow ([c6abbdc](https://github.com/simonjcarr/infrawatch/commit/c6abbdca2d0deaaa4361b5e9b23e863dfab9bb14))
+* **agent:** add --tls-skip-verify flag to agent install flow ([ab124d2](https://github.com/simonjcarr/infrawatch/commit/ab124d2a3e350b01e34119652bac1b6a56e41810))
+
 ## [0.7.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.6.0...agent/v0.7.0) (2026-04-06)
 
 

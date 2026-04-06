@@ -32,6 +32,8 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml ./
 # Copy source first, then node_modules so they are never overwritten
 COPY apps/web/ ./apps/web/
+# Manifest is read at runtime to determine the required agent version
+COPY .release-please-manifest.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 
@@ -65,6 +67,9 @@ RUN mkdir -p apps/web/.next && chown nextjs:nodejs apps/web/.next
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+# Release-please manifest — read at runtime to determine the required agent version
+COPY --from=builder --chown=nextjs:nodejs /app/.release-please-manifest.json /app/.release-please-manifest.json
 
 # Migration script and SQL files — uses drizzle-orm (prod dep), no drizzle-kit needed
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/migrate.js ./apps/web/migrate.js

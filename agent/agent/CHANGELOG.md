@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.6.0...agent/v0.7.0) (2026-04-06)
+
+
+### Features
+
+* **checks:** add ad-hoc agent queries for port and service discovery ([dfad656](https://github.com/simonjcarr/infrawatch/commit/dfad65698a5556140e00a21b9058aec45fc1cf2c))
+* **checks:** add ad-hoc agent queries for port and service discovery ([cfafed1](https://github.com/simonjcarr/infrawatch/commit/cfafed175314e1ed70819a11e9d9420e9e4f2043))
+
 ## [0.6.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.5.1...agent/v0.6.0) (2026-04-06)
 
 

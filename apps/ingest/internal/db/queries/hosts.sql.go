@@ -2,10 +2,9 @@ package queries
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -94,14 +93,15 @@ func buildIPJSON(ips []string) string {
 	return result
 }
 
-// newCUID generates a simple random ID compatible with the cuid2 format used by the web app.
-// In production this would use the @paralleldrive/cuid2 equivalent or a UUID.
+// newCUID generates a cryptographically random ID compatible with the cuid2 format used by the web app.
 func newCUID() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	b := make([]byte, 24)
-	for i := range b {
-		b[i] = chars[r.Intn(len(chars))]
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		panic("crypto/rand unavailable: " + err.Error())
 	}
-	return string(b)
+	for i, b := range buf {
+		buf[i] = chars[int(b)%len(chars)]
+	}
+	return string(buf)
 }

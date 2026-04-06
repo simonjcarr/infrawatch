@@ -2,9 +2,11 @@
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { agents, agentStatusHistory, agentEnrolmentTokens, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, gt } from 'drizzle-orm'
-import type { Agent, AgentEnrolmentToken, Host } from '@/lib/db/schema'
+import { agents, agentStatusHistory, agentEnrolmentTokens, hosts, hostMetrics } from '@/lib/db/schema'
+import { eq, and, isNull, gt, gte, asc } from 'drizzle-orm'
+import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
+
+export type OfflinePeriod = { start: number; end: number | null }
 
 const createEnrolmentTokenSchema = z.object({
   label: z.string().min(1, 'Label is required').max(100),
@@ -185,6 +187,74 @@ export async function getActiveEnrolmentToken(token: string) {
       gt(agentEnrolmentTokens.expiresAt, now),
     ),
   })
+}
+
+export type MetricsRange = '1h' | '24h' | '7d'
+
+export async function getHostMetrics(
+  orgId: string,
+  hostId: string,
+  range: MetricsRange,
+): Promise<HostMetric[]> {
+  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+
+  return db
+    .select()
+    .from(hostMetrics)
+    .where(
+      and(
+        eq(hostMetrics.organisationId, orgId),
+        eq(hostMetrics.hostId, hostId),
+        gte(hostMetrics.recordedAt, cutoff),
+      ),
+    )
+    .orderBy(asc(hostMetrics.recordedAt))
+}
+
+export async function getAgentOfflinePeriods(
+  orgId: string,
+  agentId: string,
+  range: MetricsRange,
+): Promise<OfflinePeriod[]> {
+  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
+  const windowStart = Date.now() - hours * 60 * 60 * 1000
+  // Look back one extra hour before the window to capture an offline event that
+  // started before the visible range.
+  const lookback = new Date(windowStart - 60 * 60 * 1000)
+
+  const events = await db
+    .select({ status: agentStatusHistory.status, createdAt: agentStatusHistory.createdAt })
+    .from(agentStatusHistory)
+    .where(
+      and(
+        eq(agentStatusHistory.agentId, agentId),
+        eq(agentStatusHistory.organisationId, orgId),
+        gte(agentStatusHistory.createdAt, lookback),
+      ),
+    )
+    .orderBy(asc(agentStatusHistory.createdAt))
+
+  const periods: OfflinePeriod[] = []
+  let offlineStart: number | null = null
+
+  for (const event of events) {
+    const ts = new Date(event.createdAt).getTime()
+    if (event.status === 'offline') {
+      // Clamp start to the visible window boundary
+      offlineStart = Math.max(ts, windowStart)
+    } else if (event.status === 'active' && offlineStart !== null) {
+      periods.push({ start: offlineStart, end: ts })
+      offlineStart = null
+    }
+  }
+
+  // Agent is still offline — period extends to now
+  if (offlineStart !== null) {
+    periods.push({ start: offlineStart, end: null })
+  }
+
+  return periods
 }
 
 export async function getHost(orgId: string, hostId: string): Promise<HostWithAgent | null> {

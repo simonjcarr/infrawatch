@@ -9,11 +9,46 @@
 **Phase 1 — Agent & Host Inventory**
 
 ## Current Status
-🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end. Agent collects real system metrics (CPU, memory, disk, uptime, disks, network interfaces), streams via gRPC heartbeat, ingest updates the DB, and the web UI shows live data via SSE. mTLS, Redpanda, metrics consumer, and check definitions deferred.
+🟡 Phase 1 in progress — Full agent → ingest → web pipeline working end-to-end with metric history. Agent collects real system metrics and streams via gRPC heartbeat. Ingest persists each heartbeat to a TimescaleDB hypertable (`host_metrics`). Web UI shows live data via SSE and historical CPU/memory/disk graphs with 1h/24h/7d range selector. mTLS, Redpanda, and check definitions deferred.
 
 ---
 
 ## What Has Been Built
+
+### Session 5 — Metric history, TimescaleDB hypertable, metric graphs
+
+**`host_metrics` TimescaleDB hypertable** (`apps/web/lib/db/schema/metrics.ts`)
+- New table: `id, organisation_id, host_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds, created_at`
+- Migration `0005_wet_photon.sql` creates the table, converts it to a TimescaleDB hypertable on `recorded_at`, and adds a 30-day retention policy. Wrapped in `DO $$` block for graceful degradation if TimescaleDB is not available.
+
+**Ingest: persist metric rows** (`apps/ingest/internal/db/queries/metrics.sql.go`)
+- `InsertHostMetricByAgentID` — inserts into `host_metrics` via subquery on `hosts.agent_id`; no extra round-trip needed
+- Called from `processHeartbeat` on every heartbeat alongside the existing `UpdateHostVitals`
+
+**Fix `newCUID()`** (`apps/ingest/internal/db/queries/hosts.sql.go`)
+- Replaced `math/rand` with `crypto/rand` — IDs are now cryptographically random
+
+**`getHostMetrics` server action** (`apps/web/lib/actions/agents.ts`)
+- `getHostMetrics(orgId, hostId, range: '1h'|'24h'|'7d')` — queries `host_metrics` with a computed cutoff timestamp, returns rows ordered by `recorded_at` asc
+
+**Metrics tab on host detail page** (`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`)
+- Fourth tab: Metrics
+- Range selector buttons: Last hour / Last 24 hours / Last 7 days
+- Recharts `LineChart` with three lines: CPU (blue), Memory (green), Disk (amber); Y-axis 0–100 %
+- Empty state when no data yet; loading state while fetching
+- Refetches every 60 s; only fetches when the Metrics tab is active
+
+**Offline period visualisation** (`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`)
+- `getAgentOfflinePeriods(orgId, agentId, range)` server action — walks `agent_status_history` to build `{start, end}` offline windows within the visible time range; looks back one extra hour to capture periods that started before the window
+- Chart X-axis domain always extends to `Date.now()` via a sentinel null point so time advances even when no new rows are arriving
+- `ReferenceArea` rendered for each offline window — light gray tint (`fillOpacity: 0.15`), dark readable "Offline" label
+- Zero-value boundary points injected at each offline start/end so lines visually drop to 0% during the outage and rise again on reconnect
+
+**Build state**
+- `npm run build` — zero errors ✅
+- `go build ./apps/ingest/...` — compiles ✅
+
+---
 
 ### Session 4 — Real system metrics, host detail page, SSE real-time streaming
 
@@ -244,7 +279,7 @@
 ## Known Issues / Technical Debt
 
 - `codec.go` is a development stub — replace with protoc-generated files by running `make proto` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`)
-- `newCUID()` in ingest DB queries uses `math/rand` — replace with a proper cuid2 Go library before production
+- `newCUID()` in ingest DB queries now uses `crypto/rand` ✅
 - Docker Compose does not auto-run migrations on startup
 - `gen_cuid()` SQL function does not exist in PostgreSQL — `InsertAgent` has a fallback but the primary query will fail and fall through. The fallback is correct.
 - mTLS client certificates deferred — TLS builder is structured for it; deliberately deferred until Phase 1 metrics work is complete
@@ -261,22 +296,21 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 5 — Metrics history, TimescaleDB hypertables, metric graphs**
+**Session 6 — Check definition system**
 
-The pipeline is working end-to-end. The next step is to persist metric history (not just the latest snapshot) and surface it as graphs in the UI.
+Metric history is working. The next step is the check definition system — the mechanism by which operators define what the agent should monitor beyond basic heartbeat vitals.
 
-1. **TimescaleDB hypertable** — create `host_metrics` table (host_id, org_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds); convert to hypertable; add 30-day retention policy
-2. **Metrics consumer** (`consumers/metrics/`) — reads from `TopicMetricsRaw` queue, inserts into `host_metrics`; for now the in-process queue is fine
-3. **Server action** — `getHostMetrics(orgId, hostId, range)` — returns time-series rows for a given time window (1h, 24h, 7d)
-4. **Metrics tab** on host detail page — Recharts line chart for CPU %, memory %, disk % over time; time-range selector
-5. **Fix `newCUID()`** — replace `math/rand` stub in ingest DB queries with a proper cuid2 Go library (`github.com/lucsky/cuid` or equivalent)
-6. **mTLS** (deferred again if metrics work is prioritised — record the decision)
+1. **Check definition schema** — `checks` table (org_id, host_id or tag-based targeting, check_type, config jsonb, enabled, interval_seconds); `check_results` hypertable (check_id, host_id, org_id, ran_at, status: pass/fail/error, output, duration_ms)
+2. **Check types** — `port` (TCP connectivity), `process` (is a process running), `http` (internal HTTP health check) — at minimum these three; `shell` can be deferred
+3. **Agent-side check execution** — agent receives check definitions via `HeartbeatResponse.command` field or a new `GetChecks` RPC; executes checks; returns results in next heartbeat or a dedicated RPC
+4. **Check results persistence** — ingest handler receives check results and inserts into `check_results` hypertable
+5. **Checks UI** — list of checks per host, create/edit check dialog, latest result status badge, link to result history
 
 **Outstanding technical debt (carry forward):**
-- `newCUID()` in `apps/ingest/internal/db/queries/` still uses `math/rand` — must be replaced before production
 - `codec.go` is a JSON stub — replace with protoc-generated files (`make proto` requires protoc + plugins)
-- No DB migration has been explicitly confirmed as run — verify `host_metrics` hypertable lands correctly
+- mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
+- DB migrations have not been explicitly confirmed as run in production — verify `host_metrics` hypertable lands correctly on next deploy
 
 ---
 

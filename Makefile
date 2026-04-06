@@ -1,5 +1,7 @@
 .PHONY: proto go-build go-test agent ingest clean
 
+AGENT_DIST_DIR := apps/web/data/agent-dist
+
 PROTO_OUT := proto/gen/go
 
 # Generate Go code from .proto sources.
@@ -20,15 +22,24 @@ proto:
 go-build: agent ingest
 
 agent:
-	@echo "Building agent..."
-	@mkdir -p dist
+	@echo "Building agent binaries for all platforms..."
+	@mkdir -p $(AGENT_DIST_DIR)
 	docker run --rm \
 		-v "$(CURDIR):/src" \
 		-w /src \
 		--user "$(shell id -u):$(shell id -g)" \
+		-e CGO_ENABLED=0 \
+		-e GOCACHE=/tmp/go-cache \
+		-e GOPATH=/tmp/go \
 		golang:1.23 \
-		go build -o dist/agent ./agent/cmd/agent
-	@echo "Agent binary: dist/agent"
+		sh -c 'for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do \
+			os=$${p%%/*}; arch=$${p##*/}; \
+			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
+			echo "  $$os/$$arch..."; \
+			GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags="-s -w" \
+				-o $(AGENT_DIST_DIR)/infrawatch-agent-$$os-$$arch$$ext ./agent/cmd/agent; \
+		done'
+	@echo "Agent binaries ready in $(AGENT_DIST_DIR)/"
 
 ingest:
 	@echo "Building ingest service..."
@@ -73,4 +84,4 @@ dev-tls:
 	@echo "Generated deploy/dev-tls/server.crt and deploy/dev-tls/server.key"
 
 clean:
-	rm -rf dist/ deploy/dev-tls/
+	rm -rf dist/ deploy/dev-tls/ $(AGENT_DIST_DIR)/

@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'web/v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing web/v* tag to bundle (e.g. web/v0.3.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -13,10 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Compute version
         id: ver
-        run: echo "version=${GITHUB_REF_NAME#web/}" >> "$GITHUB_OUTPUT"
+        run: |
+          REF="${{ inputs.tag || github.ref_name }}"
+          echo "version=${REF#web/}" >> "$GITHUB_OUTPUT"
+          echo "tag=${REF}" >> "$GITHUB_OUTPUT"
 
       - name: Stage bundle files
         run: |
@@ -47,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          gh release upload "$GITHUB_REF_NAME" \
+          gh release upload "${{ steps.ver.outputs.tag }}" \
             "infrawatch-single-${VERSION}.zip" \
             "infrawatch-single.zip" \
             --clobber

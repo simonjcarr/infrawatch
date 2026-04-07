@@ -24,10 +24,13 @@ export interface WebhookChannelConfig {
   secret?: string
 }
 
+export type SmtpEncryption = 'none' | 'starttls' | 'tls'
+
 export interface SmtpChannelConfig {
   host: string
   port: number
-  secure: boolean
+  /** 'none' = plain, 'starttls' = STARTTLS on connect, 'tls' = direct SSL/TLS */
+  encryption: SmtpEncryption
   username?: string
   password?: string
   fromAddress: string

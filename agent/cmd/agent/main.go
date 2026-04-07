@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -28,7 +29,14 @@ func main() {
 	addressFlag := flag.String("address", "", "Ingest address host:port (overrides config file and INFRAWATCH_INGEST_ADDRESS)")
 	installFlag := flag.Bool("install", false, "Install agent as a system service and exit (requires --token)")
 	tlsSkipVerifyFlag := flag.Bool("tls-skip-verify", false, "Skip TLS certificate verification — use when ingest uses a self-signed cert (insecure)")
+	versionFlag := flag.Bool("version", false, "Print agent version and exit")
+	versionFlagShort := flag.Bool("v", false, "Print agent version and exit (shorthand)")
 	flag.Parse()
+
+	if *versionFlag || *versionFlagShort {
+		fmt.Printf("infrawatch-agent %s\n", version)
+		os.Exit(0)
+	}
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,

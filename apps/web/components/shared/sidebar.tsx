@@ -28,6 +28,9 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
+import pkg from '../../package.json'
+
+const WEB_VERSION = `v${pkg.version}`
 
 interface NavItem {
   title: string
@@ -103,7 +106,9 @@ export function AppSidebar() {
         <NavGroup label="Administration" items={adminNav} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-2">
-        <p className="text-xs text-muted-foreground px-2 py-1">Community Edition</p>
+        <p className="text-xs text-muted-foreground px-2 py-1">
+          Community Edition <span className="font-mono">{WEB_VERSION}</span>
+        </p>
       </SidebarFooter>
     </Sidebar>
   )

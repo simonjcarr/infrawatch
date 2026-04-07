@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { getHost } from '@/lib/actions/agents'
+import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 import { HostDetailClient } from './host-detail-client'
 
 export const metadata: Metadata = {
@@ -20,5 +21,12 @@ export default async function HostDetailPage({ params }: Props) {
   const host = await getHost(orgId, id)
   if (!host) notFound()
 
-  return <HostDetailClient host={host} orgId={orgId} currentUserId={session.user.id} />
+  return (
+    <HostDetailClient
+      host={host}
+      orgId={orgId}
+      currentUserId={session.user.id}
+      latestAgentVersion={REQUIRED_AGENT_VERSION}
+    />
+  )
 }

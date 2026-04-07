@@ -51,6 +51,26 @@ interface Props {
   host: HostWithAgent
   orgId: string
   currentUserId: string
+  latestAgentVersion: string
+}
+
+/**
+ * Compare two semver-ish version strings ("v1.2.3" or "1.2.3").
+ * Returns true if `latest` is strictly newer than `current`.
+ */
+function isAgentOutdated(current: string | null | undefined, latest: string): boolean {
+  if (!current) return false
+  const parse = (v: string) =>
+    v.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0)
+  const c = parse(current)
+  const l = parse(latest)
+  for (let i = 0; i < Math.max(c.length, l.length); i++) {
+    const a = c[i] ?? 0
+    const b = l[i] ?? 0
+    if (b > a) return true
+    if (b < a) return false
+  }
+  return false
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -147,7 +167,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   )
 }
 
-export function HostDetailClient({ host: initialHost, orgId, currentUserId }: Props) {
+export function HostDetailClient({ host: initialHost, orgId, currentUserId, latestAgentVersion }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState<MetricsRange>('24h')
 
@@ -354,10 +374,18 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId }: Pr
                       {host.agent ? <StatusBadge status={host.agent.status} /> : '—'}
                     </dd>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
                     <dt className="text-muted-foreground">Version</dt>
-                    <dd className="font-medium text-foreground font-mono text-xs">
-                      {host.agent?.version ?? '—'}
+                    <dd className="font-medium text-foreground font-mono text-xs flex items-center gap-2">
+                      <span>{host.agent?.version ?? '—'}</span>
+                      {isAgentOutdated(host.agent?.version, latestAgentVersion) && (
+                        <Badge
+                          className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 font-sans"
+                          title={`Latest available: ${latestAgentVersion}`}
+                        >
+                          Update available ({latestAgentVersion})
+                        </Badge>
+                      )}
                     </dd>
                   </div>
                   <div className="flex justify-between">

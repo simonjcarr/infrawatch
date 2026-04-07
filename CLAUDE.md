@@ -331,11 +331,37 @@ Do not start Phase N+1 until Phase N is solid.
 
 ---
 
+## Database Migration Rules
+
+> **CRITICAL — do not skip these steps.**
+
+### Always use `db:generate` for schema changes
+
+**Never hand-write migration SQL files or `_journal.json` entries manually.**
+
+When you change any file in `apps/web/lib/db/schema/`:
+
+```bash
+cd apps/web
+pnpm run db:generate   # creates the SQL file + updates meta/_journal.json
+pnpm run db:migrate    # applies it to the local/dev database
+```
+
+**Why this matters:** `drizzle-kit generate` produces a consistent SQL file, a correctly-hashed journal entry, and a meta snapshot that all three consumers (drizzle-kit CLI, the ORM migrator in `migrate.js`, and the Docker container startup) agree on. Hand-crafted migrations have been proven to cause the migration to be recorded in `__drizzle_migrations` as applied without the SQL actually executing — leaving the database out of sync with no error and no way to re-run the migration without manual intervention.
+
+### Migration checklist
+1. Edit schema file(s) in `apps/web/lib/db/schema/`
+2. Run `pnpm run db:generate` — commit the generated files alongside the schema change
+3. Run `pnpm run db:migrate` to apply locally
+4. Run `pnpm run build` to verify no TypeScript errors
+
+---
+
 ## Code Quality Rules
 
 - TypeScript strict mode — no `any`, no `@ts-ignore` without explanation
 - No linting errors — fix before committing
-- Run `npm run build` after every significant change and fix all errors
+- Run `pnpm run build` after every significant change and fix all errors
 - Server Actions must validate input with Zod before touching the database
 - All database queries must be scoped by `organisationId`
 - Never expose internal IDs in URLs without verifying the requesting user has access

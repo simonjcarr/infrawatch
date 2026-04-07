@@ -34,8 +34,6 @@ services:
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
       NODE_ENV: production
       AGENT_DIST_DIR: /var/lib/infrawatch/agent-dist
-      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER:-}
-      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME:-}
     volumes:
       - agent_dist:/var/lib/infrawatch/agent-dist
 

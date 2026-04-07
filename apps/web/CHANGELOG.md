@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.2.0...web/v0.3.0) (2026-04-07)
+
+
+### Features
+
+* **dist:** customer bundle + hardcoded agent repo + first-run start.sh ([d055a59](https://github.com/simonjcarr/infrawatch/commit/d055a59e9096dcee6358078d72e3697bf0965ece))
+* **dist:** customer bundle, hardcoded agent repo, first-run start.sh ([711cd04](https://github.com/simonjcarr/infrawatch/commit/711cd04b05cb49bff3c99273040a1aea956d3906))
+
 ## [0.2.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.1.0...web/v0.2.0) (2026-04-07)
 
 

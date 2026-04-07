@@ -93,6 +93,13 @@ func (r *Runner) runStream(ctx context.Context) error {
 		return fmt.Errorf("opening heartbeat stream: %w", err)
 	}
 
+	// Reset the dedup map per stream session. Queries pushed on a previous
+	// (now-dead) stream will be re-pushed by the server on reconnect and must
+	// be re-executed; keeping stale IDs would silently drop them.
+	r.seenMu.Lock()
+	r.seenQueryIDs = make(map[string]struct{})
+	r.seenMu.Unlock()
+
 	slog.Info("heartbeat stream opened", "agent_id", r.agentID)
 
 	// Background receiver: the server pushes HeartbeatResponses both as

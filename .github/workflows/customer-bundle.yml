@@ -1,0 +1,53 @@
+name: Customer Bundle
+
+on:
+  push:
+    tags:
+      - 'web/v*'
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#web/}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage bundle files
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p dist/infrawatch
+          cp docker-compose.single.yml dist/infrawatch/docker-compose.yml
+          cp start.sh                  dist/infrawatch/start.sh
+          cp .env.example              dist/infrawatch/.env.example
+          cp deploy/customer-bundle/README.md dist/infrawatch/README.md
+          echo "$VERSION" > dist/infrawatch/VERSION
+          chmod +x dist/infrawatch/start.sh
+          # Bundled compose file is named docker-compose.yml so plain
+          # `docker compose` works without -f. Strip the explicit -f from
+          # the bundled start.sh to match.
+          sed -i 's/-f docker-compose.single.yml //g' dist/infrawatch/start.sh
+
+      - name: Create zip
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          (cd dist && zip -r "../infrawatch-single-${VERSION}.zip" infrawatch)
+          cp "infrawatch-single-${VERSION}.zip" infrawatch-single.zip
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          gh release upload "$GITHUB_REF_NAME" \
+            "infrawatch-single-${VERSION}.zip" \
+            "infrawatch-single.zip" \
+            --clobber

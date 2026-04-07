@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
+import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from '@/lib/agent/repo'
 
-const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER ?? ''
-const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME ?? ''
 const AGENT_DIST_DIR = process.env.AGENT_DIST_DIR ?? './data/agent-dist'
 
 interface GitHubAsset {
@@ -61,17 +60,15 @@ export async function GET(request: NextRequest) {
   }
 
   // ── 2: Fetch from GitHub release for the required version ─────────────────
-  if (GITHUB_REPO_OWNER && GITHUB_REPO_NAME) {
-    const tag = `agent/${REQUIRED_AGENT_VERSION}`
-    const release = await fetchRelease(tag)
-    if (release) {
-      const asset = release.assets.find((a) => a.name === baseName)
-      if (asset) {
-        const binary = await fetchBinaryFromGitHub(asset.browser_download_url)
-        if (binary) {
-          await cacheLocally(versionedPath, binary)
-          return new NextResponse(binary, buildHeaders(baseName, binary.byteLength))
-        }
+  const tag = `agent/${REQUIRED_AGENT_VERSION}`
+  const release = await fetchRelease(tag)
+  if (release) {
+    const asset = release.assets.find((a) => a.name === baseName)
+    if (asset) {
+      const binary = await fetchBinaryFromGitHub(asset.browser_download_url)
+      if (binary) {
+        await cacheLocally(versionedPath, binary)
+        return new NextResponse(binary, buildHeaders(baseName, binary.byteLength))
       }
     }
   }
@@ -87,9 +84,7 @@ export async function GET(request: NextRequest) {
     {
       error:
         `No binary available for ${os}/${arch} (required version: ${REQUIRED_AGENT_VERSION}). ` +
-        (GITHUB_REPO_OWNER
-          ? `Ensure a GitHub release exists for tag "agent/${REQUIRED_AGENT_VERSION}".`
-          : `Set GITHUB_REPO_OWNER + GITHUB_REPO_NAME, or run \`make agent\` to build locally.`),
+        `Ensure a GitHub release exists for tag "agent/${REQUIRED_AGENT_VERSION}" in ${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}.`,
     },
     { status: 503 }
   )
@@ -108,7 +103,7 @@ const ghHeaders: Record<string, string> = {
 async function fetchRelease(tag: string): Promise<GitHubRelease | null> {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/tags/${encodeURIComponent(tag)}`,
+      `https://api.github.com/repos/${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}/releases/tags/${encodeURIComponent(tag)}`,
       { headers: ghHeaders }
     )
     if (!res.ok) return null

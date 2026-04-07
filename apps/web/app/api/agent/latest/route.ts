@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-
-const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER ?? ''
-const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME ?? ''
+import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from '@/lib/agent/repo'
 
 interface GitHubRelease {
   tag_name: string
@@ -15,13 +13,6 @@ interface GitHubRelease {
  * Filters GitHub releases to those tagged agent/v* and returns the newest.
  */
 export async function GET() {
-  if (!GITHUB_REPO_OWNER || !GITHUB_REPO_NAME) {
-    return NextResponse.json(
-      { error: 'GITHUB_REPO_OWNER and GITHUB_REPO_NAME must be set' },
-      { status: 503 }
-    )
-  }
-
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
@@ -31,7 +22,7 @@ export async function GET() {
   }
 
   const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases?per_page=20`,
+    `https://api.github.com/repos/${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}/releases?per_page=20`,
     { headers, next: { revalidate: 300 } }
   )
 

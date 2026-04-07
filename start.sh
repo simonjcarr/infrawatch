@@ -1,16 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load .env so values like AGENT_DOWNLOAD_BASE_URL, GITHUB_REPO_OWNER etc.
-# are available both to this script and (via export) to the docker compose
-# variable substitution that follows. docker compose also reads .env on its
-# own, but we need these in the bash environment too because start.sh
-# inspects them and prints warnings.
-if [ -f ".env" ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
+# First-run bootstrap: if .env is missing but .env.example is here, copy it
+# and ask the user to review before continuing. We never want to silently
+# boot with placeholder secrets.
+if [ ! -f ".env" ]; then
+  if [ -f ".env.example" ]; then
+    cp .env.example .env
+    chmod 600 .env
+    echo ""
+    echo "Created .env from .env.example."
+    echo "Edit .env to set your URLs, then re-run ./start.sh."
+    echo ""
+    exit 0
+  else
+    echo "ERROR: no .env and no .env.example found in $(pwd)" >&2
+    exit 1
+  fi
+fi
+
+# Load .env so values like AGENT_DOWNLOAD_BASE_URL are available both to
+# this script and (via export) to the docker compose variable substitution
+# that follows.
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
+
+# Auto-generate BETTER_AUTH_SECRET on first run if blank. Written back to
+# .env in place so subsequent runs reuse the same secret.
+if [ -z "${BETTER_AUTH_SECRET:-}" ]; then
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "ERROR: openssl is required to generate BETTER_AUTH_SECRET" >&2
+    exit 1
+  fi
+  GENERATED_SECRET=$(openssl rand -hex 32)
+  # Portable in-place edit (BSD/GNU sed compatible).
+  if grep -q '^BETTER_AUTH_SECRET=' .env; then
+    awk -v s="$GENERATED_SECRET" '/^BETTER_AUTH_SECRET=/ {print "BETTER_AUTH_SECRET=" s; next} {print}' .env > .env.tmp && mv .env.tmp .env
+  else
+    echo "BETTER_AUTH_SECRET=$GENERATED_SECRET" >> .env
+  fi
+  chmod 600 .env
+  export BETTER_AUTH_SECRET="$GENERATED_SECRET"
+  echo "Generated BETTER_AUTH_SECRET and wrote it to .env."
 fi
 
 # Generate dev TLS certificates for the ingest service if they don't exist
@@ -45,13 +78,6 @@ fi
 # running this script for remote agents (e.g. AGENT_DOWNLOAD_BASE_URL=https://infrawatch.example.com).
 export AGENT_DOWNLOAD_BASE_URL="${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}"
 echo "Agent download base URL: ${AGENT_DOWNLOAD_BASE_URL}"
-
-# GITHUB_REPO_OWNER / GITHUB_REPO_NAME let the web app lazily fetch agent
-# binaries from GitHub Releases on first request and cache them in the
-# agent_dist volume. Without these, only locally-built binaries are served.
-if [ -z "${GITHUB_REPO_OWNER:-}" ] || [ -z "${GITHUB_REPO_NAME:-}" ]; then
-  echo "WARNING: GITHUB_REPO_OWNER / GITHUB_REPO_NAME not set — the web app will not be able to fetch agent binaries from GitHub Releases."
-fi
 
 # Always pull the latest published images from GHCR. This is the production
 # install path — users running Infrawatch from Docker do not have a source

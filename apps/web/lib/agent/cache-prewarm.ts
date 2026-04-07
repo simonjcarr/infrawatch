@@ -1,9 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 import { REQUIRED_AGENT_VERSION } from './version'
+import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from './repo'
 
-const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER ?? ''
-const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME ?? ''
 const AGENT_DIST_DIR = process.env.AGENT_DIST_DIR ?? './data/agent-dist'
 
 const PLATFORMS = [
@@ -34,17 +33,12 @@ interface GitHubRelease {
  * prewarm failure must never prevent the server from starting.
  */
 export async function prewarmAgentCache(): Promise<void> {
-  if (!GITHUB_REPO_OWNER || !GITHUB_REPO_NAME) {
-    console.log('[agent-cache] GitHub not configured — skipping prewarm')
-    return
-  }
-
   const tag = `agent/${REQUIRED_AGENT_VERSION}`
   let release: GitHubRelease | null = null
 
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/tags/${encodeURIComponent(tag)}`,
+      `https://api.github.com/repos/${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}/releases/tags/${encodeURIComponent(tag)}`,
       {
         headers: {
           Accept: 'application/vnd.github+json',

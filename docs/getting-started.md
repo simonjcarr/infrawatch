@@ -21,133 +21,21 @@ That's it. No local Go, Node.js, or pnpm required.
 
 ## Option A — Pre-built images from GHCR
 
-The fastest way to get Infrawatch running. Images are published to the GitHub Container Registry on every push to `main`.
-
-### Step 1 — Create a working directory
+The fastest way to get Infrawatch running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`, README) from the latest GitHub release and unpacks it into `./infrawatch`:
 
 ```bash
-mkdir infrawatch && cd infrawatch
+curl -fsSL https://raw.githubusercontent.com/simonjcarr/infrawatch/main/install.sh | bash
+cd infrawatch
+./start.sh        # first run: creates .env from the example, then exits
+$EDITOR .env      # set BETTER_AUTH_URL, AGENT_DOWNLOAD_BASE_URL, etc.
+./start.sh        # second run: generates secret, certs, pulls images, boots
 ```
 
-### Step 2 — Generate dev TLS certificates
+To pin a specific bundle version: `INFRAWATCH_VERSION=v0.3.0 bash` instead of plain `bash`.
 
-The ingest service (gRPC) requires TLS. Generate a self-signed certificate using Docker:
+The bundled `start.sh` generates dev TLS certs, generates `BETTER_AUTH_SECRET` if blank, pulls the latest `web`/`ingest`/`db` images from GHCR, and starts the stack. Database migrations run inside the web container automatically on startup.
 
-```bash
-mkdir -p deploy/dev-tls
-docker run --rm \
-  -v "$(pwd)/deploy/dev-tls:/out" \
-  alpine/openssl req -x509 \
-  -newkey rsa:4096 \
-  -keyout /out/server.key \
-  -out /out/server.crt \
-  -days 365 \
-  -nodes \
-  -subj "/CN=localhost" \
-  -addext "subjectAltName=DNS:localhost,DNS:ingest,IP:127.0.0.1"
-```
-
-### Step 3 — Create the docker-compose file
-
-Create `docker-compose.yml` with the following content:
-
-```yaml
-services:
-  db:
-    image: timescale/timescaledb:latest-pg16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: infrawatch
-      POSTGRES_PASSWORD: infrawatch
-      POSTGRES_DB: infrawatch
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U infrawatch -d infrawatch"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  web:
-    image: ghcr.io/simonjcarr/infrawatch/web:latest
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
-      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      NODE_ENV: production
-
-  ingest:
-    image: ghcr.io/simonjcarr/infrawatch/ingest:latest
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "9443:9443"   # gRPC (TLS)
-      - "8080:8080"   # JWKS + healthz HTTP
-    environment:
-      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
-      INGEST_TLS_CERT: /etc/infrawatch/tls/server.crt
-      INGEST_TLS_KEY: /etc/infrawatch/tls/server.key
-      INGEST_JWT_KEY_FILE: /var/lib/infrawatch/jwt_key.pem
-    volumes:
-      - ./deploy/dev-tls:/etc/infrawatch/tls:ro
-      - ingest_data:/var/lib/infrawatch
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  db_data:
-  ingest_data:
-```
-
-### Step 4 — Create the env file
-
-Create a `.env` file in the same directory:
-
-```env
-BETTER_AUTH_SECRET=change-this-to-a-long-random-string
-BETTER_AUTH_URL=http://localhost:3000
-BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-> Generate a strong secret with: `openssl rand -hex 32`
-
-### Step 5 — Start the stack
-
-```bash
-docker compose up -d
-```
-
-Pull the latest images and start all three services. Wait until healthy:
-
-```bash
-docker compose ps
-```
-
-All three should show `healthy` or `running`.
-
-### Step 6 — Run database migrations
-
-Migrations run inside the web container using the bundled migration script:
-
-```bash
-docker compose exec web node migrate.js
-```
-
-### Step 7 — Continue from [Create your account](#step-create-your-account)
+When all three containers show `healthy` in `docker compose ps`, continue from [Create your account](#step-create-your-account). The full quickstart, troubleshooting, and uninstall instructions are in `infrawatch/README.md` inside the bundle.
 
 ---
 

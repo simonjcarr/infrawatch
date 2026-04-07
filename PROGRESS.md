@@ -9,11 +9,46 @@
 **Phase 2 — Monitoring & Alerting**
 
 ## Current Status
-🟡 Phase 2 in progress — Full alert pipeline built with multi-channel notifications (webhook + SMTP email). Ingest evaluates rules on every heartbeat, fires/resolves instances. Alert rules support `check_status` and `metric_threshold`. Web UI has a live Alerts page, per-host Alerts tab, alert count badge in inventory, and a Global Alert Defaults settings page that auto-applies configured rules to every newly-approved host. Agent HTTP check resource leak fixed; stream dedup map reset on reconnect. mTLS and Redpanda deferred.
+🟡 Phase 2 in progress — Full alert pipeline built with multi-channel notifications (webhook + SMTP email). Notification channels now support test delivery with a result log dialog, in-place editing, and a three-way encryption selector (none/STARTTLS/SSL-TLS). SMTP dispatch is now wired into the Go ingest service — previously only webhooks were dispatched. Ingest evaluates rules on every heartbeat, fires/resolves instances. Alert rules support `check_status` and `metric_threshold`. Web UI has a live Alerts page, per-host Alerts tab, alert count badge in inventory, and a Global Alert Defaults settings page that auto-applies configured rules to every newly-approved host. mTLS and Redpanda deferred.
 
 ---
 
 ## What Has Been Built
+
+### Session 12 — Notification channel test, edit, and SMTP dispatch fix
+
+**Test notification button** (`apps/web/app/(dashboard)/alerts/alerts-client.tsx`, `apps/web/lib/actions/alerts.ts`)
+- Flask icon button per channel row; sends a real test payload and shows a `TestLogDialog` with success confirmation or the exact error string (e.g. SMTP auth failure, HTTP 401, TLS version mismatch)
+- Webhook test: POSTs `alert.test` JSON payload with HMAC-SHA256 signature when a secret is set; 10 s timeout
+- SMTP test: sends via nodemailer using the stored channel config; nodemailer installed as a new web dependency
+- Button shows `Loader2` spinner while in flight; result dialog stays open until dismissed
+
+**Edit notification channel** (`apps/web/app/(dashboard)/alerts/alerts-client.tsx`, `apps/web/lib/actions/alerts.ts`)
+- Pencil icon button opens type-specific edit dialog (`EditWebhookDialog` / `EditSmtpDialog`) pre-filled from the safe config
+- Secret/password fields labelled "leave blank to keep existing" when a value is already stored; empty submission preserves the existing credential
+- `updateNotificationChannel` server action merges with the existing DB row so secrets are never lost
+
+**SMTP encryption field** (`apps/web/lib/db/schema/alerts.ts`, `apps/web/lib/actions/alerts.ts`, `apps/web/app/(dashboard)/alerts/alerts-client.tsx`)
+- `SmtpChannelConfig.secure: boolean` replaced with `encryption: 'none' | 'starttls' | 'tls'`; new `SmtpEncryption` type exported from schema
+- Zod schemas and `NotificationChannelSafe` type updated throughout
+- `normaliseSmtpConfig()` backward-compat function converts legacy `secure: bool` rows on read (`true → 'tls'`, `false → 'starttls'`) — no migration needed (JSONB)
+- `sendTestNotification` maps encryption to nodemailer: `tls → secure: true`, `starttls → requireTLS: true`, `none → plain`
+- UI: checkbox replaced with labelled `SmtpEncryptionSelect` (three options with descriptions); selecting a mode auto-fills the conventional port (465/587/25)
+- Channel details column now shows encryption mode: e.g. `smtp.eu.mailgun.org:587 (STARTTLS) → ...`
+
+**SMTP alert dispatch — Go ingest service** (`apps/ingest/internal/db/queries/alerts.sql.go`, `apps/ingest/internal/handlers/alerts.go`, `apps/ingest/internal/handlers/notify.go`)
+- `SmtpChannelRow` struct and `GetEnabledSmtpChannels` query added — previously absent; SMTP channels were silently never fetched
+- `smtpChannelConfig` struct with `effectiveEncryption()` handles both new `encryption` field and legacy `secure: bool`
+- `sendSmtpEmail`: implements all three modes — `tls` (direct TLS via `crypto/tls` + `smtp.NewClient`), `starttls` (`smtp.Dial` + `StartTLS`), `none` (`smtp.SendMail`); `smtpSend` helper for MAIL/RCPT/DATA sequence
+- `dispatchSmtp` fans out to all SMTP channels in goroutines, logging failures (best-effort, same pattern as webhooks)
+- `notifChannels` struct bundles `webhooks` and `smtp` slices; `evaluateCheckStatusRule` and `evaluateMetricThresholdRule` updated to accept and dispatch to both
+- All four fire/resolve points in both rule evaluators now call both `dispatchWebhooks` and `dispatchSmtp`
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./apps/ingest/...` — compiles ✅
+
+---
 
 ### Session 11 — Agent HTTP client fix and stream dedup reset
 

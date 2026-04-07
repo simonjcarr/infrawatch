@@ -9,11 +9,52 @@
 **Phase 2 — Monitoring & Alerting**
 
 ## Current Status
-🟡 Phase 2 in progress — Full alert pipeline built: ingest evaluates alert rules on every heartbeat, fires/resolves instances, and POSTs to webhook channels. Alert rules support `check_status` (consecutive failures) and `metric_threshold` (cpu/memory/disk vs threshold). Web UI has a live Alerts page (active alerts, history, acknowledge, webhook channel management), an Alerts tab on each host detail page (rule builder + active count badge), and an alert count column in the host inventory table. Auto-refresh 30 s throughout. mTLS and Redpanda deferred.
+🟡 Phase 2 in progress — Full alert pipeline built with multi-channel notifications (webhook + SMTP email). Ingest evaluates rules on every heartbeat, fires/resolves instances. Alert rules support `check_status` and `metric_threshold`. Web UI has a live Alerts page, per-host Alerts tab, alert count badge in inventory, and a Global Alert Defaults settings page that auto-applies configured rules to every newly-approved host. Agent HTTP check resource leak fixed; stream dedup map reset on reconnect. mTLS and Redpanda deferred.
 
 ---
 
 ## What Has Been Built
+
+### Session 11 — Agent HTTP client fix and stream dedup reset
+
+**HTTP check resource leak** (`agent/internal/checks/http.go`)
+- Shared a single `http.Client` (with `Transport`) across all HTTP check goroutines instead of creating a new one per check — prevents file-descriptor exhaustion from accumulated idle transports on hosts with many HTTP checks
+- Response bodies are now always drained before close so TCP connections are cleanly returned to the pool
+
+**Stream dedup map reset on reconnect** (`agent/internal/heartbeat/heartbeat.go`)
+- `seenQueryIDs` map is cleared at the start of each new stream session so ad-hoc queries that were pending when a stream died are re-executed on the new stream rather than silently dropped
+
+**Build state**
+- `go build ./agent/...` — compiles ✅
+
+---
+
+### Session 10 — SMTP email notifications and global alert defaults
+
+**SMTP notification channel** (`apps/web/lib/db/schema/alerts.ts`, `apps/web/lib/actions/alerts.ts`, `apps/web/app/(dashboard)/alerts/alerts-client.tsx`)
+- New `SmtpChannelConfig` interface: host, port, secure, optional username/password, fromAddress, fromName, toAddresses (array)
+- `NotificationChannelType` union type `'webhook' | 'smtp'` replaces the hard-coded `'webhook'` literal on `notificationChannels.type`
+- `notificationChannels.config` now typed as `WebhookChannelConfig | SmtpChannelConfig`
+- `createNotificationChannel` action handles both channel types; SMTP passwords are redacted (`hasSecret`) the same way webhook secrets are
+- Alerts page updated: Add Channel dialog has a type selector that switches between webhook and SMTP field sets; channel list renders type badge and appropriate masked credentials
+
+**Global alert defaults** (`apps/web/lib/db/schema/alerts.ts`, migration `0009_global_alert_defaults.sql`, `apps/web/lib/actions/alerts.ts`, `apps/web/lib/actions/agents.ts`)
+- New `isGlobalDefault` boolean column on `alertRules` (default false); migration `0009` adds it
+- `getGlobalAlertDefaults(orgId)` — fetches all global-default rules for the org
+- `createGlobalAlertDefault(orgId, input)` — creates a rule with `isGlobalDefault = true`; only `metric_threshold` type allowed for defaults
+- `deleteGlobalAlertDefault(orgId, ruleId)` — soft-deletes a global default rule
+- `applyGlobalDefaultsToHost(orgId, hostId)` — clones each active global-default rule as a host-scoped rule; called from `approveAgent` immediately after manual approval
+- `getAlertRules` now excludes global defaults from regular host/org rule listings (prevents duplicates in the Alerts tab)
+
+**Global Alert Defaults settings page** (`apps/web/app/(dashboard)/settings/alerts/`)
+- New `page.tsx` — admin-only server component; fetches initial defaults, passes to client
+- `alerts-client.tsx` — table of default metric threshold rules with Add/Delete; Add dialog: metric (cpu/memory/disk), operator, threshold %, severity
+- Sidebar link "Global Alert Defaults" added under Administration
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
 
 ### Session 9 — Alert rule builder + alert state machine
 

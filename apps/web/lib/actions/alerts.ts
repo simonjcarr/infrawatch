@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { alertRules, alertInstances, notificationChannels, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, or, desc, inArray, sql } from 'drizzle-orm'
+import { eq, and, isNull, desc, inArray, sql } from 'drizzle-orm'
 import type {
   AlertRule,
   AlertInstance,
@@ -83,12 +83,102 @@ export async function getAlertRules(orgId: string, hostId?: string): Promise<Ale
     where: and(
       eq(alertRules.organisationId, orgId),
       isNull(alertRules.deletedAt),
-      hostId != null
-        ? or(eq(alertRules.hostId, hostId), isNull(alertRules.hostId))
-        : undefined,
+      eq(alertRules.isGlobalDefault, false),
+      hostId != null ? eq(alertRules.hostId, hostId) : undefined,
     ),
     orderBy: alertRules.createdAt,
   })
+}
+
+export async function getGlobalAlertDefaults(orgId: string): Promise<AlertRule[]> {
+  return db.query.alertRules.findMany({
+    where: and(
+      eq(alertRules.organisationId, orgId),
+      isNull(alertRules.deletedAt),
+      eq(alertRules.isGlobalDefault, true),
+    ),
+    orderBy: alertRules.createdAt,
+  })
+}
+
+const createGlobalAlertDefaultSchema = z.object({
+  name: z.string().min(1).max(100),
+  config: metricThresholdConfigSchema,
+  severity: z.enum(['info', 'warning', 'critical']).default('warning'),
+})
+
+export async function createGlobalAlertDefault(
+  orgId: string,
+  input: unknown,
+): Promise<{ success: true; id: string } | { error: string }> {
+  const parsed = createGlobalAlertDefaultSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+  const data = parsed.data
+
+  try {
+    const [row] = await db
+      .insert(alertRules)
+      .values({
+        organisationId: orgId,
+        hostId: null,
+        name: data.name,
+        conditionType: 'metric_threshold',
+        config: data.config as AlertRuleConfig,
+        severity: data.severity,
+        isGlobalDefault: true,
+      })
+      .returning({ id: alertRules.id })
+
+    if (!row) return { error: 'Insert failed' }
+    return { success: true, id: row.id }
+  } catch {
+    return { error: 'Failed to create global alert default' }
+  }
+}
+
+export async function deleteGlobalAlertDefault(
+  orgId: string,
+  ruleId: string,
+): Promise<{ success: true } | { error: string }> {
+  const existing = await db.query.alertRules.findFirst({
+    where: and(
+      eq(alertRules.id, ruleId),
+      eq(alertRules.organisationId, orgId),
+      eq(alertRules.isGlobalDefault, true),
+      isNull(alertRules.deletedAt),
+    ),
+  })
+  if (!existing) return { error: 'Global alert default not found' }
+
+  await db
+    .update(alertRules)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(alertRules.id, ruleId), eq(alertRules.organisationId, orgId)))
+
+  return { success: true }
+}
+
+export async function applyGlobalDefaultsToHost(
+  orgId: string,
+  hostId: string,
+): Promise<void> {
+  const defaults = await getGlobalAlertDefaults(orgId)
+  if (defaults.length === 0) return
+
+  await db.insert(alertRules).values(
+    defaults.map((rule) => ({
+      organisationId: orgId,
+      hostId,
+      name: rule.name,
+      conditionType: rule.conditionType,
+      config: rule.config,
+      severity: rule.severity,
+      enabled: rule.enabled,
+      isGlobalDefault: false,
+    })),
+  )
 }
 
 export async function createAlertRule(

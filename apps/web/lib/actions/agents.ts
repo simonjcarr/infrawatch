@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { agents, agentStatusHistory, agentEnrolmentTokens, hosts, hostMetrics } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, asc } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
+import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 
 export type OfflinePeriod = { start: number; end: number | null }
 
@@ -56,6 +57,14 @@ export async function approveAgent(
         reason: 'Approved by admin',
       })
     })
+
+    // Apply global alert defaults to the associated host (best-effort, outside transaction)
+    const host = await db.query.hosts.findFirst({
+      where: and(eq(hosts.agentId, agentId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    })
+    if (host) {
+      await applyGlobalDefaultsToHost(orgId, host.id)
+    }
 
     return { success: true }
   } catch (err) {

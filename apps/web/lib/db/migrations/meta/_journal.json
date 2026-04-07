@@ -64,6 +64,13 @@
       "when": 1775900000000,
       "tag": "0008_alert_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1744070400000,
+      "tag": "0009_global_alert_defaults",
+      "breakpoints": true
     }
   ]
 }

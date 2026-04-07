@@ -46,6 +46,7 @@ export const alertRules = pgTable('alert_rules', {
   config: jsonb('config').notNull().$type<AlertRuleConfig>(),
   severity: text('severity').notNull().default('warning').$type<AlertSeverity>(),
   enabled: boolean('enabled').notNull().default(true),
+  isGlobalDefault: boolean('is_global_default').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -53,6 +54,7 @@ export const alertRules = pgTable('alert_rules', {
 }, (table) => [
   index('alert_rules_org_host_idx').on(table.organisationId, table.hostId),
   index('alert_rules_org_enabled_idx').on(table.organisationId, table.enabled),
+  index('alert_rules_org_global_idx').on(table.organisationId, table.isGlobalDefault),
 ])
 
 export const alertInstances = pgTable('alert_instances', {

@@ -6,6 +6,7 @@ import {
   Server,
   ShieldCheck,
   Bell,
+  BellPlus,
   Key,
   Package,
   BookOpen,
@@ -53,6 +54,7 @@ const adminNav: NavItem[] = [
   { title: 'Team', href: '/team', icon: Users },
   { title: 'Settings', href: '/settings', icon: Settings },
   { title: 'Agent Enrolment', href: '/settings/agents', icon: Server },
+  { title: 'Global Alert Defaults', href: '/settings/alerts', icon: BellPlus },
 ]
 
 function NavGroup({ label, items }: { label: string; items: NavItem[] }) {

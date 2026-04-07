@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.11.0...agent/v0.11.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* **agent:** self-update now survives systemd and Restart=always ([18c6d5c](https://github.com/simonjcarr/infrawatch/commit/18c6d5c969b94cdbdbe1107d6926ebb1c05d7238))
+* **agent:** self-update survives systemd (syscall.Exec + Restart=always) ([ef17a26](https://github.com/simonjcarr/infrawatch/commit/ef17a26f1974cf3ab530aa0097853233201be51b))
+
 ## [0.11.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.10.0...agent/v0.11.0) (2026-04-07)
 
 

@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -64,7 +66,48 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(cfg)
+
+	// If no explicit LatestVersion was supplied via YAML or env, try reading
+	// it from .release-please-manifest.json. release-please updates this file
+	// automatically when it cuts a new agent release, so this keeps the
+	// ingest service in sync without any manual env-var bookkeeping — exactly
+	// the same source of truth the web app uses (apps/web/lib/agent/version.ts).
+	if cfg.Agent.LatestVersion == "" {
+		if v := loadAgentVersionFromManifest(); v != "" {
+			cfg.Agent.LatestVersion = v
+			slog.Info("loaded agent latest version from release-please manifest", "version", v)
+		}
+	}
 	return cfg, nil
+}
+
+// loadAgentVersionFromManifest reads .release-please-manifest.json from one of
+// several candidate locations and returns the agent version (prefixed with "v")
+// if present. Returns "" if the file cannot be read or has no agent entry.
+func loadAgentVersionFromManifest() string {
+	candidates := []string{
+		os.Getenv("INGEST_RELEASE_MANIFEST_PATH"),
+		"/var/lib/infrawatch/.release-please-manifest.json",
+		".release-please-manifest.json",
+		"../../.release-please-manifest.json",
+	}
+	for _, path := range candidates {
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var manifest map[string]string
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			continue
+		}
+		if v, ok := manifest["agent"]; ok && v != "" {
+			return "v" + v
+		}
+	}
+	return ""
 }
 
 func defaults() *Config {

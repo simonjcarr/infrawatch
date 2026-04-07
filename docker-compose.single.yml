@@ -54,8 +54,18 @@ services:
       INGEST_TLS_CERT: /etc/infrawatch/tls/server.crt
       INGEST_TLS_KEY: /etc/infrawatch/tls/server.key
       INGEST_JWT_KEY_FILE: /var/lib/infrawatch/jwt_key.pem
+      # Public base URL of the web app — agents construct their download URL
+      # from this, so it must be reachable from the agent host (not just from
+      # inside the docker network). Override via .env / start.sh for remote
+      # agents; defaults to localhost for single-host dev.
+      INGEST_AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
+      # Manifest path inside the container — kept in sync with the volume mount
+      # below so the ingest service auto-discovers the latest agent version
+      # from release-please without any env-var bookkeeping.
+      INGEST_RELEASE_MANIFEST_PATH: /etc/infrawatch/release-please-manifest.json
     volumes:
       - ./deploy/dev-tls:/etc/infrawatch/tls:ro
+      - ./.release-please-manifest.json:/etc/infrawatch/release-please-manifest.json:ro
       - ingest_data:/var/lib/infrawatch
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]

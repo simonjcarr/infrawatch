@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.10.0...agent/v0.11.0) (2026-04-07)
+
+
+### Features
+
+* agent --version flag, UI version in sidebar, update-available badge ([2e93adf](https://github.com/simonjcarr/infrawatch/commit/2e93adfcf00094652ab7b3d6d937ead391c43012))
+* agent --version flag, UI version in sidebar, update-available badge ([5468ffb](https://github.com/simonjcarr/infrawatch/commit/5468ffb41241a67824bb558bac4a0e3d0188b38c))
+
 ## [0.10.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.9.1...agent/v0.10.0) (2026-04-07)
 
 

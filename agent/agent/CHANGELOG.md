@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.9.1...agent/v0.10.0) (2026-04-07)
+
+
+### Features
+
+* **alerts:** test notifications, edit channels, and SMTP dispatch ([7ff498b](https://github.com/simonjcarr/infrawatch/commit/7ff498b743aca25228de44fa2d1ad806013f2752))
+
+
+### Bug Fixes
+
+* **agent,ingest:** add gRPC keepalive to prevent silent stream death ([008aba8](https://github.com/simonjcarr/infrawatch/commit/008aba85007a0ebd42e0e622389df04587684667))
+
 ## [0.9.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.9.0...agent/v0.9.1) (2026-04-07)
 
 

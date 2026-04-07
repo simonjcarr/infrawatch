@@ -61,13 +61,12 @@ services:
       # inside the docker network). Override via .env / start.sh for remote
       # agents; defaults to localhost for single-host dev.
       INGEST_AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
-      # Manifest path inside the container — kept in sync with the volume mount
-      # below so the ingest service auto-discovers the latest agent version
-      # from release-please without any env-var bookkeeping.
-      INGEST_RELEASE_MANIFEST_PATH: /etc/infrawatch/release-please-manifest.json
+      # The release-please manifest is baked into the ingest image at build
+      # time (see apps/ingest/Dockerfile) and INGEST_RELEASE_MANIFEST_PATH is
+      # set there as well, so production users running from GHCR do not need
+      # a source checkout for the agent version to be discovered.
     volumes:
       - ./deploy/dev-tls:/etc/infrawatch/tls:ro
-      - ./.release-please-manifest.json:/etc/infrawatch/release-please-manifest.json:ro
       - ingest_data:/var/lib/infrawatch
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]

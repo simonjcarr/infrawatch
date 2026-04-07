@@ -20,8 +20,16 @@ RUN apk add --no-cache ca-certificates wget
 
 COPY --from=builder /dist/ingest /usr/local/bin/ingest
 
+# Bake the release-please manifest into the image. Both the web and ingest
+# images are built from the same commit, so they always agree on the
+# required agent version. Production users running from GHCR have no source
+# checkout to bind-mount.
+COPY .release-please-manifest.json /etc/infrawatch/release-please-manifest.json
+
 # Create runtime directories
 RUN mkdir -p /etc/infrawatch/tls /var/lib/infrawatch
+
+ENV INGEST_RELEASE_MANIFEST_PATH=/etc/infrawatch/release-please-manifest.json
 
 EXPOSE 9443 8080
 

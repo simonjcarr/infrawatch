@@ -70,10 +70,14 @@ if [ -z "${GITHUB_REPO_OWNER:-}" ] || [ -z "${GITHUB_REPO_NAME:-}" ]; then
   echo "WARNING: GITHUB_REPO_OWNER / GITHUB_REPO_NAME not set — the web app will not be able to fetch agent binaries from GitHub Releases."
 fi
 
-docker compose -f docker-compose.single.yml build web ingest
-docker compose -f docker-compose.single.yml pull
+# Always pull the latest published images from GHCR. This is the production
+# install path — users running Infrawatch from Docker do not have a source
+# checkout to build from. To run a locally-built image instead, set
+# WEB_IMAGE / INGEST_IMAGE in your environment (or .env) before invoking this
+# script, or run `docker compose -f docker-compose.single.yml build` manually.
+docker compose -f docker-compose.single.yml pull db web ingest
 docker compose -f docker-compose.single.yml down
-docker compose -f docker-compose.single.yml up -d
+docker compose -f docker-compose.single.yml up -d --pull always
 
 # Wait for the DB to be ready, then apply all pending migrations directly from the
 # host filesystem. This is the authoritative migration step:

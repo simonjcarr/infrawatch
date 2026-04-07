@@ -2,6 +2,7 @@ import { pgTable, text, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
 import { hosts } from './hosts'
+import { users } from './auth'
 
 export interface CheckStatusConfig {
   checkId: string
@@ -92,9 +93,29 @@ export const notificationChannels = pgTable('notification_channels', {
   index('notification_channels_org_enabled_idx').on(table.organisationId, table.enabled),
 ])
 
+export const alertSilences = pgTable('alert_silences', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  hostId: text('host_id').references(() => hosts.id),      // null = org-wide silence
+  ruleId: text('rule_id').references(() => alertRules.id), // null = silence all rules
+  reason: text('reason').notNull(),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+  endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  createdBy: text('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  metadata: jsonb('metadata'),
+}, (table) => [
+  index('alert_silences_org_host_idx').on(table.organisationId, table.hostId),
+  index('alert_silences_org_active_idx').on(table.organisationId, table.startsAt, table.endsAt),
+])
+
 export type AlertRule = typeof alertRules.$inferSelect
 export type NewAlertRule = typeof alertRules.$inferInsert
 export type AlertInstance = typeof alertInstances.$inferSelect
 export type NewAlertInstance = typeof alertInstances.$inferInsert
 export type NotificationChannel = typeof notificationChannels.$inferSelect
 export type NewNotificationChannel = typeof notificationChannels.$inferInsert
+export type AlertSilence = typeof alertSilences.$inferSelect
+export type NewAlertSilence = typeof alertSilences.$inferInsert

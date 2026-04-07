@@ -71,9 +71,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Release-please manifest — read at runtime to determine the required agent version
 COPY --from=builder --chown=nextjs:nodejs /app/.release-please-manifest.json /app/.release-please-manifest.json
 
-# Migration script and SQL files — uses drizzle-orm (prod dep), no drizzle-kit needed
+# Migration script — from builder stage (same source, no caching concern)
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/migrate.js ./apps/web/migrate.js
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/lib/db/migrations ./apps/web/lib/db/migrations
+# Migration SQL files — copied DIRECTLY from the build context so this layer is always
+# invalidated when any migration file changes, regardless of builder-stage cache hits.
+COPY --chown=nextjs:nodejs apps/web/lib/db/migrations ./apps/web/lib/db/migrations
 
 # Next.js standalone only traces the specific files it needs for server.js, not the full
 # package structure required for CJS require() in migrate.js. Copy full packages explicitly.

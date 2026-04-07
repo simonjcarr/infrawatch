@@ -181,6 +181,23 @@ func GetEnabledSmtpChannels(ctx context.Context, pool *pgxpool.Pool, orgID strin
 	return result, rows.Err()
 }
 
+// IsHostSilenced returns true if the given host (or the whole org) currently has
+// an active silence window covering now.
+func IsHostSilenced(ctx context.Context, pool *pgxpool.Pool, orgID, hostID string) (bool, error) {
+	const q = `
+		SELECT COUNT(*) > 0
+		FROM alert_silences
+		WHERE organisation_id = $1
+		  AND deleted_at IS NULL
+		  AND starts_at <= NOW()
+		  AND ends_at   >= NOW()
+		  AND (host_id = $2 OR host_id IS NULL)
+	`
+	var silenced bool
+	err := pool.QueryRow(ctx, q, orgID, hostID).Scan(&silenced)
+	return silenced, err
+}
+
 // GetEnabledWebhookChannels returns all enabled, non-deleted webhook notification
 // channels for the given organisation.
 func GetEnabledWebhookChannels(ctx context.Context, pool *pgxpool.Pool, orgID string) ([]WebhookChannelRow, error) {

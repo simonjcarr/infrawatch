@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  VolumeX,
   Webhook,
   XCircle,
 } from 'lucide-react'
@@ -55,9 +56,13 @@ import {
   deleteNotificationChannel,
   updateNotificationChannel,
   sendTestNotification,
+  getSilences,
+  createSilence,
+  deleteSilence,
 } from '@/lib/actions/alerts'
-import type { AlertInstanceWithRule, NotificationChannelSafe } from '@/lib/actions/alerts'
+import type { AlertInstanceWithRule, NotificationChannelSafe, AlertSilenceWithHost } from '@/lib/actions/alerts'
 import type { AlertSeverity, AlertInstanceStatus } from '@/lib/db/schema'
+import type { HostWithAgent } from '@/lib/actions/agents'
 
 // ─── Severity Badge ────────────────────────────────────────────────────────────
 
@@ -713,6 +718,127 @@ function EditSmtpDialog({
   )
 }
 
+// ─── Add Silence Dialog ────────────────────────────────────────────────────────
+
+function toLocalDatetimeValue(d: Date): string {
+  // Returns a string suitable for <input type="datetime-local"> in local time
+  const offset = d.getTimezoneOffset() * 60_000
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16)
+}
+
+const silenceFormSchema = z.object({
+  hostId: z.string().optional(),
+  reason: z.string().min(1, 'Reason is required').max(255),
+  startsAt: z.string().min(1, 'Start time is required'),
+  endsAt: z.string().min(1, 'End time is required'),
+})
+
+type SilenceFormValues = z.infer<typeof silenceFormSchema>
+
+function AddSilenceDialog({
+  orgId,
+  userId,
+  hosts,
+  open,
+  onOpenChange,
+  onSuccess,
+  prefilledHostId,
+}: {
+  orgId: string
+  userId: string
+  hosts: HostWithAgent[]
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+  prefilledHostId?: string
+}) {
+  const now = new Date()
+  const inOneHour = new Date(now.getTime() + 60 * 60 * 1000)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SilenceFormValues>({
+    resolver: zodResolver(silenceFormSchema),
+    defaultValues: {
+      hostId: prefilledHostId ?? '',
+      startsAt: toLocalDatetimeValue(now),
+      endsAt: toLocalDatetimeValue(inOneHour),
+    },
+  })
+
+  async function onSubmit(values: SilenceFormValues) {
+    const result = await createSilence(orgId, userId, {
+      hostId: values.hostId || null,
+      reason: values.reason,
+      startsAt: new Date(values.startsAt).toISOString(),
+      endsAt: new Date(values.endsAt).toISOString(),
+    })
+    if ('error' in result) return
+    reset()
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create Silence</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="silence-host">Host <span className="text-muted-foreground font-normal">(leave blank for org-wide)</span></Label>
+            <select
+              id="silence-host"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              {...register('hostId')}
+            >
+              <option value="">All hosts (org-wide)</option>
+              {hosts.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.hostname}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="silence-reason">Reason</Label>
+            <Input
+              id="silence-reason"
+              placeholder="e.g. Scheduled maintenance window"
+              {...register('reason')}
+            />
+            {errors.reason && <p className="text-sm text-red-600">{errors.reason.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="silence-starts">Starts at</Label>
+              <Input id="silence-starts" type="datetime-local" {...register('startsAt')} />
+              {errors.startsAt && <p className="text-sm text-red-600">{errors.startsAt.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="silence-ends">Ends at</Label>
+              <Input id="silence-ends" type="datetime-local" {...register('endsAt')} />
+              {errors.endsAt && <p className="text-sm text-red-600">{errors.endsAt.message}</p>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Create Silence
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 interface AlertsClientProps {
@@ -721,6 +847,8 @@ interface AlertsClientProps {
   initialActive: AlertInstanceWithRule[]
   initialRecent: AlertInstanceWithRule[]
   initialChannels: NotificationChannelSafe[]
+  initialSilences: AlertSilenceWithHost[]
+  hosts: HostWithAgent[]
 }
 
 type SeverityFilter = 'all' | AlertSeverity
@@ -731,11 +859,14 @@ export function AlertsClient({
   initialActive,
   initialRecent,
   initialChannels,
+  initialSilences,
+  hosts,
 }: AlertsClientProps) {
   const qc = useQueryClient()
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all')
   const [addWebhookOpen, setAddWebhookOpen] = useState(false)
   const [addSmtpOpen, setAddSmtpOpen] = useState(false)
+  const [addSilenceOpen, setAddSilenceOpen] = useState(false)
   const [editingChannel, setEditingChannel] = useState<NotificationChannelSafe | null>(null)
   const [testingChannelId, setTestingChannelId] = useState<string | null>(null)
   const [testLog, setTestLog] = useState<TestLogEntry | null>(null)
@@ -761,6 +892,13 @@ export function AlertsClient({
     refetchInterval: 60_000,
   })
 
+  const { data: silences = [] } = useQuery({
+    queryKey: ['silences', orgId],
+    queryFn: () => getSilences(orgId),
+    initialData: initialSilences,
+    refetchInterval: 60_000,
+  })
+
   const acknowledgeMutation = useMutation({
     mutationFn: (instanceId: string) => acknowledgeAlert(orgId, instanceId, currentUserId),
     onSuccess: () => {
@@ -772,6 +910,13 @@ export function AlertsClient({
     mutationFn: (channelId: string) => deleteNotificationChannel(orgId, channelId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+    },
+  })
+
+  const deleteSilenceMutation = useMutation({
+    mutationFn: (silenceId: string) => deleteSilence(orgId, silenceId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['silences', orgId] })
     },
   })
 
@@ -950,6 +1095,108 @@ export function AlertsClient({
         </CardContent>
       </Card>
 
+      {/* Silences */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <VolumeX className="size-4 text-muted-foreground" />
+              Silences
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Suppress alert firing during planned maintenance windows
+            </CardDescription>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            onClick={() => setAddSilenceOpen(true)}
+          >
+            <Plus className="size-3.5 mr-1" />
+            Add Silence
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {silences.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No silences configured
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Starts</TableHead>
+                  <TableHead>Ends</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {silences.map((s) => {
+                  const now = new Date()
+                  const start = new Date(s.startsAt)
+                  const end = new Date(s.endsAt)
+                  const isActive = start <= now && end >= now
+                  const isExpired = end < now
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">
+                        {s.hostname ? (
+                          <Link href={`/hosts/${s.hostId}`} className="hover:underline text-foreground">
+                            {s.hostname}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground italic">All hosts</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                        {s.reason}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatAbsolute(s.startsAt)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatAbsolute(s.endsAt)}
+                      </TableCell>
+                      <TableCell>
+                        {isActive ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+                            Active
+                          </Badge>
+                        ) : isExpired ? (
+                          <Badge className="bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100">
+                            Expired
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
+                            Upcoming
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Remove silence"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => deleteSilenceMutation.mutate(s.id)}
+                          disabled={deleteSilenceMutation.isPending}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Notification Channels */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">
@@ -1067,6 +1314,14 @@ export function AlertsClient({
         </CardContent>
       </Card>
 
+      <AddSilenceDialog
+        orgId={orgId}
+        userId={currentUserId}
+        hosts={hosts}
+        open={addSilenceOpen}
+        onOpenChange={setAddSilenceOpen}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['silences', orgId] })}
+      />
       <AddWebhookDialog
         orgId={orgId}
         open={addWebhookOpen}

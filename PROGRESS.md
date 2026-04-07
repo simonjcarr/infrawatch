@@ -15,6 +15,27 @@
 
 ## What Has Been Built
 
+### Session 13 — Alert silencing + migration runner root-cause fix
+
+**Alert silencing feature** (`apps/web/lib/db/schema/alerts.ts`, `apps/web/lib/actions/alerts.ts`, `apps/web/app/(dashboard)/alerts/alerts-client.tsx`, `apps/web/app/(dashboard)/hosts/[id]/alerts-tab.tsx`, `apps/ingest/internal/db/queries/alerts.sql.go`, `apps/ingest/internal/handlers/alerts.go`)
+- New `alert_silences` table — host-scoped or org-wide time windows that suppress alert evaluation; migration `0010_eager_chameleon.sql` generated via `db:generate`
+- Server actions: `getSilences`, `getActiveSilencesForHost`, `createSilence`, `deleteSilence`
+- Go ingest: `IsHostSilenced` query short-circuits `evaluateAlerts` so silenced hosts skip rule evaluation entirely
+- UI: dedicated Silences card on `/alerts` page with Active/Upcoming/Expired badges + add dialog; per-host "Silence Host" button and amber active-silence banner with one-click remove on the host detail Alerts tab
+
+**Migration runner root-cause fix** (`apps/web/lib/db/migrations/meta/_journal.json`, `apps/web/lib/db/migrations/0009_global_alert_defaults.sql`, `apps/web/Dockerfile`, `start.sh`)
+- Recurring "migrations not applied" symptom traced to `_journal.json`: drizzle-orm's migrator decides pending migrations by comparing each entry's `when` timestamp against `MAX(created_at)` in `__drizzle_migrations`. Migration 0008 had been hand-crafted with `when: 1775900000000` (artificially in the future), so 0009 and 0010 — with smaller `when` values — were silently classified as already applied and skipped with no error.
+- Fix: bumped 0009 → `1775900000001` and 0010 → `1775900000002` so timestamps are strictly monotonic
+- 0009 SQL rewritten with `IF NOT EXISTS` guards because its column had been applied to live DBs without being tracked
+- Dockerfile: migration SQL files now copied directly from build context (`COPY --chown=nextjs:nodejs apps/web/lib/db/migrations …`) so the layer is always invalidated when migrations change, regardless of builder-stage cache hits
+- `start.sh`: explicit `DOCKER_DB_URL` constant and fail-fast on `pnpm db:migrate` failure so silent skips can never happen again
+- **Going forward:** never hand-craft migration files or `_journal.json` entries — always `pnpm run db:generate` so `when` is `Date.now()` and remains monotonic
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./apps/ingest/...` — compiles ✅
+- `alert_silences` table verified present; `__drizzle_migrations` has all 11 rows
+
 ### Session 12 — Notification channel test, edit, and SMTP dispatch fix
 
 **Test notification button** (`apps/web/app/(dashboard)/alerts/alerts-client.tsx`, `apps/web/lib/actions/alerts.ts`)

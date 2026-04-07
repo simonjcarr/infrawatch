@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
-import { Bell, Plus, Trash2 } from 'lucide-react'
+import { formatDistanceToNow, format } from 'date-fns'
+import { Bell, Plus, Trash2, VolumeX, VolumeOff } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -41,9 +41,12 @@ import {
   updateAlertRule,
   deleteAlertRule,
   getAlertInstances,
+  getActiveSilencesForHost,
+  createSilence,
+  deleteSilence,
 } from '@/lib/actions/alerts'
 import { getChecksWithHistory } from '@/lib/actions/checks'
-import type { AlertRule, AlertSeverity } from '@/lib/db/schema'
+import type { AlertRule, AlertSeverity, AlertSilence } from '@/lib/db/schema'
 
 // ─── Form schema (flat — validation applied per conditionType in onSubmit) ─────
 
@@ -85,6 +88,107 @@ function ruleConditionSummary(rule: AlertRule): string {
     return `${cfg['metric']} ${op} ${cfg['threshold']}%`
   }
   return '—'
+}
+
+// ─── Silence Dialog (host-scoped) ─────────────────────────────────────────────
+
+function toLocalDatetimeValue(d: Date): string {
+  const offset = d.getTimezoneOffset() * 60_000
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16)
+}
+
+const silenceFormSchema = z.object({
+  reason: z.string().min(1, 'Reason is required').max(255),
+  startsAt: z.string().min(1, 'Start time is required'),
+  endsAt: z.string().min(1, 'End time is required'),
+})
+
+type SilenceFormValues = z.infer<typeof silenceFormSchema>
+
+function AddSilenceDialog({
+  orgId,
+  hostId,
+  userId,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  orgId: string
+  hostId: string
+  userId: string
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+}) {
+  const now = new Date()
+  const inOneHour = new Date(now.getTime() + 60 * 60 * 1000)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SilenceFormValues>({
+    resolver: zodResolver(silenceFormSchema),
+    defaultValues: {
+      startsAt: toLocalDatetimeValue(now),
+      endsAt: toLocalDatetimeValue(inOneHour),
+    },
+  })
+
+  async function onSubmit(values: SilenceFormValues) {
+    const result = await createSilence(orgId, userId, {
+      hostId,
+      reason: values.reason,
+      startsAt: new Date(values.startsAt).toISOString(),
+      endsAt: new Date(values.endsAt).toISOString(),
+    })
+    if ('error' in result) return
+    reset()
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create Silence for This Host</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="silence-reason">Reason</Label>
+            <Input
+              id="silence-reason"
+              placeholder="e.g. Scheduled maintenance window"
+              {...register('reason')}
+            />
+            {errors.reason && <p className="text-sm text-red-600">{errors.reason.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="silence-starts">Starts at</Label>
+              <Input id="silence-starts" type="datetime-local" {...register('startsAt')} />
+              {errors.startsAt && <p className="text-sm text-red-600">{errors.startsAt.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="silence-ends">Ends at</Label>
+              <Input id="silence-ends" type="datetime-local" {...register('endsAt')} />
+              {errors.endsAt && <p className="text-sm text-red-600">{errors.endsAt.message}</p>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Create Silence
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 // ─── Add Rule Dialog ──────────────────────────────────────────────────────────
@@ -335,9 +439,10 @@ interface Props {
   currentUserId: string
 }
 
-export function AlertsTab({ orgId, hostId }: Props) {
+export function AlertsTab({ orgId, hostId, currentUserId }: Props) {
   const qc = useQueryClient()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [addSilenceOpen, setAddSilenceOpen] = useState(false)
 
   const { data: allRules = [] } = useQuery({
     queryKey: ['alert-rules', orgId, hostId],
@@ -349,6 +454,12 @@ export function AlertsTab({ orgId, hostId }: Props) {
     queryKey: ['alerts', orgId, 'firing', hostId],
     queryFn: () => getAlertInstances(orgId, { status: 'firing', hostId }),
     refetchInterval: 30_000,
+  })
+
+  const { data: activeSilences = [] } = useQuery({
+    queryKey: ['silences-active', orgId, hostId],
+    queryFn: () => getActiveSilencesForHost(orgId, hostId),
+    refetchInterval: 60_000,
   })
 
   const hostRules = allRules.filter((r) => r.hostId === hostId)
@@ -365,8 +476,41 @@ export function AlertsTab({ orgId, hostId }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', orgId, hostId] }),
   })
 
+  const deleteSilenceMutation = useMutation({
+    mutationFn: (silenceId: string) => deleteSilence(orgId, silenceId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['silences-active', orgId, hostId] }),
+  })
+
+  const currentSilence = activeSilences[0] ?? null
+
   return (
     <div className="space-y-6">
+      {/* Active silence banner */}
+      {currentSilence != null && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm text-amber-900 flex items-center gap-2">
+                <VolumeOff className="size-4 shrink-0" />
+                <span>
+                  <strong>Alerts silenced</strong> — {currentSilence.reason}.{' '}
+                  Ends {format(new Date(currentSilence.endsAt), 'MMM d, HH:mm')}.
+                </span>
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-amber-800 hover:text-amber-900 hover:bg-amber-100 shrink-0 -mt-0.5"
+                onClick={() => deleteSilenceMutation.mutate(currentSilence.id)}
+                disabled={deleteSilenceMutation.isPending}
+              >
+                Remove silence
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Active alerts summary */}
       {activeAlerts.length > 0 && (
         <Card className="border-red-200 bg-red-50">
@@ -391,10 +535,16 @@ export function AlertsTab({ orgId, hostId }: Props) {
             <CardTitle className="text-base">Alert Rules</CardTitle>
             <CardDescription className="mt-1">Rules that apply specifically to this host</CardDescription>
           </div>
-          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setAddDialogOpen(true)}>
-            <Plus className="size-3.5 mr-1" />
-            Add Rule
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => setAddSilenceOpen(true)}>
+              <VolumeX className="size-3.5 mr-1" />
+              Silence Host
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="size-3.5 mr-1" />
+              Add Rule
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {hostRules.length === 0 ? (
@@ -498,6 +648,14 @@ export function AlertsTab({ orgId, hostId }: Props) {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         onSuccess={() => qc.invalidateQueries({ queryKey: ['alert-rules', orgId, hostId] })}
+      />
+      <AddSilenceDialog
+        orgId={orgId}
+        hostId={hostId}
+        userId={currentUserId}
+        open={addSilenceOpen}
+        onOpenChange={setAddSilenceOpen}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['silences-active', orgId, hostId] })}
       />
     </div>
   )

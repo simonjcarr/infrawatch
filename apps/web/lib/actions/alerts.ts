@@ -4,8 +4,8 @@ import { z } from 'zod'
 import { createHmac } from 'crypto'
 import nodemailer from 'nodemailer'
 import { db } from '@/lib/db'
-import { alertRules, alertInstances, notificationChannels, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, desc, inArray, sql } from 'drizzle-orm'
+import { alertRules, alertInstances, notificationChannels, alertSilences, hosts } from '@/lib/db/schema'
+import { eq, and, isNull, desc, inArray, sql, lte, gte } from 'drizzle-orm'
 import type {
   AlertRule,
   AlertInstance,
@@ -16,6 +16,7 @@ import type {
   WebhookChannelConfig,
   SmtpChannelConfig,
   SmtpEncryption,
+  AlertSilence,
 } from '@/lib/db/schema'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -631,4 +632,120 @@ export async function sendTestNotification(
       return { error: err instanceof Error ? err.message : 'Failed to send email' }
     }
   }
+}
+
+// ─── Alert Silences ───────────────────────────────────────────────────────────
+
+export type AlertSilenceWithHost = AlertSilence & { hostname: string | null }
+
+const createSilenceSchema = z.object({
+  hostId: z.string().min(1).nullable().optional(),
+  ruleId: z.string().min(1).nullable().optional(),
+  reason: z.string().min(1).max(255),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+}).refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
+  message: 'End time must be after start time',
+  path: ['endsAt'],
+})
+
+export async function getSilences(orgId: string): Promise<AlertSilenceWithHost[]> {
+  const rows = await db
+    .select({
+      id: alertSilences.id,
+      organisationId: alertSilences.organisationId,
+      hostId: alertSilences.hostId,
+      ruleId: alertSilences.ruleId,
+      reason: alertSilences.reason,
+      startsAt: alertSilences.startsAt,
+      endsAt: alertSilences.endsAt,
+      createdBy: alertSilences.createdBy,
+      createdAt: alertSilences.createdAt,
+      updatedAt: alertSilences.updatedAt,
+      deletedAt: alertSilences.deletedAt,
+      metadata: alertSilences.metadata,
+      hostname: hosts.hostname,
+    })
+    .from(alertSilences)
+    .leftJoin(hosts, eq(alertSilences.hostId, hosts.id))
+    .where(
+      and(
+        eq(alertSilences.organisationId, orgId),
+        isNull(alertSilences.deletedAt),
+      ),
+    )
+    .orderBy(desc(alertSilences.startsAt))
+
+  return rows
+}
+
+export async function getActiveSilencesForHost(
+  orgId: string,
+  hostId: string,
+): Promise<AlertSilence[]> {
+  const now = new Date()
+  return db.query.alertSilences.findMany({
+    where: and(
+      eq(alertSilences.organisationId, orgId),
+      isNull(alertSilences.deletedAt),
+      lte(alertSilences.startsAt, now),
+      gte(alertSilences.endsAt, now),
+      // match host-specific silences for this host, or org-wide silences (hostId IS NULL)
+      // We use a raw SQL OR here via the Drizzle `or` helper imported above
+      sql`(${alertSilences.hostId} = ${hostId} OR ${alertSilences.hostId} IS NULL)`,
+    ),
+  })
+}
+
+export async function createSilence(
+  orgId: string,
+  userId: string,
+  input: unknown,
+): Promise<{ success: true; id: string } | { error: string }> {
+  const parsed = createSilenceSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+  const data = parsed.data
+
+  try {
+    const [row] = await db
+      .insert(alertSilences)
+      .values({
+        organisationId: orgId,
+        hostId: data.hostId ?? null,
+        ruleId: data.ruleId ?? null,
+        reason: data.reason,
+        startsAt: new Date(data.startsAt),
+        endsAt: new Date(data.endsAt),
+        createdBy: userId,
+      })
+      .returning({ id: alertSilences.id })
+
+    if (!row) return { error: 'Insert failed' }
+    return { success: true, id: row.id }
+  } catch {
+    return { error: 'Failed to create silence' }
+  }
+}
+
+export async function deleteSilence(
+  orgId: string,
+  silenceId: string,
+): Promise<{ success: true } | { error: string }> {
+  const existing = await db.query.alertSilences.findFirst({
+    where: and(
+      eq(alertSilences.id, silenceId),
+      eq(alertSilences.organisationId, orgId),
+      isNull(alertSilences.deletedAt),
+    ),
+  })
+  if (!existing) return { error: 'Silence not found' }
+
+  await db
+    .update(alertSilences)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(alertSilences.id, silenceId), eq(alertSilences.organisationId, orgId)))
+
+  return { success: true }
 }

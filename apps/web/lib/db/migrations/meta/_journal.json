@@ -68,8 +68,15 @@
     {
       "idx": 9,
       "version": "7",
-      "when": 1744070400000,
+      "when": 1775900000001,
       "tag": "0009_global_alert_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775900000002,
+      "tag": "0010_eager_chameleon",
       "breakpoints": true
     }
   ]

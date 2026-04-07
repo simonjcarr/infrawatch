@@ -53,6 +53,15 @@ func evaluateAlerts(
 	checkStatuses map[string]string,
 	metrics heartbeatMetrics,
 ) {
+	// Skip evaluation entirely if the host is currently silenced.
+	silenced, err := queries.IsHostSilenced(ctx, pool, orgID, hostID)
+	if err != nil {
+		slog.Warn("evaluateAlerts: checking silence", "host_id", hostID, "err", err)
+	} else if silenced {
+		slog.Debug("evaluateAlerts: host silenced, skipping", "host_id", hostID)
+		return
+	}
+
 	rules, err := queries.GetAlertRulesForHost(ctx, pool, orgID, hostID)
 	if err != nil {
 		slog.Warn("evaluateAlerts: fetching rules", "host_id", hostID, "err", err)

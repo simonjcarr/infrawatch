@@ -6,10 +6,10 @@
 ---
 
 ## Current Phase
-**Phase 2 — Monitoring & Alerting**
+**Phase 3 — Certificate Management** (Phase 2 complete)
 
 ## Current Status
-🟡 Phase 2 nearly complete — Alert history now has paginated browsing (25 per page) with date range and severity filters. TimescaleDB hypertable was retroactively fixed (composite PK on `id + recorded_at`); continuous aggregates (`host_metrics_hourly`, `host_metrics_daily`) created with auto-refresh policies — metric queries for 24h/7d ranges now fall back automatically from aggregates to raw data if needed. Metric retention is configurable per-org in settings (7–365 days). Alert silencing, SMTP + webhook notifications, global alert defaults all remain in place.
+🟢 Phase 2 complete — Alert history has paginated browsing (25 per page) with date range and severity filters. TimescaleDB hypertable was retroactively fixed (composite PK on `id + recorded_at`); continuous aggregates (`host_metrics_hourly`, `host_metrics_daily`) created with auto-refresh policies — metric queries for 24h/7d ranges fall back automatically from aggregates to raw data if needed. Metric retention is configurable per-org in settings (7–365 days). Alert silencing, SMTP + webhook notifications, global alert defaults all in place. All Phase 2 checklist items are checked. Ready to start Phase 3.
 
 ---
 

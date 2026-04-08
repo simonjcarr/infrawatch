@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.5.0...web/v0.5.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* **web:** use ISO string for Date params in db.execute() raw SQL queries ([822d9df](https://github.com/simonjcarr/infrawatch/commit/822d9df890631b93e41fd890d0011b53340df5db))
+* **web:** use ISO string for Date params in db.execute() raw SQL queries ([78bf7d1](https://github.com/simonjcarr/infrawatch/commit/78bf7d150c6a25fbf4f625fcd576f1cf1166bc6e))
+
 ## [0.5.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.4.0...web/v0.5.0) (2026-04-08)
 
 

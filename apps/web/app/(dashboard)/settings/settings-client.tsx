@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info } from 'lucide-react'
-import { updateOrgName, saveLicenceKey } from '@/lib/actions/settings'
+import { CheckCircle2, XCircle, Info, Database } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { updateOrgName, saveLicenceKey, updateMetricRetention } from '@/lib/actions/settings'
 import type { Organisation } from '@/lib/db/schema'
 
 const orgNameSchema = z.object({
@@ -39,6 +40,16 @@ function formatTier(tier: string) {
   return tier.charAt(0).toUpperCase() + tier.slice(1)
 }
 
+const RETENTION_OPTIONS = [
+  { value: '7', label: '7 days' },
+  { value: '14', label: '14 days' },
+  { value: '30', label: '30 days' },
+  { value: '60', label: '60 days' },
+  { value: '90', label: '90 days' },
+  { value: '180', label: '180 days' },
+  { value: '365', label: '1 year' },
+]
+
 export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
   const [orgSaveSuccess, setOrgSaveSuccess] = useState(false)
   const [licenceResult, setLicenceResult] = useState<{
@@ -46,6 +57,9 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
     tier?: string
     error?: string
   } | null>(null)
+  const [retentionDays, setRetentionDays] = useState(String(org.metricRetentionDays ?? 30))
+  const [retentionSaveSuccess, setRetentionSaveSuccess] = useState(false)
+  const [retentionError, setRetentionError] = useState<string | null>(null)
 
   const orgForm = useForm<OrgNameValues>({
     resolver: zodResolver(orgNameSchema),
@@ -78,6 +92,19 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       }
       setLicenceResult({ success: true, tier: result.tier })
       licenceForm.reset()
+    },
+  })
+
+  const retentionMutation = useMutation({
+    mutationFn: (days: number) => updateMetricRetention(org.id, days),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setRetentionError(result.error)
+        return
+      }
+      setRetentionSaveSuccess(true)
+      setRetentionError(null)
+      setTimeout(() => setRetentionSaveSuccess(false), 3000)
     },
   })
 
@@ -137,6 +164,66 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
             </form>
           ) : (
             <p className="text-sm text-foreground">{org.name}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Metric Retention section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="size-4 text-muted-foreground" />
+            Metric Retention
+          </CardTitle>
+          <CardDescription>
+            How long raw metric data is stored. Older data is automatically purged.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isAdmin ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="retention-select">Retention period</Label>
+                <Select
+                  value={retentionDays}
+                  onValueChange={setRetentionDays}
+                  disabled={retentionMutation.isPending}
+                >
+                  <SelectTrigger id="retention-select" className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RETENTION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {retentionError && (
+                <p className="text-sm text-destructive">{retentionError}</p>
+              )}
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  disabled={retentionMutation.isPending || retentionDays === String(org.metricRetentionDays ?? 30)}
+                  onClick={() => retentionMutation.mutate(Number(retentionDays))}
+                >
+                  {retentionMutation.isPending ? 'Saving…' : 'Save'}
+                </Button>
+                {retentionSaveSuccess && (
+                  <span className="flex items-center gap-1 text-sm text-green-700">
+                    <CheckCircle2 className="size-4" />
+                    Saved
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-foreground">
+              {RETENTION_OPTIONS.find((o) => o.value === String(org.metricRetentionDays ?? 30))?.label ?? `${org.metricRetentionDays ?? 30} days`}
+            </p>
           )}
         </CardContent>
       </Card>

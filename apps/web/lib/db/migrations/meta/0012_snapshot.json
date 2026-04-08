@@ -1,6 +1,6 @@
 {
-  "id": "46e0457d-d98c-414a-a15a-700747eddb0f",
-  "prevId": "fbda57bb-3bf3-4ad9-9c5b-7c04c7b50cb3",
+  "id": "db0d2a45-28bc-4ff5-9266-10436dfbb1be",
+  "prevId": "46e0457d-d98c-414a-a15a-700747eddb0f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1301,7 +1301,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "organisation_id": {
@@ -1383,7 +1383,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "host_metrics_id_recorded_at_pk": {
+          "name": "host_metrics_id_recorded_at_pk",
+          "columns": [
+            "id",
+            "recorded_at"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

@@ -12,9 +12,8 @@ export default async function AlertsPage() {
   const session = await getRequiredSession()
   const orgId = session.user.organisationId!
 
-  const [activeAlerts, recentAlerts, channels, silences, hosts] = await Promise.all([
+  const [activeAlerts, channels, silences, hosts] = await Promise.all([
     getAlertInstances(orgId, { status: 'firing', limit: 100 }),
-    getAlertInstances(orgId, { limit: 50 }),
     getNotificationChannels(orgId),
     getSilences(orgId),
     listHosts(orgId),
@@ -25,7 +24,6 @@ export default async function AlertsPage() {
       orgId={orgId}
       currentUserId={session.user.id}
       initialActive={activeAlerts}
-      initialRecent={recentAlerts}
       initialChannels={channels}
       initialSilences={silences}
       hosts={hosts}

@@ -15,9 +15,9 @@
 
 ## What Has Been Built
 
-### Session 14 — Phase 3 Certificate Management
+### Session 16 — Phase 3 Certificate Management
 
-**Database schema** (`apps/web/lib/db/schema/certificates.ts`, migration `0011_empty_maverick.sql`)
+**Database schema** (`apps/web/lib/db/schema/certificates.ts`, migration `0013_certificates.sql`)
 - New `certificates` table with composite unique index on `(org_id, host, port, server_name, fingerprint_sha256)`, expiry and status indexes, soft delete, `source` column (`discovered|imported|issued`) for future CA work, `discoveredByHostId` field (semantically scoped to discovery, not deployment)
 - New `certificate_events` table for append-only event spine: discovered, renewed, expiring_soon, expired, restored, removed
 - `CertificateStatus`, `CertificateSource`, `CertificateEventType` TypeScript types
@@ -45,7 +45,7 @@
 - `AddRuleDialog` extended: scope radio (All / Specific), cert picker, days-before-expiry input; `ruleConditionSummary` handles cert_expiry display
 
 **Agent: certificate check** (`agent/internal/checks/certificate.go`, `agent/internal/checks/executor.go`)
-- `runCertificateCheck(cfg)` — dials with mTLS skip (intentional, own validation), parses leaf + chain, builds `CertificateReport` JSON
+- `runCertificateCheck(cfg)` — dials with TLS skip (intentional, own validation), parses leaf + chain, builds `CertificateReport` JSON
 - Returns `pass` (valid), `fail` (expired/not-yet-valid), or `error` (dial failure)
 - Dispatcher wired in executor.go
 
@@ -65,7 +65,68 @@
 **Build state**
 - `pnpm run build` (apps/web) — zero TypeScript errors ✅
 - `go build ./apps/ingest/... ./agent/...` — zero errors ✅
-- Migration `0011_empty_maverick.sql` generated ✅
+- Migration `0013_certificates.sql` generated ✅
+
+---
+
+### Session 15 — Alert history pagination + TimescaleDB continuous aggregates
+
+**Alert history: pagination + date/severity filters** (`apps/web/lib/actions/alerts.ts`, `apps/web/app/(dashboard)/alerts/alerts-client.tsx`, `apps/web/app/(dashboard)/alerts/page.tsx`)
+- `getAlertInstances` now accepts `offset`, `dateFrom`, `dateTo`, `severity` filters in addition to the existing `status`/`hostId`/`limit` params
+- `getAlertInstanceCount` added — returns the total count matching the same filters (used for pagination metadata)
+- Recent History section replaced with a fully paginated Alert History table (25 rows/page)
+- Filter controls: severity dropdown + date-from / date-to inputs in the card header; "Clear" button appears when any filter is active; page resets to 0 when any filter changes
+- Page count and "X–Y of Z alerts" summary shown in the card description; Previous/Next buttons shown only when there is more than one page
+- Table dims with `opacity-60` transition while fetching (TanStack Query `placeholderData: prev`)
+- Server no longer pre-fetches `initialRecent` — history is entirely client-driven so SSR doesn't block on a potentially large query
+
+**TimescaleDB hypertable fix** (migration `0012_massive_dormammu.sql`)
+- Root cause: migration 0005 called `create_hypertable` but the table had a single-column PK on `id`; TimescaleDB requires the partition column (`recorded_at`) to be part of any unique constraint — so the call silently failed via the EXCEPTION handler
+- Fix: changed `host_metrics` schema to composite PK `(id, recorded_at)` in `apps/web/lib/db/schema/metrics.ts`; migration 0012 drops the old `host_metrics_pkey` and adds `host_metrics_id_recorded_at_pk (id, recorded_at)`, then calls `create_hypertable` with `migrate_data => true`
+- Migration is fully idempotent (uses `IF EXISTS` / `IF NOT EXISTS` guards in a DO block) so it applies cleanly even if partially applied previously
+
+**TimescaleDB continuous aggregates** (migrations `0011_overrated_mongu.sql`, `0012_massive_dormammu.sql`)
+- `host_metrics_hourly` — 1-hour bucket CAGG, refresh policy: every hour, covering last 3 hours
+- `host_metrics_daily` — 1-day bucket CAGG, refresh policy: every day, covering last 3 days
+- `getHostMetrics` (in `apps/web/lib/actions/agents.ts`) now queries from `host_metrics_hourly` for 24h range and `host_metrics_daily` for 7d range using raw SQL via `db.execute(sql\`...\`)`; falls back to the raw `host_metrics` table if the view doesn't exist (graceful degradation for plain PostgreSQL)
+
+**Metric retention setting** (`apps/web/lib/db/schema/organisations.ts`, `apps/web/lib/actions/settings.ts`, `apps/web/app/(dashboard)/settings/settings-client.tsx`)
+- New `metricRetentionDays` integer column (default 30) on `organisations` table — migration `0011_overrated_mongu.sql`
+- `updateMetricRetention(orgId, days)` server action validates 1–3650 days; admin-only
+- New "Metric Retention" card in Settings UI with a Select (7 / 14 / 30 / 60 / 90 / 180 days / 1 year); Save button disabled when value matches current DB value
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- 13 migrations applied, all with monotonically increasing `when` timestamps ✅
+- `host_metrics` hypertable confirmed ✅
+- `host_metrics_hourly` + `host_metrics_daily` continuous aggregates confirmed ✅
+
+---
+
+### Session 14 — Agent self-update reliability + native multi-arch CI
+
+**Heartbeat backoff reset after stable stream** (`agent/internal/heartbeat/heartbeat.go`)
+- The reconnect backoff now resets to 1 s when a stream ran stably for at least 10 s (`minStableTime`)
+- Prevents a transient blip (e.g. firewall state expiry) from locking the agent into a slow 60 s retry cycle on the next failure
+
+**Agent self-update: live version refresh in ingest** (`apps/ingest/internal/config/version_poller.go`, `apps/ingest/internal/handlers/heartbeat.go`, `apps/ingest/cmd/ingest/main.go`)
+- Root cause: ingest read `latestVersion` from `.release-please-manifest.json` once at startup and cached it for the process lifetime. The UI's "available version" display uses the `/api/agent/latest` endpoint which queries GitHub live, so UI and ingest diverged whenever a new release was cut without an ingest restart — producing step-wise upgrades (v0.9.0 → v0.11.0 on first restart, v0.11.0 → v0.11.1 on a second).
+- Added `VersionPoller` struct: seeds from the startup config value, then re-reads the manifest from disk every 5 minutes in a background goroutine using `atomic.Value` for lock-free reads
+- `HeartbeatHandler` replaced `latestVersion string` field with `*config.VersionPoller`; calls `versionPoller.Get()` on each heartbeat so agents are notified of new releases within 5 minutes of the manifest being updated — no service restart required
+- Version changes logged at Info level ("agent latest version updated") for observability
+
+**Docker multi-arch builds: native runners instead of QEMU** (`.github/workflows/docker-publish.yml`)
+- Root cause: both web and ingest jobs used a single `ubuntu-latest` runner with QEMU emulating arm64; `pnpm install` under QEMU was taking 60+ minutes.
+- Replaced with a platform matrix — `ubuntu-latest` (linux/amd64) and `ubuntu-24.04-arm` (linux/arm64) — running in parallel as native builds; arm64 build time drops to ~2–3 minutes
+- Each platform job builds and pushes by digest (`push-by-digest=true`), uploads the digest as an artifact; a downstream `merge-web` / `merge-ingest` job downloads both digests and runs `docker buildx imagetools create` to produce the final multi-arch manifest list
+- GHA cache scoped per platform (`scope=web-amd64`, `scope=web-arm64`) to prevent cross-arch cache collisions
+- No more QEMU step required in any job
+
+**Build state**
+- `go build ./apps/ingest/...` — compiles ✅
+- `go build ./agent/...` — compiles ✅
+
+---
 
 ### Session 13 — Alert silencing + migration runner root-cause fix
 
@@ -642,22 +703,21 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 10 — Alert silencing + email notifications + TimescaleDB continuous aggregates**
+**Session 16 — Phase 3: Certificate Management**
 
-Alert rule builder, state machine, webhooks, and the full UI are working. The next improvements are:
+Phase 2 is complete. Phase 3 starts here:
 
-1. **Alert silencing** — `alert_silences` table (rule_id or host_id scoped, start/end time, reason, created_by); silence banner in host detail and alerts page; suppresses new firings during active silence window
-2. **Email notifications** — add `type='email'` to `notificationChannels`; SMTP config in org settings; send alert.fired/resolved email with HTML template
-3. **Alert history improvements** — pagination on the recent history table; filter by date range; per-rule alert history on the Alerts tab
-4. **TimescaleDB continuous aggregates** — 1-hour and 1-day downsampled views on `host_metrics`; use downsampled data for 7-day range in the metrics graph to reduce query load
-5. **Metric retention UI** — expose retention period config in org settings (default 30 days)
+1. **Agent-side cert discovery** — add a `cert` check type to the agent; scans TLS endpoints (or local cert files) and returns subject, SANs, expiry, issuer. Returns structured data over the existing gRPC stream.
+2. **Certificate schema + inventory** — `certificates` table (host_id, common_name, sans, issuer, not_before, not_after, source); `db:generate` + migrate; list UI with expiry countdown badges (green/amber/red)
+3. **Expiry alerting** — new alert condition type `cert_expiry` with threshold in days; ingest evaluates on each heartbeat using the stored cert data
+4. **CSR generation wizard** — form to generate a CSR (key type, CN, SANs); returns PEM for admin to sign externally or with an internal CA
+5. **Approval workflow** — "pending certs" queue for newly discovered certs that haven't been reviewed
 
 **Outstanding technical debt (carry forward):**
 - `codec.go` is a JSON stub — replace with protoc-generated files (`make proto` requires protoc + plugins)
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
-- Run migration `0008_alert_rules.sql` in production
-- Alerts page shows `hostId` raw — should join to display hostname (requires `getAlertInstances` to join `hosts.hostname`)
+- Metric retention setting is stored in DB but doesn't yet call `add_retention_policy` dynamically (TimescaleDB retention is fixed at 30 days until wired up)
 
 ---
 
@@ -699,15 +759,15 @@ Alert rule builder, state machine, webhooks, and the full UI are working. The ne
 - [x] Check definition system
 - [x] Check types — port, process, http (shell/file deferred)
 - [x] Ad-hoc agent queries (list_ports, list_services — used in check creation UI)
-- [ ] TimescaleDB continuous aggregates
-- [ ] Metric retention policies
+- [x] TimescaleDB continuous aggregates (host_metrics_hourly + host_metrics_daily)
+- [x] Metric retention policies (configurable per-org in settings, default 30 days)
 - [x] Metric graphs (Recharts)
 - [x] Alert rule builder (check_status + metric_threshold, per-host + org-wide)
 - [x] Alert state machine (fire/resolve in ingest; acknowledge in web)
 - [x] Notification channels (webhook with HMAC-SHA256 signing)
-- [ ] Alert silencing
+- [x] Alert silencing
 - [x] Alert acknowledgement
-- [ ] Alert history pagination + date filter
+- [x] Alert history pagination + date/severity filter
 
 ### Phase 3 — Certificate Management
 - [ ] Agent-side cert discovery

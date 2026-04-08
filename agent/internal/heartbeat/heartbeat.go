@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/infrawatch/agent/internal/checks"
 	"github.com/infrawatch/agent/internal/updater"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
@@ -20,7 +22,11 @@ import (
 
 // Runner manages the bidirectional heartbeat stream with the ingest service.
 type Runner struct {
-	client   agentv1.IngestServiceClient
+	// dialFunc creates a fresh gRPC connection for each stream attempt. A new
+	// connection is used every time rather than reusing a long-lived ClientConn
+	// because gRPC's internal TRANSIENT_FAILURE state can get stuck after a
+	// server restart — a fresh connection always starts clean.
+	dialFunc func() (*grpc.ClientConn, error)
 	agentID  string
 	jwtToken string
 	version  string
@@ -34,7 +40,7 @@ type Runner struct {
 
 	// Buffered ad-hoc query results, drained on each heartbeat send.
 	queryResultsMu sync.Mutex
-	queryResults   []agentv1.AgentQueryResult
+	queryResults   []*agentv1.AgentQueryResult
 
 	// Dedupes server-pushed queries: the ingest handler may re-push the same
 	// query on consecutive 2s poll ticks while the agent is still executing it.
@@ -46,10 +52,12 @@ type Runner struct {
 	resultsReady chan struct{}
 }
 
-// New creates a new heartbeat Runner.
-func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor) *Runner {
+// New creates a new heartbeat Runner. dialFunc is called once per stream
+// attempt to obtain a fresh gRPC connection; the runner closes it when the
+// stream ends.
+func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor) *Runner {
 	return &Runner{
-		client:       client,
+		dialFunc:     dialFunc,
 		agentID:      agentID,
 		jwtToken:     jwtToken,
 		version:      version,
@@ -61,8 +69,12 @@ func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, 
 }
 
 // Run starts the heartbeat stream. It reconnects automatically on transient
-// errors, backing off up to 60 seconds between attempts.
+// errors, backing off up to 60 seconds between attempts. The backoff resets
+// to 1s after any stream that ran stably for at least minStableTime, so a
+// transient blip (e.g. firewall state expiry) does not leave the agent
+// waiting 60s between retries on the next failure.
 func (r *Runner) Run(ctx context.Context) error {
+	const minStableTime = 10 * time.Second
 	backoff := time.Second
 	maxBackoff := 60 * time.Second
 
@@ -71,9 +83,14 @@ func (r *Runner) Run(ctx context.Context) error {
 			return ctx.Err()
 		}
 
+		start := time.Now()
 		err := r.runStream(ctx)
 		if err == nil || err == context.Canceled || err == context.DeadlineExceeded {
 			return err
+		}
+
+		if time.Since(start) >= minStableTime {
+			backoff = time.Second // stream was stable — reset backoff
 		}
 
 		slog.Warn("heartbeat stream ended, reconnecting", "err", err, "backoff", backoff)
@@ -88,7 +105,13 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 func (r *Runner) runStream(ctx context.Context) error {
-	stream, err := r.client.Heartbeat(ctx)
+	conn, err := r.dialFunc()
+	if err != nil {
+		return fmt.Errorf("connecting to ingest: %w", err)
+	}
+	defer conn.Close()
+
+	stream, err := agentv1.NewIngestServiceClient(conn).Heartbeat(ctx)
 	if err != nil {
 		return fmt.Errorf("opening heartbeat stream: %w", err)
 	}
@@ -187,12 +210,12 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 			go r.executeQueries(fresh)
 		}
 	}
-	if resp.UpdateAvailable && resp.DownloadURL != "" {
+	if resp.UpdateAvailable && resp.DownloadUrl != "" {
 		slog.Info("agent update available, downloading",
 			"current", r.version,
 			"latest", resp.LatestVersion,
 		)
-		if err := updater.Update(resp.LatestVersion, resp.DownloadURL); err != nil {
+		if err := updater.Update(resp.LatestVersion, resp.DownloadUrl); err != nil {
 			slog.Warn("self-update failed, continuing with current version", "err", err)
 		}
 		// If Update succeeds it re-execs and never returns.
@@ -200,15 +223,15 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 }
 
 // filterUnseenQueries returns queries not yet seen for this stream's lifetime.
-func (r *Runner) filterUnseenQueries(queries []agentv1.AgentQuery) []agentv1.AgentQuery {
+func (r *Runner) filterUnseenQueries(queries []*agentv1.AgentQuery) []*agentv1.AgentQuery {
 	r.seenMu.Lock()
 	defer r.seenMu.Unlock()
-	out := make([]agentv1.AgentQuery, 0, len(queries))
+	out := make([]*agentv1.AgentQuery, 0, len(queries))
 	for _, q := range queries {
-		if _, dup := r.seenQueryIDs[q.QueryID]; dup {
+		if _, dup := r.seenQueryIDs[q.QueryId]; dup {
 			continue
 		}
-		r.seenQueryIDs[q.QueryID] = struct{}{}
+		r.seenQueryIDs[q.QueryId] = struct{}{}
 		out = append(out, q)
 	}
 	return out
@@ -216,15 +239,15 @@ func (r *Runner) filterUnseenQueries(queries []agentv1.AgentQuery) []agentv1.Age
 
 // executeQueries runs each query, buffers the result, and nudges the send loop
 // to fire an immediate heartbeat with the results.
-func (r *Runner) executeQueries(queries []agentv1.AgentQuery) {
+func (r *Runner) executeQueries(queries []*agentv1.AgentQuery) {
 	for _, q := range queries {
-		slog.Info("executing agent query", "query_id", q.QueryID, "type", q.QueryType)
+		slog.Info("executing agent query", "query_id", q.QueryId, "type", q.QueryType)
 		result := checks.RunQuery(q)
 		r.queryResultsMu.Lock()
 		r.queryResults = append(r.queryResults, result)
 		r.queryResultsMu.Unlock()
 		slog.Info("agent query completed",
-			"query_id", q.QueryID,
+			"query_id", q.QueryId,
 			"type", q.QueryType,
 			"status", result.Status,
 		)
@@ -238,7 +261,7 @@ func (r *Runner) executeQueries(queries []agentv1.AgentQuery) {
 }
 
 // drainQueryResults atomically returns and clears all buffered query results.
-func (r *Runner) drainQueryResults() []agentv1.AgentQueryResult {
+func (r *Runner) drainQueryResults() []*agentv1.AgentQueryResult {
 	r.queryResultsMu.Lock()
 	defer r.queryResultsMu.Unlock()
 	results := r.queryResults
@@ -274,7 +297,7 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 
 // collectMetrics gathers all system metrics. Returns best-effort values;
 // on unsupported platforms or read errors individual values will be zero/empty.
-func (r *Runner) collectMetrics() (cpu, mem, disk float32, uptimeSecs int64, osVersion string, disks []agentv1.DiskInfo, nets []agentv1.NetworkInterface) {
+func (r *Runner) collectMetrics() (cpu, mem, disk float32, uptimeSecs int64, osVersion string, disks []*agentv1.DiskInfo, nets []*agentv1.NetworkInterface) {
 	uptimeSecs = readUptime()
 	cpu = r.readCPUPercent()
 	mem = readMemPercent()
@@ -398,13 +421,13 @@ func readOsVersion() string {
 }
 
 // readNetworkInterfaces collects non-loopback network interfaces.
-func readNetworkInterfaces() []agentv1.NetworkInterface {
+func readNetworkInterfaces() []*agentv1.NetworkInterface {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
 	}
 
-	var result []agentv1.NetworkInterface
+	var result []*agentv1.NetworkInterface
 	for _, iface := range ifaces {
 		if iface.Flags&net.FlagLoopback != 0 {
 			continue
@@ -425,7 +448,7 @@ func readNetworkInterfaces() []agentv1.NetworkInterface {
 			ips = append(ips, ip.String())
 		}
 
-		result = append(result, agentv1.NetworkInterface{
+		result = append(result, &agentv1.NetworkInterface{
 			Name:        iface.Name,
 			IpAddresses: ips,
 			MacAddress:  iface.HardwareAddr.String(),

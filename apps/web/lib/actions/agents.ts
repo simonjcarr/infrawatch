@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { agents, agentStatusHistory, agentEnrolmentTokens, hosts, hostMetrics } from '@/lib/db/schema'
-import { eq, and, isNull, gt, gte, asc } from 'drizzle-orm'
+import { eq, and, isNull, gt, gte, asc, sql } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 
@@ -207,6 +207,59 @@ export async function getHostMetrics(
 ): Promise<HostMetric[]> {
   const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
   const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+  // db.execute() does not serialise Date parameters — use ISO string instead
+  const cutoffISO = cutoff.toISOString()
+
+  // For 7d and 24h ranges, try to use the continuous aggregate views (TimescaleDB).
+  // Falls back to raw table on plain PostgreSQL or if the view doesn't exist yet.
+  if (range === '7d' || range === '24h') {
+    const view = range === '7d' ? 'host_metrics_daily' : 'host_metrics_hourly'
+    try {
+      const rows = await db.execute<{
+        id: string
+        organisation_id: string
+        host_id: string
+        recorded_at: Date
+        cpu_percent: number | null
+        memory_percent: number | null
+        disk_percent: number | null
+        uptime_seconds: number | null
+        created_at: Date
+      }>(sql`
+        SELECT
+          concat(${hostId}, '-', bucket::text) AS id,
+          ${orgId}                             AS organisation_id,
+          ${hostId}                            AS host_id,
+          bucket                               AS recorded_at,
+          cpu_percent,
+          memory_percent,
+          disk_percent,
+          NULL::integer                        AS uptime_seconds,
+          bucket                               AS created_at
+        FROM ${sql.identifier(view)}
+        WHERE organisation_id = ${orgId}
+          AND host_id         = ${hostId}
+          AND bucket         >= ${cutoffISO}
+        ORDER BY bucket ASC
+      `)
+      const rowArr = Array.from(rows)
+      if (rowArr.length > 0) {
+        return rowArr.map((r) => ({
+          id: r.id,
+          organisationId: r.organisation_id,
+          hostId: r.host_id,
+          recordedAt: new Date(r.recorded_at),
+          cpuPercent: r.cpu_percent,
+          memoryPercent: r.memory_percent,
+          diskPercent: r.disk_percent,
+          uptimeSeconds: r.uptime_seconds,
+          createdAt: new Date(r.created_at),
+        }))
+      }
+    } catch {
+      // Aggregate view not available — fall through to raw query
+    }
+  }
 
   return db
     .select()
@@ -264,6 +317,96 @@ export async function getAgentOfflinePeriods(
   }
 
   return periods
+}
+
+export type HeartbeatPoint = { time: number; intervalSecs: number }
+
+export async function getHeartbeatHistory(
+  orgId: string,
+  hostId: string,
+  range: MetricsRange,
+): Promise<HeartbeatPoint[]> {
+  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+  // db.execute() does not serialise Date parameters — use ISO string instead
+  const cutoffISO = cutoff.toISOString()
+
+  if (range === '1h') {
+    // Individual intervals — LAG() gives the gap between consecutive heartbeats
+    const rows = await db.execute<{ recorded_at: string; interval_secs: number | null }>(sql`
+      SELECT
+        recorded_at,
+        EXTRACT(EPOCH FROM (
+          recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
+        ))::float AS interval_secs
+      FROM host_metrics
+      WHERE organisation_id = ${orgId}
+        AND host_id         = ${hostId}
+        AND recorded_at    >= ${cutoffISO}
+      ORDER BY recorded_at ASC
+    `)
+    return Array.from(rows)
+      .filter((r) => r.interval_secs != null)
+      .map((r) => ({
+        time: new Date(r.recorded_at).getTime(),
+        intervalSecs: parseFloat(Number(r.interval_secs).toFixed(1)),
+      }))
+  }
+
+  // 24h/7d: bucket by 5-minute or 1-hour windows and take the MAX gap per
+  // bucket so outages are visible even when there are many healthy heartbeats
+  // in the same window. Uses TimescaleDB time_bucket; falls back to raw LAG
+  // on plain PostgreSQL.
+  const bucketInterval = range === '24h' ? sql.raw("'5 minutes'") : sql.raw("'1 hour'")
+  try {
+    const rows = await db.execute<{ bucket: string; max_interval_secs: number | null }>(sql`
+      WITH intervals AS (
+        SELECT
+          recorded_at,
+          EXTRACT(EPOCH FROM (
+            recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
+          ))::float AS interval_secs
+        FROM host_metrics
+        WHERE organisation_id = ${orgId}
+          AND host_id         = ${hostId}
+          AND recorded_at    >= ${cutoffISO}
+      )
+      SELECT
+        time_bucket(${bucketInterval}::interval, recorded_at) AS bucket,
+        MAX(interval_secs)                                     AS max_interval_secs
+      FROM intervals
+      WHERE interval_secs IS NOT NULL
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `)
+    return Array.from(rows)
+      .filter((r) => r.max_interval_secs != null)
+      .map((r) => ({
+        time: new Date(r.bucket).getTime(),
+        intervalSecs: parseFloat(Number(r.max_interval_secs).toFixed(1)),
+      }))
+  } catch {
+    // Plain PostgreSQL fallback — raw intervals, capped to avoid massive payloads
+    const rows = await db.execute<{ recorded_at: string; interval_secs: number | null }>(sql`
+      SELECT
+        recorded_at,
+        EXTRACT(EPOCH FROM (
+          recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
+        ))::float AS interval_secs
+      FROM host_metrics
+      WHERE organisation_id = ${orgId}
+        AND host_id         = ${hostId}
+        AND recorded_at    >= ${cutoffISO}
+      ORDER BY recorded_at ASC
+      LIMIT 500
+    `)
+    return Array.from(rows)
+      .filter((r) => r.interval_secs != null)
+      .map((r) => ({
+        time: new Date(r.recorded_at).getTime(),
+        intervalSecs: parseFloat(Number(r.interval_secs).toFixed(1)),
+      }))
+  }
 }
 
 export async function getHost(orgId: string, hostId: string): Promise<HostWithAgent | null> {

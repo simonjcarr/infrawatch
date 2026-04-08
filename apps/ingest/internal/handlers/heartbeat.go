@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/infrawatch/ingest/internal/auth"
+	"github.com/infrawatch/ingest/internal/config"
 	"github.com/infrawatch/ingest/internal/db/queries"
 	"github.com/infrawatch/ingest/internal/queue"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
@@ -24,17 +25,17 @@ type HeartbeatHandler struct {
 	pool            *pgxpool.Pool
 	issuer          *auth.JWTIssuer
 	publisher       queue.Publisher
-	latestVersion   string
+	versionPoller   *config.VersionPoller
 	downloadBaseURL string
 }
 
 // NewHeartbeatHandler creates a HeartbeatHandler.
-func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, latestVersion, downloadBaseURL string) *HeartbeatHandler {
+func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, versionPoller *config.VersionPoller, downloadBaseURL string) *HeartbeatHandler {
 	return &HeartbeatHandler{
 		pool:            pool,
 		issuer:          issuer,
 		publisher:       pub,
-		latestVersion:   latestVersion,
+		versionPoller:   versionPoller,
 		downloadBaseURL: downloadBaseURL,
 	}
 }
@@ -165,9 +166,9 @@ loop:
 			if len(pending) == 0 {
 				continue
 			}
-			pqs := make([]agentv1.AgentQuery, 0, len(pending))
+			pqs := make([]*agentv1.AgentQuery, 0, len(pending))
 			for _, p := range pending {
-				pqs = append(pqs, agentv1.AgentQuery{QueryID: p.ID, QueryType: p.QueryType})
+				pqs = append(pqs, &agentv1.AgentQuery{QueryId: p.ID, QueryType: p.QueryType})
 			}
 			if err := stream.Send(&agentv1.HeartbeatResponse{Ok: true, PendingQueries: pqs}); err != nil {
 				slog.Warn("pushing pending queries", "host_id", hostID, "err", err)
@@ -244,23 +245,23 @@ func (h *HeartbeatHandler) processHeartbeat(
 		for _, result := range req.CheckResults {
 			ranAt := time.Unix(result.RanAtUnix, 0)
 			if err := queries.InsertCheckResult(ctx, h.pool,
-				result.CheckID, hostID, orgID,
+				result.CheckId, hostID, orgID,
 				result.Status, result.Output,
 				result.DurationMs, ranAt,
 			); err != nil {
-				slog.Warn("inserting check result", "check_id", result.CheckID, "err", err)
+				slog.Warn("inserting check result", "check_id", result.CheckId, "err", err)
 			}
 
 			// Dispatch certificate results to the cert persister.
-			if checkTypeMap[result.CheckID] == "certificate" && result.Output != "" {
-				persistCertificateResult(ctx, h.pool, orgID, hostID, result.CheckID, result.Output)
+			if checkTypeMap[result.CheckId] == "certificate" && result.Output != "" {
+				persistCertificateResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
 			}
 		}
 
 		// Evaluate alert rules for this heartbeat.
 		checkStatuses := make(map[string]string, len(req.CheckResults))
 		for _, result := range req.CheckResults {
-			checkStatuses[result.CheckID] = result.Status
+			checkStatuses[result.CheckId] = result.Status
 		}
 		evaluateAlerts(ctx, h.pool, orgID, hostID, hostname, checkStatuses, heartbeatMetrics{
 			CPU:    req.CpuPercent,
@@ -283,8 +284,8 @@ func (h *HeartbeatHandler) processHeartbeat(
 		if dbStatus == "ok" {
 			dbStatus = "complete"
 		}
-		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryID, dbStatus, qr.Error, resultJSON); err != nil {
-			slog.Warn("completing agent query", "query_id", qr.QueryID, "err", err)
+		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryId, dbStatus, qr.Error, resultJSON); err != nil {
+			slog.Warn("completing agent query", "query_id", qr.QueryId, "err", err)
 		}
 	}
 
@@ -307,18 +308,20 @@ func (h *HeartbeatHandler) processHeartbeat(
 	resp := &agentv1.HeartbeatResponse{Ok: true}
 
 	// Signal an update when the agent is running a different version than the
-	// configured latest, and the agent is not a dev build.
-	if h.latestVersion != "" &&
+	// latest known version, and the agent is not a dev build.
+	// latestVersion is read from the poller so it refreshes without a restart.
+	latestVersion := h.versionPoller.Get()
+	if latestVersion != "" &&
 		req.AgentVersion != "" &&
 		req.AgentVersion != "dev" &&
-		req.AgentVersion != h.latestVersion {
+		req.AgentVersion != latestVersion {
 		resp.UpdateAvailable = true
-		resp.LatestVersion = h.latestVersion
-		resp.DownloadURL = h.downloadBaseURL + "/api/agent/download"
+		resp.LatestVersion = latestVersion
+		resp.DownloadUrl = h.downloadBaseURL + "/api/agent/download"
 		slog.Info("signalling agent update",
 			"agent_id", agentID,
 			"current", req.AgentVersion,
-			"latest", h.latestVersion,
+			"latest", latestVersion,
 		)
 	}
 
@@ -328,12 +331,12 @@ func (h *HeartbeatHandler) processHeartbeat(
 		if err != nil {
 			slog.Warn("fetching checks for host", "host_id", hostID, "err", err)
 		} else {
-			defs := make([]agentv1.CheckDefinition, 0, len(checkRows))
+			defs := make([]*agentv1.CheckDefinition, 0, len(checkRows))
 			for _, row := range checkRows {
-				defs = append(defs, agentv1.CheckDefinition{
-					CheckID:         row.ID,
+				defs = append(defs, &agentv1.CheckDefinition{
+					CheckId:         row.ID,
 					CheckType:       row.CheckType,
-					ConfigJSON:      row.ConfigJSON,
+					ConfigJson:      row.ConfigJSON,
 					IntervalSeconds: int32(row.IntervalSeconds),
 				})
 			}

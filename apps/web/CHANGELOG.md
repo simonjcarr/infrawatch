@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.5.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.5.0...web/v0.5.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* **web:** use ISO string for Date params in db.execute() raw SQL queries ([822d9df](https://github.com/simonjcarr/infrawatch/commit/822d9df890631b93e41fd890d0011b53340df5db))
+* **web:** use ISO string for Date params in db.execute() raw SQL queries ([78bf7d1](https://github.com/simonjcarr/infrawatch/commit/78bf7d150c6a25fbf4f625fcd576f1cf1166bc6e))
+
+## [0.5.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.4.0...web/v0.5.0) (2026-04-08)
+
+
+### Features
+
+* **web:** heartbeat interval chart on host metrics tab ([270d79c](https://github.com/simonjcarr/infrawatch/commit/270d79c3ffcd45731cdb567d9604dc132519a779))
+
+
+### Bug Fixes
+
+* **agent:** gRPC reconnect reliability + heartbeat interval chart ([02baa79](https://github.com/simonjcarr/infrawatch/commit/02baa79fe7a7cb3b042585b0051e8b4d913879a3))
+
+## [0.4.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.3.0...web/v0.4.0) (2026-04-08)
+
+
+### Features
+
+* **phase2:** alert history pagination, TimescaleDB CAGGs, metric retention ([63f5676](https://github.com/simonjcarr/infrawatch/commit/63f56762aa70985f4741faa9ee4dd017ffb0791e))
+* **phase2:** alert history pagination, TimescaleDB CAGGs, metric retention ([ac5ff93](https://github.com/simonjcarr/infrawatch/commit/ac5ff93138a2c556efd098e55650383dd0c983bd))
+
 ## [0.3.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.2.0...web/v0.3.0) (2026-04-07)
 
 

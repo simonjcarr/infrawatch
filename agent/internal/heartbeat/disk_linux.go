@@ -11,14 +11,14 @@ import (
 )
 
 // readAllDisks reads /proc/mounts and calls syscall.Statfs on each real filesystem.
-func readAllDisks() []agentv1.DiskInfo {
+func readAllDisks() []*agentv1.DiskInfo {
 	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return nil
 	}
 
 	seen := make(map[string]bool)
-	var result []agentv1.DiskInfo
+	var result []*agentv1.DiskInfo
 
 	for _, line := range splitLines(string(data)) {
 		fields := strings.Fields(line)
@@ -51,7 +51,7 @@ func readAllDisks() []agentv1.DiskInfo {
 			pct = float32(used) / float32(total) * 100
 		}
 
-		result = append(result, agentv1.DiskInfo{
+		result = append(result, &agentv1.DiskInfo{
 			MountPoint:  mountPoint,
 			Device:      device,
 			FsType:      fsType,

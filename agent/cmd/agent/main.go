@@ -10,6 +10,8 @@ import (
 	"strings"
 	"syscall"
 
+	"google.golang.org/grpc"
+
 	agentgrpc "github.com/infrawatch/agent/internal/grpc"
 	"github.com/infrawatch/agent/internal/checks"
 	"github.com/infrawatch/agent/internal/config"
@@ -102,19 +104,23 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 		return err
 	}
 
-	conn, err := agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile, cfg.Ingest.TLSSkipVerify)
-	if err != nil {
-		slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
-		return err
+	// dialFunc creates a fresh gRPC connection each time it is called. The
+	// heartbeat runner calls it once per stream attempt so that a stuck or
+	// stale ClientConn from a previous attempt can never block reconnection.
+	dialFunc := func() (*grpc.ClientConn, error) {
+		return agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile, cfg.Ingest.TLSSkipVerify)
 	}
-	defer conn.Close()
-
-	client := agentv1.NewIngestServiceClient(conn)
 
 	if state.JWTToken == "" {
 		slog.Info("registering agent", "address", cfg.Ingest.Address)
-		registrar := registration.New(client, keypair, cfg.Agent.OrgToken, version)
+		regConn, err := dialFunc()
+		if err != nil {
+			slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
+			return err
+		}
+		registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.OrgToken, version)
 		newState, err := registrar.Register(ctx, state.AgentID)
+		regConn.Close()
 		if err != nil {
 			return err
 		}
@@ -129,6 +135,6 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 
 	slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
 	executor := checks.NewExecutor()
-	hb := heartbeat.New(client, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)
+	hb := heartbeat.New(dialFunc, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)
 	return hb.Run(ctx)
 }

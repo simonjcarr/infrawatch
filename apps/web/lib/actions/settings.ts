@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
 import { getRequiredSession } from '@/lib/auth/session'
 
@@ -36,6 +36,67 @@ export async function updateOrgName(
     return { success: true }
   } catch (err) {
     console.error('Failed to update org name:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
+const metricRetentionSchema = z.object({
+  days: z.number().int().min(1).max(3650),
+})
+
+export async function updateMetricRetention(
+  orgId: string,
+  days: number,
+): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  if (!ADMIN_ROLES.includes(session.user.role)) {
+    return { error: 'You do not have permission to perform this action' }
+  }
+
+  const parsed = metricRetentionSchema.safeParse({ days })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid value' }
+  }
+
+  try {
+    await db
+      .update(organisations)
+      .set({ metricRetentionDays: parsed.data.days, updatedAt: new Date() })
+      .where(eq(organisations.id, orgId))
+
+    // Update TimescaleDB retention policies for both metric hypertables.
+    // Wrapped in a DO block so this silently degrades on plain PostgreSQL.
+    // Each policy call is in its own sub-block so one failure doesn't abort the other.
+    const days = parsed.data.days
+    await db.execute(sql`
+      DO $$
+      BEGIN
+        BEGIN
+          PERFORM drop_retention_policy('host_metrics', if_exists => true);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        BEGIN
+          PERFORM add_retention_policy('host_metrics', INTERVAL '${sql.raw(String(days))} days', if_not_exists => true);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        BEGIN
+          PERFORM drop_retention_policy('check_results', if_exists => true);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        BEGIN
+          PERFORM add_retention_policy('check_results', INTERVAL '${sql.raw(String(days))} days', if_not_exists => true);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+      END $$;
+    `)
+
+    return { success: true }
+  } catch (err) {
+    console.error('Failed to update metric retention:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

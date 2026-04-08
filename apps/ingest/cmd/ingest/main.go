@@ -67,7 +67,9 @@ func main() {
 
 	// Build handlers
 	regHandler := handlers.NewRegisterHandler(pool, issuer)
-	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, cfg.Agent.LatestVersion, cfg.Agent.DownloadBaseURL)
+	versionPoller := config.NewVersionPoller(cfg.Agent.LatestVersion, 5*time.Minute)
+	versionPoller.Start(ctx)
+	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL)
 
 	// Start JWKS HTTP server
 	go func() {
@@ -90,7 +92,7 @@ func main() {
 	grpcErr := make(chan error, 1)
 	go func() {
 		slog.Info("gRPC server starting", "port", cfg.GRPCPort)
-		grpcErr <- ingestgrpc.Serve(cfg.GRPCPort, creds, regHandler, hbHandler)
+		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler)
 	}()
 
 	select {

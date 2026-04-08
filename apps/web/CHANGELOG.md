@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.4.0...web/v0.5.0) (2026-04-08)
+
+
+### Features
+
+* **web:** heartbeat interval chart on host metrics tab ([270d79c](https://github.com/simonjcarr/infrawatch/commit/270d79c3ffcd45731cdb567d9604dc132519a779))
+
+
+### Bug Fixes
+
+* **agent:** gRPC reconnect reliability + heartbeat interval chart ([02baa79](https://github.com/simonjcarr/infrawatch/commit/02baa79fe7a7cb3b042585b0051e8b4d913879a3))
+
 ## [0.4.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.3.0...web/v0.4.0) (2026-04-08)
 
 

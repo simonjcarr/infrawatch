@@ -85,6 +85,9 @@ func main() {
 		}
 	}()
 
+	// Start cert expiry sweeper goroutine
+	go handlers.RunCertExpirySweeper(ctx, pool, 15*time.Minute)
+
 	// Start gRPC server in goroutine
 	grpcErr := make(chan error, 1)
 	go func() {

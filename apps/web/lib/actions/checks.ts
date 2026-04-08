@@ -25,18 +25,25 @@ const httpConfigSchema = z.object({
   expected_status: z.number().int().min(100).max(599).default(200),
 })
 
+const certificateConfigSchema = z.object({
+  host: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  serverName: z.string().optional(),
+  timeoutSeconds: z.number().int().min(1).max(60).optional(),
+})
+
 const createCheckSchema = z.object({
   hostId: z.string().min(1),
   name: z.string().min(1).max(100),
-  checkType: z.enum(['port', 'process', 'http']),
-  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema]),
+  checkType: z.enum(['port', 'process', 'http', 'certificate']),
+  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema]),
   intervalSeconds: z.number().int().min(10).max(3600).default(60),
 })
 
 const updateCheckSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
-  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema]).optional(),
+  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema]).optional(),
   intervalSeconds: z.number().int().min(10).max(3600).optional(),
 })
 

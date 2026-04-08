@@ -232,6 +232,16 @@ func (h *HeartbeatHandler) processHeartbeat(
 
 	// Persist incoming check results
 	if hostID != "" {
+		// Build a checkID → checkType map once per heartbeat to route cert results.
+		checkTypeMap := make(map[string]string)
+		if hostChecks, err := queries.GetChecksForHost(ctx, h.pool, hostID); err == nil {
+			for _, c := range hostChecks {
+				checkTypeMap[c.ID] = c.CheckType
+			}
+		} else {
+			slog.Warn("heartbeat: fetching check types for host", "host_id", hostID, "err", err)
+		}
+
 		for _, result := range req.CheckResults {
 			ranAt := time.Unix(result.RanAtUnix, 0)
 			if err := queries.InsertCheckResult(ctx, h.pool,
@@ -240,6 +250,11 @@ func (h *HeartbeatHandler) processHeartbeat(
 				result.DurationMs, ranAt,
 			); err != nil {
 				slog.Warn("inserting check result", "check_id", result.CheckId, "err", err)
+			}
+
+			// Dispatch certificate results to the cert persister.
+			if checkTypeMap[result.CheckId] == "certificate" && result.Output != "" {
+				persistCertificateResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
 			}
 		}
 

@@ -40,11 +40,17 @@ const metricThresholdConfigSchema = z.object({
   threshold: z.number().min(0).max(100),
 })
 
+const certExpiryConfigSchema = z.object({
+  scope: z.enum(['all', 'specific']),
+  certificateId: z.string().min(1).optional(),
+  daysBeforeExpiry: z.number().int().min(1).max(365),
+})
+
 const createAlertRuleSchema = z.object({
   hostId: z.string().min(1).nullable().optional(),
   name: z.string().min(1).max(100),
-  conditionType: z.enum(['check_status', 'metric_threshold']),
-  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema]),
+  conditionType: z.enum(['check_status', 'metric_threshold', 'cert_expiry']),
+  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema]),
   severity: z.enum(['info', 'warning', 'critical']).default('warning'),
 })
 
@@ -52,7 +58,7 @@ const updateAlertRuleSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
   severity: z.enum(['info', 'warning', 'critical']).optional(),
-  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema]).optional(),
+  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema]).optional(),
 })
 
 const smtpEncryptionSchema = z.enum(['none', 'starttls', 'tls'])

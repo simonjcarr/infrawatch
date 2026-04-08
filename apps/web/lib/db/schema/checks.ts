@@ -17,9 +17,16 @@ export interface HttpCheckConfig {
   expected_status: number
 }
 
-export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig
+export interface CertificateCheckConfig {
+  host: string
+  port: number
+  serverName?: string
+  timeoutSeconds?: number
+}
 
-export type CheckType = 'port' | 'process' | 'http'
+export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig
+
+export type CheckType = 'port' | 'process' | 'http' | 'certificate'
 export type CheckStatus = 'pass' | 'fail' | 'error'
 
 export const checks = pgTable('checks', {

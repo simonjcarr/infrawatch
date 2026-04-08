@@ -46,12 +46,13 @@ import {
   deleteSilence,
 } from '@/lib/actions/alerts'
 import { getChecksWithHistory } from '@/lib/actions/checks'
+import { getCertificates } from '@/lib/actions/certificates'
 import type { AlertRule, AlertSeverity, AlertSilence } from '@/lib/db/schema'
 
 // ─── Form schema (flat — validation applied per conditionType in onSubmit) ─────
 
 const ruleFormSchema = z.object({
-  conditionType: z.enum(['check_status', 'metric_threshold']),
+  conditionType: z.enum(['check_status', 'metric_threshold', 'cert_expiry']),
   name: z.string().min(1, 'Name is required').max(100),
   severity: z.enum(['info', 'warning', 'critical']),
   // check_status fields
@@ -61,6 +62,10 @@ const ruleFormSchema = z.object({
   metric: z.enum(['cpu', 'memory', 'disk']).optional(),
   operator: z.enum(['gt', 'lt']).optional(),
   threshold: z.number().min(0).max(100).optional(),
+  // cert_expiry fields
+  certScope: z.enum(['all', 'specific']).optional(),
+  certificateId: z.string().optional(),
+  daysBeforeExpiry: z.number().int().min(1).max(365).optional(),
 })
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>
@@ -86,6 +91,10 @@ function ruleConditionSummary(rule: AlertRule): string {
   if (rule.conditionType === 'metric_threshold') {
     const op = cfg['operator'] === 'gt' ? '>' : '<'
     return `${cfg['metric']} ${op} ${cfg['threshold']}%`
+  }
+  if (rule.conditionType === 'cert_expiry') {
+    const scope = cfg['scope'] === 'specific' ? 'specific cert' : 'any cert'
+    return `${scope} expires within ${cfg['daysBeforeExpiry'] ?? 30} days`
   }
   return '—'
 }
@@ -206,11 +215,18 @@ function AddRuleDialog({
   onOpenChange: (v: boolean) => void
   onSuccess: () => void
 }) {
-  const [conditionType, setConditionType] = useState<'check_status' | 'metric_threshold'>('check_status')
+  const [conditionType, setConditionType] = useState<'check_status' | 'metric_threshold' | 'cert_expiry'>('check_status')
+  const [certScope, setCertScope] = useState<'all' | 'specific'>('all')
 
   const { data: checks = [] } = useQuery({
     queryKey: ['checks-history', orgId, hostId],
     queryFn: () => getChecksWithHistory(orgId, hostId),
+  })
+
+  const { data: orgCerts = [] } = useQuery({
+    queryKey: ['certificates', orgId],
+    queryFn: () => getCertificates(orgId, { limit: 200 }),
+    enabled: conditionType === 'cert_expiry' && certScope === 'specific',
   })
 
   const {
@@ -240,6 +256,19 @@ function AddRuleDialog({
         name: values.name,
         conditionType: 'check_status',
         config: { checkId: values.checkId, failureThreshold: values.failureThreshold ?? 3 },
+        severity: values.severity,
+      }
+    } else if (values.conditionType === 'cert_expiry') {
+      const scope = values.certScope ?? 'all'
+      input = {
+        hostId: null,
+        name: values.name,
+        conditionType: 'cert_expiry',
+        config: {
+          scope,
+          ...(scope === 'specific' && values.certificateId ? { certificateId: values.certificateId } : {}),
+          daysBeforeExpiry: values.daysBeforeExpiry ?? 30,
+        },
         severity: values.severity,
       }
     } else {
@@ -278,7 +307,7 @@ function AddRuleDialog({
                   value={field.value}
                   onValueChange={(v) => {
                     field.onChange(v)
-                    setConditionType(v as 'check_status' | 'metric_threshold')
+                    setConditionType(v as 'check_status' | 'metric_threshold' | 'cert_expiry')
                   }}
                 >
                   <SelectTrigger>
@@ -287,6 +316,7 @@ function AddRuleDialog({
                   <SelectContent>
                     <SelectItem value="check_status">Check failure</SelectItem>
                     <SelectItem value="metric_threshold">Metric threshold</SelectItem>
+                    <SelectItem value="cert_expiry">Certificate expiry</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -392,6 +422,71 @@ function AddRuleDialog({
                     {...register('threshold', { valueAsNumber: true })}
                   />
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* cert_expiry fields */}
+          {conditionType === 'cert_expiry' && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Scope</Label>
+                <Controller
+                  name="certScope"
+                  control={control}
+                  defaultValue="all"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? 'all'}
+                      onValueChange={(v) => {
+                        field.onChange(v)
+                        setCertScope(v as 'all' | 'specific')
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All certificates</SelectItem>
+                        <SelectItem value="specific">Specific certificate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              {certScope === 'specific' && (
+                <div className="space-y-1.5">
+                  <Label>Certificate</Label>
+                  <Controller
+                    name="certificateId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a certificate…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {orgCerts.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.commonName} ({c.host}:{c.port})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="days-before-expiry">Days before expiry</Label>
+                <Input
+                  id="days-before-expiry"
+                  type="number"
+                  min={1}
+                  max={365}
+                  placeholder="e.g. 30"
+                  {...register('daysBeforeExpiry', { valueAsNumber: true })}
+                />
               </div>
             </>
           )}

@@ -136,6 +136,12 @@ func dispatchCheck(def *agentv1.CheckDefinition) (status, output string) {
 			return "error", "invalid http config: " + err.Error()
 		}
 		return runHttpCheck(cfg)
+	case "certificate":
+		var cfg CertificateConfig
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
+			return "error", "invalid certificate config: " + err.Error()
+		}
+		return runCertificateCheck(cfg)
 	default:
 		return "error", "unknown check type: " + def.CheckType
 	}

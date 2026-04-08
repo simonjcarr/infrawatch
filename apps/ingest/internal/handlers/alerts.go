@@ -263,6 +263,208 @@ func evaluateMetricThresholdRule(
 	}
 }
 
+// certExpiryConfig is the JSONB config for cert_expiry alert rules.
+type certExpiryConfig struct {
+	CertificateID    string `json:"certificateId,omitempty"` // only when scope == "specific"
+	Scope            string `json:"scope"`                   // "all" | "specific"
+	DaysBeforeExpiry int    `json:"daysBeforeExpiry"`
+}
+
+// evaluateCertExpiryForCert is called immediately after a cert is upserted.
+// It loads all cert_expiry rules for the org and evaluates them against the
+// freshly-observed cert.
+func evaluateCertExpiryForCert(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	orgID, certID, commonName, issuer, host string, port int,
+	notAfter time.Time, status string,
+) {
+	rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, orgID)
+	if err != nil {
+		slog.Warn("evaluateCertExpiry: fetching rules", "org_id", orgID, "err", err)
+		return
+	}
+	if len(rules) == 0 {
+		return
+	}
+
+	webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
+	smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
+	channels := notifChannels{webhooks: webhooks, smtp: smtpChs}
+
+	cert := queries.CertSummary{
+		ID:         certID,
+		CommonName: commonName,
+		Issuer:     issuer,
+		Host:       host,
+		Port:       port,
+		NotAfter:   notAfter,
+		Status:     status,
+	}
+
+	for _, rule := range rules {
+		evaluateCertExpiryRule(ctx, pool, orgID, rule, cert, channels)
+	}
+}
+
+// evaluateCertExpiryRule fires or resolves a single cert_expiry rule against one cert.
+func evaluateCertExpiryRule(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	orgID string,
+	rule queries.AlertRuleRow,
+	cert queries.CertSummary,
+	channels notifChannels,
+) {
+	var cfg certExpiryConfig
+	if err := json.Unmarshal([]byte(rule.ConfigJSON), &cfg); err != nil {
+		slog.Warn("evaluateCertExpiryRule: unmarshal config", "rule_id", rule.ID, "err", err)
+		return
+	}
+	if cfg.DaysBeforeExpiry < 1 {
+		return
+	}
+
+	// Scope filter: if rule targets a specific cert, skip all others.
+	if cfg.Scope == "specific" && cfg.CertificateID != "" && cfg.CertificateID != cert.ID {
+		return
+	}
+
+	// If the cert has no discoveredByHostId, we cannot satisfy the NOT NULL FK on alert_instances.
+	hostID := cert.DiscoveredByHostID
+	if hostID == "" {
+		slog.Debug("evaluateCertExpiryRule: cert has no discovered_by_host_id, skipping", "cert_id", cert.ID)
+		return
+	}
+
+	warnDate := time.Now().Add(time.Duration(cfg.DaysBeforeExpiry) * 24 * time.Hour)
+	conditionMet := cert.NotAfter.Before(warnDate) // cert expires within the threshold window
+
+	existing, err := queries.GetActiveCertAlertInstance(ctx, pool, rule.ID, cert.ID)
+	if err != nil {
+		slog.Warn("evaluateCertExpiryRule: checking active instance", "rule_id", rule.ID, "err", err)
+		return
+	}
+
+	if conditionMet && existing == nil {
+		// Fire a new alert instance.
+		daysLeft := int(time.Until(cert.NotAfter).Hours() / 24)
+		var message string
+		if daysLeft <= 0 {
+			message = fmt.Sprintf("Certificate expired: %s (issuer: %s) on %s:%d expired %d days ago",
+				cert.CommonName, cert.Issuer, cert.Host, cert.Port, -daysLeft)
+		} else {
+			message = fmt.Sprintf("Certificate expiring soon: %s (issuer: %s) on %s:%d expires in %d days",
+				cert.CommonName, cert.Issuer, cert.Host, cert.Port, daysLeft)
+		}
+
+		id, err := queries.InsertCertAlertInstance(ctx, pool, rule.ID, hostID, orgID, rule.Severity, message, cert.ID, time.Now())
+		if err != nil {
+			slog.Warn("evaluateCertExpiryRule: inserting alert instance", "rule_id", rule.ID, "err", err)
+			return
+		}
+		slog.Info("cert_expiry alert fired", "instance_id", id, "rule", rule.Name, "cert_cn", cert.CommonName)
+		ev := AlertEvent{
+			Event:     "alert.fired",
+			Severity:  rule.Severity,
+			Host:      fmt.Sprintf("%s:%d", cert.Host, cert.Port),
+			Rule:      rule.Name,
+			Message:   message,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+		}
+		dispatchWebhooks(ctx, channels.webhooks, ev)
+		dispatchSmtp(channels.smtp, ev)
+		return
+	}
+
+	if !conditionMet && existing != nil {
+		// Resolve the alert — cert is no longer within the warning window.
+		if err := queries.ResolveAlertInstance(ctx, pool, existing.ID, time.Now()); err != nil {
+			slog.Warn("evaluateCertExpiryRule: resolving alert instance", "instance_id", existing.ID, "err", err)
+			return
+		}
+		slog.Info("cert_expiry alert resolved", "instance_id", existing.ID, "rule", rule.Name, "cert_cn", cert.CommonName)
+		ev := AlertEvent{
+			Event:     "alert.resolved",
+			Severity:  rule.Severity,
+			Host:      fmt.Sprintf("%s:%d", cert.Host, cert.Port),
+			Rule:      rule.Name,
+			Message:   fmt.Sprintf("Certificate %s on %s:%d is no longer within the expiry warning window", cert.CommonName, cert.Host, cert.Port),
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+		}
+		dispatchWebhooks(ctx, channels.webhooks, ev)
+		dispatchSmtp(channels.smtp, ev)
+	}
+}
+
+// RunCertExpirySweeper periodically evaluates all cert_expiry rules for all orgs.
+// This catches certs that drift into the warning window without a new scan.
+func RunCertExpirySweeper(ctx context.Context, pool *pgxpool.Pool, interval time.Duration) {
+	if interval <= 0 {
+		interval = 15 * time.Minute
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	slog.Info("cert expiry sweeper started", "interval", interval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			runCertExpirySweep(ctx, pool)
+		}
+	}
+}
+
+func runCertExpirySweep(ctx context.Context, pool *pgxpool.Pool) {
+	orgIDs, err := queries.GetAllOrgsWithCertExpiryRules(ctx, pool)
+	if err != nil {
+		slog.Warn("cert sweeper: fetching orgs", "err", err)
+		return
+	}
+
+	for _, orgID := range orgIDs {
+		rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, orgID)
+		if err != nil {
+			slog.Warn("cert sweeper: fetching rules", "org_id", orgID, "err", err)
+			continue
+		}
+
+		webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
+		smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
+		channels := notifChannels{webhooks: webhooks, smtp: smtpChs}
+
+		for _, rule := range rules {
+			var cfg certExpiryConfig
+			if err := json.Unmarshal([]byte(rule.ConfigJSON), &cfg); err != nil {
+				continue
+			}
+
+			var certs []queries.CertSummary
+			if cfg.Scope == "specific" && cfg.CertificateID != "" {
+				cert, err := queries.GetCertificateByID(ctx, pool, orgID, cfg.CertificateID)
+				if err != nil || cert == nil {
+					continue
+				}
+				certs = []queries.CertSummary{*cert}
+			} else {
+				certs, err = queries.ListCertificatesExpiringWithin(ctx, pool, orgID, cfg.DaysBeforeExpiry+1)
+				if err != nil {
+					slog.Warn("cert sweeper: fetching certs", "org_id", orgID, "err", err)
+					continue
+				}
+			}
+
+			for _, cert := range certs {
+				evaluateCertExpiryRule(ctx, pool, orgID, rule, cert, channels)
+			}
+		}
+	}
+	slog.Debug("cert expiry sweep complete", "orgs_checked", len(orgIDs))
+}
+
 // dispatchWebhooks fans out an AlertEvent to all configured webhook channels.
 // Each delivery runs in its own goroutine; failures are logged and discarded.
 func dispatchWebhooks(ctx context.Context, channels []queries.WebhookChannelRow, event AlertEvent) {

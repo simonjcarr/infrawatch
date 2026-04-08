@@ -15,8 +15,14 @@ export interface MetricThresholdConfig {
   threshold: number
 }
 
-export type AlertConditionType = 'check_status' | 'metric_threshold'
-export type AlertRuleConfig = CheckStatusConfig | MetricThresholdConfig
+export interface CertExpiryConfig {
+  certificateId?: string           // only set when scope === 'specific'
+  scope: 'all' | 'specific'
+  daysBeforeExpiry: number
+}
+
+export type AlertConditionType = 'check_status' | 'metric_threshold' | 'cert_expiry'
+export type AlertRuleConfig = CheckStatusConfig | MetricThresholdConfig | CertExpiryConfig
 export type AlertSeverity = 'info' | 'warning' | 'critical'
 export type AlertInstanceStatus = 'firing' | 'resolved' | 'acknowledged'
 

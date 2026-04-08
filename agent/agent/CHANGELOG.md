@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.3](https://github.com/simonjcarr/infrawatch/compare/agent/v0.11.2...agent/v0.11.3) (2026-04-08)
+
+
+### Bug Fixes
+
+* **agent:** fresh gRPC conn per stream attempt + TCP keepalive ([7426d3e](https://github.com/simonjcarr/infrawatch/commit/7426d3ec36ac4d391cd7d7b556994850c4878d9a))
+* **agent:** gRPC reconnect reliability + heartbeat interval chart ([02baa79](https://github.com/simonjcarr/infrawatch/commit/02baa79fe7a7cb3b042585b0051e8b4d913879a3))
+
 ## [0.11.2](https://github.com/simonjcarr/infrawatch/compare/agent/v0.11.1...agent/v0.11.2) (2026-04-08)
 
 

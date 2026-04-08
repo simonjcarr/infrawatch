@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.6.0...web/v0.6.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* **web:** agent self-update 503 — baked fallback + manifest version sync ([42a2626](https://github.com/simonjcarr/infrawatch/commit/42a262603154e2aac3c8e0ce314b68a7eb29099a))
+* **web:** agent self-update 503 — baked fallback + manifest version sync ([1a5670d](https://github.com/simonjcarr/infrawatch/commit/1a5670d8ebc0c4cdc71c891d923bc53e56135709))
+
 ## [0.6.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.5.1...web/v0.6.0) (2026-04-08)
 
 

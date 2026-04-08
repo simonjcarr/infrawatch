@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.6.1...web/v0.7.0) (2026-04-08)
+
+
+### Features
+
+* **web:** add certificate check type to Add Check dialog ([64e1192](https://github.com/simonjcarr/infrawatch/commit/64e1192e1b854689181042aaef95842123a9fad0))
+* **web:** add certificate check type to Add Check dialog ([42f8ea3](https://github.com/simonjcarr/infrawatch/commit/42f8ea30fc2b62d72a735a48ad2fb37c45c780c3))
+
 ## [0.6.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.6.0...web/v0.6.1) (2026-04-08)
 
 

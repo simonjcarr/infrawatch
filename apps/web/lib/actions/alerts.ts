@@ -5,7 +5,7 @@ import { createHmac } from 'crypto'
 import nodemailer from 'nodemailer'
 import { db } from '@/lib/db'
 import { alertRules, alertInstances, notificationChannels, alertSilences, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, desc, inArray, sql, lte, gte } from 'drizzle-orm'
+import { eq, and, isNull, desc, inArray, sql, lte, gte, count } from 'drizzle-orm'
 import type {
   AlertRule,
   AlertInstance,
@@ -274,11 +274,22 @@ export async function deleteAlertRule(
 
 // ─── Alert Instances ──────────────────────────────────────────────────────────
 
+export type AlertHistoryFilters = {
+  status?: AlertInstanceStatus
+  hostId?: string
+  severity?: AlertSeverity
+  dateFrom?: Date
+  dateTo?: Date
+  limit?: number
+  offset?: number
+}
+
 export async function getAlertInstances(
   orgId: string,
-  filters: { status?: AlertInstanceStatus; hostId?: string; limit?: number } = {},
+  filters: AlertHistoryFilters = {},
 ): Promise<AlertInstanceWithRule[]> {
   const limit = filters.limit ?? 50
+  const offset = filters.offset ?? 0
 
   const rows = await db
     .select({
@@ -305,10 +316,14 @@ export async function getAlertInstances(
         eq(alertInstances.organisationId, orgId),
         filters.status != null ? eq(alertInstances.status, filters.status) : undefined,
         filters.hostId != null ? eq(alertInstances.hostId, filters.hostId) : undefined,
+        filters.severity != null ? eq(alertRules.severity, filters.severity) : undefined,
+        filters.dateFrom != null ? gte(alertInstances.triggeredAt, filters.dateFrom) : undefined,
+        filters.dateTo != null ? lte(alertInstances.triggeredAt, filters.dateTo) : undefined,
       ),
     )
     .orderBy(desc(alertInstances.triggeredAt))
     .limit(limit)
+    .offset(offset)
 
   return rows.map((r) => ({
     ...r,
@@ -316,6 +331,28 @@ export async function getAlertInstances(
     ruleSeverity: r.ruleSeverity as AlertSeverity,
     hostname: r.hostname,
   }))
+}
+
+export async function getAlertInstanceCount(
+  orgId: string,
+  filters: Omit<AlertHistoryFilters, 'limit' | 'offset'> = {},
+): Promise<number> {
+  const rows = await db
+    .select({ total: count() })
+    .from(alertInstances)
+    .innerJoin(alertRules, eq(alertInstances.ruleId, alertRules.id))
+    .where(
+      and(
+        eq(alertInstances.organisationId, orgId),
+        filters.status != null ? eq(alertInstances.status, filters.status) : undefined,
+        filters.hostId != null ? eq(alertInstances.hostId, filters.hostId) : undefined,
+        filters.severity != null ? eq(alertRules.severity, filters.severity) : undefined,
+        filters.dateFrom != null ? gte(alertInstances.triggeredAt, filters.dateFrom) : undefined,
+        filters.dateTo != null ? lte(alertInstances.triggeredAt, filters.dateTo) : undefined,
+      ),
+    )
+
+  return rows[0]?.total ?? 0
 }
 
 export async function acknowledgeAlert(

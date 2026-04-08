@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { agents, agentStatusHistory, agentEnrolmentTokens, hosts, hostMetrics } from '@/lib/db/schema'
-import { eq, and, isNull, gt, gte, asc } from 'drizzle-orm'
+import { eq, and, isNull, gt, gte, asc, sql } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 
@@ -207,6 +207,57 @@ export async function getHostMetrics(
 ): Promise<HostMetric[]> {
   const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
   const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+
+  // For 7d and 24h ranges, try to use the continuous aggregate views (TimescaleDB).
+  // Falls back to raw table on plain PostgreSQL or if the view doesn't exist yet.
+  if (range === '7d' || range === '24h') {
+    const view = range === '7d' ? 'host_metrics_daily' : 'host_metrics_hourly'
+    try {
+      const rows = await db.execute<{
+        id: string
+        organisation_id: string
+        host_id: string
+        recorded_at: Date
+        cpu_percent: number | null
+        memory_percent: number | null
+        disk_percent: number | null
+        uptime_seconds: number | null
+        created_at: Date
+      }>(sql`
+        SELECT
+          concat(${hostId}, '-', bucket::text) AS id,
+          ${orgId}                             AS organisation_id,
+          ${hostId}                            AS host_id,
+          bucket                               AS recorded_at,
+          cpu_percent,
+          memory_percent,
+          disk_percent,
+          NULL::integer                        AS uptime_seconds,
+          bucket                               AS created_at
+        FROM ${sql.identifier(view)}
+        WHERE organisation_id = ${orgId}
+          AND host_id         = ${hostId}
+          AND bucket         >= ${cutoff}
+        ORDER BY bucket ASC
+      `)
+      const rowArr = Array.from(rows)
+      if (rowArr.length > 0) {
+        return rowArr.map((r) => ({
+          id: r.id,
+          organisationId: r.organisation_id,
+          hostId: r.host_id,
+          recordedAt: new Date(r.recorded_at),
+          cpuPercent: r.cpu_percent,
+          memoryPercent: r.memory_percent,
+          diskPercent: r.disk_percent,
+          uptimeSeconds: r.uptime_seconds,
+          createdAt: new Date(r.created_at),
+        }))
+      }
+    } catch {
+      // Aggregate view not available — fall through to raw query
+    }
+  }
 
   return db
     .select()

@@ -40,6 +40,37 @@ export async function updateOrgName(
   }
 }
 
+const metricRetentionSchema = z.object({
+  days: z.number().int().min(1).max(3650),
+})
+
+export async function updateMetricRetention(
+  orgId: string,
+  days: number,
+): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  if (!ADMIN_ROLES.includes(session.user.role)) {
+    return { error: 'You do not have permission to perform this action' }
+  }
+
+  const parsed = metricRetentionSchema.safeParse({ days })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid value' }
+  }
+
+  try {
+    await db
+      .update(organisations)
+      .set({ metricRetentionDays: parsed.data.days, updatedAt: new Date() })
+      .where(eq(organisations.id, orgId))
+
+    return { success: true }
+  } catch (err) {
+    console.error('Failed to update metric retention:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
 export async function saveLicenceKey(
   orgId: string,
   key: string,

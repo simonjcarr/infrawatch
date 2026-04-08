@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/select'
 import {
   getAlertInstances,
+  getAlertInstanceCount,
   acknowledgeAlert,
   getNotificationChannels,
   createNotificationChannel,
@@ -845,7 +846,6 @@ interface AlertsClientProps {
   orgId: string
   currentUserId: string
   initialActive: AlertInstanceWithRule[]
-  initialRecent: AlertInstanceWithRule[]
   initialChannels: NotificationChannelSafe[]
   initialSilences: AlertSilenceWithHost[]
   hosts: HostWithAgent[]
@@ -853,11 +853,12 @@ interface AlertsClientProps {
 
 type SeverityFilter = 'all' | AlertSeverity
 
+const HISTORY_PAGE_SIZE = 25
+
 export function AlertsClient({
   orgId,
   currentUserId,
   initialActive,
-  initialRecent,
   initialChannels,
   initialSilences,
   hosts,
@@ -871,6 +872,18 @@ export function AlertsClient({
   const [testingChannelId, setTestingChannelId] = useState<string | null>(null)
   const [testLog, setTestLog] = useState<TestLogEntry | null>(null)
 
+  // History pagination + filters
+  const [historyPage, setHistoryPage] = useState(0)
+  const [historyDateFrom, setHistoryDateFrom] = useState('')
+  const [historyDateTo, setHistoryDateTo] = useState('')
+  const [historySeverity, setHistorySeverity] = useState<SeverityFilter>('all')
+
+  const historyFilters = {
+    severity: historySeverity !== 'all' ? historySeverity : undefined,
+    dateFrom: historyDateFrom ? new Date(historyDateFrom) : undefined,
+    dateTo: historyDateTo ? new Date(historyDateTo + 'T23:59:59') : undefined,
+  }
+
   const { data: activeAlerts = [] } = useQuery({
     queryKey: ['alerts', orgId, 'firing'],
     queryFn: () => getAlertInstances(orgId, { status: 'firing', limit: 100 }),
@@ -878,11 +891,20 @@ export function AlertsClient({
     refetchInterval: 30_000,
   })
 
-  const { data: recentAlerts = [] } = useQuery({
-    queryKey: ['alerts', orgId, 'recent'],
-    queryFn: () => getAlertInstances(orgId, { limit: 50 }),
-    initialData: initialRecent,
-    refetchInterval: 30_000,
+  const { data: historyAlerts = [], isFetching: historyFetching } = useQuery({
+    queryKey: ['alerts', orgId, 'history', historyPage, historyFilters],
+    queryFn: () =>
+      getAlertInstances(orgId, {
+        ...historyFilters,
+        limit: HISTORY_PAGE_SIZE,
+        offset: historyPage * HISTORY_PAGE_SIZE,
+      }),
+    placeholderData: (prev) => prev,
+  })
+
+  const { data: historyTotal = 0 } = useQuery({
+    queryKey: ['alerts', orgId, 'history-count', historyFilters],
+    queryFn: () => getAlertInstanceCount(orgId, historyFilters),
   })
 
   const { data: channels = [] } = useQuery({
@@ -933,13 +955,20 @@ export function AlertsClient({
     })
   }
 
+  function resetHistoryFilters() {
+    setHistoryDateFrom('')
+    setHistoryDateTo('')
+    setHistorySeverity('all')
+    setHistoryPage(0)
+  }
+
+  const historyPageCount = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))
+  const historyFrom = historyTotal === 0 ? 0 : historyPage * HISTORY_PAGE_SIZE + 1
+  const historyTo = Math.min((historyPage + 1) * HISTORY_PAGE_SIZE, historyTotal)
+
   const filteredActive = severityFilter === 'all'
     ? activeAlerts
     : activeAlerts.filter((a) => a.ruleSeverity === severityFilter)
-
-  const filteredRecent = severityFilter === 'all'
-    ? recentAlerts.filter((a) => a.status !== 'firing')
-    : recentAlerts.filter((a) => a.status !== 'firing' && a.ruleSeverity === severityFilter)
 
   return (
     <div className="space-y-6">
@@ -1039,58 +1068,131 @@ export function AlertsClient({
         </CardContent>
       </Card>
 
-      {/* Recent Resolved / Acknowledged */}
+      {/* Alert History */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <CheckCircle2 className="size-4 text-muted-foreground" />
-            Recent History
-          </CardTitle>
-          <CardDescription>Last 50 resolved and acknowledged alerts</CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-muted-foreground" />
+                Alert History
+              </CardTitle>
+              <CardDescription>
+                {historyTotal > 0
+                  ? `${historyFrom}–${historyTo} of ${historyTotal} alerts`
+                  : 'No history yet'}
+              </CardDescription>
+            </div>
+          </div>
+
+          {/* History filters */}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Select
+              value={historySeverity}
+              onValueChange={(v) => { setHistorySeverity(v as SeverityFilter); setHistoryPage(0) }}
+            >
+              <SelectTrigger className="w-36 h-8 text-sm">
+                <SelectValue placeholder="Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All severities</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="date"
+              className="w-36 h-8 text-sm"
+              value={historyDateFrom}
+              onChange={(e) => { setHistoryDateFrom(e.target.value); setHistoryPage(0) }}
+              placeholder="From"
+            />
+            <Input
+              type="date"
+              className="w-36 h-8 text-sm"
+              value={historyDateTo}
+              onChange={(e) => { setHistoryDateTo(e.target.value); setHistoryPage(0) }}
+              placeholder="To"
+            />
+            {(historySeverity !== 'all' || historyDateFrom || historyDateTo) && (
+              <Button variant="ghost" size="sm" className="h-8 text-sm" onClick={resetHistoryFilters}>
+                Clear
+              </Button>
+            )}
+          </div>
         </CardHeader>
-        <CardContent>
-          {filteredRecent.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No history yet</p>
+        <CardContent className="space-y-4">
+          {historyAlerts.length === 0 && !historyFetching ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No alerts match the current filters</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Host</TableHead>
-                  <TableHead>Rule</TableHead>
-                  <TableHead>Triggered</TableHead>
-                  <TableHead>Resolved / Acknowledged</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecent.map((alert) => (
-                  <TableRow key={alert.id}>
-                    <TableCell>
-                      <SeverityBadge severity={alert.ruleSeverity} />
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={alert.status} />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/hosts/${alert.hostId}`}
-                        className="hover:underline text-foreground"
-                      >
-                        {alert.hostname}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm">{alert.ruleName}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatAbsolute(alert.triggeredAt)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatAbsolute(alert.resolvedAt ?? alert.acknowledgedAt)}
-                    </TableCell>
+            <div className={historyFetching ? 'opacity-60 transition-opacity' : ''}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Host</TableHead>
+                    <TableHead>Rule</TableHead>
+                    <TableHead>Triggered</TableHead>
+                    <TableHead>Resolved / Acknowledged</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {historyAlerts.map((alert) => (
+                    <TableRow key={alert.id}>
+                      <TableCell>
+                        <SeverityBadge severity={alert.ruleSeverity} />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={alert.status} />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/hosts/${alert.hostId}`}
+                          className="hover:underline text-foreground"
+                        >
+                          {alert.hostname}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-sm">{alert.ruleName}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatAbsolute(alert.triggeredAt)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatAbsolute(alert.resolvedAt ?? alert.acknowledgedAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {historyPageCount > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-muted-foreground">
+                Page {historyPage + 1} of {historyPageCount}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={historyPage === 0 || historyFetching}
+                  onClick={() => setHistoryPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={historyPage >= historyPageCount - 1 || historyFetching}
+                  onClick={() => setHistoryPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

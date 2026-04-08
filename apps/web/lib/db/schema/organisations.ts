@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, jsonb, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 
 export const organisations = pgTable('organisations', {
@@ -8,6 +8,7 @@ export const organisations = pgTable('organisations', {
   logoUrl: text('logo_url'),
   licenceTier: text('licence_tier').notNull().default('community'),
   licenceKey: text('licence_key'),
+  metricRetentionDays: integer('metric_retention_days').notNull().default(30),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

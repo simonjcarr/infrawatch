@@ -70,6 +70,7 @@ import type {
   PortCheckConfig,
   ProcessCheckConfig,
   HttpCheckConfig,
+  CertificateCheckConfig,
   AgentQueryStatus,
   PortInfoResult,
   ServiceInfoResult,
@@ -110,6 +111,12 @@ function CheckTypeBadge({ type }: { type: string }) {
       return (
         <Badge variant="outline" className="text-teal-700 border-teal-300 bg-teal-50">
           HTTP
+        </Badge>
+      )
+    case 'certificate':
+      return (
+        <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
+          Certificate
         </Badge>
       )
     default:
@@ -251,6 +258,9 @@ function AddCheckDialog({
   const [processName, setProcessName] = useState('')
   const [httpUrl, setHttpUrl] = useState('')
   const [httpStatus, setHttpStatus] = useState('200')
+  const [certHost, setCertHost] = useState('')
+  const [certPort, setCertPort] = useState('443')
+  const [certServerName, setCertServerName] = useState('')
 
   // Ad-hoc agent query ("Query server" button) state
   const [queryId, setQueryId] = useState<string | null>(null)
@@ -301,6 +311,10 @@ function AddCheckDialog({
         config = { host: portHost, port: parseInt(portPort, 10) }
       } else if (checkType === 'process') {
         config = { process_name: processName }
+      } else if (checkType === 'certificate') {
+        const certConfig: CertificateCheckConfig = { host: certHost, port: parseInt(certPort, 10) || 443 }
+        if (certServerName) certConfig.serverName = certServerName
+        config = certConfig
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -329,6 +343,9 @@ function AddCheckDialog({
     setProcessName('')
     setHttpUrl('')
     setHttpStatus('200')
+    setCertHost('')
+    setCertPort('443')
+    setCertServerName('')
     setError('')
     setQueryId(null)
     setQueryError(null)
@@ -362,6 +379,7 @@ function AddCheckDialog({
                 <SelectItem value="port">Port — TCP connectivity</SelectItem>
                 <SelectItem value="process">Process — running process</SelectItem>
                 <SelectItem value="http">HTTP — health endpoint</SelectItem>
+                <SelectItem value="certificate">Certificate — TLS certificate</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -527,6 +545,46 @@ function AddCheckDialog({
                   value={httpStatus}
                   onChange={(e) => setHttpStatus(e.target.value)}
                   placeholder="200"
+                />
+              </div>
+            </div>
+          )}
+
+          {checkType === 'certificate' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cert-host">Host</Label>
+                  <Input
+                    id="cert-host"
+                    value={certHost}
+                    onChange={(e) => setCertHost(e.target.value)}
+                    placeholder="example.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cert-port">Port</Label>
+                  <Input
+                    id="cert-port"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={certPort}
+                    onChange={(e) => setCertPort(e.target.value)}
+                    placeholder="443"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cert-sni">
+                  Server name (SNI){' '}
+                  <span className="text-muted-foreground font-normal">— optional</span>
+                </Label>
+                <Input
+                  id="cert-sni"
+                  value={certServerName}
+                  onChange={(e) => setCertServerName(e.target.value)}
+                  placeholder="Leave blank to use host above"
                 />
               </div>
             </div>

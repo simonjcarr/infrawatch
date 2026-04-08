@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.3.0...web/v0.4.0) (2026-04-08)
+
+
+### Features
+
+* **phase2:** alert history pagination, TimescaleDB CAGGs, metric retention ([63f5676](https://github.com/simonjcarr/infrawatch/commit/63f56762aa70985f4741faa9ee4dd017ffb0791e))
+* **phase2:** alert history pagination, TimescaleDB CAGGs, metric retention ([ac5ff93](https://github.com/simonjcarr/infrawatch/commit/ac5ff93138a2c556efd098e55650383dd0c983bd))
+
 ## [0.3.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.2.0...web/v0.3.0) (2026-04-07)
 
 

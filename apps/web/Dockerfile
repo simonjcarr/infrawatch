@@ -71,6 +71,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Release-please manifest — read at runtime to determine the required agent version
 COPY --from=builder --chown=nextjs:nodejs /app/.release-please-manifest.json /app/.release-please-manifest.json
 
+# Agent binaries — baked into the image as a bootstrap fallback for air-gapped
+# deployments where the operator-managed agent_dist volume starts empty and
+# GitHub is unreachable. The download route checks this directory last.
+COPY --chown=nextjs:nodejs apps/web/data/agent-dist ./apps/web/data/agent-dist
+
 # Migration script — from builder stage (same source, no caching concern)
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/migrate.js ./apps/web/migrate.js
 # Migration SQL files — copied DIRECTLY from the build context so this layer is always

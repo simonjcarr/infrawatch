@@ -24,10 +24,11 @@ const SUPPORTED_ARCH = ['amd64', 'arm64']
  * Serves the agent binary for the required version (pinned in lib/agent/version.ts).
  *
  * Resolution order:
- *   1. Versioned local file (infrawatch-agent-linux-amd64-v0.1.0) — served immediately if cached
+ *   1. Versioned local file in AGENT_DIST_DIR — served immediately if cached
  *   2. GitHub Release for the required version — downloads, caches, then serves
- *   3. Unversioned fallback (manually built via `make agent`) — for local dev without releases
- *   4. 503 if nothing available
+ *   3. Unversioned file in AGENT_DIST_DIR — operator-managed volume / local dev
+ *   4. Unversioned file baked into image (data/agent-dist/) — air-gap bootstrap
+ *   5. 503 if nothing available
  *
  * Query params: os (linux|darwin|windows), arch (amd64|arm64)
  */
@@ -73,18 +74,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── 3: Unversioned fallback (locally built via `make agent`) ──────────────
+  // ── 3: Unversioned fallback (operator-managed volume / AGENT_DIST_DIR) ────
   const unversionedPath = path.join(AGENT_DIST_DIR, baseName)
   if (fs.existsSync(unversionedPath)) {
     return streamFile(unversionedPath, baseName)
   }
 
-  // ── 4: Nothing available ──────────────────────────────────────────────────
+  // ── 4: Baked-in fallback (copied into image at build time) ────────────────
+  // Essential for air-gapped deployments where GitHub is unreachable and the
+  // operator-managed volume hasn't been seeded yet. AGENT_DIST_DIR may point
+  // to a named Docker volume that starts empty; this directory is always present.
+  const bakedDistDir = path.join(process.cwd(), 'data/agent-dist')
+  if (path.resolve(bakedDistDir) !== path.resolve(AGENT_DIST_DIR)) {
+    const bakedPath = path.join(bakedDistDir, baseName)
+    if (fs.existsSync(bakedPath)) {
+      return streamFile(bakedPath, baseName)
+    }
+  }
+
+  // ── 5: Nothing available ──────────────────────────────────────────────────
   return NextResponse.json(
     {
       error:
         `No binary available for ${os}/${arch} (required version: ${REQUIRED_AGENT_VERSION}). ` +
-        `Ensure a GitHub release exists for tag "agent/${REQUIRED_AGENT_VERSION}" in ${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}.`,
+        `Either place a binary in AGENT_DIST_DIR (${AGENT_DIST_DIR}) or ensure a GitHub release ` +
+        `exists for tag "agent/${REQUIRED_AGENT_VERSION}" in ${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}.`,
     },
     { status: 503 }
   )

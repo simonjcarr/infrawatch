@@ -14,9 +14,9 @@ import (
 // RunQuery executes a one-shot enumeration query and returns its result.
 // It is called inline from the heartbeat runner and should complete within
 // a few seconds at most (subprocess exec + line parsing).
-func RunQuery(q agentv1.AgentQuery) agentv1.AgentQueryResult {
-	result := agentv1.AgentQueryResult{
-		QueryID:   q.QueryID,
+func RunQuery(q *agentv1.AgentQuery) *agentv1.AgentQueryResult {
+	result := &agentv1.AgentQueryResult{
+		QueryId:   q.QueryId,
 		QueryType: q.QueryType,
 	}
 	switch q.QueryType {
@@ -47,7 +47,7 @@ func RunQuery(q agentv1.AgentQuery) agentv1.AgentQueryResult {
 
 // listOpenPorts runs `ss -tlnp` (preferred) or falls back to `netstat -tlnp`,
 // parsing TCP listening ports and their binding process names.
-func listOpenPorts() ([]agentv1.PortInfo, error) {
+func listOpenPorts() ([]*agentv1.PortInfo, error) {
 	out, err := exec.Command("ss", "-tlnp").Output()
 	if err != nil {
 		// Fallback to netstat for minimal images lacking iproute2.
@@ -58,7 +58,7 @@ func listOpenPorts() ([]agentv1.PortInfo, error) {
 	}
 
 	seen := make(map[string]struct{})
-	var ports []agentv1.PortInfo
+	var ports []*agentv1.PortInfo
 	scanner := bufio.NewScanner(strings.NewReader(string(out)))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -99,7 +99,7 @@ func listOpenPorts() ([]agentv1.PortInfo, error) {
 		}
 		seen[key] = struct{}{}
 
-		ports = append(ports, agentv1.PortInfo{
+		ports = append(ports, &agentv1.PortInfo{
 			Port:     int32(portNum),
 			Protocol: "tcp",
 			Process:  process,
@@ -137,7 +137,7 @@ func extractProcessName(s string) string {
 
 // listRunningServices runs `systemctl list-units --type=service --state=running`
 // and parses the output. Returns a friendly error if systemd is not present.
-func listRunningServices() ([]agentv1.ServiceInfo, error) {
+func listRunningServices() ([]*agentv1.ServiceInfo, error) {
 	if _, err := os.Stat("/run/systemd/system"); err != nil {
 		return nil, fmt.Errorf("systemd is not available on this host")
 	}
@@ -155,7 +155,7 @@ func listRunningServices() ([]agentv1.ServiceInfo, error) {
 		return nil, fmt.Errorf("systemctl failed: %w", err)
 	}
 
-	var services []agentv1.ServiceInfo
+	var services []*agentv1.ServiceInfo
 	scanner := bufio.NewScanner(strings.NewReader(string(out)))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -167,7 +167,7 @@ func listRunningServices() ([]agentv1.ServiceInfo, error) {
 		if len(fields) < 4 {
 			continue
 		}
-		services = append(services, agentv1.ServiceInfo{
+		services = append(services, &agentv1.ServiceInfo{
 			Name:      fields[0],
 			LoadState: fields[1],
 			ActiveSub: fields[3],

@@ -166,9 +166,9 @@ loop:
 			if len(pending) == 0 {
 				continue
 			}
-			pqs := make([]agentv1.AgentQuery, 0, len(pending))
+			pqs := make([]*agentv1.AgentQuery, 0, len(pending))
 			for _, p := range pending {
-				pqs = append(pqs, agentv1.AgentQuery{QueryID: p.ID, QueryType: p.QueryType})
+				pqs = append(pqs, &agentv1.AgentQuery{QueryId: p.ID, QueryType: p.QueryType})
 			}
 			if err := stream.Send(&agentv1.HeartbeatResponse{Ok: true, PendingQueries: pqs}); err != nil {
 				slog.Warn("pushing pending queries", "host_id", hostID, "err", err)
@@ -235,18 +235,18 @@ func (h *HeartbeatHandler) processHeartbeat(
 		for _, result := range req.CheckResults {
 			ranAt := time.Unix(result.RanAtUnix, 0)
 			if err := queries.InsertCheckResult(ctx, h.pool,
-				result.CheckID, hostID, orgID,
+				result.CheckId, hostID, orgID,
 				result.Status, result.Output,
 				result.DurationMs, ranAt,
 			); err != nil {
-				slog.Warn("inserting check result", "check_id", result.CheckID, "err", err)
+				slog.Warn("inserting check result", "check_id", result.CheckId, "err", err)
 			}
 		}
 
 		// Evaluate alert rules for this heartbeat.
 		checkStatuses := make(map[string]string, len(req.CheckResults))
 		for _, result := range req.CheckResults {
-			checkStatuses[result.CheckID] = result.Status
+			checkStatuses[result.CheckId] = result.Status
 		}
 		evaluateAlerts(ctx, h.pool, orgID, hostID, hostname, checkStatuses, heartbeatMetrics{
 			CPU:    req.CpuPercent,
@@ -269,8 +269,8 @@ func (h *HeartbeatHandler) processHeartbeat(
 		if dbStatus == "ok" {
 			dbStatus = "complete"
 		}
-		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryID, dbStatus, qr.Error, resultJSON); err != nil {
-			slog.Warn("completing agent query", "query_id", qr.QueryID, "err", err)
+		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryId, dbStatus, qr.Error, resultJSON); err != nil {
+			slog.Warn("completing agent query", "query_id", qr.QueryId, "err", err)
 		}
 	}
 
@@ -302,7 +302,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 		req.AgentVersion != latestVersion {
 		resp.UpdateAvailable = true
 		resp.LatestVersion = latestVersion
-		resp.DownloadURL = h.downloadBaseURL + "/api/agent/download"
+		resp.DownloadUrl = h.downloadBaseURL + "/api/agent/download"
 		slog.Info("signalling agent update",
 			"agent_id", agentID,
 			"current", req.AgentVersion,
@@ -316,12 +316,12 @@ func (h *HeartbeatHandler) processHeartbeat(
 		if err != nil {
 			slog.Warn("fetching checks for host", "host_id", hostID, "err", err)
 		} else {
-			defs := make([]agentv1.CheckDefinition, 0, len(checkRows))
+			defs := make([]*agentv1.CheckDefinition, 0, len(checkRows))
 			for _, row := range checkRows {
-				defs = append(defs, agentv1.CheckDefinition{
-					CheckID:         row.ID,
+				defs = append(defs, &agentv1.CheckDefinition{
+					CheckId:         row.ID,
 					CheckType:       row.CheckType,
-					ConfigJSON:      row.ConfigJSON,
+					ConfigJson:      row.ConfigJSON,
 					IntervalSeconds: int32(row.IntervalSeconds),
 				})
 			}

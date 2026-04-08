@@ -17,29 +17,29 @@ import (
 // Executor manages concurrent check goroutines and accumulates their results.
 type Executor struct {
 	mu      sync.Mutex
-	results []agentv1.CheckResult
+	results []*agentv1.CheckResult
 
 	// cancels maps checkID → cancel function for the running goroutine
 	cancels map[string]context.CancelFunc
 	// defs maps checkID → the definition that goroutine is running
-	defs map[string]agentv1.CheckDefinition
+	defs map[string]*agentv1.CheckDefinition
 }
 
 // NewExecutor creates a new idle Executor.
 func NewExecutor() *Executor {
 	return &Executor{
 		cancels: make(map[string]context.CancelFunc),
-		defs:    make(map[string]agentv1.CheckDefinition),
+		defs:    make(map[string]*agentv1.CheckDefinition),
 	}
 }
 
 // UpdateDefinitions reconciles running goroutines with the incoming set.
 // Removed checks are cancelled; new or changed checks are (re)started.
 // ctx should be the agent-level context so goroutines survive stream reconnects.
-func (e *Executor) UpdateDefinitions(ctx context.Context, incoming []agentv1.CheckDefinition) {
-	incomingSet := make(map[string]agentv1.CheckDefinition, len(incoming))
+func (e *Executor) UpdateDefinitions(ctx context.Context, incoming []*agentv1.CheckDefinition) {
+	incomingSet := make(map[string]*agentv1.CheckDefinition, len(incoming))
 	for _, def := range incoming {
-		incomingSet[def.CheckID] = def
+		incomingSet[def.CheckId] = def
 	}
 
 	e.mu.Lock()
@@ -68,7 +68,7 @@ func (e *Executor) UpdateDefinitions(ctx context.Context, incoming []agentv1.Che
 }
 
 // DrainResults atomically returns and clears all accumulated results.
-func (e *Executor) DrainResults() []agentv1.CheckResult {
+func (e *Executor) DrainResults() []*agentv1.CheckResult {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	results := e.results
@@ -76,7 +76,7 @@ func (e *Executor) DrainResults() []agentv1.CheckResult {
 	return results
 }
 
-func (e *Executor) runCheck(ctx context.Context, def agentv1.CheckDefinition) {
+func (e *Executor) runCheck(ctx context.Context, def *agentv1.CheckDefinition) {
 	interval := time.Duration(def.IntervalSeconds) * time.Second
 	if interval <= 0 {
 		interval = 60 * time.Second
@@ -98,11 +98,11 @@ func (e *Executor) runCheck(ctx context.Context, def agentv1.CheckDefinition) {
 	}
 }
 
-func (e *Executor) executeOnce(def agentv1.CheckDefinition) {
+func (e *Executor) executeOnce(def *agentv1.CheckDefinition) {
 	start := time.Now()
 	checkStatus, output := dispatchCheck(def)
-	result := agentv1.CheckResult{
-		CheckID:    def.CheckID,
+	result := &agentv1.CheckResult{
+		CheckId:    def.CheckId,
 		Status:     checkStatus,
 		Output:     output,
 		DurationMs: int32(time.Since(start).Milliseconds()),
@@ -113,26 +113,26 @@ func (e *Executor) executeOnce(def agentv1.CheckDefinition) {
 	e.results = append(e.results, result)
 	e.mu.Unlock()
 
-	slog.Debug("check executed", "check_id", def.CheckID, "type", def.CheckType, "status", checkStatus)
+	slog.Debug("check executed", "check_id", def.CheckId, "type", def.CheckType, "status", checkStatus)
 }
 
-func dispatchCheck(def agentv1.CheckDefinition) (status, output string) {
+func dispatchCheck(def *agentv1.CheckDefinition) (status, output string) {
 	switch def.CheckType {
 	case "port":
 		var cfg PortConfig
-		if err := json.Unmarshal([]byte(def.ConfigJSON), &cfg); err != nil {
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
 			return "error", "invalid port config: " + err.Error()
 		}
 		return runPortCheck(cfg)
 	case "process":
 		var cfg ProcessConfig
-		if err := json.Unmarshal([]byte(def.ConfigJSON), &cfg); err != nil {
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
 			return "error", "invalid process config: " + err.Error()
 		}
 		return runProcessCheck(cfg)
 	case "http":
 		var cfg HttpConfig
-		if err := json.Unmarshal([]byte(def.ConfigJSON), &cfg); err != nil {
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
 			return "error", "invalid http config: " + err.Error()
 		}
 		return runHttpCheck(cfg)
@@ -143,8 +143,8 @@ func dispatchCheck(def agentv1.CheckDefinition) (status, output string) {
 
 // definitionChanged returns true if the two definitions differ in a way that
 // warrants restarting the check goroutine.
-func definitionChanged(old, new agentv1.CheckDefinition) bool {
+func definitionChanged(old, new *agentv1.CheckDefinition) bool {
 	return old.CheckType != new.CheckType ||
-		old.ConfigJSON != new.ConfigJSON ||
+		old.ConfigJson != new.ConfigJson ||
 		old.IntervalSeconds != new.IntervalSeconds
 }

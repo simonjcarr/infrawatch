@@ -19,6 +19,10 @@ import Link from 'next/link'
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
+  Cell,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,8 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getHost, getHostMetrics, getAgentOfflinePeriods } from '@/lib/actions/agents'
-import type { HostWithAgent, MetricsRange, OfflinePeriod } from '@/lib/actions/agents'
+import { getHost, getHostMetrics, getAgentOfflinePeriods, getHeartbeatHistory } from '@/lib/actions/agents'
+import type { HostWithAgent, MetricsRange, OfflinePeriod, HeartbeatPoint } from '@/lib/actions/agents'
 import { useHostStream } from '@/hooks/use-host-stream'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
 import { ChecksTab } from './checks-tab'
@@ -194,6 +198,13 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
         ? getAgentOfflinePeriods(orgId, initialHost.agentId, metricsRange)
         : Promise.resolve([]),
     enabled: activeTab === 'metrics' && !!initialHost.agentId,
+    refetchInterval: 60_000,
+  })
+
+  const { data: heartbeatData = [] } = useQuery<HeartbeatPoint[]>({
+    queryKey: ['host-heartbeat-history', orgId, initialHost.id, metricsRange],
+    queryFn: () => getHeartbeatHistory(orgId, initialHost.id, metricsRange),
+    enabled: activeTab === 'metrics',
     refetchInterval: 60_000,
   })
 
@@ -514,86 +525,172 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Activity className="size-4 text-muted-foreground" />
-                  CPU, Memory &amp; Disk Usage (%)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={320}>
-                  <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis
-                      dataKey="time"
-                      type="number"
-                      scale="time"
-                      domain={['dataMin', () => Date.now()]}
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                      tickLine={false}
-                      tickFormatter={(ts: number) => format(new Date(ts), tickFormat)}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      domain={[0, 100]}
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                      tickLine={false}
-                      tickFormatter={(v: number) => `${v}%`}
-                      width={40}
-                    />
-                    <Tooltip
-                      formatter={(value) => [`${value}%`]}
-                      labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--popover))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                        color: 'hsl(var(--popover-foreground))',
-                        fontSize: '12px',
-                      }}
-                    />
-                    <Legend
-                      wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }}
-                    />
-                    {offlinePeriods.map((period, i) => (
-                      <ReferenceArea
-                        key={i}
-                        x1={period.start}
-                        x2={period.end ?? Date.now()}
-                        fill="hsl(220, 13%, 60%)"
-                        fillOpacity={0.15}
-                        label={{ value: 'Offline', position: 'insideTop', fontSize: 11, fill: 'hsl(220, 13%, 30%)', fontWeight: 500 }}
+            <>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="size-4 text-muted-foreground" />
+                    CPU, Memory &amp; Disk Usage (%)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis
+                        dataKey="time"
+                        type="number"
+                        scale="time"
+                        domain={['dataMin', () => Date.now()]}
+                        tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                        tickLine={false}
+                        tickFormatter={(ts: number) => format(new Date(ts), tickFormat)}
+                        interval="preserveStartEnd"
                       />
-                    ))}
-                    <Line
-                      type="monotone"
-                      dataKey="cpu"
-                      name="CPU"
-                      stroke="hsl(221, 83%, 53%)"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="memory"
-                      name="Memory"
-                      stroke="hsl(142, 71%, 45%)"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="disk"
-                      name="Disk"
-                      stroke="hsl(38, 92%, 50%)"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                        tickLine={false}
+                        tickFormatter={(v: number) => `${v}%`}
+                        width={40}
+                      />
+                      <Tooltip
+                        formatter={(value) => [`${value}%`]}
+                        labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--popover))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                          color: 'hsl(var(--popover-foreground))',
+                          fontSize: '12px',
+                        }}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }}
+                      />
+                      {offlinePeriods.map((period, i) => (
+                        <ReferenceArea
+                          key={i}
+                          x1={period.start}
+                          x2={period.end ?? Date.now()}
+                          fill="hsl(220, 13%, 60%)"
+                          fillOpacity={0.15}
+                          label={{ value: 'Offline', position: 'insideTop', fontSize: 11, fill: 'hsl(220, 13%, 30%)', fontWeight: 500 }}
+                        />
+                      ))}
+                      <Line
+                        type="monotone"
+                        dataKey="cpu"
+                        name="CPU"
+                        stroke="hsl(221, 83%, 53%)"
+                        dot={false}
+                        strokeWidth={2}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="memory"
+                        name="Memory"
+                        stroke="hsl(142, 71%, 45%)"
+                        dot={false}
+                        strokeWidth={2}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="disk"
+                        name="Disk"
+                        stroke="hsl(38, 92%, 50%)"
+                        dot={false}
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="size-4 text-muted-foreground" />
+                    Heartbeat Interval
+                    <span className="text-xs font-normal text-muted-foreground">
+                      — seconds between consecutive heartbeats
+                      {metricsRange !== '1h' && ' (max per bucket)'}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {heartbeatData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No heartbeat data for this period.
+                    </p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={heartbeatData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                        <XAxis
+                          dataKey="time"
+                          type="number"
+                          scale="time"
+                          domain={['dataMin', () => Date.now()]}
+                          tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                          tickLine={false}
+                          tickFormatter={(ts: number) => format(new Date(ts), tickFormat)}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                          tickLine={false}
+                          tickFormatter={(v: number) => `${v}s`}
+                          width={40}
+                        />
+                        <Tooltip
+                          formatter={(value) => [`${value}s`, 'Interval']}
+                          labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '6px',
+                            color: 'hsl(var(--popover-foreground))',
+                            fontSize: '12px',
+                          }}
+                        />
+                        {/* Expected heartbeat interval reference line */}
+                        <ReferenceLine
+                          y={30}
+                          stroke="hsl(var(--muted-foreground))"
+                          strokeDasharray="4 2"
+                          strokeOpacity={0.5}
+                          label={{ value: '30s', position: 'insideTopRight', fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        />
+                        {offlinePeriods.map((period, i) => (
+                          <ReferenceArea
+                            key={i}
+                            x1={period.start}
+                            x2={period.end ?? Date.now()}
+                            fill="hsl(220, 13%, 60%)"
+                            fillOpacity={0.15}
+                          />
+                        ))}
+                        <Bar dataKey="intervalSecs" name="Interval" radius={[2, 2, 0, 0]} maxBarSize={24}>
+                          {heartbeatData.map((entry, i) => (
+                            <Cell
+                              key={i}
+                              fill={
+                                entry.intervalSecs <= 45
+                                  ? 'hsl(142, 71%, 45%)'
+                                  : entry.intervalSecs <= 120
+                                    ? 'hsl(38, 92%, 50%)'
+                                    : 'hsl(0, 84%, 60%)'
+                              }
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       )}

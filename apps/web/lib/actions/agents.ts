@@ -317,6 +317,94 @@ export async function getAgentOfflinePeriods(
   return periods
 }
 
+export type HeartbeatPoint = { time: number; intervalSecs: number }
+
+export async function getHeartbeatHistory(
+  orgId: string,
+  hostId: string,
+  range: MetricsRange,
+): Promise<HeartbeatPoint[]> {
+  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+
+  if (range === '1h') {
+    // Individual intervals — LAG() gives the gap between consecutive heartbeats
+    const rows = await db.execute<{ recorded_at: string; interval_secs: number | null }>(sql`
+      SELECT
+        recorded_at,
+        EXTRACT(EPOCH FROM (
+          recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
+        ))::float AS interval_secs
+      FROM host_metrics
+      WHERE organisation_id = ${orgId}
+        AND host_id         = ${hostId}
+        AND recorded_at    >= ${cutoff}
+      ORDER BY recorded_at ASC
+    `)
+    return Array.from(rows)
+      .filter((r) => r.interval_secs != null)
+      .map((r) => ({
+        time: new Date(r.recorded_at).getTime(),
+        intervalSecs: parseFloat(Number(r.interval_secs).toFixed(1)),
+      }))
+  }
+
+  // 24h/7d: bucket by 5-minute or 1-hour windows and take the MAX gap per
+  // bucket so outages are visible even when there are many healthy heartbeats
+  // in the same window. Uses TimescaleDB time_bucket; falls back to raw LAG
+  // on plain PostgreSQL.
+  const bucketInterval = range === '24h' ? sql.raw("'5 minutes'") : sql.raw("'1 hour'")
+  try {
+    const rows = await db.execute<{ bucket: string; max_interval_secs: number | null }>(sql`
+      WITH intervals AS (
+        SELECT
+          recorded_at,
+          EXTRACT(EPOCH FROM (
+            recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
+          ))::float AS interval_secs
+        FROM host_metrics
+        WHERE organisation_id = ${orgId}
+          AND host_id         = ${hostId}
+          AND recorded_at    >= ${cutoff}
+      )
+      SELECT
+        time_bucket(${bucketInterval}::interval, recorded_at) AS bucket,
+        MAX(interval_secs)                                     AS max_interval_secs
+      FROM intervals
+      WHERE interval_secs IS NOT NULL
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `)
+    return Array.from(rows)
+      .filter((r) => r.max_interval_secs != null)
+      .map((r) => ({
+        time: new Date(r.bucket).getTime(),
+        intervalSecs: parseFloat(Number(r.max_interval_secs).toFixed(1)),
+      }))
+  } catch {
+    // Plain PostgreSQL fallback — raw intervals, capped to avoid massive payloads
+    const rows = await db.execute<{ recorded_at: string; interval_secs: number | null }>(sql`
+      SELECT
+        recorded_at,
+        EXTRACT(EPOCH FROM (
+          recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
+        ))::float AS interval_secs
+      FROM host_metrics
+      WHERE organisation_id = ${orgId}
+        AND host_id         = ${hostId}
+        AND recorded_at    >= ${cutoff}
+      ORDER BY recorded_at ASC
+      LIMIT 500
+    `)
+    return Array.from(rows)
+      .filter((r) => r.interval_secs != null)
+      .map((r) => ({
+        time: new Date(r.recorded_at).getTime(),
+        intervalSecs: parseFloat(Number(r.interval_secs).toFixed(1)),
+      }))
+  }
+}
+
 export async function getHost(orgId: string, hostId: string): Promise<HostWithAgent | null> {
   const rows = await db
     .select()

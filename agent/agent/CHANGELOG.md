@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.11.3...agent/v0.12.0) (2026-04-08)
+
+
+### Features
+
+* **certificates:** implement Phase 3 certificate lifecycle management ([cf6826b](https://github.com/simonjcarr/infrawatch/commit/cf6826bda93ec09fa7563d787cd4003ead665fd7))
+* **certificates:** Phase 3 — certificate lifecycle management ([6de140e](https://github.com/simonjcarr/infrawatch/commit/6de140e3d1d9eb36b0126c4371945ed92e97f371))
+
 ## [0.11.3](https://github.com/simonjcarr/infrawatch/compare/agent/v0.11.2...agent/v0.11.3) (2026-04-08)
 
 

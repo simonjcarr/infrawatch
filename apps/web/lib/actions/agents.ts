@@ -207,6 +207,8 @@ export async function getHostMetrics(
 ): Promise<HostMetric[]> {
   const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
   const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+  // db.execute() does not serialise Date parameters — use ISO string instead
+  const cutoffISO = cutoff.toISOString()
 
   // For 7d and 24h ranges, try to use the continuous aggregate views (TimescaleDB).
   // Falls back to raw table on plain PostgreSQL or if the view doesn't exist yet.
@@ -237,7 +239,7 @@ export async function getHostMetrics(
         FROM ${sql.identifier(view)}
         WHERE organisation_id = ${orgId}
           AND host_id         = ${hostId}
-          AND bucket         >= ${cutoff}
+          AND bucket         >= ${cutoffISO}
         ORDER BY bucket ASC
       `)
       const rowArr = Array.from(rows)
@@ -326,6 +328,8 @@ export async function getHeartbeatHistory(
 ): Promise<HeartbeatPoint[]> {
   const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
   const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
+  // db.execute() does not serialise Date parameters — use ISO string instead
+  const cutoffISO = cutoff.toISOString()
 
   if (range === '1h') {
     // Individual intervals — LAG() gives the gap between consecutive heartbeats
@@ -338,7 +342,7 @@ export async function getHeartbeatHistory(
       FROM host_metrics
       WHERE organisation_id = ${orgId}
         AND host_id         = ${hostId}
-        AND recorded_at    >= ${cutoff}
+        AND recorded_at    >= ${cutoffISO}
       ORDER BY recorded_at ASC
     `)
     return Array.from(rows)
@@ -365,7 +369,7 @@ export async function getHeartbeatHistory(
         FROM host_metrics
         WHERE organisation_id = ${orgId}
           AND host_id         = ${hostId}
-          AND recorded_at    >= ${cutoff}
+          AND recorded_at    >= ${cutoffISO}
       )
       SELECT
         time_bucket(${bucketInterval}::interval, recorded_at) AS bucket,
@@ -392,7 +396,7 @@ export async function getHeartbeatHistory(
       FROM host_metrics
       WHERE organisation_id = ${orgId}
         AND host_id         = ${hostId}
-        AND recorded_at    >= ${cutoff}
+        AND recorded_at    >= ${cutoffISO}
       ORDER BY recorded_at ASC
       LIMIT 500
     `)

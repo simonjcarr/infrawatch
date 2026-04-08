@@ -61,8 +61,12 @@ func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, 
 }
 
 // Run starts the heartbeat stream. It reconnects automatically on transient
-// errors, backing off up to 60 seconds between attempts.
+// errors, backing off up to 60 seconds between attempts. The backoff resets
+// to 1s after any stream that ran stably for at least minStableTime, so a
+// transient blip (e.g. firewall state expiry) does not leave the agent
+// waiting 60s between retries on the next failure.
 func (r *Runner) Run(ctx context.Context) error {
+	const minStableTime = 10 * time.Second
 	backoff := time.Second
 	maxBackoff := 60 * time.Second
 
@@ -71,9 +75,14 @@ func (r *Runner) Run(ctx context.Context) error {
 			return ctx.Err()
 		}
 
+		start := time.Now()
 		err := r.runStream(ctx)
 		if err == nil || err == context.Canceled || err == context.DeadlineExceeded {
 			return err
+		}
+
+		if time.Since(start) >= minStableTime {
+			backoff = time.Second // stream was stable — reset backoff
 		}
 
 		slog.Warn("heartbeat stream ended, reconnecting", "err", err, "backoff", backoff)

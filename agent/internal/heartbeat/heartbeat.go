@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/infrawatch/agent/internal/checks"
 	"github.com/infrawatch/agent/internal/updater"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
@@ -20,7 +22,11 @@ import (
 
 // Runner manages the bidirectional heartbeat stream with the ingest service.
 type Runner struct {
-	client   agentv1.IngestServiceClient
+	// dialFunc creates a fresh gRPC connection for each stream attempt. A new
+	// connection is used every time rather than reusing a long-lived ClientConn
+	// because gRPC's internal TRANSIENT_FAILURE state can get stuck after a
+	// server restart — a fresh connection always starts clean.
+	dialFunc func() (*grpc.ClientConn, error)
 	agentID  string
 	jwtToken string
 	version  string
@@ -46,10 +52,12 @@ type Runner struct {
 	resultsReady chan struct{}
 }
 
-// New creates a new heartbeat Runner.
-func New(client agentv1.IngestServiceClient, agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor) *Runner {
+// New creates a new heartbeat Runner. dialFunc is called once per stream
+// attempt to obtain a fresh gRPC connection; the runner closes it when the
+// stream ends.
+func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor) *Runner {
 	return &Runner{
-		client:       client,
+		dialFunc:     dialFunc,
 		agentID:      agentID,
 		jwtToken:     jwtToken,
 		version:      version,
@@ -97,7 +105,13 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 func (r *Runner) runStream(ctx context.Context) error {
-	stream, err := r.client.Heartbeat(ctx)
+	conn, err := r.dialFunc()
+	if err != nil {
+		return fmt.Errorf("connecting to ingest: %w", err)
+	}
+	defer conn.Close()
+
+	stream, err := agentv1.NewIngestServiceClient(conn).Heartbeat(ctx)
 	if err != nil {
 		return fmt.Errorf("opening heartbeat stream: %w", err)
 	}

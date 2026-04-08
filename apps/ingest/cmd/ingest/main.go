@@ -89,7 +89,7 @@ func main() {
 	grpcErr := make(chan error, 1)
 	go func() {
 		slog.Info("gRPC server starting", "port", cfg.GRPCPort)
-		grpcErr <- ingestgrpc.Serve(cfg.GRPCPort, creds, regHandler, hbHandler)
+		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler)
 	}()
 
 	select {

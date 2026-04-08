@@ -3,6 +3,7 @@ package ingestgrpc
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
@@ -30,8 +31,12 @@ func (s *ingestService) Heartbeat(stream agentv1.IngestService_HeartbeatServer) 
 }
 
 // Serve starts the gRPC server on the given port with TLS credentials.
-// Blocks until the server stops.
-func Serve(port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler) error {
+// Blocks until the server stops. When ctx is cancelled (e.g. SIGTERM), Serve
+// sends a gRPC GOAWAY to all connected agents so they reconnect immediately
+// rather than hitting exponential backoff. If streams don't drain within 30s,
+// the server is force-stopped — this covers the case where a container is
+// killed before context cancellation can propagate.
+func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("listening on :%d: %w", port, err)
@@ -60,6 +65,26 @@ func Serve(port int, creds credentials.TransportCredentials, reg *handlers.Regis
 
 	svc := &ingestService{reg: reg, hb: hb}
 	agentv1.RegisterIngestServiceServer(grpcServer, svc)
+
+	// Graceful shutdown on context cancellation. GracefulStop sends GOAWAY
+	// so agents reconnect immediately; Stop is the hard fallback if streams
+	// don't drain within 30s (e.g. a long-running check is in flight).
+	go func() {
+		<-ctx.Done()
+		slog.Info("gRPC server shutting down gracefully")
+		stopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(stopped)
+		}()
+		select {
+		case <-stopped:
+			slog.Info("gRPC server stopped gracefully")
+		case <-time.After(30 * time.Second):
+			slog.Warn("graceful stop timed out, forcing shutdown")
+			grpcServer.Stop()
+		}
+	}()
 
 	return grpcServer.Serve(lis)
 }

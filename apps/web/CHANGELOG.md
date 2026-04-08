@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.7.0...web/v0.7.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* **ci:** track agent-dist dir so Docker COPY succeeds in CI ([15ee866](https://github.com/simonjcarr/infrawatch/commit/15ee86647f43adcdb40ab6053539630791208d9b))
+* **ci:** track agent-dist dir so Docker COPY succeeds in CI ([288291d](https://github.com/simonjcarr/infrawatch/commit/288291d92299b051bf8102ebf722f02b71ca9188))
+
 ## [0.7.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.6.1...web/v0.7.0) (2026-04-08)
 
 

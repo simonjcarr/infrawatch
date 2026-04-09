@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.13.0...agent/v0.13.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* **agent:** make check delivery resilient to stream reconnects and hostID failures ([251455d](https://github.com/simonjcarr/infrawatch/commit/251455da236c079be0d3074fef69327e57f55dd1))
+* **agent:** make check delivery resilient to stream reconnects and hostID resolution failures ([abf93d3](https://github.com/simonjcarr/infrawatch/commit/abf93d38dccca836e3ebd8dfe5deea68f169c7e9))
+
 ## [0.13.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.12.0...agent/v0.13.0) (2026-04-09)
 
 

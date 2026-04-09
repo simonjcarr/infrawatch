@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.10.0...web/v0.10.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* **db:** bump migration 0014 timestamp to be monotonically after 0013 ([039d084](https://github.com/simonjcarr/infrawatch/commit/039d0848ed04bf04e2d2a024ce1e8bcf55f188cd))
+* **db:** bump migration 0014 timestamp to be monotonically after 0013 ([2ace491](https://github.com/simonjcarr/infrawatch/commit/2ace491a0bdbf70e4cb7a66adf5c080ada9fe08c))
+
 ## [0.10.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.9.0...web/v0.10.0) (2026-04-09)
 
 

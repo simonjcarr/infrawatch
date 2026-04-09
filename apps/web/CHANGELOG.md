@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.4...web/v0.9.0) (2026-04-09)
+
+
+### Features
+
+* CI pr-checks workflow, system health page, and debt documentation cleanup ([aba140c](https://github.com/simonjcarr/infrawatch/commit/aba140c0cf605c5dc19b5d2e67e11dbf3bd107ac))
+* CI pr-checks, system health page, gen_cuid fix, and PROGRESS.md cleanup ([fc30879](https://github.com/simonjcarr/infrawatch/commit/fc3087955dc6f176046e2e9c326e0e5d1280d028))
+
+
+### Bug Fixes
+
+* **ci:** fix all PR Checks lint and Go build failures ([99253fe](https://github.com/simonjcarr/infrawatch/commit/99253fe298e06b68bac6622be77fa4ff89fa0071))
+
 ## [0.8.4](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.3...web/v0.8.4) (2026-04-09)
 
 

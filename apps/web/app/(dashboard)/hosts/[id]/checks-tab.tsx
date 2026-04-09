@@ -71,6 +71,7 @@ import type {
   ProcessCheckConfig,
   HttpCheckConfig,
   CertificateCheckConfig,
+  CertFileCheckConfig,
   AgentQueryStatus,
   PortInfoResult,
   ServiceInfoResult,
@@ -91,6 +92,33 @@ const STATUS_COLOUR: Record<string, string> = {
   pass: '#22c55e',
   fail: '#ef4444',
   error: '#f59e0b',
+}
+
+function formatCertOutput(checkType: string, output: string): string {
+  if (checkType !== 'certificate' && checkType !== 'cert_file') return output
+  try {
+    const r = JSON.parse(output) as {
+      common_name?: string
+      subject?: string
+      not_after?: string
+      error?: string
+    }
+    if (r.error) return r.error
+    const cn = r.common_name || r.subject || '—'
+    const expiry = r.not_after ? new Date(r.not_after) : null
+    const daysLeft = expiry
+      ? Math.floor((expiry.getTime() - Date.now()) / 86_400_000)
+      : null
+    const expiryStr =
+      daysLeft === null
+        ? ''
+        : daysLeft < 0
+        ? ` · Expired ${Math.abs(daysLeft)}d ago`
+        : ` · Expires in ${daysLeft}d`
+    return `${cn}${expiryStr}`
+  } catch {
+    return output
+  }
 }
 
 function CheckTypeBadge({ type }: { type: string }) {
@@ -117,6 +145,12 @@ function CheckTypeBadge({ type }: { type: string }) {
       return (
         <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
           Certificate
+        </Badge>
+      )
+    case 'cert_file':
+      return (
+        <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50">
+          Cert File
         </Badge>
       )
     default:
@@ -178,7 +212,7 @@ function StatusWeather({ results }: { results: CheckResultRow[] }) {
   return <span title={label}><CloudLightning className="size-4 text-red-500" aria-label="Mostly failing" /></span>
 }
 
-function CheckHistoryChart({ results }: { results: CheckResultRow[] }) {
+function CheckHistoryChart({ results, checkType }: { results: CheckResultRow[]; checkType: string }) {
   const data = [...results]
     .reverse()
     .map((r) => ({
@@ -186,7 +220,7 @@ function CheckHistoryChart({ results }: { results: CheckResultRow[] }) {
       time: new Date(r.ranAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       duration: Math.max(1, r.durationMs ?? 1),
       status: r.status,
-      output: r.output,
+      output: r.output ? formatCertOutput(checkType, r.output) : r.output,
     }))
 
   return (
@@ -261,6 +295,10 @@ function AddCheckDialog({
   const [certHost, setCertHost] = useState('')
   const [certPort, setCertPort] = useState('443')
   const [certServerName, setCertServerName] = useState('')
+  const [certFilePath, setCertFilePath] = useState('')
+  const [certFileFormat, setCertFileFormat] = useState<'pem' | 'pkcs12' | 'jks'>('pem')
+  const [certFilePassword, setCertFilePassword] = useState('')
+  const [certFileAlias, setCertFileAlias] = useState('')
 
   // Ad-hoc agent query ("Query server" button) state
   const [queryId, setQueryId] = useState<string | null>(null)
@@ -315,6 +353,11 @@ function AddCheckDialog({
         const certConfig: CertificateCheckConfig = { host: certHost, port: parseInt(certPort, 10) || 443 }
         if (certServerName) certConfig.serverName = certServerName
         config = certConfig
+      } else if (checkType === 'cert_file') {
+        const certFileConfig: CertFileCheckConfig = { filePath: certFilePath, format: certFileFormat }
+        if (certFilePassword) certFileConfig.password = certFilePassword
+        if (certFileAlias) certFileConfig.alias = certFileAlias
+        config = certFileConfig
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -346,6 +389,10 @@ function AddCheckDialog({
     setCertHost('')
     setCertPort('443')
     setCertServerName('')
+    setCertFilePath('')
+    setCertFileFormat('pem')
+    setCertFilePassword('')
+    setCertFileAlias('')
     setError('')
     setQueryId(null)
     setQueryError(null)
@@ -380,6 +427,7 @@ function AddCheckDialog({
                 <SelectItem value="process">Process — running process</SelectItem>
                 <SelectItem value="http">HTTP — health endpoint</SelectItem>
                 <SelectItem value="certificate">Certificate — TLS certificate</SelectItem>
+                <SelectItem value="cert_file">Certificate — File on disk</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -590,6 +638,62 @@ function AddCheckDialog({
             </div>
           )}
 
+          {checkType === 'cert_file' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="certfile-path">File path</Label>
+                <Input
+                  id="certfile-path"
+                  value={certFilePath}
+                  onChange={(e) => setCertFilePath(e.target.value)}
+                  placeholder="/etc/ssl/certs/app.pem"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Format</Label>
+                <Select value={certFileFormat} onValueChange={(v) => setCertFileFormat(v as 'pem' | 'pkcs12' | 'jks')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pem">PEM (.pem / .crt / .cer)</SelectItem>
+                    <SelectItem value="pkcs12">PKCS#12 (.p12 / .pfx)</SelectItem>
+                    <SelectItem value="jks">Java KeyStore (.jks)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(certFileFormat === 'pkcs12' || certFileFormat === 'jks') && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="certfile-password">
+                    Password{' '}
+                    <span className="text-muted-foreground font-normal">— optional</span>
+                  </Label>
+                  <Input
+                    id="certfile-password"
+                    type="password"
+                    value={certFilePassword}
+                    onChange={(e) => setCertFilePassword(e.target.value)}
+                    placeholder="Keystore password"
+                  />
+                </div>
+              )}
+              {certFileFormat === 'jks' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="certfile-alias">
+                    Alias{' '}
+                    <span className="text-muted-foreground font-normal">— optional, defaults to first entry</span>
+                  </Label>
+                  <Input
+                    id="certfile-alias"
+                    value={certFileAlias}
+                    onChange={(e) => setCertFileAlias(e.target.value)}
+                    placeholder="mycert"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="interval">Interval (seconds)</Label>
             <Input
@@ -634,7 +738,7 @@ function EditCheckDialog({
   const queryClient = useQueryClient()
 
   const initFields = () => {
-    const cfg = check.config as PortCheckConfig & ProcessCheckConfig & HttpCheckConfig
+    const cfg = check.config as PortCheckConfig & ProcessCheckConfig & HttpCheckConfig & CertificateCheckConfig & CertFileCheckConfig
     return {
       name: check.name,
       intervalSeconds: check.intervalSeconds,
@@ -643,6 +747,13 @@ function EditCheckDialog({
       processName: cfg.process_name ?? '',
       httpUrl: cfg.url ?? '',
       httpStatus: cfg.expected_status != null ? String(cfg.expected_status) : '200',
+      certHost: cfg.host ?? '',
+      certPort: cfg.port != null ? String(cfg.port) : '443',
+      certServerName: cfg.serverName ?? '',
+      certFilePath: cfg.filePath ?? '',
+      certFileFormat: (cfg.format ?? 'pem') as 'pem' | 'pkcs12' | 'jks',
+      certFilePassword: cfg.password ?? '',
+      certFileAlias: cfg.alias ?? '',
     }
   }
 
@@ -653,6 +764,13 @@ function EditCheckDialog({
   const [processName, setProcessName] = useState(() => initFields().processName)
   const [httpUrl, setHttpUrl] = useState(() => initFields().httpUrl)
   const [httpStatus, setHttpStatus] = useState(() => initFields().httpStatus)
+  const [certHost, setCertHost] = useState(() => initFields().certHost)
+  const [certPort, setCertPort] = useState(() => initFields().certPort)
+  const [certServerName, setCertServerName] = useState(() => initFields().certServerName)
+  const [certFilePath, setCertFilePath] = useState(() => initFields().certFilePath)
+  const [certFileFormat, setCertFileFormat] = useState<'pem' | 'pkcs12' | 'jks'>(() => initFields().certFileFormat)
+  const [certFilePassword, setCertFilePassword] = useState(() => initFields().certFilePassword)
+  const [certFileAlias, setCertFileAlias] = useState(() => initFields().certFileAlias)
   const [error, setError] = useState('')
   const [confirmClearHistory, setConfirmClearHistory] = useState(false)
 
@@ -667,6 +785,13 @@ function EditCheckDialog({
       setProcessName(f.processName)
       setHttpUrl(f.httpUrl)
       setHttpStatus(f.httpStatus)
+      setCertHost(f.certHost)
+      setCertPort(f.certPort)
+      setCertServerName(f.certServerName)
+      setCertFilePath(f.certFilePath)
+      setCertFileFormat(f.certFileFormat)
+      setCertFilePassword(f.certFilePassword)
+      setCertFileAlias(f.certFileAlias)
       setError('')
       setConfirmClearHistory(false)
     }
@@ -695,6 +820,15 @@ function EditCheckDialog({
         config = { host: portHost, port: parseInt(portPort, 10) }
       } else if (check.checkType === 'process') {
         config = { process_name: processName }
+      } else if (check.checkType === 'certificate') {
+        const certConfig: CertificateCheckConfig = { host: certHost, port: parseInt(certPort, 10) || 443 }
+        if (certServerName) certConfig.serverName = certServerName
+        config = certConfig
+      } else if (check.checkType === 'cert_file') {
+        const certFileConfig: CertFileCheckConfig = { filePath: certFilePath, format: certFileFormat }
+        if (certFilePassword) certFileConfig.password = certFilePassword
+        if (certFileAlias) certFileConfig.alias = certFileAlias
+        config = certFileConfig
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -785,6 +919,101 @@ function EditCheckDialog({
                   onChange={(e) => setHttpStatus(e.target.value)}
                 />
               </div>
+            </div>
+          )}
+
+          {check.checkType === 'certificate' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-cert-host">Host</Label>
+                  <Input
+                    id="edit-cert-host"
+                    value={certHost}
+                    onChange={(e) => setCertHost(e.target.value)}
+                    placeholder="example.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-cert-port">Port</Label>
+                  <Input
+                    id="edit-cert-port"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={certPort}
+                    onChange={(e) => setCertPort(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-cert-sni">
+                  Server name (SNI){' '}
+                  <span className="text-muted-foreground font-normal">— optional</span>
+                </Label>
+                <Input
+                  id="edit-cert-sni"
+                  value={certServerName}
+                  onChange={(e) => setCertServerName(e.target.value)}
+                  placeholder="Leave blank to use host above"
+                />
+              </div>
+            </div>
+          )}
+
+          {check.checkType === 'cert_file' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-certfile-path">File path</Label>
+                <Input
+                  id="edit-certfile-path"
+                  value={certFilePath}
+                  onChange={(e) => setCertFilePath(e.target.value)}
+                  placeholder="/etc/ssl/certs/app.pem"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Format</Label>
+                <Select value={certFileFormat} onValueChange={(v) => setCertFileFormat(v as 'pem' | 'pkcs12' | 'jks')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pem">PEM (.pem / .crt / .cer)</SelectItem>
+                    <SelectItem value="pkcs12">PKCS#12 (.p12 / .pfx)</SelectItem>
+                    <SelectItem value="jks">Java KeyStore (.jks)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(certFileFormat === 'pkcs12' || certFileFormat === 'jks') && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-certfile-password">
+                    Password{' '}
+                    <span className="text-muted-foreground font-normal">— optional</span>
+                  </Label>
+                  <Input
+                    id="edit-certfile-password"
+                    type="password"
+                    value={certFilePassword}
+                    onChange={(e) => setCertFilePassword(e.target.value)}
+                    placeholder="Keystore password"
+                  />
+                </div>
+              )}
+              {certFileFormat === 'jks' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-certfile-alias">
+                    Alias{' '}
+                    <span className="text-muted-foreground font-normal">— optional, defaults to first entry</span>
+                  </Label>
+                  <Input
+                    id="edit-certfile-alias"
+                    value={certFileAlias}
+                    onChange={(e) => setCertFileAlias(e.target.value)}
+                    placeholder="mycert"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -938,10 +1167,10 @@ function CheckRow({
               <p className="text-xs text-muted-foreground mb-2">
                 {check.results.length} result{check.results.length === 1 ? '' : 's'} stored
                 {check.latestResult?.output && (
-                  <> · <span className="text-foreground">{check.latestResult.output}</span></>
+                  <> · <span className="text-foreground">{formatCertOutput(check.checkType, check.latestResult.output)}</span></>
                 )}
               </p>
-              <CheckHistoryChart results={check.results} />
+              <CheckHistoryChart results={check.results} checkType={check.checkType} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground py-2">No results yet.</p>

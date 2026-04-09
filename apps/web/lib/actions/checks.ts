@@ -32,18 +32,25 @@ const certificateConfigSchema = z.object({
   timeoutSeconds: z.number().int().min(1).max(60).optional(),
 })
 
+const certFileConfigSchema = z.object({
+  filePath: z.string().min(1),
+  format: z.enum(['pem', 'pkcs12', 'jks']),
+  password: z.string().optional(),
+  alias: z.string().optional(),
+})
+
 const createCheckSchema = z.object({
   hostId: z.string().min(1),
   name: z.string().min(1).max(100),
-  checkType: z.enum(['port', 'process', 'http', 'certificate']),
-  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema]),
+  checkType: z.enum(['port', 'process', 'http', 'certificate', 'cert_file']),
+  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema, certFileConfigSchema]),
   intervalSeconds: z.number().int().min(10).max(3600).default(60),
 })
 
 const updateCheckSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
-  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema]).optional(),
+  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema, certFileConfigSchema]).optional(),
   intervalSeconds: z.number().int().min(10).max(3600).optional(),
 })
 

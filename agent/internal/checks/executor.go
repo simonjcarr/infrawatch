@@ -142,6 +142,12 @@ func dispatchCheck(def *agentv1.CheckDefinition) (status, output string) {
 			return "error", "invalid certificate config: " + err.Error()
 		}
 		return runCertificateCheck(cfg)
+	case "cert_file":
+		var cfg CertFileConfig
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
+			return "error", "invalid cert_file config: " + err.Error()
+		}
+		return runCertFileCheck(cfg)
 	default:
 		return "error", "unknown check type: " + def.CheckType
 	}

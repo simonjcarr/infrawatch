@@ -192,12 +192,12 @@ export function CertificateDetailClient({ orgId: _orgId, initialCertificate, ini
                 </TableHeader>
                 <TableBody>
                   {details.chain.map((entry, i) => (
-                    <TableRow key={entry.fingerprintSha256}>
+                    <TableRow key={entry.fingerprint_sha256}>
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono text-xs max-w-52 truncate">{entry.subject}</TableCell>
                       <TableCell className="font-mono text-xs max-w-52 truncate">{entry.issuer}</TableCell>
                       <TableCell className="text-sm">
-                        {format(new Date(entry.notAfter), 'MMM d, yyyy')}
+                        {format(new Date(entry.not_after), 'MMM d, yyyy')}
                       </TableCell>
                     </TableRow>
                   ))}

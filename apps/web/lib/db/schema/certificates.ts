@@ -7,9 +7,9 @@ import { checks } from './checks'
 export interface CertificateChainEntry {
   subject: string
   issuer: string
-  notBefore: string      // ISO
-  notAfter: string
-  fingerprintSha256: string
+  not_before: string      // ISO — matches Go json:"not_before" tag
+  not_after: string       // ISO — matches Go json:"not_after" tag
+  fingerprint_sha256: string  // matches Go json:"fingerprint_sha256" tag
 }
 
 export interface CertificateDetails {

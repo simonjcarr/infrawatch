@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ArrowLeft, Copy, Check, Clock } from 'lucide-react'
 import Link from 'next/link'
@@ -17,7 +16,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { CertificateStatusBadge } from '@/components/certificates/certificate-status-badge'
-import { getCertificate } from '@/lib/actions/certificates'
 import type { Certificate, CertificateEvent, CertificateEventType, CertificateStatus } from '@/lib/db/schema'
 import { formatDaysUntil } from '@/lib/certificates/expiry'
 
@@ -64,15 +62,9 @@ interface Props {
   initialEvents: CertificateEvent[]
 }
 
-export function CertificateDetailClient({ orgId, initialCertificate, initialEvents }: Props) {
-  const { data } = useQuery({
-    queryKey: ['certificate', orgId, initialCertificate.id],
-    queryFn: () => getCertificate(orgId, initialCertificate.id),
-    initialData: { certificate: initialCertificate, events: initialEvents },
-  })
-
-  const cert = data?.certificate ?? initialCertificate
-  const events = data?.events ?? initialEvents
+export function CertificateDetailClient({ orgId: _orgId, initialCertificate, initialEvents }: Props) {
+  const cert = initialCertificate
+  const events = initialEvents
 
   const details = cert.details as import('@/lib/db/schema').CertificateDetails | null
   const sans = cert.sans as string[]

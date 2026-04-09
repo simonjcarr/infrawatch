@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.1...web/v0.8.2) (2026-04-09)
+
+
+### Bug Fixes
+
+* **web:** stop calling server action from useQuery on certificate detail page ([66b3fd6](https://github.com/simonjcarr/infrawatch/commit/66b3fd62aadfc0c6b0a081bf03fd68023a35a484))
+* **web:** stop calling server action from useQuery on certificate detail page ([e4c8117](https://github.com/simonjcarr/infrawatch/commit/e4c8117b659b25018210f29d780fc5452af4c555))
+
 ## [0.8.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.0...web/v0.8.1) (2026-04-09)
 
 

@@ -94,7 +94,21 @@ const STATUS_COLOUR: Record<string, string> = {
   error: '#f59e0b',
 }
 
-function formatCertOutput(checkType: string, output: string): string {
+function formatCheckOutput(checkType: string, output: string): string {
+  if (checkType === 'service_account') {
+    try {
+      const r = JSON.parse(output) as { accounts?: { username: string }[]; error?: string }
+      if (r.error) return r.error
+      return `${r.accounts?.length ?? 0} accounts discovered`
+    } catch { return output }
+  }
+  if (checkType === 'ssh_key_scan') {
+    try {
+      const r = JSON.parse(output) as { keys?: { key_type: string }[]; error?: string }
+      if (r.error) return r.error
+      return `${r.keys?.length ?? 0} SSH keys discovered`
+    } catch { return output }
+  }
   if (checkType !== 'certificate' && checkType !== 'cert_file') return output
   try {
     const r = JSON.parse(output) as {
@@ -151,6 +165,18 @@ function CheckTypeBadge({ type }: { type: string }) {
       return (
         <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50">
           Cert File
+        </Badge>
+      )
+    case 'service_account':
+      return (
+        <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
+          Svc Accounts
+        </Badge>
+      )
+    case 'ssh_key_scan':
+      return (
+        <Badge variant="outline" className="text-indigo-700 border-indigo-300 bg-indigo-50">
+          SSH Keys
         </Badge>
       )
     default:
@@ -220,7 +246,7 @@ function CheckHistoryChart({ results, checkType }: { results: CheckResultRow[]; 
       time: new Date(r.ranAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       duration: Math.max(1, r.durationMs ?? 1),
       status: r.status,
-      output: r.output ? formatCertOutput(checkType, r.output) : r.output,
+      output: r.output ? formatCheckOutput(checkType, r.output) : r.output,
     }))
 
   return (
@@ -358,6 +384,10 @@ function AddCheckDialog({
         if (certFilePassword) certFileConfig.password = certFilePassword
         if (certFileAlias) certFileConfig.alias = certFileAlias
         config = certFileConfig
+      } else if (checkType === 'service_account') {
+        config = {}
+      } else if (checkType === 'ssh_key_scan') {
+        config = {}
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -428,6 +458,8 @@ function AddCheckDialog({
                 <SelectItem value="http">HTTP — health endpoint</SelectItem>
                 <SelectItem value="certificate">Certificate — TLS certificate</SelectItem>
                 <SelectItem value="cert_file">Certificate — File on disk</SelectItem>
+                <SelectItem value="service_account">Service Accounts — discover system users</SelectItem>
+                <SelectItem value="ssh_key_scan">SSH Key Scan — discover SSH keys</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -694,6 +726,18 @@ function AddCheckDialog({
             </div>
           )}
 
+          {checkType === 'service_account' && (
+            <p className="text-sm text-muted-foreground">
+              Discovers all system accounts on this host by reading /etc/passwd and checking for running processes. No additional configuration needed.
+            </p>
+          )}
+
+          {checkType === 'ssh_key_scan' && (
+            <p className="text-sm text-muted-foreground">
+              Scans all user home directories for SSH keys (authorized_keys and identity files). Reports key type, fingerprint, and age. No additional configuration needed.
+            </p>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="interval">Interval (seconds)</Label>
             <Input
@@ -829,6 +873,10 @@ function EditCheckDialog({
         if (certFilePassword) certFileConfig.password = certFilePassword
         if (certFileAlias) certFileConfig.alias = certFileAlias
         config = certFileConfig
+      } else if (check.checkType === 'service_account') {
+        config = {}
+      } else if (check.checkType === 'ssh_key_scan') {
+        config = {}
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -1167,7 +1215,7 @@ function CheckRow({
               <p className="text-xs text-muted-foreground mb-2">
                 {check.results.length} result{check.results.length === 1 ? '' : 's'} stored
                 {check.latestResult?.output && (
-                  <> · <span className="text-foreground">{formatCertOutput(check.checkType, check.latestResult.output)}</span></>
+                  <> · <span className="text-foreground">{formatCheckOutput(check.checkType, check.latestResult.output)}</span></>
                 )}
               </p>
               <CheckHistoryChart results={check.results} checkType={check.checkType} />

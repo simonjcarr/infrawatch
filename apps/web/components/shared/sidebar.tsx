@@ -14,6 +14,7 @@ import {
   BarChart3,
   Activity,
   Users,
+  HeartPulse,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -58,6 +59,7 @@ const adminNav: NavItem[] = [
   { title: 'Settings', href: '/settings', icon: Settings },
   { title: 'Agent Enrolment', href: '/settings/agents', icon: Server },
   { title: 'Global Alert Defaults', href: '/settings/alerts', icon: BellPlus },
+  { title: 'System Health', href: '/settings/system', icon: HeartPulse },
 ]
 
 function NavGroup({ label, items }: { label: string; items: NavItem[] }) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
@@ -217,10 +217,16 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
 
   const tickFormat = metricsRange === '7d' ? 'MMM d HH:mm' : 'HH:mm'
 
+  // Capture the current timestamp once per data refresh so it's stable within a single
+  // render pass. The disable comment is intentional: Date.now() inside useMemo is safe
+  // because the result is memoized and only recomputed when chart data changes.
+  // eslint-disable-next-line react-hooks/purity
+  const now = useMemo(() => Date.now(), [metricsData, heartbeatData, offlinePeriods])
+
   // Use numeric ms timestamps so we can control the X-axis domain precisely.
   // Zero-boundary points are injected at the start and end of each offline period
   // so the lines visually drop to 0 when the agent goes offline and rise again on
-  // reconnect. A sentinel null point at Date.now() keeps the right edge current.
+  // reconnect. A sentinel null point at `now` keeps the right edge current.
   const offlineBoundaries = offlinePeriods.flatMap((p) => [
     { time: p.start, cpu: 0, memory: 0, disk: 0 },
     ...(p.end != null ? [{ time: p.end, cpu: 0, memory: 0, disk: 0 }] : []),
@@ -234,7 +240,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
       disk: row.diskPercent != null ? parseFloat(row.diskPercent.toFixed(1)) : null,
     })),
     ...offlineBoundaries,
-    { time: Date.now(), cpu: null, memory: null, disk: null },
+    { time: now, cpu: null, memory: null, disk: null },
   ].sort((a, b) => a.time - b.time)
 
   if (!host) return null
@@ -572,7 +578,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
                         <ReferenceArea
                           key={i}
                           x1={period.start}
-                          x2={period.end ?? Date.now()}
+                          x2={period.end ?? now}
                           fill="hsl(220, 13%, 60%)"
                           fillOpacity={0.15}
                           label={{ value: 'Offline', position: 'insideTop', fontSize: 11, fill: 'hsl(220, 13%, 30%)', fontWeight: 500 }}
@@ -666,7 +672,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
                           <ReferenceArea
                             key={i}
                             x1={period.start}
-                            x2={period.end ?? Date.now()}
+                            x2={period.end ?? now}
                             fill="hsl(220, 13%, 60%)"
                             fillOpacity={0.15}
                           />

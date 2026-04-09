@@ -1,0 +1,61 @@
+name: PR Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  web:
+    name: Web (lint / type-check / build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.6.5'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Type check
+        run: pnpm run type-check
+
+      - name: Build
+        run: pnpm --filter web run build
+        env:
+          # Dummy env vars so Next.js build doesn't fail on missing secrets
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          BETTER_AUTH_SECRET: dummy-secret-for-ci-build-only
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  go:
+    name: Go (test / build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: |
+            agent/go.sum
+            apps/ingest/go.sum
+
+      - name: Test agent
+        run: go test ./...
+        working-directory: agent
+
+      - name: Test ingest
+        run: go test ./...
+        working-directory: apps/ingest

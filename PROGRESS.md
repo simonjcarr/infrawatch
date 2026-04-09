@@ -709,13 +709,14 @@ _(Built between Sessions 3 and 4; not previously documented)_
 
 ## Known Issues / Technical Debt
 
-- `codec.go` is a development stub — replace with protoc-generated files by running `make proto` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`)
+- `codec.go` is a development stub ✅ Resolved — real protoc-generated `.pb.go` files are in place
 - `newCUID()` in ingest DB queries now uses `crypto/rand` ✅
-- Docker Compose does not auto-run migrations on startup
-- `gen_cuid()` SQL function does not exist in PostgreSQL — `InsertAgent` has a fallback but the primary query will fail and fall through. The fallback is correct.
-- mTLS client certificates deferred — TLS builder is structured for it; deliberately deferred until Phase 1 metrics work is complete
+- Docker Compose does not auto-run migrations on startup ✅ Resolved — `entrypoint.sh` runs `node migrate.js && node server.js` before starting the web server
+- `gen_cuid()` SQL function does not exist in PostgreSQL ✅ Resolved — `InsertAgent` now generates the ID in Go via `newCUID()` directly, removing the failed-query fallback path
+- mTLS client certificates deferred — TLS builder is structured for it; deliberately deferred
 - The `go.work.sum` file is gitignored — developers must run `go work sync` after cloning
 - CPU % on first heartbeat is always 0 — by design (two-sample baseline); accurate from second heartbeat onward
+- Metric retention `add_retention_policy` not wired dynamically ✅ Resolved — `updateMetricRetention` server action already calls `drop_retention_policy` + `add_retention_policy` via `db.execute(sql\`...\`)`
 
 ---
 
@@ -727,21 +728,18 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 16 — Phase 3: Certificate Management**
+**Session 18 — Phase 4: Service Accounts & Identity**
 
-Phase 2 is complete. Phase 3 starts here:
+Phase 3 is complete and all known technical debt is resolved. Phase 4 starts here:
 
-1. **Agent-side cert discovery** — add a `cert` check type to the agent; scans TLS endpoints (or local cert files) and returns subject, SANs, expiry, issuer. Returns structured data over the existing gRPC stream.
-2. **Certificate schema + inventory** — `certificates` table (host_id, common_name, sans, issuer, not_before, not_after, source); `db:generate` + migrate; list UI with expiry countdown badges (green/amber/red)
-3. **Expiry alerting** — new alert condition type `cert_expiry` with threshold in days; ingest evaluates on each heartbeat using the stored cert data
-4. **CSR generation wizard** — form to generate a CSR (key type, CN, SANs); returns PEM for admin to sign externally or with an internal CA
-5. **Approval workflow** — "pending certs" queue for newly discovered certs that haven't been reviewed
+1. **Service account inventory** — schema (`service_accounts` table with name, type, owner, expiry); list UI with expiry countdown badges; soft delete
+2. **SSH key inventory** — track SSH public keys linked to service accounts; fingerprint, last-used-at, expiry
+3. **Expiry tracking + alerting** — new alert condition type `service_account_expiry`; ingest evaluator + sweeper (mirrors cert_expiry pattern)
+4. **LDAP/AD integration** — community-tier LDAP sync; imports users and service accounts from directory
 
 **Outstanding technical debt (carry forward):**
-- `codec.go` is a JSON stub — replace with protoc-generated files (`make proto` requires protoc + plugins)
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
-- Metric retention setting is stored in DB but doesn't yet call `add_retention_policy` dynamically (TimescaleDB retention is fixed at 30 days until wired up)
 
 ---
 
@@ -752,7 +750,7 @@ Phase 2 is complete. Phase 3 starts here:
 - [x] Next.js app with shadcn/ui + Tailwind
 - [x] PostgreSQL + Drizzle + migrations pipeline
 - [x] Docker Compose single-node
-- [ ] CI pipeline (GitHub Actions)
+- [x] CI pipeline (GitHub Actions) — pr-checks.yml: lint, type-check, build, go test
 - [x] Better Auth — email/password + TOTP
 - [x] Organisation + user schema
 - [x] Basic RBAC (roles + permissions)
@@ -760,7 +758,7 @@ Phase 2 is complete. Phase 3 starts here:
 - [x] Feature flag system
 - [x] Licence key validation scaffold
 - [x] Auth middleware (route protection)
-- [ ] System health / about page
+- [x] System health / about page — /settings/system with live agent/cert/alert counts
 
 ### Phase 1 — Agent & Host Inventory
 - [x] Go agent scaffold
@@ -794,10 +792,10 @@ Phase 2 is complete. Phase 3 starts here:
 - [x] Alert history pagination + date/severity filter
 
 ### Phase 3 — Certificate Management
-- [ ] Agent-side cert discovery
-- [ ] Certificate parser
-- [ ] Certificate inventory UI
-- [ ] Expiry alerting
+- [x] Agent-side cert discovery — `certificate` check type in agent; returns structured CertificateReport JSON
+- [x] Certificate parser — leaf + chain parsing in agent; upsert with renewal detection in ingest
+- [x] Certificate inventory UI — /certificates list + /certificates/[id] detail with SANs, chain, event timeline
+- [x] Expiry alerting — `cert_expiry` alert condition; per-cert evaluator + 15-min sweeper in ingest
 - [ ] CSR generation wizard
 - [ ] Approval workflow
 - [ ] Internal CA management

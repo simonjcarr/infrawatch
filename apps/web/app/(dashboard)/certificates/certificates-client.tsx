@@ -25,8 +25,6 @@ import {
 } from '@/components/ui/table'
 import { CertificateStatusBadge } from '@/components/certificates/certificate-status-badge'
 import {
-  getCertificates,
-  getCertificateCounts,
   deleteCertificate,
   type CertificateCounts,
   type CertificateListFilters,
@@ -101,12 +99,31 @@ export function CertificatesClient({
 
   const { data: certs = initialCertificates } = useQuery({
     queryKey: ['certificates', orgId, filters],
-    queryFn: () => getCertificates(orgId, filters),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.host ? { host: filters.host } : {}),
+        sortBy: filters.sortBy ?? 'not_after',
+        sortDir: filters.sortDir ?? 'asc',
+        limit: String(filters.limit ?? 100),
+      })
+      const res = await fetch(`/api/certificates?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch certificates')
+      return res.json() as Promise<Certificate[]>
+    },
+    initialData: initialCertificates,
+    staleTime: 30_000,
   })
 
   const { data: counts = initialCounts } = useQuery({
     queryKey: ['certificate-counts', orgId],
-    queryFn: () => getCertificateCounts(orgId),
+    queryFn: async () => {
+      const res = await fetch('/api/certificates/counts')
+      if (!res.ok) throw new Error('Failed to fetch certificate counts')
+      return res.json() as Promise<CertificateCounts>
+    },
+    initialData: initialCounts,
+    staleTime: 30_000,
   })
 
   const deleteMutation = useMutation({

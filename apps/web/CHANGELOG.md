@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.0...web/v0.8.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* **web:** fix EACCES on agent-dist volume mount ([b098402](https://github.com/simonjcarr/infrawatch/commit/b098402d7ae85dea0ce4902060cd7da2e495be22))
+* **web:** fix EACCES on agent-dist volume mount by using root entrypoint ([909494d](https://github.com/simonjcarr/infrawatch/commit/909494ddd252feb20a0a2504b0bb94a4c51c208e))
+
 ## [0.8.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.7.1...web/v0.8.0) (2026-04-09)
 
 

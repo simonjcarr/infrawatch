@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.4](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.3...web/v0.8.4) (2026-04-09)
+
+
+### Bug Fixes
+
+* **web:** fix certificate page crashes — server action mismatches and invalid date RangeError ([5c0941b](https://github.com/simonjcarr/infrawatch/commit/5c0941b059ff92629ef1d2e7ae2ada3a67a2b1cb))
+* **web:** fix RangeError in certificate chain dates — Go uses snake_case JSON keys ([4dcd267](https://github.com/simonjcarr/infrawatch/commit/4dcd267dcdc7c4ff5677f3dba1a58bc95dc1a063))
+
 ## [0.8.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.8.2...web/v0.8.3) (2026-04-09)
 
 

@@ -24,9 +24,16 @@ export interface CertificateCheckConfig {
   timeoutSeconds?: number
 }
 
-export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig
+export interface CertFileCheckConfig {
+  filePath: string
+  format: 'pem' | 'pkcs12' | 'jks'
+  password?: string
+  alias?: string
+}
 
-export type CheckType = 'port' | 'process' | 'http' | 'certificate'
+export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig | CertFileCheckConfig
+
+export type CheckType = 'port' | 'process' | 'http' | 'certificate' | 'cert_file'
 export type CheckStatus = 'pass' | 'fail' | 'error'
 
 export const checks = pgTable('checks', {

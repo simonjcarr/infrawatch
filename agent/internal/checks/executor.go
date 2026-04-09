@@ -155,6 +155,18 @@ func dispatchCheck(def *agentv1.CheckDefinition) (status, output string) {
 			return "error", "invalid cert_file config: " + err.Error()
 		}
 		return runCertFileCheck(cfg)
+	case "service_account":
+		var cfg ServiceAccountConfig
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
+			return "error", "invalid service_account config: " + err.Error()
+		}
+		return runServiceAccountCheck(cfg)
+	case "ssh_key_scan":
+		var cfg SshKeyScanConfig
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
+			return "error", "invalid ssh_key_scan config: " + err.Error()
+		}
+		return runSshKeyScanCheck(cfg)
 	default:
 		return "error", "unknown check type: " + def.CheckType
 	}

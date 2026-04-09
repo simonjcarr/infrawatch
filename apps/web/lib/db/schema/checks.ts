@@ -31,9 +31,19 @@ export interface CertFileCheckConfig {
   alias?: string
 }
 
-export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig | CertFileCheckConfig
+export interface ServiceAccountCheckConfig {
+  min_human_uid?: number
+  max_human_uid?: number
+}
 
-export type CheckType = 'port' | 'process' | 'http' | 'certificate' | 'cert_file'
+export interface SshKeyScanCheckConfig {
+  scan_paths?: string[]
+  skip_paths?: string[]
+}
+
+export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig | CertFileCheckConfig | ServiceAccountCheckConfig | SshKeyScanCheckConfig
+
+export type CheckType = 'port' | 'process' | 'http' | 'certificate' | 'cert_file' | 'service_account' | 'ssh_key_scan'
 export type CheckStatus = 'pass' | 'fail' | 'error'
 
 export const checks = pgTable('checks', {

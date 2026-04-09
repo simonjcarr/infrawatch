@@ -263,9 +263,20 @@ func (h *HeartbeatHandler) processHeartbeat(
 				slog.Warn("inserting check result", "check_id", result.CheckId, "err", err)
 			}
 
-			// Dispatch certificate results to the cert persister.
-			if checkTypeMap[result.CheckId] == "certificate" && result.Output != "" {
-				persistCertificateResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+			// Dispatch type-specific results to their persisters.
+			switch checkTypeMap[result.CheckId] {
+			case "certificate":
+				if result.Output != "" {
+					persistCertificateResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+				}
+			case "service_account":
+				if result.Output != "" {
+					persistServiceAccountResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+				}
+			case "ssh_key_scan":
+				if result.Output != "" {
+					persistSshKeyResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+				}
 			}
 		}
 

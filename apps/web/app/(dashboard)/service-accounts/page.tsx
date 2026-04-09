@@ -1,14 +1,26 @@
 import type { Metadata } from 'next'
+import { getRequiredSession } from '@/lib/auth/session'
+import { getServiceAccounts, getServiceAccountCounts } from '@/lib/actions/service-accounts'
+import { ServiceAccountsClient } from './service-accounts-client'
 
 export const metadata: Metadata = {
   title: 'Service Accounts',
 }
 
-export default function ServiceAccountsPage() {
+export default async function ServiceAccountsPage() {
+  const session = await getRequiredSession()
+  const orgId = session.user.organisationId!
+
+  const [initialAccounts, initialCounts] = await Promise.all([
+    getServiceAccounts(orgId, { sortBy: 'username', sortDir: 'asc', limit: 100 }),
+    getServiceAccountCounts(orgId),
+  ])
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-foreground mb-2">Service Accounts</h1>
-      <p className="text-muted-foreground">This section is coming soon.</p>
-    </div>
+    <ServiceAccountsClient
+      orgId={orgId}
+      initialAccounts={initialAccounts}
+      initialCounts={initialCounts}
+    />
   )
 }

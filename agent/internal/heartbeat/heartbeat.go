@@ -50,6 +50,11 @@ type Runner struct {
 	// Signalled when new query results are ready so the send loop can fire
 	// an immediate heartbeat rather than waiting for the next 30s tick.
 	resultsReady chan struct{}
+
+	// lastKnownDefs is the most recent non-empty set of check definitions
+	// received from the server. Used to restore checks after a stream reconnect
+	// if the executor has no running goroutines (e.g. after an agent restart).
+	lastKnownDefs []*agentv1.CheckDefinition
 }
 
 // New creates a new heartbeat Runner. dialFunc is called once per stream
@@ -132,7 +137,7 @@ func (r *Runner) runStream(ctx context.Context) error {
 	streamCtx, cancelRecv := context.WithCancel(ctx)
 	defer cancelRecv()
 	recvErr := make(chan error, 1)
-	go r.runReceiver(streamCtx, stream, recvErr)
+	go r.runReceiver(ctx, streamCtx, stream, recvErr)
 
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
@@ -169,8 +174,12 @@ func (r *Runner) runStream(ctx context.Context) error {
 
 // runReceiver reads HeartbeatResponses from the stream in a loop and dispatches
 // their contents. It exits (and signals recvErr) on any stream error.
+// rootCtx is the agent process lifetime context used for spawning check goroutines
+// so they survive stream reconnects. streamCtx is the stream-scoped context used
+// only to detect intentional stream teardown.
 func (r *Runner) runReceiver(
-	ctx context.Context,
+	rootCtx context.Context,
+	streamCtx context.Context,
 	stream agentv1.IngestService_HeartbeatClient,
 	recvErr chan<- error,
 ) {
@@ -181,13 +190,13 @@ func (r *Runner) runReceiver(
 			return
 		}
 		if err != nil {
-			if ctx.Err() != nil {
+			if streamCtx.Err() != nil {
 				return
 			}
 			recvErr <- fmt.Errorf("receiving heartbeat response: %w", err)
 			return
 		}
-		r.handleResponse(ctx, resp)
+		r.handleResponse(rootCtx, resp)
 	}
 }
 
@@ -200,7 +209,11 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 		slog.Info("received server command", "command", resp.Command)
 	}
 	if len(resp.Checks) > 0 {
+		r.lastKnownDefs = resp.Checks
 		r.executor.UpdateDefinitions(ctx, resp.Checks)
+	} else if !r.executor.HasRunningChecks() && r.lastKnownDefs != nil {
+		slog.Info("restoring check definitions from cache", "count", len(r.lastKnownDefs))
+		r.executor.UpdateDefinitions(ctx, r.lastKnownDefs)
 	}
 	if len(resp.PendingQueries) > 0 {
 		// Run queries in a goroutine so the receive loop is never blocked by

@@ -150,13 +150,24 @@ loop:
 			if !ok {
 				break loop
 			}
+			if hostID == "" {
+				if id, retryErr := queries.GetHostByAgentID(ctx, h.pool, agentID); retryErr == nil {
+					hostID = id
+					slog.Info("resolved host after retry", "agent_id", agentID, "host_id", hostID)
+				}
+			}
 			if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, hostID, agent.Hostname, req); err != nil {
 				return err
 			}
 
 		case <-queryPollTicker.C:
 			if hostID == "" {
-				continue
+				if id, retryErr := queries.GetHostByAgentID(ctx, h.pool, agentID); retryErr == nil {
+					hostID = id
+					slog.Info("resolved host after retry", "agent_id", agentID, "host_id", hostID)
+				} else {
+					continue
+				}
 			}
 			pending, err := queries.GetPendingQueriesForHost(ctx, h.pool, hostID)
 			if err != nil {

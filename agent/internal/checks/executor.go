@@ -76,6 +76,13 @@ func (e *Executor) DrainResults() []*agentv1.CheckResult {
 	return results
 }
 
+// HasRunningChecks reports whether any check goroutines are currently running.
+func (e *Executor) HasRunningChecks() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.cancels) > 0
+}
+
 func (e *Executor) runCheck(ctx context.Context, def *agentv1.CheckDefinition) {
 	interval := time.Duration(def.IntervalSeconds) * time.Second
 	if interval <= 0 {

@@ -15,6 +15,30 @@
 
 ## What Has Been Built
 
+### Session 18 — Overview dashboard and System Health separation
+
+**Problem: operational data was on the wrong page**
+- Certificates and Active Alerts were displayed on the System Health page (`/settings/system`), which is an admin view for Infrawatch's own platform internals. The Overview page (`/dashboard`) was an empty placeholder.
+- Engineers had to navigate into Settings to see whether alerts were firing or certificates were expiring — the wrong mental model.
+
+**Fix: split data by audience**
+- **System Health** now shows only Infrawatch platform internals: version, licence tier, database connection status, metric retention, and agent pipeline counts. Description updated to "Platform status and configuration".
+- **Overview** now shows the operational state of infrastructure: Agents (online/offline), Certificates (valid/expiring/expired), Active Alerts (firing/acknowledged), and a Summary panel. All cards link through to their respective detail pages.
+
+**New `/api/overview` endpoint** (`apps/web/app/api/overview/route.ts`)
+- Returns `agents`, `certificates`, and `alerts` counts scoped to the user's organisation.
+- `/api/system/health` stripped of certificate and alert queries — now only queries agents and org config.
+
+**New `DashboardClient` component** (`apps/web/app/(dashboard)/dashboard/dashboard-client.tsx`)
+- Polls `/api/overview` every 30 seconds (matching System Health behaviour).
+- Overview `page.tsx` delegates to this client component, replacing the static placeholder.
+
+**Build state**
+- `pnpm run build` (apps/web) — zero TypeScript errors ✅
+- `/api/overview` route appears in build output ✅
+
+---
+
 ### Session 17 — Certificate page production bug fixes
 
 **Problem 1: `Failed to find Server Action` on certificates list and detail pages**

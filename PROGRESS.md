@@ -709,14 +709,14 @@ _(Built between Sessions 3 and 4; not previously documented)_
 
 ## Known Issues / Technical Debt
 
-- `codec.go` is a development stub — replace with protoc-generated files by running `make proto` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`) ✅ Resolved — real protoc-generated `.pb.go` files are in place; no stub remains
+- `codec.go` is a development stub ✅ Resolved — real protoc-generated `.pb.go` files are in place
 - `newCUID()` in ingest DB queries now uses `crypto/rand` ✅
-- Docker Compose does not auto-run migrations on startup
-- `gen_cuid()` SQL function does not exist in PostgreSQL — `InsertAgent` has a fallback but the primary query will fail and fall through. The fallback is correct.
-- mTLS client certificates deferred — TLS builder is structured for it; deliberately deferred until Phase 1 metrics work is complete
+- Docker Compose does not auto-run migrations on startup ✅ Resolved — `entrypoint.sh` runs `node migrate.js && node server.js` before starting the web server
+- `gen_cuid()` SQL function does not exist in PostgreSQL ✅ Resolved — `InsertAgent` now generates the ID in Go via `newCUID()` directly, removing the failed-query fallback path
+- mTLS client certificates deferred — TLS builder is structured for it; deliberately deferred
 - The `go.work.sum` file is gitignored — developers must run `go work sync` after cloning
 - CPU % on first heartbeat is always 0 — by design (two-sample baseline); accurate from second heartbeat onward
-- Metric retention setting is stored in DB but doesn't yet call `add_retention_policy` dynamically ✅ Resolved — `updateMetricRetention` server action already calls `drop_retention_policy` + `add_retention_policy` via `db.execute(sql\`...\`)`
+- Metric retention `add_retention_policy` not wired dynamically ✅ Resolved — `updateMetricRetention` server action already calls `drop_retention_policy` + `add_retention_policy` via `db.execute(sql\`...\`)`
 
 ---
 
@@ -740,7 +740,6 @@ Phase 3 is complete and all known technical debt is resolved. Phase 4 starts her
 **Outstanding technical debt (carry forward):**
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
-- Docker Compose does not auto-run migrations on startup
 
 ---
 
@@ -751,7 +750,7 @@ Phase 3 is complete and all known technical debt is resolved. Phase 4 starts her
 - [x] Next.js app with shadcn/ui + Tailwind
 - [x] PostgreSQL + Drizzle + migrations pipeline
 - [x] Docker Compose single-node
-- [ ] CI pipeline (GitHub Actions)
+- [x] CI pipeline (GitHub Actions) — pr-checks.yml: lint, type-check, build, go test
 - [x] Better Auth — email/password + TOTP
 - [x] Organisation + user schema
 - [x] Basic RBAC (roles + permissions)
@@ -759,7 +758,7 @@ Phase 3 is complete and all known technical debt is resolved. Phase 4 starts her
 - [x] Feature flag system
 - [x] Licence key validation scaffold
 - [x] Auth middleware (route protection)
-- [ ] System health / about page
+- [x] System health / about page — /settings/system with live agent/cert/alert counts
 
 ### Phase 1 — Agent & Host Inventory
 - [x] Go agent scaffold
@@ -793,10 +792,10 @@ Phase 3 is complete and all known technical debt is resolved. Phase 4 starts her
 - [x] Alert history pagination + date/severity filter
 
 ### Phase 3 — Certificate Management
-- [ ] Agent-side cert discovery
-- [ ] Certificate parser
-- [ ] Certificate inventory UI
-- [ ] Expiry alerting
+- [x] Agent-side cert discovery — `certificate` check type in agent; returns structured CertificateReport JSON
+- [x] Certificate parser — leaf + chain parsing in agent; upsert with renewal detection in ingest
+- [x] Certificate inventory UI — /certificates list + /certificates/[id] detail with SANs, chain, event timeline
+- [x] Expiry alerting — `cert_expiry` alert condition; per-cert evaluator + 15-min sweeper in ingest
 - [ ] CSR generation wizard
 - [ ] Approval workflow
 - [ ] Internal CA management

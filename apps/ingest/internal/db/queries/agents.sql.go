@@ -41,23 +41,7 @@ func GetAgentByPublicKey(ctx context.Context, pool *pgxpool.Pool, publicKey stri
 func InsertAgent(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch string) (string, error) {
 	const q = `
 		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id, os, arch)
-		VALUES (gen_cuid(), $1, $2, $3, $4, $5, $6, $7)
-		RETURNING id
-	`
-	var id string
-	err := pool.QueryRow(ctx, q, orgID, hostname, publicKey, status, nullableString(tokenID), nullableString(agentOS), nullableString(agentArch)).Scan(&id)
-	if err != nil {
-		// gen_cuid() may not exist; fall back to a simple cuid-like value from the app
-		return insertAgentWithID(ctx, pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch)
-	}
-	return id, nil
-}
-
-func insertAgentWithID(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch string) (string, error) {
-	const q = `
-		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id, os, arch)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id
 	`
 	id := newCUID()
 	_, err := pool.Exec(ctx, q, id, orgID, hostname, publicKey, status, nullableString(tokenID), nullableString(agentOS), nullableString(agentArch))

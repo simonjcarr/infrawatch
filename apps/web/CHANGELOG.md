@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.12.1...web/v0.12.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* **ci:** add validate-migrations.js to ESLint ignores and add dev.sh ([8590f9b](https://github.com/simonjcarr/infrawatch/commit/8590f9b712c7b384bb7cf47d346f2ddccf02dd3e))
+
 ## [0.12.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.12.0...web/v0.12.1) (2026-04-10)
 
 

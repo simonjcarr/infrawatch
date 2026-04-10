@@ -29,8 +29,14 @@ function roleBadgeVariant(role: string): 'destructive' | 'default' | 'secondary'
     case 'super_admin': return 'destructive'
     case 'org_admin': return 'default'
     case 'engineer': return 'secondary'
+    case 'pending': return 'outline'
     default: return 'outline'
   }
+}
+
+function roleBadgeClassName(role: string): string {
+  if (role === 'pending') return 'border-yellow-600 text-yellow-700 dark:border-yellow-500 dark:text-yellow-400'
+  return ''
 }
 
 function formatRole(role: string) {
@@ -194,8 +200,8 @@ export function TeamClient({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="flex items-center gap-1 focus:outline-none">
-                            <Badge variant={roleBadgeVariant(member.role)}>
-                              {formatRole(member.role)}
+                            <Badge variant={roleBadgeVariant(member.role)} className={roleBadgeClassName(member.role)}>
+                              {member.role === 'pending' ? 'Pending Approval' : formatRole(member.role)}
                             </Badge>
                             <ChevronDown className="size-3 text-muted-foreground" />
                           </button>
@@ -215,8 +221,8 @@ export function TeamClient({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (
-                      <Badge variant={roleBadgeVariant(member.role)}>
-                        {formatRole(member.role)}
+                      <Badge variant={roleBadgeVariant(member.role)} className={roleBadgeClassName(member.role)}>
+                        {member.role === 'pending' ? 'Pending Approval' : formatRole(member.role)}
                       </Badge>
                     )}
                   </td>

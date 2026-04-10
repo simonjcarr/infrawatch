@@ -7,6 +7,14 @@ import { getRequiredSession } from '@/lib/auth/session'
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getRequiredSession()
 
+  if (session.user.email.endsWith('@ldap.local')) {
+    redirect('/setup-email')
+  }
+
+  if (session.user.role === 'pending') {
+    redirect('/pending-approval')
+  }
+
   if (!session.user.organisationId) {
     redirect('/onboarding')
   }

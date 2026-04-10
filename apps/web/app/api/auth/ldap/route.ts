@@ -4,9 +4,10 @@ import { users, accounts, sessions, ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHmac } from 'crypto'
 
 export async function POST(request: NextRequest) {
+  try {
   const body = await request.json()
   const { username, password } = body as { username?: string; password?: string }
 
@@ -28,9 +29,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Try each config until one succeeds
+  const errors: string[] = []
   for (const config of configs) {
     const result = await authenticateUser(config, username, password)
-    if ('error' in result) continue
+    if ('error' in result) {
+      console.error(`[LDAP] Auth failed for config "${config.name}" (${config.host}): ${result.error}`)
+      errors.push(`${config.name}: ${result.error}`)
+      continue
+    }
 
     const ldapUser = result.user
     const ldapDn = ldapUser.dn
@@ -70,7 +76,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Create new user
         userId = createId()
-        const email = ldapUser.email ?? `${ldapUser.username}@ldap.local`
+        const email = ldapUser.email || `${ldapUser.username}@ldap.local`
 
         // Find the org from the LDAP config
         await db.insert(users).values({
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
           email,
           emailVerified: true,
           organisationId: config.organisationId,
-          role: 'engineer',
+          role: 'pending',
         })
       }
 
@@ -111,7 +117,13 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent') ?? null,
     })
 
-    // Set session cookie (matching Better Auth cookie format)
+    // Sign the session token using HMAC-SHA256 to match Better Auth's signed cookie format.
+    // Better Auth uses setSignedCookie which produces: encodeURIComponent(token.base64(HMAC-SHA256(token, secret)))
+    // and getSignedCookie verifies the signature before returning the token.
+    const authSecret = process.env['BETTER_AUTH_SECRET'] ?? ''
+    const signature = createHmac('sha256', authSecret).update(sessionToken).digest('base64')
+    const signedToken = `${sessionToken}.${signature}`
+
     const response = NextResponse.json({
       success: true,
       user: {
@@ -121,7 +133,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    response.cookies.set('better-auth.session_token', sessionToken, {
+    response.cookies.set('better-auth.session_token', signedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -132,5 +144,11 @@ export async function POST(request: NextRequest) {
     return response
   }
 
+  console.error(`[LDAP] All configs failed for user "${username}":`, errors)
   return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+  } catch (err) {
+    console.error('[LDAP] Unexpected error during login:', err)
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: `Login failed: ${message}` }, { status: 500 })
+  }
 }

@@ -44,6 +44,14 @@ async function connectAndBind(config: LdapConfiguration, dn: string, password: s
   return client
 }
 
+/** Resolve a search base: if it already ends with baseDn, use as-is; otherwise append baseDn. */
+function resolveSearchBase(subBase: string | null | undefined, baseDn: string): string {
+  if (!subBase) return baseDn
+  // If the sub-base already contains the base DN (case-insensitive), use it directly
+  if (subBase.toLowerCase().endsWith(baseDn.toLowerCase())) return subBase
+  return `${subBase},${baseDn}`
+}
+
 function getBindPassword(config: LdapConfiguration): string {
   try {
     return decrypt(config.bindPassword)
@@ -74,9 +82,7 @@ export async function searchUsers(
   try {
     client = await connectAndBind(config, config.bindDn, getBindPassword(config))
 
-    const searchBase = config.userSearchBase
-      ? `${config.userSearchBase},${config.baseDn}`
-      : config.baseDn
+    const searchBase = resolveSearchBase(config.userSearchBase, config.baseDn)
 
     const searchFilter = filter ?? config.userSearchFilter.replace('{{username}}', '*')
 
@@ -111,8 +117,8 @@ export async function searchUsers(
     return searchEntries.map((entry) => ({
       dn: entry.dn,
       username: String(entry[config.usernameAttribute] ?? ''),
-      email: entry[config.emailAttribute] ? String(entry[config.emailAttribute]) : null,
-      displayName: entry[config.displayNameAttribute] ? String(entry[config.displayNameAttribute]) : null,
+      email: entry[config.emailAttribute] ? String(entry[config.emailAttribute]) || null : null,
+      displayName: entry[config.displayNameAttribute] ? String(entry[config.displayNameAttribute]) || null : null,
       groups: Array.isArray(entry.memberOf)
         ? entry.memberOf.map(String)
         : entry.memberOf
@@ -209,9 +215,7 @@ export async function authenticateUser(
     // First bind as service account to search for the user
     client = await connectAndBind(config, config.bindDn, getBindPassword(config))
 
-    const searchBase = config.userSearchBase
-      ? `${config.userSearchBase},${config.baseDn}`
-      : config.baseDn
+    const searchBase = resolveSearchBase(config.userSearchBase, config.baseDn)
 
     const searchFilter = config.userSearchFilter.replace('{{username}}', username)
 
@@ -252,8 +256,8 @@ export async function authenticateUser(
       user: {
         dn: userDn,
         username: String(entry[config.usernameAttribute] ?? username),
-        email: entry[config.emailAttribute] ? String(entry[config.emailAttribute]) : null,
-        displayName: entry[config.displayNameAttribute] ? String(entry[config.displayNameAttribute]) : null,
+        email: entry[config.emailAttribute] ? String(entry[config.emailAttribute]) || null : null,
+        displayName: entry[config.displayNameAttribute] ? String(entry[config.displayNameAttribute]) || null : null,
         groups: Array.isArray(entry.memberOf)
           ? entry.memberOf.map(String)
           : entry.memberOf

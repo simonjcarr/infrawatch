@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.14.1...agent/v0.15.0) (2026-04-10)
+
+
+### Features
+
+* **agent:** add -uninstall flag ([4069a90](https://github.com/simonjcarr/infrawatch/commit/4069a9032f21c28befd4191a6bdc913e035d840c))
+* **agent:** add -uninstall flag to remove agent service and files ([b4f7b5d](https://github.com/simonjcarr/infrawatch/commit/b4f7b5d12154597a923b7c3f1de53bdbd5005f50))
+
 ## [0.14.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.14.0...agent/v0.14.1) (2026-04-10)
 
 

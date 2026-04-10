@@ -15,6 +15,13 @@ export interface LdapUser {
   passwordLastChangedAt?: Date | null
 }
 
+function getTlsOptions(config: LdapConfiguration): Record<string, unknown> | undefined {
+  if (!config.useTls && !config.useStartTls) return undefined
+  return config.tlsCertificate
+    ? { ca: [config.tlsCertificate], rejectUnauthorized: true }
+    : { rejectUnauthorized: false }
+}
+
 function createClient(config: LdapConfiguration): Client {
   const url = config.useTls
     ? `ldaps://${config.host}:${config.port}`
@@ -22,10 +29,19 @@ function createClient(config: LdapConfiguration): Client {
 
   return new Client({
     url,
-    tlsOptions: config.useTls ? { rejectUnauthorized: false } : undefined,
+    tlsOptions: config.useTls ? getTlsOptions(config) : undefined,
     connectTimeout: 10_000,
     timeout: 30_000,
   })
+}
+
+async function connectAndBind(config: LdapConfiguration, dn: string, password: string): Promise<Client> {
+  const client = createClient(config)
+  if (config.useStartTls && !config.useTls) {
+    await client.startTLS(getTlsOptions(config) ?? {})
+  }
+  await client.bind(dn, password)
+  return client
 }
 
 function getBindPassword(config: LdapConfiguration): string {
@@ -40,9 +56,8 @@ function getBindPassword(config: LdapConfiguration): string {
 export async function testConnection(
   config: LdapConfiguration,
 ): Promise<{ success: true } | { error: string }> {
-  const client = createClient(config)
   try {
-    await client.bind(config.bindDn, getBindPassword(config))
+    const client = await connectAndBind(config, config.bindDn, getBindPassword(config))
     await client.unbind()
     return { success: true }
   } catch (err) {
@@ -55,9 +70,9 @@ export async function searchUsers(
   config: LdapConfiguration,
   filter?: string,
 ): Promise<LdapUser[]> {
-  const client = createClient(config)
+  let client: Client | undefined
   try {
-    await client.bind(config.bindDn, getBindPassword(config))
+    client = await connectAndBind(config, config.bindDn, getBindPassword(config))
 
     const searchBase = config.userSearchBase
       ? `${config.userSearchBase},${config.baseDn}`
@@ -91,7 +106,7 @@ export async function searchUsers(
       sizeLimit: 1000,
     })
 
-    await client.unbind()
+    await client!.unbind()
 
     return searchEntries.map((entry) => ({
       dn: entry.dn,
@@ -110,7 +125,7 @@ export async function searchUsers(
       ...parsePasswordLastChanged(entry),
     }))
   } catch (err) {
-    await client.unbind().catch(() => {})
+    await client?.unbind().catch(() => {})
     throw err
   }
 }
@@ -189,10 +204,10 @@ export async function authenticateUser(
   username: string,
   password: string,
 ): Promise<{ success: true; user: LdapUser } | { error: string }> {
-  const client = createClient(config)
+  let client: Client | undefined
   try {
     // First bind as service account to search for the user
-    await client.bind(config.bindDn, getBindPassword(config))
+    client = await connectAndBind(config, config.bindDn, getBindPassword(config))
 
     const searchBase = config.userSearchBase
       ? `${config.userSearchBase},${config.baseDn}`
@@ -215,19 +230,18 @@ export async function authenticateUser(
     })
 
     if (searchEntries.length === 0) {
-      await client.unbind()
+      await client!.unbind()
       return { error: 'User not found in directory' }
     }
 
     const entry = searchEntries[0]!
     const userDn = entry.dn
 
-    await client.unbind()
+    await client!.unbind()
 
     // Now bind as the user to verify password
-    const userClient = createClient(config)
     try {
-      await userClient.bind(userDn, password)
+      const userClient = await connectAndBind(config, userDn, password)
       await userClient.unbind()
     } catch {
       return { error: 'Invalid credentials' }
@@ -250,7 +264,7 @@ export async function authenticateUser(
       },
     }
   } catch (err) {
-    await client.unbind().catch(() => {})
+    await client?.unbind().catch(() => {})
     const message = err instanceof Error ? err.message : 'Unknown error'
     return { error: `LDAP authentication failed: ${message}` }
   }

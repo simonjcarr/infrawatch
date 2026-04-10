@@ -14,6 +14,7 @@ const createLdapConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).default(389),
   useTls: z.boolean().default(false),
   useStartTls: z.boolean().default(false),
+  tlsCertificate: z.string().optional(),
   baseDn: z.string().min(1, 'Base DN is required'),
   bindDn: z.string().min(1, 'Bind DN is required'),
   bindPassword: z.string().min(1, 'Bind password is required'),
@@ -34,6 +35,7 @@ const updateLdapConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).optional(),
   useTls: z.boolean().optional(),
   useStartTls: z.boolean().optional(),
+  tlsCertificate: z.string().nullable().optional(),
   baseDn: z.string().min(1).optional(),
   bindDn: z.string().min(1).optional(),
   bindPassword: z.string().min(1).optional(),
@@ -96,6 +98,7 @@ export async function createLdapConfiguration(
         port: parsed.data.port,
         useTls: parsed.data.useTls,
         useStartTls: parsed.data.useStartTls,
+        tlsCertificate: parsed.data.tlsCertificate || null,
         baseDn: parsed.data.baseDn,
         bindDn: parsed.data.bindDn,
         bindPassword: encryptedPassword,
@@ -146,6 +149,7 @@ export async function updateLdapConfiguration(
   if (data.port !== undefined) updates.port = data.port
   if (data.useTls !== undefined) updates.useTls = data.useTls
   if (data.useStartTls !== undefined) updates.useStartTls = data.useStartTls
+  if (data.tlsCertificate !== undefined) updates.tlsCertificate = data.tlsCertificate || null
   if (data.baseDn !== undefined) updates.baseDn = data.baseDn
   if (data.bindDn !== undefined) updates.bindDn = data.bindDn
   if (data.bindPassword !== undefined) updates.bindPassword = encrypt(data.bindPassword)

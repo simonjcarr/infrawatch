@@ -14,6 +14,7 @@ export const ldapConfigurations = pgTable('ldap_configurations', {
   port: integer('port').notNull().default(389),
   useTls: boolean('use_tls').notNull().default(false),
   useStartTls: boolean('use_start_tls').notNull().default(false),
+  tlsCertificate: text('tls_certificate'),
   baseDn: text('base_dn').notNull(),
   bindDn: text('bind_dn').notNull(),
   bindPassword: text('bind_password').notNull(),

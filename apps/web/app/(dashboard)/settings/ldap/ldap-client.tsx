@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -12,6 +12,9 @@ import {
   RefreshCw,
   Trash2,
   Plug,
+  Pencil,
+  Upload,
+  X,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -72,6 +75,7 @@ const EMPTY_FORM = {
   port: 389,
   useTls: false,
   useStartTls: false,
+  tlsCertificate: '',
   baseDn: '',
   bindDn: '',
   bindPassword: '',
@@ -86,6 +90,72 @@ const EMPTY_FORM = {
   syncIntervalMinutes: 60,
 }
 
+function CertificateUpload({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (cert: string) => void
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result
+      if (typeof text === 'string') onChange(text.trim())
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  if (value) {
+    const lines = value.split('\n')
+    const preview = lines.length > 3
+      ? `${lines[0]}\n...(${lines.length - 2} lines)...\n${lines[lines.length - 1]}`
+      : value
+    return (
+      <div className="space-y-1.5">
+        <Label>TLS Certificate (CA)</Label>
+        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre text-muted-foreground relative">
+          {preview}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute top-1 right-1 size-6 p-0 text-muted-foreground hover:text-destructive"
+            onClick={() => onChange('')}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label>TLS Certificate (CA)</Label>
+      <input ref={fileInputRef} type="file" accept=".pem,.crt,.cer,.cert" className="hidden" onChange={handleFileUpload} />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="size-4 mr-1.5" />
+        Upload Certificate (.pem, .crt)
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        Upload a CA certificate to verify the LDAP server identity. Without a certificate, TLS connections will skip server verification.
+      </p>
+    </div>
+  )
+}
+
 export function LdapSettingsClient({
   orgId,
   initialConfigs,
@@ -97,6 +167,9 @@ export function LdapSettingsClient({
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM })
   const [addError, setAddError] = useState<string | null>(null)
+  const [editingConfig, setEditingConfig] = useState<LdapConfiguration | null>(null)
+  const [editForm, setEditForm] = useState({ ...EMPTY_FORM })
+  const [editError, setEditError] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success?: boolean; error?: string }>>({})
   const [syncResults, setSyncResults] = useState<Record<string, { success?: boolean; count?: number; error?: string }>>({})
 
@@ -119,6 +192,66 @@ export function LdapSettingsClient({
       queryClient.invalidateQueries({ queryKey: ['ldap-configs'] })
     },
   })
+
+  const editMutation = useMutation({
+    mutationFn: () => {
+      if (!editingConfig) return Promise.reject(new Error('No config selected'))
+      const updates: Record<string, unknown> = {}
+      if (editForm.name !== editingConfig.name) updates.name = editForm.name
+      if (editForm.host !== editingConfig.host) updates.host = editForm.host
+      if (editForm.port !== editingConfig.port) updates.port = editForm.port
+      if (editForm.useTls !== editingConfig.useTls) updates.useTls = editForm.useTls
+      if (editForm.useStartTls !== editingConfig.useStartTls) updates.useStartTls = editForm.useStartTls
+      if (editForm.tlsCertificate !== (editingConfig.tlsCertificate ?? '')) updates.tlsCertificate = editForm.tlsCertificate || null
+      if (editForm.baseDn !== editingConfig.baseDn) updates.baseDn = editForm.baseDn
+      if (editForm.bindDn !== editingConfig.bindDn) updates.bindDn = editForm.bindDn
+      if (editForm.bindPassword) updates.bindPassword = editForm.bindPassword
+      if (editForm.userSearchBase !== (editingConfig.userSearchBase ?? '')) updates.userSearchBase = editForm.userSearchBase
+      if (editForm.userSearchFilter !== editingConfig.userSearchFilter) updates.userSearchFilter = editForm.userSearchFilter
+      if (editForm.groupSearchBase !== (editingConfig.groupSearchBase ?? '')) updates.groupSearchBase = editForm.groupSearchBase
+      if (editForm.groupSearchFilter !== (editingConfig.groupSearchFilter ?? '')) updates.groupSearchFilter = editForm.groupSearchFilter
+      if (editForm.usernameAttribute !== editingConfig.usernameAttribute) updates.usernameAttribute = editForm.usernameAttribute
+      if (editForm.emailAttribute !== editingConfig.emailAttribute) updates.emailAttribute = editForm.emailAttribute
+      if (editForm.displayNameAttribute !== editingConfig.displayNameAttribute) updates.displayNameAttribute = editForm.displayNameAttribute
+      if (editForm.allowLogin !== editingConfig.allowLogin) updates.allowLogin = editForm.allowLogin
+      if (editForm.syncIntervalMinutes !== editingConfig.syncIntervalMinutes) updates.syncIntervalMinutes = editForm.syncIntervalMinutes
+      return updateLdapConfiguration(orgId, editingConfig.id, updates)
+    },
+    onSuccess: (result) => {
+      if (result && 'error' in result) {
+        setEditError(result.error)
+        return
+      }
+      setEditingConfig(null)
+      setEditError(null)
+      queryClient.invalidateQueries({ queryKey: ['ldap-configs'] })
+    },
+  })
+
+  function openEditDialog(config: LdapConfiguration) {
+    setEditForm({
+      name: config.name,
+      host: config.host,
+      port: config.port,
+      useTls: config.useTls,
+      useStartTls: config.useStartTls,
+      tlsCertificate: config.tlsCertificate ?? '',
+      baseDn: config.baseDn,
+      bindDn: config.bindDn,
+      bindPassword: '',
+      userSearchBase: config.userSearchBase ?? '',
+      userSearchFilter: config.userSearchFilter,
+      groupSearchBase: config.groupSearchBase ?? '',
+      groupSearchFilter: config.groupSearchFilter ?? '',
+      usernameAttribute: config.usernameAttribute,
+      emailAttribute: config.emailAttribute,
+      displayNameAttribute: config.displayNameAttribute,
+      allowLogin: config.allowLogin,
+      syncIntervalMinutes: config.syncIntervalMinutes ?? 60,
+    })
+    setEditError(null)
+    setEditingConfig(config)
+  }
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
@@ -225,6 +358,12 @@ export function LdapSettingsClient({
                   Use STARTTLS
                 </label>
               </div>
+              {(addForm.useTls || addForm.useStartTls) && (
+                <CertificateUpload
+                  value={addForm.tlsCertificate}
+                  onChange={(cert) => setAddForm({ ...addForm, tlsCertificate: cert })}
+                />
+              )}
               <div className="space-y-1.5">
                 <Label>Base DN</Label>
                 <Input
@@ -410,6 +549,14 @@ export function LdapSettingsClient({
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => openEditDialog(config)}
+                  >
+                    <Pencil className="size-4 mr-1.5" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="text-destructive hover:text-destructive ml-auto"
                     onClick={() => deleteMutation.mutate(config.id)}
                     disabled={deleteMutation.isPending}
@@ -423,6 +570,175 @@ export function LdapSettingsClient({
           ))}
         </div>
       )}
+
+      {/* Edit LDAP Configuration Dialog */}
+      <Dialog open={editingConfig !== null} onOpenChange={(open) => { if (!open) setEditingConfig(null) }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit LDAP Configuration</DialogTitle>
+            <DialogDescription>
+              Update your LDAP or Active Directory connection settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Configuration Name</Label>
+              <Input
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="e.g. Corporate AD"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2 space-y-1.5">
+                <Label>Host</Label>
+                <Input
+                  value={editForm.host}
+                  onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
+                  placeholder="ldap.example.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Port</Label>
+                <Input
+                  type="number"
+                  value={editForm.port}
+                  onChange={(e) => setEditForm({ ...editForm, port: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={editForm.useTls}
+                  onCheckedChange={(checked) => setEditForm({ ...editForm, useTls: checked, port: checked ? 636 : 389 })}
+                />
+                Use TLS (LDAPS)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={editForm.useStartTls}
+                  onCheckedChange={(checked) => setEditForm({ ...editForm, useStartTls: checked })}
+                />
+                Use STARTTLS
+              </label>
+            </div>
+            {(editForm.useTls || editForm.useStartTls) && (
+              <CertificateUpload
+                value={editForm.tlsCertificate}
+                onChange={(cert) => setEditForm({ ...editForm, tlsCertificate: cert })}
+              />
+            )}
+            <div className="space-y-1.5">
+              <Label>Base DN</Label>
+              <Input
+                value={editForm.baseDn}
+                onChange={(e) => setEditForm({ ...editForm, baseDn: e.target.value })}
+                placeholder="dc=example,dc=com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bind DN</Label>
+              <Input
+                value={editForm.bindDn}
+                onChange={(e) => setEditForm({ ...editForm, bindDn: e.target.value })}
+                placeholder="cn=admin,dc=example,dc=com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bind Password</Label>
+              <Input
+                type="password"
+                value={editForm.bindPassword}
+                onChange={(e) => setEditForm({ ...editForm, bindPassword: e.target.value })}
+                placeholder="Leave blank to keep current password"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>User Search Base (optional)</Label>
+              <Input
+                value={editForm.userSearchBase}
+                onChange={(e) => setEditForm({ ...editForm, userSearchBase: e.target.value })}
+                placeholder="ou=users"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>User Search Filter</Label>
+              <Input
+                value={editForm.userSearchFilter}
+                onChange={(e) => setEditForm({ ...editForm, userSearchFilter: e.target.value })}
+                placeholder="(uid={{username}})"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label>Username Attr</Label>
+                <Input
+                  value={editForm.usernameAttribute}
+                  onChange={(e) => setEditForm({ ...editForm, usernameAttribute: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email Attr</Label>
+                <Input
+                  value={editForm.emailAttribute}
+                  onChange={(e) => setEditForm({ ...editForm, emailAttribute: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Display Name Attr</Label>
+                <Input
+                  value={editForm.displayNameAttribute}
+                  onChange={(e) => setEditForm({ ...editForm, displayNameAttribute: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Group Search Base (optional)</Label>
+              <Input
+                value={editForm.groupSearchBase}
+                onChange={(e) => setEditForm({ ...editForm, groupSearchBase: e.target.value })}
+                placeholder="ou=groups"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Group Search Filter (optional)</Label>
+              <Input
+                value={editForm.groupSearchFilter}
+                onChange={(e) => setEditForm({ ...editForm, groupSearchFilter: e.target.value })}
+                placeholder="(objectClass=groupOfNames)"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sync Interval (minutes)</Label>
+              <Input
+                type="number"
+                value={editForm.syncIntervalMinutes}
+                onChange={(e) => setEditForm({ ...editForm, syncIntervalMinutes: Number(e.target.value) })}
+                min={5}
+                max={1440}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Allow Web UI Login</Label>
+              <Switch
+                checked={editForm.allowLogin}
+                onCheckedChange={(checked) => setEditForm({ ...editForm, allowLogin: checked })}
+              />
+            </div>
+            {editError && <p className="text-sm text-destructive">{editError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingConfig(null)}>Cancel</Button>
+            <Button
+              onClick={() => editMutation.mutate()}
+              disabled={editMutation.isPending || !editForm.name || !editForm.host || !editForm.baseDn || !editForm.bindDn}
+            >
+              {editMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

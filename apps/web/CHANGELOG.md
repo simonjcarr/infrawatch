@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.10.1...web/v0.11.0) (2026-04-10)
+
+
+### Features
+
+* **phase4:** restructure service accounts, add host settings & LDAP login ([da1cc9b](https://github.com/simonjcarr/infrawatch/commit/da1cc9b1feb8540fe636095506abf50da1453e0e))
+* **phase4:** restructure service accounts, add host settings & LDAP login ([cda5150](https://github.com/simonjcarr/infrawatch/commit/cda515088557a47fe3ba82288be74e702f20bdf1))
+
+
+### Bug Fixes
+
+* **lint:** use const for existingUser, remove unused TAG_LENGTH ([39e38ba](https://github.com/simonjcarr/infrawatch/commit/39e38bacbcbd1a0d0ed1c59447a3f5f3b0ebf6f8))
+
 ## [0.10.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.10.0...web/v0.10.1) (2026-04-09)
 
 

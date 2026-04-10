@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "type-check": "tsc --noEmit",
-    "build": "next build",
+    "build": "node scripts/validate-migrations.js && next build",
     "start": "next start",
     "lint": "eslint",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate && node scripts/validate-migrations.js",
+    "db:validate": "node scripts/validate-migrations.js",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"

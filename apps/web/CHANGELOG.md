@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.12.2...web/v0.13.0) (2026-04-10)
+
+
+### Features
+
+* **phase4:** service accounts, LDAP login & identity management ([c5ba9c1](https://github.com/simonjcarr/infrawatch/commit/c5ba9c1b8ab416aee98ca58eaaed0fc1dbdda7af))
+
 ## [0.12.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.12.1...web/v0.12.2) (2026-04-10)
 
 

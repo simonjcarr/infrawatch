@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.12.0...web/v0.12.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **db:** add migration timestamp validation ([644d265](https://github.com/simonjcarr/infrawatch/commit/644d26589bc51022cbda5ba91ab2642a46588598))
+* **db:** add migration timestamp validation to prevent skipped migrations ([b915029](https://github.com/simonjcarr/infrawatch/commit/b91502924ddb2b6870098662884ccb70e39bd2c4))
+
 ## [0.12.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.11.1...web/v0.12.0) (2026-04-10)
 
 

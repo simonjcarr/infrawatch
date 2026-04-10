@@ -24,6 +24,7 @@
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.2",
+    "ldapts": "^8.1.7",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",
     "nodemailer": "^8.0.4",

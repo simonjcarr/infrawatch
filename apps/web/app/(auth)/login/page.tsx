@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { LoginForm } from './login-form'
+import { hasLdapLoginEnabled } from '@/lib/actions/ldap'
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -18,5 +19,7 @@ export default async function LoginPage() {
     redirect(user?.organisationId ? '/dashboard' : '/onboarding')
   }
 
-  return <LoginForm />
+  const ldapEnabled = await hasLdapLoginEnabled()
+
+  return <LoginForm ldapLoginEnabled={ldapEnabled} />
 }

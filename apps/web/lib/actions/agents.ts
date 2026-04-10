@@ -6,6 +6,8 @@ import { agents, agentStatusHistory, agentEnrolmentTokens, hosts, hostMetrics } 
 import { eq, and, isNull, gt, gte, asc, sql } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
+import { getOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
+import type { HostMetadata } from '@/lib/db/schema'
 
 export type OfflinePeriod = { start: number; end: number | null }
 
@@ -58,12 +60,23 @@ export async function approveAgent(
       })
     })
 
-    // Apply global alert defaults to the associated host (best-effort, outside transaction)
+    // Apply defaults to the associated host (best-effort, outside transaction)
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.agentId, agentId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
     })
     if (host) {
       await applyGlobalDefaultsToHost(orgId, host.id)
+
+      // Apply org default collection settings to the new host
+      const defaults = await getOrgDefaultCollectionSettings(orgId)
+      const currentMetadata = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+      await db
+        .update(hosts)
+        .set({
+          metadata: { ...currentMetadata, collectionSettings: defaults },
+          updatedAt: new Date(),
+        })
+        .where(and(eq(hosts.id, host.id), eq(hosts.organisationId, orgId)))
     }
 
     return { success: true }

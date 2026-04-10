@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import {
   ArrowLeft,
-  User,
   Hash,
   Home,
   Terminal,
@@ -130,14 +129,16 @@ function InfoCard({
   )
 }
 
-export function ServiceAccountDetailClient({
+export function LocalUserDetailClient({
   orgId: _orgId,
+  hostId,
   account,
   keys,
   events,
   host,
 }: {
   orgId: string
+  hostId: string
   account: ServiceAccount
   keys: SshKey[]
   events: IdentityEvent[]
@@ -150,7 +151,7 @@ export function ServiceAccountDetailClient({
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/service-accounts">
+          <Link href={`/hosts/${hostId}`}>
             <ArrowLeft className="size-4" />
           </Link>
         </Button>

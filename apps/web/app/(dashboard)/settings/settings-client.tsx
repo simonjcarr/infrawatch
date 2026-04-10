@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,10 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { updateOrgName, saveLicenceKey, updateMetricRetention } from '@/lib/actions/settings'
-import type { Organisation } from '@/lib/db/schema'
+import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
+import type { Organisation, HostCollectionSettings } from '@/lib/db/schema'
+import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 
 const orgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -51,6 +54,7 @@ const RETENTION_OPTIONS = [
 ]
 
 export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
+  const queryClient = useQueryClient()
   const [orgSaveSuccess, setOrgSaveSuccess] = useState(false)
   const [licenceResult, setLicenceResult] = useState<{
     success?: boolean
@@ -105,6 +109,27 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       setRetentionSaveSuccess(true)
       setRetentionError(null)
       setTimeout(() => setRetentionSaveSuccess(false), 3000)
+    },
+  })
+
+  // Default collection settings
+  const [collectionSaveSuccess, setCollectionSaveSuccess] = useState(false)
+  const { data: collectionDefaults } = useQuery({
+    queryKey: ['org-collection-defaults', org.id],
+    queryFn: () => getOrgDefaultCollectionSettings(org.id),
+  })
+  const [localCollectionSettings, setLocalCollectionSettings] = useState<HostCollectionSettings | null>(null)
+  const currentCollectionSettings = localCollectionSettings ?? collectionDefaults ?? { ...DEFAULT_COLLECTION_SETTINGS }
+  const collectionDirty = localCollectionSettings !== null
+
+  const collectionMutation = useMutation({
+    mutationFn: (settings: HostCollectionSettings) => updateOrgDefaultCollectionSettings(org.id, settings),
+    onSuccess: (result) => {
+      if ('error' in result) return
+      setLocalCollectionSettings(null)
+      setCollectionSaveSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ['org-collection-defaults', org.id] })
+      setTimeout(() => setCollectionSaveSuccess(false), 3000)
     },
   })
 
@@ -224,6 +249,95 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
             <p className="text-sm text-foreground">
               {RETENTION_OPTIONS.find((o) => o.value === String(org.metricRetentionDays ?? 30))?.label ?? `${org.metricRetentionDays ?? 30} days`}
             </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Default Data Collection section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Cpu className="size-4 text-muted-foreground" />
+            Default Data Collection
+          </CardTitle>
+          <CardDescription>
+            These defaults are applied when new hosts are enrolled. Existing hosts are not affected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isAdmin ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Cpu className="size-4 text-muted-foreground" />
+                  <Label className="text-sm">CPU Usage</Label>
+                </div>
+                <Switch
+                  checked={currentCollectionSettings.cpu}
+                  onCheckedChange={(checked) =>
+                    setLocalCollectionSettings({ ...currentCollectionSettings, cpu: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MemoryStick className="size-4 text-muted-foreground" />
+                  <Label className="text-sm">Memory Usage</Label>
+                </div>
+                <Switch
+                  checked={currentCollectionSettings.memory}
+                  onCheckedChange={(checked) =>
+                    setLocalCollectionSettings({ ...currentCollectionSettings, memory: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <HardDrive className="size-4 text-muted-foreground" />
+                  <Label className="text-sm">Disk Usage</Label>
+                </div>
+                <Switch
+                  checked={currentCollectionSettings.disk}
+                  onCheckedChange={(checked) =>
+                    setLocalCollectionSettings({ ...currentCollectionSettings, disk: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Users className="size-4 text-muted-foreground" />
+                  <Label className="text-sm">Local Users</Label>
+                </div>
+                <Switch
+                  checked={currentCollectionSettings.localUsers}
+                  onCheckedChange={(checked) =>
+                    setLocalCollectionSettings({ ...currentCollectionSettings, localUsers: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center gap-3 pt-2 border-t">
+                <Button
+                  size="sm"
+                  disabled={!collectionDirty || collectionMutation.isPending}
+                  onClick={() => collectionMutation.mutate(currentCollectionSettings)}
+                >
+                  {collectionMutation.isPending ? 'Saving...' : 'Save'}
+                </Button>
+                {collectionSaveSuccess && (
+                  <span className="flex items-center gap-1 text-sm text-green-700">
+                    <CheckCircle2 className="size-4" />
+                    Saved
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <p>CPU: {currentCollectionSettings.cpu ? 'Enabled' : 'Disabled'}</p>
+              <p>Memory: {currentCollectionSettings.memory ? 'Enabled' : 'Disabled'}</p>
+              <p>Disk: {currentCollectionSettings.disk ? 'Enabled' : 'Disabled'}</p>
+              <p>Local Users: {currentCollectionSettings.localUsers ? 'Enabled' : 'Disabled'}</p>
+            </div>
           )}
         </CardContent>
       </Card>

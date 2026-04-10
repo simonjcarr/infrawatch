@@ -1,23 +1,23 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getServiceAccounts, getServiceAccountCounts } from '@/lib/actions/service-accounts'
-import { ServiceAccountsClient } from './service-accounts-client'
+import { getDomainAccounts, getDomainAccountCounts } from '@/lib/actions/domain-accounts'
+import { DirectoryAccountsClient } from './directory-accounts-client'
 
 export const metadata: Metadata = {
-  title: 'Service Accounts',
+  title: 'Directory Accounts',
 }
 
-export default async function ServiceAccountsPage() {
+export default async function DirectoryAccountsPage() {
   const session = await getRequiredSession()
   const orgId = session.user.organisationId!
 
   const [initialAccounts, initialCounts] = await Promise.all([
-    getServiceAccounts(orgId, { sortBy: 'username', sortDir: 'asc', limit: 100 }),
-    getServiceAccountCounts(orgId),
+    getDomainAccounts(orgId, { sortBy: 'username', sortDir: 'asc', limit: 100 }),
+    getDomainAccountCounts(orgId),
   ])
 
   return (
-    <ServiceAccountsClient
+    <DirectoryAccountsClient
       orgId={orgId}
       initialAccounts={initialAccounts}
       initialCounts={initialCounts}

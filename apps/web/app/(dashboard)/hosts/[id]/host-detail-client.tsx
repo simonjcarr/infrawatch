@@ -47,9 +47,13 @@ import { useHostStream } from '@/hooks/use-host-stream'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
 import { ChecksTab } from './checks-tab'
 import { AlertsTab } from './alerts-tab'
+import { SettingsTab } from './settings-tab'
+import { LocalUsersTab } from './local-users-tab'
 import { getAlertInstances } from '@/lib/actions/alerts'
+import { getHostCollectionSettings } from '@/lib/actions/host-settings'
+import { getServiceAccounts } from '@/lib/actions/service-accounts'
 
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings'
 
 interface Props {
   host: HostWithAgent
@@ -215,6 +219,18 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
   })
   const activeAlertCount = activeAlerts.length
 
+  const { data: collectionSettings } = useQuery({
+    queryKey: ['host-collection-settings', orgId, initialHost.id],
+    queryFn: () => getHostCollectionSettings(orgId, initialHost.id),
+  })
+
+  const { data: localUsers = [] } = useQuery({
+    queryKey: ['local-users-count', orgId, initialHost.id],
+    queryFn: () => getServiceAccounts(orgId, { hostId: initialHost.id, limit: 1 }),
+    enabled: collectionSettings?.localUsers === true,
+  })
+  const localUserCount = localUsers.length > 0 ? localUsers.length : 0
+
   const tickFormat = metricsRange === '7d' ? 'MMM d HH:mm' : 'HH:mm'
 
   // Capture the current timestamp once per data refresh so it's stable within a single
@@ -326,6 +342,19 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
               {activeAlertCount}
             </span>
           )}
+        </TabButton>
+        {collectionSettings?.localUsers && (
+          <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users')}>
+            Users
+            {localUserCount > 0 && (
+              <span className="ml-1.5 text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5">
+                {localUserCount}
+              </span>
+            )}
+          </TabButton>
+        )}
+        <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>
+          Settings
         </TabButton>
       </div>
 
@@ -709,6 +738,16 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
       {/* Alerts Tab */}
       {activeTab === 'alerts' && (
         <AlertsTab orgId={orgId} hostId={initialHost.id} currentUserId={currentUserId} />
+      )}
+
+      {/* Users Tab */}
+      {activeTab === 'users' && collectionSettings?.localUsers && (
+        <LocalUsersTab orgId={orgId} hostId={initialHost.id} />
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === 'settings' && (
+        <SettingsTab orgId={orgId} hostId={initialHost.id} />
       )}
 
       {/* Network Tab */}

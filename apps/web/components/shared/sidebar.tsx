@@ -45,7 +45,7 @@ const primaryNav: NavItem[] = [
   { title: 'Hosts', href: '/hosts', icon: Server },
   { title: 'Checks & Alerts', href: '/alerts', icon: Bell },
   { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
-  { title: 'Service Accounts', href: '/service-accounts', icon: Key },
+  { title: 'Directory Accounts', href: '/service-accounts', icon: Key },
 ]
 
 const toolingNav: NavItem[] = [
@@ -59,6 +59,7 @@ const adminNav: NavItem[] = [
   { title: 'Settings', href: '/settings', icon: Settings },
   { title: 'Agent Enrolment', href: '/settings/agents', icon: Server },
   { title: 'Global Alert Defaults', href: '/settings/alerts', icon: BellPlus },
+  { title: 'LDAP / Directory', href: '/settings/ldap', icon: Key },
   { title: 'System Health', href: '/settings/system', icon: HeartPulse },
 ]
 

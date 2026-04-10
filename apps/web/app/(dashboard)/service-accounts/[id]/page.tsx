@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getServiceAccount } from '@/lib/actions/service-accounts'
-import { ServiceAccountDetailClient } from './service-account-detail-client'
+import { getDomainAccount } from '@/lib/actions/domain-accounts'
+import { DirectoryAccountDetailClient } from './directory-account-detail-client'
 
 export const metadata: Metadata = {
-  title: 'Service Account Detail',
+  title: 'Directory Account Detail',
 }
 
-export default async function ServiceAccountDetailPage({
+export default async function DirectoryAccountDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -17,16 +17,13 @@ export default async function ServiceAccountDetailPage({
   const orgId = session.user.organisationId!
   const { id } = await params
 
-  const result = await getServiceAccount(orgId, id)
-  if (!result) notFound()
+  const account = await getDomainAccount(orgId, id)
+  if (!account) notFound()
 
   return (
-    <ServiceAccountDetailClient
+    <DirectoryAccountDetailClient
       orgId={orgId}
-      account={result.account}
-      keys={result.keys}
-      events={result.events}
-      host={result.host}
+      account={account}
     />
   )
 }

@@ -20,9 +20,28 @@ export interface NetworkInterface {
   is_up: boolean
 }
 
+export interface HostCollectionSettings {
+  cpu: boolean
+  memory: boolean
+  disk: boolean
+  localUsers: boolean
+  localUserConfig?: {
+    mode: 'all' | 'selected'
+    selectedUsernames?: string[]
+  }
+}
+
+export const DEFAULT_COLLECTION_SETTINGS: HostCollectionSettings = {
+  cpu: true,
+  memory: true,
+  disk: true,
+  localUsers: false,
+}
+
 export interface HostMetadata {
   disks: DiskInfo[]
   network_interfaces: NetworkInterface[]
+  collectionSettings?: HostCollectionSettings
 }
 
 export const hosts = pgTable('hosts', {

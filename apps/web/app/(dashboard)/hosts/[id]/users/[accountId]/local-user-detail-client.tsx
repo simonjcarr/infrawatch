@@ -12,6 +12,8 @@ import {
   XCircle,
   Copy,
   Key,
+  Lock,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -233,6 +235,56 @@ export function LocalUserDetailClient({
                     No
                   </>
                 )}
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Lock className="size-3.5" />
+                Account Locked
+              </span>
+              <div className="flex items-center gap-1.5 mt-1 font-medium">
+                {account.accountLocked ? (
+                  <>
+                    <XCircle className="size-4 text-red-600" />
+                    <span className="text-red-600">Locked</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="size-4 text-green-600" />
+                    No
+                  </>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Clock className="size-3.5" />
+                Password Expires
+              </span>
+              <div className="mt-1 font-medium">
+                {account.passwordExpiresAt ? (
+                  (() => {
+                    const expiry = new Date(account.passwordExpiresAt)
+                    const isExpired = expiry < new Date()
+                    return (
+                      <span className={isExpired ? 'text-red-600' : ''}>
+                        {isExpired ? 'Expired ' : ''}
+                        {formatDistanceToNow(expiry, { addSuffix: true })}
+                      </span>
+                    )
+                  })()
+                ) : (
+                  <span className="text-muted-foreground">Never</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Password Last Changed</span>
+              <div className="mt-1 font-medium">
+                {account.passwordLastChangedAt
+                  ? formatDistanceToNow(new Date(account.passwordLastChangedAt), { addSuffix: true })
+                  : <span className="text-muted-foreground">Unknown</span>
+                }
               </div>
             </div>
             <div>

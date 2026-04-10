@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, jsonb, boolean, uniqueIndex, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
 
@@ -19,6 +19,9 @@ export const domainAccounts = pgTable('domain_accounts', {
   userPrincipalName: text('user_principal_name'),
   groups: jsonb('groups').$type<string[]>(),
   status: text('status').notNull().$type<DomainAccountStatus>().default('active'),
+  accountLocked: boolean('account_locked').notNull().default(false),
+  passwordExpiresAt: timestamp('password_expires_at', { withTimezone: true }),
+  passwordLastChangedAt: timestamp('password_last_changed_at', { withTimezone: true }),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

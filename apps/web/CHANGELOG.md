@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.11.1...web/v0.12.0) (2026-04-10)
+
+
+### Features
+
+* **ldap:** add edit dialog for LDAP configs and TLS certificate upload ([6fc619f](https://github.com/simonjcarr/infrawatch/commit/6fc619f444f917fccf66d6897fc2762cd81343da))
+* **phase4:** service accounts, LDAP sync & directory management ([db3ebf6](https://github.com/simonjcarr/infrawatch/commit/db3ebf68e3d429463c817c5b4af506c0fb4a78f9))
+
 ## [0.11.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.11.0...web/v0.11.1) (2026-04-10)
 
 

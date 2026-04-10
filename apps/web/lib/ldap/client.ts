@@ -10,6 +10,9 @@ export interface LdapUser {
   groups: string[]
   samAccountName?: string
   userPrincipalName?: string
+  accountLocked?: boolean
+  passwordExpiresAt?: Date | null
+  passwordLastChangedAt?: Date | null
 }
 
 function createClient(config: LdapConfiguration): Client {
@@ -72,6 +75,18 @@ export async function searchUsers(
         'memberOf',
         'sAMAccountName',
         'userPrincipalName',
+        // Password and lock attributes (AD)
+        'userAccountControl',
+        'lockoutTime',
+        'pwdLastSet',
+        'accountExpires',
+        'msDS-UserPasswordExpiryTimeComputed',
+        // OpenLDAP password policy attributes
+        'pwdAccountLockedTime',
+        'pwdChangedTime',
+        'shadowExpire',
+        'shadowLastChange',
+        'shadowMax',
       ],
       sizeLimit: 1000,
     })
@@ -90,11 +105,83 @@ export async function searchUsers(
           : [],
       samAccountName: entry.sAMAccountName ? String(entry.sAMAccountName) : undefined,
       userPrincipalName: entry.userPrincipalName ? String(entry.userPrincipalName) : undefined,
+      ...parseAccountLockStatus(entry),
+      ...parsePasswordExpiry(entry),
+      ...parsePasswordLastChanged(entry),
     }))
   } catch (err) {
     await client.unbind().catch(() => {})
     throw err
   }
+}
+
+// AD uses Windows file time (100-nanosecond intervals since 1601-01-01).
+// This constant is the difference between the Windows epoch and Unix epoch in milliseconds.
+const AD_EPOCH_DIFF_MS = BigInt('11644473600000')
+const NEVER_EXPIRES = BigInt('9223372036854775807')
+
+function adFileTimeToDate(value: string | number): Date | null {
+  const bigVal = BigInt(value)
+  if (bigVal <= BigInt(0) || bigVal === NEVER_EXPIRES) return null // never expires
+  const unixMs = Number(bigVal / BigInt(10000) - AD_EPOCH_DIFF_MS)
+  return new Date(unixMs)
+}
+
+function parseAccountLockStatus(entry: Record<string, unknown>): { accountLocked: boolean } {
+  // AD: userAccountControl bit 0x0002 = ACCOUNTDISABLE, lockoutTime > 0 = locked
+  if (entry.userAccountControl) {
+    const uac = Number(entry.userAccountControl)
+    if (uac & 0x0002) return { accountLocked: true }
+  }
+  if (entry.lockoutTime) {
+    const lockoutTime = BigInt(String(entry.lockoutTime))
+    if (lockoutTime > BigInt(0)) return { accountLocked: true }
+  }
+  // OpenLDAP: pwdAccountLockedTime is set when account is locked
+  if (entry.pwdAccountLockedTime) return { accountLocked: true }
+  return { accountLocked: false }
+}
+
+function parsePasswordExpiry(entry: Record<string, unknown>): { passwordExpiresAt: Date | null } {
+  // AD: msDS-UserPasswordExpiryTimeComputed is the most accurate
+  const computedExpiry = entry['msDS-UserPasswordExpiryTimeComputed']
+  if (computedExpiry) {
+    const d = adFileTimeToDate(String(computedExpiry))
+    if (d) return { passwordExpiresAt: d }
+  }
+  // AD fallback: accountExpires
+  if (entry.accountExpires) {
+    const d = adFileTimeToDate(String(entry.accountExpires))
+    if (d) return { passwordExpiresAt: d }
+  }
+  // OpenLDAP shadow: shadowLastChange + shadowMax (in days since epoch)
+  if (entry.shadowLastChange && entry.shadowMax) {
+    const lastChange = Number(entry.shadowLastChange)
+    const max = Number(entry.shadowMax)
+    if (lastChange > 0 && max > 0 && max < 99999) {
+      return { passwordExpiresAt: new Date((lastChange + max) * 86400 * 1000) }
+    }
+  }
+  return { passwordExpiresAt: null }
+}
+
+function parsePasswordLastChanged(entry: Record<string, unknown>): { passwordLastChangedAt: Date | null } {
+  // AD: pwdLastSet (Windows file time)
+  if (entry.pwdLastSet) {
+    const d = adFileTimeToDate(String(entry.pwdLastSet))
+    if (d) return { passwordLastChangedAt: d }
+  }
+  // OpenLDAP: pwdChangedTime (generalised time format: YYYYMMDDHHmmssZ)
+  if (entry.pwdChangedTime) {
+    const d = new Date(String(entry.pwdChangedTime))
+    if (!isNaN(d.getTime())) return { passwordLastChangedAt: d }
+  }
+  // Shadow: shadowLastChange (days since epoch)
+  if (entry.shadowLastChange) {
+    const days = Number(entry.shadowLastChange)
+    if (days > 0) return { passwordLastChangedAt: new Date(days * 86400 * 1000) }
+  }
+  return { passwordLastChangedAt: null }
 }
 
 export async function authenticateUser(

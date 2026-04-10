@@ -43,7 +43,7 @@ func UpdateHostVitals(ctx context.Context, pool *pgxpool.Pool, agentID string, c
 		    os_version     = COALESCE(NULLIF($7, ''), os_version),
 		    os             = COALESCE(NULLIF($8, ''), os),
 		    arch           = COALESCE(NULLIF($9, ''), arch),
-		    metadata       = jsonb_build_object(
+		    metadata       = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
 		                       'disks',              $10::jsonb,
 		                       'network_interfaces', $11::jsonb
 		                     ),

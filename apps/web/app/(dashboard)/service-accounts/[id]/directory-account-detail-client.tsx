@@ -13,6 +13,11 @@ import {
   Shield,
   Pencil,
   Trash2,
+  Lock,
+  Clock,
+  KeyRound,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -265,6 +270,70 @@ export function DirectoryAccountDetailClient({
         <InfoCard label="Source" value={<SourceBadge source={account.source as DomainAccountSource} />} icon={Globe} />
         <InfoCard label="Status" value={<StatusBadge status={account.status as DomainAccountStatus} />} icon={Shield} />
       </div>
+
+      {/* Security & Password */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <KeyRound className="size-4" />
+            Security
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Lock className="size-3.5" />
+                Account Locked
+              </span>
+              <div className="flex items-center gap-1.5 mt-1 font-medium">
+                {account.accountLocked ? (
+                  <span className="text-red-600 flex items-center gap-1.5">
+                    <XCircle className="size-4" />
+                    Locked
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle className="size-4 text-green-600" />
+                    No
+                  </span>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Clock className="size-3.5" />
+                Password Expires
+              </span>
+              <div className="mt-1 font-medium">
+                {account.passwordExpiresAt ? (
+                  (() => {
+                    const expiry = new Date(account.passwordExpiresAt)
+                    const isExpired = expiry < new Date()
+                    return (
+                      <span className={isExpired ? 'text-red-600' : ''}>
+                        {isExpired ? 'Expired ' : ''}
+                        {formatDistanceToNow(expiry, { addSuffix: true })}
+                      </span>
+                    )
+                  })()
+                ) : (
+                  <span className="text-muted-foreground">Never</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Password Last Changed</span>
+              <div className="mt-1 font-medium">
+                {account.passwordLastChangedAt
+                  ? formatDistanceToNow(new Date(account.passwordLastChangedAt), { addSuffix: true })
+                  : <span className="text-muted-foreground">Unknown</span>
+                }
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* LDAP/AD Properties */}
       {(account.distinguishedName || account.samAccountName || account.userPrincipalName) && (

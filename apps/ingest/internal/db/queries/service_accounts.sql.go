@@ -32,7 +32,8 @@ func UpsertServiceAccount(
 	orgID, hostID string,
 	username string, uid, gid int,
 	homeDir, shell, accountType string,
-	hasLogin, hasProcs bool,
+	hasLogin, hasProcs, accountLocked bool,
+	passwordExpiresAt, passwordLastChangedAt *time.Time,
 	status string,
 ) (id string, wasInsert bool, previous *ServiceAccountRow, err error) {
 	const selectQ = `
@@ -61,12 +62,16 @@ func UpsertServiceAccount(
 			INSERT INTO service_accounts (
 				id, organisation_id, host_id, username,
 				uid, gid, home_directory, shell, account_type,
-				has_login_capability, has_running_processes, status,
+				has_login_capability, has_running_processes,
+				account_locked, password_expires_at, password_last_changed_at,
+				status,
 				first_seen_at, last_seen_at, created_at, updated_at
 			) VALUES (
 				$1, $2, $3, $4,
 				$5, $6, $7, $8, $9,
-				$10, $11, $12,
+				$10, $11,
+				$12, $13, $14,
+				$15,
 				NOW(), NOW(), NOW(), NOW()
 			)
 			RETURNING id
@@ -76,7 +81,9 @@ func UpsertServiceAccount(
 		err = pool.QueryRow(ctx, insertQ,
 			newID, orgID, hostID, username,
 			uid, gid, homeDir, shell, accountType,
-			hasLogin, hasProcs, status,
+			hasLogin, hasProcs,
+			accountLocked, passwordExpiresAt, passwordLastChangedAt,
+			status,
 		).Scan(&returnedID)
 		if err != nil {
 			return "", false, nil, err
@@ -87,21 +94,25 @@ func UpsertServiceAccount(
 	// Update existing row.
 	const updateQ = `
 		UPDATE service_accounts
-		SET uid                   = $2,
-		    gid                   = $3,
-		    home_directory        = $4,
-		    shell                 = $5,
-		    account_type          = $6,
-		    has_login_capability  = $7,
-		    has_running_processes = $8,
-		    status                = $9,
-		    last_seen_at          = NOW(),
-		    updated_at            = NOW()
+		SET uid                       = $2,
+		    gid                       = $3,
+		    home_directory            = $4,
+		    shell                     = $5,
+		    account_type              = $6,
+		    has_login_capability      = $7,
+		    has_running_processes     = $8,
+		    account_locked            = $9,
+		    password_expires_at       = $10,
+		    password_last_changed_at  = $11,
+		    status                    = $12,
+		    last_seen_at              = NOW(),
+		    updated_at                = NOW()
 		WHERE id = $1
 	`
 	_, err = pool.Exec(ctx, updateQ,
 		existing.ID, uid, gid, homeDir, shell, accountType,
-		hasLogin, hasProcs, status,
+		hasLogin, hasProcs, accountLocked, passwordExpiresAt, passwordLastChangedAt,
+		status,
 	)
 	if err != nil {
 		return "", false, nil, err

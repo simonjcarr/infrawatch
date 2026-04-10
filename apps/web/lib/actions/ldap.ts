@@ -236,6 +236,8 @@ export async function syncLdapAccounts(
       if (!user.username) continue
 
       // Upsert: try insert, on conflict update
+      const status = user.accountLocked ? 'locked' as const : 'active' as const
+
       await db
         .insert(domainAccounts)
         .values({
@@ -248,7 +250,10 @@ export async function syncLdapAccounts(
           samAccountName: user.samAccountName ?? null,
           userPrincipalName: user.userPrincipalName ?? null,
           groups: user.groups.length > 0 ? user.groups : null,
-          status: 'active',
+          status,
+          accountLocked: user.accountLocked ?? false,
+          passwordExpiresAt: user.passwordExpiresAt ?? null,
+          passwordLastChangedAt: user.passwordLastChangedAt ?? null,
           lastSyncedAt: new Date(),
         })
         .onConflictDoUpdate({
@@ -260,7 +265,10 @@ export async function syncLdapAccounts(
             samAccountName: user.samAccountName ?? null,
             userPrincipalName: user.userPrincipalName ?? null,
             groups: user.groups.length > 0 ? user.groups : null,
-            status: 'active',
+            status,
+            accountLocked: user.accountLocked ?? false,
+            passwordExpiresAt: user.passwordExpiresAt ?? null,
+            passwordLastChangedAt: user.passwordLastChangedAt ?? null,
             lastSyncedAt: new Date(),
             updatedAt: new Date(),
           },

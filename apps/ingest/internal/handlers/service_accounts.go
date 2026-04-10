@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -18,14 +20,17 @@ type serviceAccountReport struct {
 }
 
 type accountEntry struct {
-	Username            string `json:"username"`
-	UID                 int    `json:"uid"`
-	GID                 int    `json:"gid"`
-	HomeDirectory       string `json:"home_directory"`
-	Shell               string `json:"shell"`
-	AccountType         string `json:"account_type"`
-	HasLoginCapability  bool   `json:"has_login_capability"`
-	HasRunningProcesses bool   `json:"has_running_processes"`
+	Username             string `json:"username"`
+	UID                  int    `json:"uid"`
+	GID                  int    `json:"gid"`
+	HomeDirectory        string `json:"home_directory"`
+	Shell                string `json:"shell"`
+	AccountType          string `json:"account_type"`
+	HasLoginCapability   bool   `json:"has_login_capability"`
+	HasRunningProcesses  bool   `json:"has_running_processes"`
+	AccountLocked        bool   `json:"account_locked"`
+	PasswordExpiresAt    string `json:"password_expires_at,omitempty"`
+	PasswordLastChanged  string `json:"password_last_changed,omitempty"`
 }
 
 // persistServiceAccountResult upserts service accounts from a scan result and emits events.
@@ -62,11 +67,26 @@ func persistServiceAccountResult(
 			status = "disabled"
 		}
 
+		var pwExpiresAt, pwLastChanged *time.Time
+		if acct.PasswordExpiresAt != "" {
+			if secs, err := strconv.ParseInt(acct.PasswordExpiresAt, 10, 64); err == nil {
+				t := time.Unix(secs, 0).UTC()
+				pwExpiresAt = &t
+			}
+		}
+		if acct.PasswordLastChanged != "" {
+			if secs, err := strconv.ParseInt(acct.PasswordLastChanged, 10, 64); err == nil {
+				t := time.Unix(secs, 0).UTC()
+				pwLastChanged = &t
+			}
+		}
+
 		id, wasInsert, previous, err := queries.UpsertServiceAccount(
 			ctx, pool, orgID, hostID,
 			acct.Username, acct.UID, acct.GID,
 			acct.HomeDirectory, acct.Shell, acct.AccountType,
 			acct.HasLoginCapability, acct.HasRunningProcesses,
+			acct.AccountLocked, pwExpiresAt, pwLastChanged,
 			status,
 		)
 		if err != nil {

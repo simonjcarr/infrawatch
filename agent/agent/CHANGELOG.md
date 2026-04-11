@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.15.0...agent/v0.16.0) (2026-04-11)
+
+
+### Features
+
+* **agent:** auto re-register after host deletion ([b6de1d8](https://github.com/simonjcarr/infrawatch/commit/b6de1d8caaa45d9285ba64953865ccd7f89a9f00))
+* **agent:** auto re-register after host deletion; fix service accounts UI ([1eb533d](https://github.com/simonjcarr/infrawatch/commit/1eb533d49e332070120f445620d9049ade79758b))
+
 ## [0.15.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.14.1...agent/v0.15.0) (2026-04-10)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.14.3...web/v0.15.0) (2026-04-11)
+
+
+### Features
+
+* **agents:** add copy actions to enrollment token list ([14bd87e](https://github.com/simonjcarr/infrawatch/commit/14bd87e226b3b32a532fa2dba539730f87c3ce94))
+* **agents:** add copy actions to enrollment token list ([#101](https://github.com/simonjcarr/infrawatch/issues/101)) ([c850aa8](https://github.com/simonjcarr/infrawatch/commit/c850aa8b6e2da6d56692453d4cd8ae9189e2e8ca))
+
 ## [0.14.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.14.2...web/v0.14.3) (2026-04-11)
 
 

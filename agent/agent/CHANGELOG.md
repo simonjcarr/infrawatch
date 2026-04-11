@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.17.0...agent/v0.17.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* **tasks:** resolve patch output deadlock, add timeouts and debug UI ([74a9a87](https://github.com/simonjcarr/infrawatch/commit/74a9a874a6b8cca954729dcb1342632d84d2e757))
+* **tasks:** resolve patch output deadlock, add timeouts and debug UI ([7bfd4f8](https://github.com/simonjcarr/infrawatch/commit/7bfd4f8a40c45317d420b479f186c60c47b39fa8))
+
 ## [0.17.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.16.0...agent/v0.17.0) (2026-04-11)
 
 

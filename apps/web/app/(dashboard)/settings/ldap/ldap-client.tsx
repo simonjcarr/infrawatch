@@ -84,7 +84,7 @@ function CertificateUpload({
     return (
       <div className="space-y-1.5">
         <Label>TLS Certificate (CA)</Label>
-        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre overflow-x-auto w-full text-muted-foreground relative">
+        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all text-muted-foreground relative">
           {preview}
           <Button
             type="button"
@@ -258,7 +258,7 @@ export function LdapSettingsClient({
               Add Configuration
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-x-hidden overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add LDAP Configuration</DialogTitle>
               <DialogDescription>
@@ -487,7 +487,7 @@ export function LdapSettingsClient({
 
       {/* Edit LDAP Configuration Dialog */}
       <Dialog open={editingConfig !== null} onOpenChange={(open) => { if (!open) setEditingConfig(null) }}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-x-hidden overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit LDAP Configuration</DialogTitle>
             <DialogDescription>

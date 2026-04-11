@@ -21,7 +21,7 @@ import {
   agentQueries,
   resourceTags,
 } from '@/lib/db/schema'
-import { eq, and, isNull, gt, gte, asc, sql, inArray } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull, gt, gte, asc, sql, inArray } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { getOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
@@ -191,12 +191,39 @@ export async function createEnrolmentToken(
 }
 
 export async function listEnrolmentTokens(orgId: string): Promise<AgentEnrolmentToken[]> {
-  return db.query.agentEnrolmentTokens.findMany({
+  const tokens = await db.query.agentEnrolmentTokens.findMany({
     where: and(
       eq(agentEnrolmentTokens.organisationId, orgId),
       isNull(agentEnrolmentTokens.deletedAt),
     ),
   })
+
+  if (tokens.length === 0) return tokens
+
+  // Derive live usage count from active agents — the stored counter can drift
+  // if hosts are deleted, so we always compute it fresh
+  const liveCounts = await db
+    .select({
+      enrolmentTokenId: agents.enrolmentTokenId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.organisationId, orgId),
+        isNull(agents.deletedAt),
+        isNotNull(agents.enrolmentTokenId),
+        inArray(agents.enrolmentTokenId, tokens.map((t) => t.id)),
+      ),
+    )
+    .groupBy(agents.enrolmentTokenId)
+
+  const countMap = new Map(liveCounts.map((r) => [r.enrolmentTokenId, r.count]))
+
+  return tokens.map((token) => ({
+    ...token,
+    usageCount: countMap.get(token.id) ?? 0,
+  }))
 }
 
 export async function revokeEnrolmentToken(

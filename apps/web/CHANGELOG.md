@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.14.0...web/v0.14.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* **ldap:** constrain TLS certificate preview to modal width ([f160e3c](https://github.com/simonjcarr/infrawatch/commit/f160e3cd9d62817c1a54426cc2bb921acc04b081))
+* **ldap:** constrain TLS certificate preview to modal width ([6d76f44](https://github.com/simonjcarr/infrawatch/commit/6d76f446e3cb3f884f80154a94515c98eb16a70a)), closes [#92](https://github.com/simonjcarr/infrawatch/issues/92)
+
 ## [0.14.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.13.0...web/v0.14.0) (2026-04-11)
 
 

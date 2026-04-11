@@ -190,18 +190,43 @@ loop:
 				slog.Warn("fetching pending queries", "host_id", hostID, "err", err)
 				continue
 			}
-			if len(pending) == 0 {
+			if len(pending) > 0 {
+				pqs := make([]*agentv1.AgentQuery, 0, len(pending))
+				for _, p := range pending {
+					pqs = append(pqs, &agentv1.AgentQuery{QueryId: p.ID, QueryType: p.QueryType})
+				}
+				if err := stream.Send(&agentv1.HeartbeatResponse{Ok: true, PendingQueries: pqs}); err != nil {
+					slog.Warn("pushing pending queries", "host_id", hostID, "err", err)
+					return err
+				}
+				slog.Info("pushed pending queries to agent", "host_id", hostID, "count", len(pqs))
+			}
+
+			// Dispatch the next eligible task (parallelism enforced in SQL).
+			pendingTasks, err := queries.GetPendingTasksForHost(ctx, h.pool, hostID)
+			if err != nil {
+				slog.Warn("fetching pending tasks", "host_id", hostID, "err", err)
 				continue
 			}
-			pqs := make([]*agentv1.AgentQuery, 0, len(pending))
-			for _, p := range pending {
-				pqs = append(pqs, &agentv1.AgentQuery{QueryId: p.ID, QueryType: p.QueryType})
+			if len(pendingTasks) > 0 {
+				t := pendingTasks[0]
+				if err := queries.MarkTaskRunHostRunning(ctx, h.pool, t.ID); err != nil {
+					slog.Warn("marking task run host running", "task_run_host_id", t.ID, "err", err)
+					continue
+				}
+				if err := stream.Send(&agentv1.HeartbeatResponse{
+					Ok: true,
+					PendingTask: &agentv1.AgentTask{
+						TaskId:     t.ID,
+						TaskType:   t.TaskType,
+						ConfigJson: t.ConfigJSON,
+					},
+				}); err != nil {
+					slog.Warn("pushing pending task to agent", "task_run_host_id", t.ID, "err", err)
+					return err
+				}
+				slog.Info("dispatched task to agent", "host_id", hostID, "task_run_host_id", t.ID, "task_type", t.TaskType)
 			}
-			if err := stream.Send(&agentv1.HeartbeatResponse{Ok: true, PendingQueries: pqs}); err != nil {
-				slog.Warn("pushing pending queries", "host_id", hostID, "err", err)
-				return err
-			}
-			slog.Info("pushed pending queries to agent", "host_id", hostID, "count", len(pqs))
 		}
 	}
 
@@ -325,6 +350,31 @@ func (h *HeartbeatHandler) processHeartbeat(
 		if err := queries.CompleteAgentQuery(ctx, h.pool, qr.QueryId, dbStatus, qr.Error, resultJSON); err != nil {
 			slog.Warn("completing agent query", "query_id", qr.QueryId, "err", err)
 		}
+	}
+
+	// Persist incremental task output chunks
+	for _, p := range req.TaskProgress {
+		if err := queries.AppendTaskOutput(ctx, h.pool, p.TaskId, p.OutputChunk); err != nil {
+			slog.Warn("appending task output", "task_run_host_id", p.TaskId, "err", err)
+		}
+	}
+
+	// Persist task completions
+	for _, tr := range req.TaskResults {
+		hostStatus := "success"
+		if tr.ExitCode != 0 {
+			hostStatus = "failed"
+		}
+		if err := queries.CompleteTaskRunHost(ctx, h.pool, tr.TaskId, hostStatus,
+			int(tr.ExitCode), tr.ResultJson, tr.Error,
+		); err != nil {
+			slog.Warn("completing task run host", "task_run_host_id", tr.TaskId, "err", err)
+			continue
+		}
+		if err := queries.MaybeCompleteTaskRun(ctx, h.pool, tr.TaskId); err != nil {
+			slog.Warn("maybe completing task run", "task_run_host_id", tr.TaskId, "err", err)
+		}
+		slog.Info("task completed on agent", "task_run_host_id", tr.TaskId, "status", hostStatus, "exit_code", tr.ExitCode)
 	}
 
 	// Publish to queue (for consumers/metrics in standard/ha deployments)

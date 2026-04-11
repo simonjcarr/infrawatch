@@ -69,6 +69,29 @@ message AgentQueryResult {
   repeated ServiceInfo services = 6;
 }
 
+// AgentTask is pushed server→agent to execute a named task.
+message AgentTask {
+  string task_id     = 1;  // = task_run_hosts.id
+  string task_type   = 2;  // "patch" | "custom_script" (extensible)
+  string config_json = 3;  // JSON payload parsed by the task handler
+}
+
+// AgentTaskProgress is sent agent→server with incremental stdout/stderr
+// while a task is still running (one or more per heartbeat during execution).
+message AgentTaskProgress {
+  string task_id      = 1;
+  string output_chunk = 2;  // raw stdout/stderr since last progress message
+}
+
+// AgentTaskResult is sent agent→server exactly once, when a task completes.
+message AgentTaskResult {
+  string task_id     = 1;
+  string task_type   = 2;
+  int32  exit_code   = 3;
+  string result_json = 4;  // structured outcome (task-type specific)
+  string error       = 5;  // human-readable error if task failed to start
+}
+
 message HeartbeatRequest {
   string    agent_id      = 1;
   float     cpu_percent   = 2;
@@ -84,6 +107,8 @@ message HeartbeatRequest {
   repeated NetworkInterface  network_interfaces = 10;
   repeated CheckResult       check_results      = 13;
   repeated AgentQueryResult  query_results      = 14;
+  repeated AgentTaskProgress task_progress      = 15;
+  repeated AgentTaskResult   task_results       = 16;
 }
 
 message HeartbeatResponse {
@@ -95,4 +120,5 @@ message HeartbeatResponse {
   string download_url = 6;    // base URL to fetch the updated binary from
   repeated CheckDefinition checks = 7;
   repeated AgentQuery pending_queries = 8;
+  AgentTask pending_task = 9;  // current pending task (one at a time; absent = none)
 }

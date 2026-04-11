@@ -588,6 +588,198 @@ func (x *AgentQueryResult) GetServices() []*ServiceInfo {
 	return nil
 }
 
+// AgentTask is pushed server→agent to execute a named task.
+type AgentTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`             // = task_run_hosts.id
+	TaskType      string                 `protobuf:"bytes,2,opt,name=task_type,json=taskType,proto3" json:"task_type,omitempty"`       // "patch" | "custom_script" (extensible)
+	ConfigJson    string                 `protobuf:"bytes,3,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // JSON payload parsed by the task handler
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentTask) Reset() {
+	*x = AgentTask{}
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentTask) ProtoMessage() {}
+
+func (x *AgentTask) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentTask.ProtoReflect.Descriptor instead.
+func (*AgentTask) Descriptor() ([]byte, []int) {
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AgentTask) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *AgentTask) GetTaskType() string {
+	if x != nil {
+		return x.TaskType
+	}
+	return ""
+}
+
+func (x *AgentTask) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+// AgentTaskProgress is sent agent→server with incremental stdout/stderr
+// while a task is still running (one or more per heartbeat during execution).
+type AgentTaskProgress struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	OutputChunk   string                 `protobuf:"bytes,2,opt,name=output_chunk,json=outputChunk,proto3" json:"output_chunk,omitempty"` // raw stdout/stderr since last progress message
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentTaskProgress) Reset() {
+	*x = AgentTaskProgress{}
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentTaskProgress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentTaskProgress) ProtoMessage() {}
+
+func (x *AgentTaskProgress) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentTaskProgress.ProtoReflect.Descriptor instead.
+func (*AgentTaskProgress) Descriptor() ([]byte, []int) {
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AgentTaskProgress) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *AgentTaskProgress) GetOutputChunk() string {
+	if x != nil {
+		return x.OutputChunk
+	}
+	return ""
+}
+
+// AgentTaskResult is sent agent→server exactly once, when a task completes.
+type AgentTaskResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	TaskType      string                 `protobuf:"bytes,2,opt,name=task_type,json=taskType,proto3" json:"task_type,omitempty"`
+	ExitCode      int32                  `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	ResultJson    string                 `protobuf:"bytes,4,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"` // structured outcome (task-type specific)
+	Error         string                 `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`                             // human-readable error if task failed to start
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentTaskResult) Reset() {
+	*x = AgentTaskResult{}
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentTaskResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentTaskResult) ProtoMessage() {}
+
+func (x *AgentTaskResult) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentTaskResult.ProtoReflect.Descriptor instead.
+func (*AgentTaskResult) Descriptor() ([]byte, []int) {
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AgentTaskResult) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *AgentTaskResult) GetTaskType() string {
+	if x != nil {
+		return x.TaskType
+	}
+	return ""
+}
+
+func (x *AgentTaskResult) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
+}
+
+func (x *AgentTaskResult) GetResultJson() string {
+	if x != nil {
+		return x.ResultJson
+	}
+	return ""
+}
+
+func (x *AgentTaskResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 type HeartbeatRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	AgentId           string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
@@ -604,13 +796,15 @@ type HeartbeatRequest struct {
 	NetworkInterfaces []*NetworkInterface    `protobuf:"bytes,10,rep,name=network_interfaces,json=networkInterfaces,proto3" json:"network_interfaces,omitempty"`
 	CheckResults      []*CheckResult         `protobuf:"bytes,13,rep,name=check_results,json=checkResults,proto3" json:"check_results,omitempty"`
 	QueryResults      []*AgentQueryResult    `protobuf:"bytes,14,rep,name=query_results,json=queryResults,proto3" json:"query_results,omitempty"`
+	TaskProgress      []*AgentTaskProgress   `protobuf:"bytes,15,rep,name=task_progress,json=taskProgress,proto3" json:"task_progress,omitempty"`
+	TaskResults       []*AgentTaskResult     `protobuf:"bytes,16,rep,name=task_results,json=taskResults,proto3" json:"task_results,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[8]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -622,7 +816,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[8]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -635,7 +829,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{8}
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *HeartbeatRequest) GetAgentId() string {
@@ -736,6 +930,20 @@ func (x *HeartbeatRequest) GetQueryResults() []*AgentQueryResult {
 	return nil
 }
 
+func (x *HeartbeatRequest) GetTaskProgress() []*AgentTaskProgress {
+	if x != nil {
+		return x.TaskProgress
+	}
+	return nil
+}
+
+func (x *HeartbeatRequest) GetTaskResults() []*AgentTaskResult {
+	if x != nil {
+		return x.TaskResults
+	}
+	return nil
+}
+
 type HeartbeatResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Ok              bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
@@ -746,13 +954,14 @@ type HeartbeatResponse struct {
 	DownloadUrl     string                 `protobuf:"bytes,6,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`              // base URL to fetch the updated binary from
 	Checks          []*CheckDefinition     `protobuf:"bytes,7,rep,name=checks,proto3" json:"checks,omitempty"`
 	PendingQueries  []*AgentQuery          `protobuf:"bytes,8,rep,name=pending_queries,json=pendingQueries,proto3" json:"pending_queries,omitempty"`
+	PendingTask     *AgentTask             `protobuf:"bytes,9,opt,name=pending_task,json=pendingTask,proto3" json:"pending_task,omitempty"` // current pending task (one at a time; absent = none)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[9]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +973,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[9]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +986,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{9}
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HeartbeatResponse) GetOk() bool {
@@ -832,6 +1041,13 @@ func (x *HeartbeatResponse) GetChecks() []*CheckDefinition {
 func (x *HeartbeatResponse) GetPendingQueries() []*AgentQuery {
 	if x != nil {
 		return x.PendingQueries
+	}
+	return nil
+}
+
+func (x *HeartbeatResponse) GetPendingTask() *AgentTask {
+	if x != nil {
+		return x.PendingTask
 	}
 	return nil
 }
@@ -895,7 +1111,22 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12(\n" +
 	"\x05ports\x18\x05 \x03(\v2\x12.agent.v1.PortInfoR\x05ports\x121\n" +
-	"\bservices\x18\x06 \x03(\v2\x15.agent.v1.ServiceInfoR\bservices\"\xc0\x04\n" +
+	"\bservices\x18\x06 \x03(\v2\x15.agent.v1.ServiceInfoR\bservices\"b\n" +
+	"\tAgentTask\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1b\n" +
+	"\ttask_type\x18\x02 \x01(\tR\btaskType\x12\x1f\n" +
+	"\vconfig_json\x18\x03 \x01(\tR\n" +
+	"configJson\"O\n" +
+	"\x11AgentTaskProgress\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12!\n" +
+	"\foutput_chunk\x18\x02 \x01(\tR\voutputChunk\"\x9b\x01\n" +
+	"\x0fAgentTaskResult\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1b\n" +
+	"\ttask_type\x18\x02 \x01(\tR\btaskType\x12\x1b\n" +
+	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12\x1f\n" +
+	"\vresult_json\x18\x04 \x01(\tR\n" +
+	"resultJson\x12\x14\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\"\xc0\x05\n" +
 	"\x10HeartbeatRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1f\n" +
 	"\vcpu_percent\x18\x02 \x01(\x02R\n" +
@@ -913,7 +1144,9 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\x12network_interfaces\x18\n" +
 	" \x03(\v2\x1a.agent.v1.NetworkInterfaceR\x11networkInterfaces\x12:\n" +
 	"\rcheck_results\x18\r \x03(\v2\x15.agent.v1.CheckResultR\fcheckResults\x12?\n" +
-	"\rquery_results\x18\x0e \x03(\v2\x1a.agent.v1.AgentQueryResultR\fqueryResults\"\xcd\x02\n" +
+	"\rquery_results\x18\x0e \x03(\v2\x1a.agent.v1.AgentQueryResultR\fqueryResults\x12@\n" +
+	"\rtask_progress\x18\x0f \x03(\v2\x1b.agent.v1.AgentTaskProgressR\ftaskProgress\x12<\n" +
+	"\ftask_results\x18\x10 \x03(\v2\x19.agent.v1.AgentTaskResultR\vtaskResults\"\x85\x03\n" +
 	"\x11HeartbeatResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12'\n" +
@@ -922,7 +1155,8 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\x10update_available\x18\x05 \x01(\bR\x0fupdateAvailable\x12!\n" +
 	"\fdownload_url\x18\x06 \x01(\tR\vdownloadUrl\x121\n" +
 	"\x06checks\x18\a \x03(\v2\x19.agent.v1.CheckDefinitionR\x06checks\x12=\n" +
-	"\x0fpending_queries\x18\b \x03(\v2\x14.agent.v1.AgentQueryR\x0ependingQueriesB.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\x0fpending_queries\x18\b \x03(\v2\x14.agent.v1.AgentQueryR\x0ependingQueries\x126\n" +
+	"\fpending_task\x18\t \x01(\v2\x13.agent.v1.AgentTaskR\vpendingTaskB.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_heartbeat_proto_rawDescOnce sync.Once
@@ -936,7 +1170,7 @@ func file_agent_v1_heartbeat_proto_rawDescGZIP() []byte {
 	return file_agent_v1_heartbeat_proto_rawDescData
 }
 
-var file_agent_v1_heartbeat_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_agent_v1_heartbeat_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_agent_v1_heartbeat_proto_goTypes = []any{
 	(*DiskInfo)(nil),          // 0: agent.v1.DiskInfo
 	(*NetworkInterface)(nil),  // 1: agent.v1.NetworkInterface
@@ -946,23 +1180,29 @@ var file_agent_v1_heartbeat_proto_goTypes = []any{
 	(*PortInfo)(nil),          // 5: agent.v1.PortInfo
 	(*ServiceInfo)(nil),       // 6: agent.v1.ServiceInfo
 	(*AgentQueryResult)(nil),  // 7: agent.v1.AgentQueryResult
-	(*HeartbeatRequest)(nil),  // 8: agent.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil), // 9: agent.v1.HeartbeatResponse
+	(*AgentTask)(nil),         // 8: agent.v1.AgentTask
+	(*AgentTaskProgress)(nil), // 9: agent.v1.AgentTaskProgress
+	(*AgentTaskResult)(nil),   // 10: agent.v1.AgentTaskResult
+	(*HeartbeatRequest)(nil),  // 11: agent.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil), // 12: agent.v1.HeartbeatResponse
 }
 var file_agent_v1_heartbeat_proto_depIdxs = []int32{
-	5, // 0: agent.v1.AgentQueryResult.ports:type_name -> agent.v1.PortInfo
-	6, // 1: agent.v1.AgentQueryResult.services:type_name -> agent.v1.ServiceInfo
-	0, // 2: agent.v1.HeartbeatRequest.disks:type_name -> agent.v1.DiskInfo
-	1, // 3: agent.v1.HeartbeatRequest.network_interfaces:type_name -> agent.v1.NetworkInterface
-	3, // 4: agent.v1.HeartbeatRequest.check_results:type_name -> agent.v1.CheckResult
-	7, // 5: agent.v1.HeartbeatRequest.query_results:type_name -> agent.v1.AgentQueryResult
-	2, // 6: agent.v1.HeartbeatResponse.checks:type_name -> agent.v1.CheckDefinition
-	4, // 7: agent.v1.HeartbeatResponse.pending_queries:type_name -> agent.v1.AgentQuery
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	5,  // 0: agent.v1.AgentQueryResult.ports:type_name -> agent.v1.PortInfo
+	6,  // 1: agent.v1.AgentQueryResult.services:type_name -> agent.v1.ServiceInfo
+	0,  // 2: agent.v1.HeartbeatRequest.disks:type_name -> agent.v1.DiskInfo
+	1,  // 3: agent.v1.HeartbeatRequest.network_interfaces:type_name -> agent.v1.NetworkInterface
+	3,  // 4: agent.v1.HeartbeatRequest.check_results:type_name -> agent.v1.CheckResult
+	7,  // 5: agent.v1.HeartbeatRequest.query_results:type_name -> agent.v1.AgentQueryResult
+	9,  // 6: agent.v1.HeartbeatRequest.task_progress:type_name -> agent.v1.AgentTaskProgress
+	10, // 7: agent.v1.HeartbeatRequest.task_results:type_name -> agent.v1.AgentTaskResult
+	2,  // 8: agent.v1.HeartbeatResponse.checks:type_name -> agent.v1.CheckDefinition
+	4,  // 9: agent.v1.HeartbeatResponse.pending_queries:type_name -> agent.v1.AgentQuery
+	8,  // 10: agent.v1.HeartbeatResponse.pending_task:type_name -> agent.v1.AgentTask
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_heartbeat_proto_init() }
@@ -976,7 +1216,7 @@ func file_agent_v1_heartbeat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_heartbeat_proto_rawDesc), len(file_agent_v1_heartbeat_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

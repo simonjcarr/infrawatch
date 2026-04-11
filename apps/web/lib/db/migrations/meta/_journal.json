@@ -155,6 +155,13 @@
       "when": 1775920082968,
       "tag": "0021_chilly_tomas",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1775930310437,
+      "tag": "0022_black_silhouette",
+      "breakpoints": true
     }
   ]
 }

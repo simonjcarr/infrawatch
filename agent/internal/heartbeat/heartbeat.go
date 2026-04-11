@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/infrawatch/agent/internal/checks"
+	"github.com/infrawatch/agent/internal/tasks"
 	"github.com/infrawatch/agent/internal/updater"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
@@ -50,10 +51,20 @@ type Runner struct {
 	queryResultsMu sync.Mutex
 	queryResults   []*agentv1.AgentQueryResult
 
+	// Buffered agent task progress chunks and results, drained on each heartbeat send.
+	taskProgressMu sync.Mutex
+	taskProgress   []*agentv1.AgentTaskProgress
+	taskResultsMu  sync.Mutex
+	taskResults    []*agentv1.AgentTaskResult
+
 	// Dedupes server-pushed queries: the ingest handler may re-push the same
 	// query on consecutive 2s poll ticks while the agent is still executing it.
 	seenMu       sync.Mutex
 	seenQueryIDs map[string]struct{}
+
+	// Dedupes server-pushed tasks: prevents double-execution if the server
+	// re-sends the same task before the agent has reported a result.
+	seenTaskIDs map[string]struct{}
 
 	// Signalled when new query results are ready so the send loop can fire
 	// an immediate heartbeat rather than waiting for the next 30s tick.
@@ -77,6 +88,7 @@ func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version s
 		interval:     time.Duration(intervalSecs) * time.Second,
 		executor:     executor,
 		seenQueryIDs: make(map[string]struct{}),
+		seenTaskIDs:  make(map[string]struct{}),
 		resultsReady: make(chan struct{}, 1),
 	}
 }
@@ -136,11 +148,12 @@ func (r *Runner) runStream(ctx context.Context) error {
 		return fmt.Errorf("opening heartbeat stream: %w", err)
 	}
 
-	// Reset the dedup map per stream session. Queries pushed on a previous
+	// Reset dedup maps per stream session. Anything pushed on a previous
 	// (now-dead) stream will be re-pushed by the server on reconnect and must
 	// be re-executed; keeping stale IDs would silently drop them.
 	r.seenMu.Lock()
 	r.seenQueryIDs = make(map[string]struct{})
+	r.seenTaskIDs = make(map[string]struct{})
 	r.seenMu.Unlock()
 
 	slog.Info("heartbeat stream opened", "agent_id", r.agentID)
@@ -238,6 +251,17 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 			go r.executeQueries(fresh)
 		}
 	}
+	if resp.PendingTask != nil {
+		r.seenMu.Lock()
+		_, dup := r.seenTaskIDs[resp.PendingTask.TaskId]
+		if !dup {
+			r.seenTaskIDs[resp.PendingTask.TaskId] = struct{}{}
+		}
+		r.seenMu.Unlock()
+		if !dup {
+			go r.executeTask(ctx, resp.PendingTask)
+		}
+	}
 	if resp.UpdateAvailable && resp.DownloadUrl != "" {
 		slog.Info("agent update available, downloading",
 			"current", r.version,
@@ -297,6 +321,53 @@ func (r *Runner) drainQueryResults() []*agentv1.AgentQueryResult {
 	return results
 }
 
+// executeTask runs the task in the background, forwarding incremental output
+// chunks via progressFn and buffering the final result for the next heartbeat.
+func (r *Runner) executeTask(ctx context.Context, task *agentv1.AgentTask) {
+	progressFn := func(chunk string) {
+		r.taskProgressMu.Lock()
+		r.taskProgress = append(r.taskProgress, &agentv1.AgentTaskProgress{
+			TaskId:      task.TaskId,
+			OutputChunk: chunk,
+		})
+		r.taskProgressMu.Unlock()
+		// Nudge the send loop so progress is reported promptly.
+		select {
+		case r.resultsReady <- struct{}{}:
+		default:
+		}
+	}
+
+	result := tasks.Dispatch(ctx, task, progressFn)
+
+	r.taskResultsMu.Lock()
+	r.taskResults = append(r.taskResults, result)
+	r.taskResultsMu.Unlock()
+
+	select {
+	case r.resultsReady <- struct{}{}:
+	default:
+	}
+}
+
+// drainTaskProgress atomically returns and clears all buffered task progress chunks.
+func (r *Runner) drainTaskProgress() []*agentv1.AgentTaskProgress {
+	r.taskProgressMu.Lock()
+	defer r.taskProgressMu.Unlock()
+	p := r.taskProgress
+	r.taskProgress = nil
+	return p
+}
+
+// drainTaskResults atomically returns and clears all buffered task results.
+func (r *Runner) drainTaskResults() []*agentv1.AgentTaskResult {
+	r.taskResultsMu.Lock()
+	defer r.taskResultsMu.Unlock()
+	results := r.taskResults
+	r.taskResults = nil
+	return results
+}
+
 func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) error {
 	cpu, mem, disk, uptime, osVersion, disks, nets := r.collectMetrics()
 
@@ -315,6 +386,8 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 		NetworkInterfaces: nets,
 		CheckResults:      r.executor.DrainResults(),
 		QueryResults:      r.drainQueryResults(),
+		TaskProgress:      r.drainTaskProgress(),
+		TaskResults:       r.drainTaskResults(),
 	}
 
 	if err := stream.Send(req); err != nil {

@@ -64,6 +64,7 @@ import { ChecksTab } from './checks-tab'
 import { AlertsTab } from './alerts-tab'
 import { SettingsTab } from './settings-tab'
 import { LocalUsersTab } from './local-users-tab'
+import { TasksTab } from './tasks-tab'
 import { getAlertInstances } from '@/lib/actions/alerts'
 import { getHostCollectionSettings } from '@/lib/actions/host-settings'
 import { getServiceAccounts } from '@/lib/actions/service-accounts'
@@ -71,7 +72,7 @@ import { listGroupsForHost, listGroups, addHostToGroup, removeHostFromGroup } fr
 import type { HostGroup } from '@/lib/db/schema'
 import type { HostGroupWithCount } from '@/lib/actions/host-groups'
 
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'tasks'
 
 interface Props {
   host: HostWithAgent
@@ -453,6 +454,9 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
         </TabButton>
         <TabButton active={activeTab === 'groups'} onClick={() => setActiveTab('groups')}>
           Groups
+        </TabButton>
+        <TabButton active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')}>
+          Tasks
         </TabButton>
       </div>
 
@@ -1015,6 +1019,11 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Tasks Tab */}
+      {activeTab === 'tasks' && (
+        <TasksTab orgId={orgId} host={host} userId={currentUserId} />
       )}
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

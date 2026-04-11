@@ -14,16 +14,26 @@ import {
   AlertTriangle,
   Clock,
   Search,
+  Shield,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  RotateCcw,
+  SkipForward,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import {
   AlertDialog,
@@ -49,12 +59,29 @@ import {
   removeHostFromGroup,
 } from '@/lib/actions/host-groups'
 import { listHosts } from '@/lib/actions/agents'
+import { triggerGroupPatchRun, listTaskRunsForGroup } from '@/lib/actions/task-runs'
 import type { HostGroupWithMembers } from '@/lib/actions/host-groups'
 import type { HostWithAgent } from '@/lib/actions/agents'
-import type { Host } from '@/lib/db/schema'
+import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
+import type { Host, PatchTaskConfig } from '@/lib/db/schema'
+
+const PARALLEL_OPTIONS = [
+  { value: 1, label: '1 (sequential)' },
+  { value: 2, label: '2' },
+  { value: 5, label: '5' },
+  { value: 10, label: '10' },
+  { value: 0, label: 'Unlimited' },
+]
+
+const TERMINAL_RUN_STATUSES = new Set(['completed', 'failed'])
+
+function isRunActive(status: string) {
+  return !TERMINAL_RUN_STATUSES.has(status)
+}
 
 interface Props {
   orgId: string
+  userId: string
   initialGroup: HostGroupWithMembers
   initialAllHosts: HostWithAgent[]
 }
@@ -92,11 +119,50 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Props) {
+function RunStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'completed':
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">
+          <CheckCircle2 className="size-3 mr-1" />
+          Completed
+        </Badge>
+      )
+    case 'failed':
+      return (
+        <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100">
+          <XCircle className="size-3 mr-1" />
+          Failed
+        </Badge>
+      )
+    case 'running':
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
+          <Loader2 className="size-3 mr-1 animate-spin" />
+          Running
+        </Badge>
+      )
+    default:
+      return (
+        <Badge className="bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100">
+          <Clock className="size-3 mr-1" />
+          Pending
+        </Badge>
+      )
+  }
+}
+
+export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts }: Props) {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Host | null>(null)
+
+  // Patch dialog state
+  const [patchOpen, setPatchOpen] = useState(false)
+  const [patchMode, setPatchMode] = useState<'all' | 'security'>('all')
+  const [maxParallel, setMaxParallel] = useState(1)
 
   const { data: group } = useQuery({
     queryKey: ['host-group', orgId, initialGroup.id],
@@ -110,6 +176,15 @@ export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Prop
     queryFn: () => listHosts(orgId),
     initialData: initialAllHosts,
     enabled: addOpen,
+  })
+
+  const { data: taskRuns = [] } = useQuery({
+    queryKey: ['task-runs-group', orgId, initialGroup.id],
+    queryFn: () => listTaskRunsForGroup(orgId, initialGroup.id),
+    refetchInterval: (query) => {
+      const runs = query.state.data ?? []
+      return runs.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
+    },
   })
 
   const { mutate: doAdd, isPending: isAdding } = useMutation({
@@ -129,9 +204,21 @@ export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Prop
     },
   })
 
+  const { mutate: doPatchGroup, isPending: isPatching } = useMutation({
+    mutationFn: () =>
+      triggerGroupPatchRun(orgId, userId, initialGroup.id, patchMode, maxParallel),
+    onSuccess: (result) => {
+      setPatchOpen(false)
+      if ('taskRunId' in result) {
+        router.push(`/tasks/${result.taskRunId}`)
+      }
+    },
+  })
+
   if (!group) return null
 
   const memberIds = new Set(group.members.map((h) => h.id))
+  const nonLinuxCount = group.members.filter((h) => h.os?.toLowerCase() !== 'linux').length
 
   const filteredSearch = allHosts.filter((h) => {
     if (memberIds.has(h.id)) return false
@@ -162,10 +249,16 @@ export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Prop
               <p className="text-sm text-muted-foreground mt-1">{group.description}</p>
             )}
           </div>
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="size-4 mr-1" />
-            Add Hosts
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setPatchOpen(true)}>
+              <Shield className="size-4 mr-1" />
+              Patch Group
+            </Button>
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="size-4 mr-1" />
+              Add Hosts
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -236,6 +329,108 @@ export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Prop
         </div>
       )}
 
+      {/* Task History */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Task History</h2>
+        {taskRuns.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <Shield className="size-7 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground">No task runs yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Use &quot;Patch Group&quot; to start the first task run on this group.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Mode</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Hosts</TableHead>
+                  <TableHead>Reboot</TableHead>
+                  <TableHead>Started</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {taskRuns.map((run) => {
+                  const config = run.config as PatchTaskConfig
+                  const successCount = run.hosts.filter((h) => h.status === 'success').length
+                  const failedCount = run.hosts.filter((h) => h.status === 'failed').length
+                  const skippedCount = run.hosts.filter((h) => h.status === 'skipped').length
+                  const runningCount = run.hosts.filter((h) => h.status === 'running').length
+                  const pendingCount = run.hosts.filter((h) => h.status === 'pending').length
+                  const rebootCount = run.hosts.filter(
+                    (h) => (h.result as { reboot_required?: boolean } | null)?.reboot_required,
+                  ).length
+
+                  return (
+                    <TableRow key={run.id}>
+                      <TableCell className="font-medium capitalize">
+                        {run.taskType === 'patch' ? 'Patch' : run.taskType}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">
+                        {config.mode === 'security' ? 'Security only' : 'All updates'}
+                      </TableCell>
+                      <TableCell>
+                        <RunStatusBadge status={run.status} />
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div className="space-y-0.5">
+                          {successCount > 0 && (
+                            <div className="text-green-700">{successCount} succeeded</div>
+                          )}
+                          {failedCount > 0 && (
+                            <div className="text-red-600">{failedCount} failed</div>
+                          )}
+                          {runningCount > 0 && (
+                            <div className="text-blue-600">{runningCount} running</div>
+                          )}
+                          {pendingCount > 0 && (
+                            <div className="text-muted-foreground">{pendingCount} pending</div>
+                          )}
+                          {skippedCount > 0 && (
+                            <div className="text-muted-foreground flex items-center gap-0.5">
+                              <SkipForward className="size-3" />
+                              {skippedCount} skipped
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {rebootCount > 0 ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs">
+                            <RotateCcw className="size-3 mr-1" />
+                            {rebootCount} host{rebootCount !== 1 ? 's' : ''}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {run.startedAt
+                          ? formatDistanceToNow(new Date(run.startedAt), { addSuffix: true })
+                          : formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/tasks/${run.id}`}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
+                            {isRunActive(run.status) ? 'View live' : 'View'}
+                            <ExternalLink className="size-3" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
       {/* Add Hosts Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-lg">
@@ -286,6 +481,88 @@ export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Prop
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patch Group Dialog */}
+      <Dialog open={patchOpen} onOpenChange={setPatchOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Patch Group &quot;{group.name}&quot;</DialogTitle>
+            <DialogDescription>
+              Choose patch settings. The platform will send patch commands to each Linux host in
+              this group.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Patch mode */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Patch mode</Label>
+              {(
+                [
+                  { value: 'all', label: 'All updates', desc: 'Full system upgrade' },
+                  {
+                    value: 'security',
+                    label: 'Security updates only',
+                    desc: 'Security-flagged packages only',
+                  },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setPatchMode(opt.value)}
+                  className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                    patchMode === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Max parallel */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Max parallel hosts</Label>
+              <div className="flex flex-wrap gap-2">
+                {PARALLEL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setMaxParallel(opt.value)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                      maxParallel === opt.value
+                        ? 'border-primary bg-primary/5 text-foreground font-medium'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Non-Linux warning */}
+            {nonLinuxCount > 0 && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+                <AlertTriangle className="size-3.5 inline mr-1" />
+                {nonLinuxCount} non-Linux host{nonLinuxCount !== 1 ? 's' : ''} in this group will
+                be skipped.
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPatchOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => doPatchGroup()} disabled={isPatching}>
+              {isPatching && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Start Patch Run
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

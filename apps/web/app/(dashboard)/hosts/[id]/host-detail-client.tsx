@@ -16,6 +16,7 @@ import {
   Activity,
   Trash2,
   Loader2,
+  Layers,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -66,8 +67,11 @@ import { LocalUsersTab } from './local-users-tab'
 import { getAlertInstances } from '@/lib/actions/alerts'
 import { getHostCollectionSettings } from '@/lib/actions/host-settings'
 import { getServiceAccounts } from '@/lib/actions/service-accounts'
+import { listGroupsForHost, listGroups, addHostToGroup, removeHostFromGroup } from '@/lib/actions/host-groups'
+import type { HostGroup } from '@/lib/db/schema'
+import type { HostGroupWithCount } from '@/lib/actions/host-groups'
 
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups'
 
 interface Props {
   host: HostWithAgent
@@ -193,6 +197,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState<MetricsRange>('24h')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [addGroupOpen, setAddGroupOpen] = useState(false)
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -276,6 +281,35 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
     enabled: collectionSettings?.localUsers === true,
   })
   const localUserCount = localUsers.length > 0 ? localUsers.length : 0
+
+  const { data: hostGroupsList = [] } = useQuery<HostGroup[]>({
+    queryKey: ['host-groups-for-host', orgId, initialHost.id],
+    queryFn: () => listGroupsForHost(orgId, initialHost.id),
+    enabled: activeTab === 'groups',
+  })
+
+  const { data: allGroups = [] } = useQuery<HostGroupWithCount[]>({
+    queryKey: ['host-groups', orgId],
+    queryFn: () => listGroups(orgId),
+    enabled: activeTab === 'groups',
+  })
+
+  const { mutate: doAddToGroup, isPending: isAddingToGroup } = useMutation({
+    mutationFn: (groupId: string) => addHostToGroup(orgId, groupId, initialHost.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', orgId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      setAddGroupOpen(false)
+    },
+  })
+
+  const { mutate: doRemoveFromGroup, isPending: isRemovingFromGroup } = useMutation({
+    mutationFn: (groupId: string) => removeHostFromGroup(orgId, groupId, initialHost.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', orgId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+    },
+  })
 
   const tickFormat = metricsRange === '7d' ? 'MMM d HH:mm' : 'HH:mm'
 
@@ -416,6 +450,9 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
         )}
         <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>
           Settings
+        </TabButton>
+        <TabButton active={activeTab === 'groups'} onClick={() => setActiveTab('groups')}>
+          Groups
         </TabButton>
       </div>
 
@@ -809,6 +846,105 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <SettingsTab orgId={orgId} hostId={initialHost.id} />
+      )}
+
+      {/* Groups Tab */}
+      {activeTab === 'groups' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Groups this host belongs to.
+            </p>
+            <Button size="sm" onClick={() => setAddGroupOpen(true)} disabled={allGroups.length === hostGroupsList.length}>
+              <Layers className="size-4 mr-1" />
+              Add to Group
+            </Button>
+          </div>
+          {hostGroupsList.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-12 text-center">
+              <Layers className="size-8 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm font-medium text-foreground">Not in any groups</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Add this host to a group to target it in batch operations.
+              </p>
+              <Button className="mt-4" size="sm" onClick={() => setAddGroupOpen(true)}>
+                <Layers className="size-4 mr-1" />
+                Add to Group
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-lg border divide-y">
+              {hostGroupsList.map((group) => (
+                <div key={group.id} className="flex items-center gap-3 px-4 py-3">
+                  <Layers className="size-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/hosts/groups/${group.id}`}
+                      className="font-medium text-foreground hover:underline"
+                    >
+                      {group.name}
+                    </Link>
+                    {group.description && (
+                      <p className="text-xs text-muted-foreground truncate">{group.description}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-destructive hover:text-destructive shrink-0"
+                    disabled={isRemovingFromGroup}
+                    onClick={() => doRemoveFromGroup(group.id)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add to Group Dialog */}
+          <AlertDialog open={addGroupOpen} onOpenChange={setAddGroupOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Add to Group</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Select a group to add this host to.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="divide-y rounded-lg border max-h-64 overflow-y-auto">
+                {allGroups.filter((g) => !hostGroupsList.some((hg) => hg.id === g.id)).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    This host is already in all available groups.
+                  </p>
+                ) : (
+                  allGroups
+                    .filter((g) => !hostGroupsList.some((hg) => hg.id === g.id))
+                    .map((group) => (
+                      <div key={group.id} className="flex items-center justify-between px-3 py-2.5">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{group.name}</p>
+                          {group.description && (
+                            <p className="text-xs text-muted-foreground">{group.description}</p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isAddingToGroup}
+                          onClick={() => doAddToGroup(group.id)}
+                        >
+                          {isAddingToGroup ? <Loader2 className="size-3.5 animate-spin" /> : 'Add'}
+                        </Button>
+                      </div>
+                    ))
+                )}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Close</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       )}
 
       {/* Network Tab */}

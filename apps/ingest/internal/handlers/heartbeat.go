@@ -133,6 +133,13 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 	queryPollTicker := time.NewTicker(2 * time.Second)
 	defer queryPollTicker.Stop()
 
+	// Re-validate the agent exists every 30s. If it was deleted (e.g. the host
+	// was removed in the UI), close the stream with NotFound so the agent
+	// detects the rejection and re-registers cleanly rather than heartbeating
+	// into the void for the lifetime of the stream.
+	agentCheckTicker := time.NewTicker(30 * time.Second)
+	defer agentCheckTicker.Stop()
+
 loop:
 	for {
 		select {
@@ -158,6 +165,15 @@ loop:
 			}
 			if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, hostID, agent.Hostname, req); err != nil {
 				return err
+			}
+
+		case <-agentCheckTicker.C:
+			if _, err := queries.GetAgentByID(ctx, h.pool, agentID); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					slog.Info("agent deleted, closing stream for re-registration", "agent_id", agentID)
+					return status.Error(codes.NotFound, "agent not found")
+				}
+				slog.Warn("re-validating agent", "agent_id", agentID, "err", err)
 			}
 
 		case <-queryPollTicker.C:

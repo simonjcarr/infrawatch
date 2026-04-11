@@ -6,14 +6,187 @@
 ---
 
 ## Current Phase
-**Phase 3 — Certificate Management (bug fixes)**
+**Phase 5 — Tooling (in progress)**
 
 ## Current Status
-🟢 Phase 3 complete and stable — Certificate lifecycle management fully built and production bugs resolved. Agent performs TLS certificate checks via a new `certificate` check type, reports a structured JSON `CertificateReport` payload. Ingest persists certificates to the DB with upsert semantics, renewal detection, and event history. Web UI provides an inventory page at `/certificates` with summary cards and sortable/filterable table, plus a detail page showing SANs, chain, fingerprint, and event timeline. Alert system extended with `cert_expiry` condition type; per-org evaluator fires/resolves on every cert scan and a background sweeper runs every 15 minutes. Production Docker deployment bugs fixed: server action mismatches on certificate pages resolved via proper API routes; certificate chain date rendering crash fixed.
+🟢 Phase 4 complete — Service accounts, SSH key discovery, LDAP directory integration, per-host collection settings, and agent lifecycle management (install/uninstall/auto re-register) all built and stable. Phase 5 started: general-purpose agent task framework implemented with Linux host patching as the first task type, real-time streaming output, parallelism control, and task cancellation. UI polish: dark mode with per-user preference saved to DB and applied server-side on every page load.
 
 ---
 
 ## What Has Been Built
+
+### Session 27 — Dark mode with per-user theme preference
+
+**User-persisted theme** (`apps/web/lib/db/schema/auth.ts`, `apps/web/lib/actions/profile.ts`)
+- New `theme` column (`'light' | 'dark' | 'system'`, default `'system'`) on the `users` table — migration `0023_high_loki.sql`
+- `updateTheme(userId, theme)` server action: validates with Zod, writes to DB, and sets a 1-year `theme` cookie (path `/`, sameSite `lax`, not httpOnly) so subsequent SSR reads work without an extra DB query
+
+**Root layout: SSR dark class + FOUC prevention** (`apps/web/app/layout.tsx`)
+- Root layout is now `async`; reads the `theme` cookie server-side via `cookies()` and adds the `dark` class to `<html>` when `theme === 'dark'`
+- Injects a tiny inline `<script>` in `<head>` that runs before React hydrates: reads the cookie, and for `system` or missing values uses `window.matchMedia('(prefers-color-scheme: dark)')` — prevents any flash of wrong theme for returning users and handles OS dark preference on first load
+
+**Profile page Appearance card** (`apps/web/app/(dashboard)/profile/profile-client.tsx`)
+- New "Appearance" card below the 2FA section with three buttons: Light / Dark / System (Sun / Moon / Monitor icons)
+- Selected option highlighted with `border-primary bg-primary/10`; on click: applies class to `document.documentElement` immediately (no reload), then saves to DB and sets cookie via `updateTheme` mutation in the background
+- Current theme initialised from `user.theme` so the correct button is pre-selected
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- Migration `0023_high_loki.sql` generated and applied ✅
+
+---
+
+### Session 26 — General agent task framework with Linux host patching
+
+**Database schema** (`apps/web/lib/db/schema/tasks.ts`, migrations `0021`–`0022`)
+- `task_runs` table: type, status, config jsonb, `max_parallel`, org/created-by FKs, started/completed timestamps
+- `task_run_hosts` table: per-host execution state (pending → running → completed/failed/cancelled/skipped), `raw_output` text accumulator, exit_code, reboot_required, packages_updated jsonb
+- `max_parallel` enforced at query level — SQL counts active rows before dispatching so concurrent ingest instances cannot over-dispatch
+
+**Protocol additions** (`proto/agent/v1/heartbeat.proto`)
+- `AgentTask` (server→agent): task_run_host_id, task_type, config_json
+- `AgentTaskProgress` (agent→server): incremental stdout/stderr chunk per heartbeat cycle
+- `AgentTaskResult` (agent→server): final status, exit code, reboot flag, packages list
+- `HeartbeatResponse` gains `cancel_task_ids` (field 10) for agent-side cancellation signals
+
+**Ingest: task dispatch and output streaming** (`apps/ingest/internal/handlers/heartbeat.go`)
+- 2-second ticker polls `GetPendingTasksForHost` respecting `max_parallel`; pushes `AgentTask` messages in each `HeartbeatResponse`
+- Appends output chunks with `raw_output || chunk` on every `AgentTaskProgress` message
+- Marks `task_run_hosts` terminal on `AgentTaskResult`; closes parent `task_runs` when all hosts reach a terminal state
+- `GetCancellingTasksForHost` pushes `cancel_task_ids` so the agent can kill in-flight processes
+- `TimeoutStuckTaskRunHosts` marks `running` hosts as failed after 60 minutes; fires every 5 minutes from the heartbeat handler
+
+**Agent: task runner** (`agent/internal/tasks/`)
+- `runner.go` — registry pattern: `RegisterHandler(taskType, HandlerFunc)`; routes by `task_type`, stores per-task `context.CancelFunc` in a `sync.Map`; cancellation via `handleResponse` on `cancel_task_ids` arrival
+- `patch.go` — first registered handler; detects package manager (`apt` / `dnf` / `yum` / `zypper`), supports `all` and `security` modes, streams real output via `io.Pipe`, checks `/var/run/reboot-required` and `needs-restarting`, parses updated package list from output
+- 45-minute context timeout per task; `RunPatch` returns `"cancelled by user"` or `"task timed out"` for distinct error messages
+- `io.Pipe` deadlock fixed: scanner goroutine reads from the pipe while the command writes; `pw.Close()` deferred after `cmd.Wait()`
+
+**Web: task monitoring UI** (`apps/web/app/(dashboard)/tasks/[id]/`, `apps/web/app/(dashboard)/hosts/[id]/tasks-tab.tsx`)
+- `/tasks/[id]` monitor page: host list (left column) with pending/running/done status icons, scrolling terminal-style output panel (right), live elapsed timer in panel header, auto-scroll while task is running, 3-second poll stops when task completes
+- Amber warning after 5 minutes with no output, noting the 60-minute auto-fail
+- Host detail "Tasks" tab: "Run Patch" button (Linux hosts only), patch mode dialog (All / Security), task history table with links to monitor page
+- Group detail "Patch Group" button: mode selection + parallel host selector (1 / 2 / 5 / 10 / Unlimited), non-Linux skip warning, task history
+- "Cancel" button on monitor page sets host to `cancelling` state; ingest sends `cancel_task_ids` to agent on next heartbeat
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./agent/... ./apps/ingest/...` — zero errors ✅
+
+---
+
+### Session 25 — Host groups with collapsible sidebar navigation
+
+**Database schema** (`apps/web/lib/db/schema/host-groups.ts`, migration `0021_chilly_tomas.sql`)
+- `host_groups` table: name, description, org FK, standard timestamps
+- `host_group_members` table: group FK, host FK, agent FK, org FK — join table with audit timestamps
+
+**Server actions** (`apps/web/lib/actions/host-groups.ts`)
+- `createHostGroup`, `updateHostGroup`, `deleteHostGroup` — full CRUD, Zod-validated, org-scoped
+- `getHostGroups(orgId)` — returns groups with member count
+- `getHostGroup(orgId, groupId)` — returns group + full member list
+- `addHostToGroup`, `removeHostFromGroup` — membership management
+
+**Groups UI** (`apps/web/app/(dashboard)/hosts/groups/`)
+- `/hosts/groups` list page: create dialog, edit inline, delete with confirmation, member count badge
+- `/hosts/groups/[id]` detail page: group metadata header, member list table with remove button, "Add Host" dialog with search/filter over org hosts not already in the group
+- Host detail page "Groups" tab: shows current group memberships with inline add and remove
+
+**Sidebar restructure** (`apps/web/components/shared/sidebar.tsx`)
+- Collapsible parent/child navigation: Hosts → All Hosts + Groups; Settings → Organisation + Agent Enrolment + Alert Defaults + LDAP + System Health
+- `CollapsibleSidebarItem` component with chevron indicator; auto-expands when a child route is active
+- Added shadcn `textarea` and `form` UI components
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- Migration `0021_chilly_tomas.sql` generated and applied ✅
+
+---
+
+### Session 24 — LDAP UI polish and enrollment token improvements
+
+**LDAP TLS certificate preview** (`apps/web/app/(dashboard)/settings/ldap/`)
+- Fixed TLS certificate textarea overflowing the modal width across three iterations: added `break-all` word-wrap, then capped at 5 visible lines with vertical scroll (`max-h-20 overflow-y-auto`)
+
+**Agent enrollment token list** (`apps/web/app/(dashboard)/settings/agents/`)
+- Added copy-to-clipboard actions for token value and install command on each row
+- Replaced dual copy icons with a single "View" button opening a modal showing the full token and ready-to-run `curl` install command in a code block
+
+**Development tooling** (`start.sh`)
+- Replaced `dev.sh` with a unified `start.sh` supporting both production Docker mode and local development
+- Single entry point reduces onboarding friction
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 23 — Agent lifecycle: uninstall, auto re-register, and stream reliability
+
+**Agent -uninstall flag** (`agent/internal/install/uninstall.go`, `agent/cmd/agent/main.go`)
+- New `-uninstall` CLI flag: stops the running service, removes the binary, service files, config, and data directories
+- Cross-platform: systemd (Linux), launchd (macOS), Windows SCM
+
+**Agent auto re-registration after host deletion** (`agent/internal/heartbeat/heartbeat.go`, `apps/web/lib/actions/hosts.ts`)
+- Agent detects gRPC `NotFound` / `PermissionDenied` / `Unauthenticated` on heartbeat stream and returns `ErrAgentDeregistered` rather than retrying indefinitely
+- `runAgent` outer loop: on `ErrAgentDeregistered`, clears `agent_state.json` and re-registers with the same keypair — host reappears in the UI automatically without reinstall
+- `deleteHost` server action now also deletes `agent_status_history` and the `agent` record so the running agent is rejected on its next heartbeat
+
+**Ingest heartbeat stream close** (`apps/ingest/internal/handlers/heartbeat.go`)
+- Heartbeat streaming goroutine now closes within 30 seconds when the associated agent is deleted, preventing orphaned open streams from keeping the host falsely "online"
+
+**Build state**
+- `go build ./agent/... ./apps/ingest/...` — zero errors ✅
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 22 — LDAP post-login flows and migration reliability
+
+**LDAP post-login flows** (`apps/web/app/(setup)/setup-email/`, `apps/web/app/(setup)/pending-approval/`)
+- LDAP users provisioned with placeholder `@ldap.local` email are redirected to `/setup-email` to capture a real address before accessing the dashboard
+- New LDAP users are provisioned with `role: 'pending'` and redirected to `/pending-approval`; an admin assigns a role from the Team page to grant access
+- Session cookie signing fixed to match Better Auth's HMAC format; LDAP search base resolution improved
+
+**Migration timestamp validation** (`apps/web/scripts/validate-migrations.js`, `package.json`)
+- `db:generate` script now runs `validate-migrations.js` after `drizzle-kit generate`: verifies all journal entries have strictly increasing `when` timestamps and fails with a clear error if not
+- Prevents the silent "already applied" skip that burned us in Session 13
+- ESLint config updated to ignore the validator script
+
+**LDAP edit dialog with TLS certificate upload** (`apps/web/app/(dashboard)/settings/ldap/`)
+- Pencil icon on each LDAP config row opens a pre-filled edit dialog
+- TLS certificate field accepts paste or file upload; stored in the `ldap_configurations.tls_certificate` column
+- `updateLdapConfiguration` server action validates and persists changes
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 21 — Phase 4: LDAP directory integration and service account restructure
+
+**Service account / directory account split** (`apps/web/app/(dashboard)/service-accounts/`, `apps/web/app/(dashboard)/hosts/[id]/`)
+- Local OS users moved from top-level service accounts page to per-host "Users" and "Settings" tabs; these are host-scoped, not org-level inventory
+- New "Service Accounts" top-level page targets network/domain accounts sourced from LDAP/AD
+- Per-host "Settings" tab: collection toggles (CPU, Memory, Disk on by default; Local Users opt-in); org-level defaults applied to newly enrolled hosts
+
+**LDAP / Active Directory integration** (`apps/web/lib/ldap/client.ts`, `apps/web/app/api/auth/ldap/route.ts`, `apps/web/app/(dashboard)/settings/ldap/`)
+- `ldap_configurations` table: host, port, bind DN/password (AES-256-GCM encrypted at rest using `LDAP_ENCRYPTION_KEY`), base DN, user/group filters, TLS mode — migration `0016`
+- `domain_accounts` table: synced directory accounts with last-seen, locked, password-age, group memberships — migration `0016`
+- LDAP client (`ldapts`): `testConnection`, `syncUsers`, `authenticateUser` functions
+- `POST /api/auth/ldap` route: authenticates domain credentials, upserts Better Auth user + session; dual-mode login form (email/password tab + domain username/password tab)
+- Settings → LDAP page: create config, test connection, trigger sync, view synced user count
+
+**Agent check delivery resilience** (`agent/internal/heartbeat/heartbeat.go`, `agent/internal/checks/executor.go`)
+- `hostID` resolution failures (pre-approval agent) no longer crash the stream; check results are buffered and retried on the next heartbeat
+- Check executor survives stream reconnects: goroutines are kept alive; pending results accumulate and drain on the next successful stream
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./agent/... ./apps/ingest/...` — zero errors ✅
+- Migrations `0014`–`0017` generated and applied ✅
+
+---
 
 ### Session 18 — Overview dashboard and System Health separation
 

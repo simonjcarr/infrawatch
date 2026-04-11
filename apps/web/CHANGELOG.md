@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.17.1...web/v0.18.0) (2026-04-11)
+
+
+### Features
+
+* **tasks:** add task cancellation with agent-side process kill and UI ([017e9e0](https://github.com/simonjcarr/infrawatch/commit/017e9e078230d99b998657591eb4af00d32a0a75))
+* **tasks:** add task cancellation with agent-side process kill and UI ([81315a1](https://github.com/simonjcarr/infrawatch/commit/81315a1bd00e04871928ad28a171c0abef30578b))
+
 ## [0.17.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.17.0...web/v0.17.1) (2026-04-11)
 
 

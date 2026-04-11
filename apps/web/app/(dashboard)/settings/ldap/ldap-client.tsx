@@ -84,7 +84,7 @@ function CertificateUpload({
     return (
       <div className="space-y-1.5">
         <Label>TLS Certificate (CA)</Label>
-        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre text-muted-foreground relative">
+        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre overflow-x-auto w-full text-muted-foreground relative">
           {preview}
           <Button
             type="button"

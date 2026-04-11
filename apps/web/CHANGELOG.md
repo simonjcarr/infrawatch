@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.15.0...web/v0.16.0) (2026-04-11)
+
+
+### Features
+
+* **hosts:** add host groups with strategic collapsible nav ([#105](https://github.com/simonjcarr/infrawatch/issues/105)) ([d75cf5e](https://github.com/simonjcarr/infrawatch/commit/d75cf5ece2f2797a4897abcfd1aeb37e2ab93948))
+* **hosts:** host groups + strategic collapsible nav ([#105](https://github.com/simonjcarr/infrawatch/issues/105)) ([5883273](https://github.com/simonjcarr/infrawatch/commit/58832734061a61c5cb63425abc43bdfbdb06b899))
+
 ## [0.15.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.14.3...web/v0.15.0) (2026-04-11)
 
 

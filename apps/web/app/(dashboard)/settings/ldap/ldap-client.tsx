@@ -77,15 +77,11 @@ function CertificateUpload({
   }
 
   if (value) {
-    const lines = value.split('\n')
-    const preview = lines.length > 3
-      ? `${lines[0]}\n...(${lines.length - 2} lines)...\n${lines[lines.length - 1]}`
-      : value
     return (
       <div className="space-y-1.5">
         <Label>TLS Certificate (CA)</Label>
-        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all text-muted-foreground relative">
-          {preview}
+        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all overflow-y-auto max-h-24 text-muted-foreground relative">
+          {value}
           <Button
             type="button"
             variant="ghost"

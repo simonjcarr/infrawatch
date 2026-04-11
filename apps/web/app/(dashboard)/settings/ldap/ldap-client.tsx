@@ -2,14 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
 import {
   Plus,
   FolderTree,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  RefreshCw,
   Trash2,
   Plug,
   Pencil,
@@ -37,37 +32,8 @@ import {
   updateLdapConfiguration,
   deleteLdapConfiguration,
   testLdapConnection,
-  syncLdapAccounts,
 } from '@/lib/actions/ldap'
-import type { LdapConfiguration, LdapSyncStatus } from '@/lib/db/schema'
-
-function SyncStatusBadge({ status }: { status: LdapSyncStatus | null }) {
-  switch (status) {
-    case 'success':
-      return (
-        <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">
-          <CheckCircle2 className="size-3 mr-1" />
-          Success
-        </Badge>
-      )
-    case 'error':
-      return (
-        <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100">
-          <XCircle className="size-3 mr-1" />
-          Error
-        </Badge>
-      )
-    case 'running':
-      return (
-        <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
-          <Loader2 className="size-3 mr-1 animate-spin" />
-          Running
-        </Badge>
-      )
-    default:
-      return <Badge variant="outline">Never synced</Badge>
-  }
-}
+import type { LdapConfiguration } from '@/lib/db/schema'
 
 const EMPTY_FORM = {
   name: '',
@@ -87,7 +53,6 @@ const EMPTY_FORM = {
   emailAttribute: 'mail',
   displayNameAttribute: 'cn',
   allowLogin: false,
-  syncIntervalMinutes: 60,
 }
 
 function CertificateUpload({
@@ -171,7 +136,6 @@ export function LdapSettingsClient({
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM })
   const [editError, setEditError] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success?: boolean; error?: string }>>({})
-  const [syncResults, setSyncResults] = useState<Record<string, { success?: boolean; count?: number; error?: string }>>({})
 
   const { data: configs = initialConfigs } = useQuery({
     queryKey: ['ldap-configs', orgId],
@@ -214,7 +178,6 @@ export function LdapSettingsClient({
       if (editForm.emailAttribute !== editingConfig.emailAttribute) updates.emailAttribute = editForm.emailAttribute
       if (editForm.displayNameAttribute !== editingConfig.displayNameAttribute) updates.displayNameAttribute = editForm.displayNameAttribute
       if (editForm.allowLogin !== editingConfig.allowLogin) updates.allowLogin = editForm.allowLogin
-      if (editForm.syncIntervalMinutes !== editingConfig.syncIntervalMinutes) updates.syncIntervalMinutes = editForm.syncIntervalMinutes
       return updateLdapConfiguration(orgId, editingConfig.id, updates)
     },
     onSuccess: (result) => {
@@ -247,7 +210,6 @@ export function LdapSettingsClient({
       emailAttribute: config.emailAttribute,
       displayNameAttribute: config.displayNameAttribute,
       allowLogin: config.allowLogin,
-      syncIntervalMinutes: config.syncIntervalMinutes ?? 60,
     })
     setEditError(null)
     setEditingConfig(config)
@@ -280,25 +242,13 @@ export function LdapSettingsClient({
     }
   }
 
-  async function handleSync(configId: string) {
-    setSyncResults((prev) => ({ ...prev, [configId]: {} }))
-    const result = await syncLdapAccounts(orgId, configId)
-    if ('error' in result) {
-      setSyncResults((prev) => ({ ...prev, [configId]: { error: result.error } }))
-    } else {
-      setSyncResults((prev) => ({ ...prev, [configId]: { success: true, count: result.count } }))
-      queryClient.invalidateQueries({ queryKey: ['ldap-configs'] })
-      queryClient.invalidateQueries({ queryKey: ['domain-accounts'] })
-    }
-  }
-
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">LDAP / Directory</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure LDAP or Active Directory connections for account sync and login.
+            Configure LDAP or Active Directory connections for domain login.
           </p>
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -432,7 +382,7 @@ export function LdapSettingsClient({
             <FolderTree className="size-12 mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-muted-foreground font-medium">No LDAP configurations</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Add an LDAP or Active Directory configuration to sync directory accounts and enable domain login.
+              Add an LDAP or Active Directory configuration to enable domain login.
             </p>
           </CardContent>
         </Card>
@@ -478,24 +428,6 @@ export function LdapSettingsClient({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Sync Status:</span>
-                    <SyncStatusBadge status={config.lastSyncStatus as LdapSyncStatus | null} />
-                  </div>
-                  {config.lastSyncAt && (
-                    <span className="text-muted-foreground text-xs">
-                      {formatDistanceToNow(new Date(config.lastSyncAt), { addSuffix: true })}
-                    </span>
-                  )}
-                </div>
-
-                {config.lastSyncError && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
-                    {config.lastSyncError}
-                  </p>
-                )}
-
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm">
                     <Switch
@@ -506,22 +438,13 @@ export function LdapSettingsClient({
                   </label>
                 </div>
 
-                {/* Test/Sync results */}
+                {/* Test result */}
                 {(() => {
                   const tr = testResults[config.id]
                   if (!tr) return null
                   return (
                     <div className={`text-sm rounded-md px-3 py-2 ${tr.success ? 'bg-green-50 text-green-800 border border-green-200' : tr.error ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-muted text-muted-foreground'}`}>
                       {tr.success ? 'Connection successful' : tr.error ?? 'Testing...'}
-                    </div>
-                  )
-                })()}
-                {(() => {
-                  const sr = syncResults[config.id]
-                  if (!sr) return null
-                  return (
-                    <div className={`text-sm rounded-md px-3 py-2 ${sr.success ? 'bg-green-50 text-green-800 border border-green-200' : sr.error ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-muted text-muted-foreground'}`}>
-                      {sr.success ? `Synced ${sr.count} accounts` : sr.error ?? 'Syncing...'}
                     </div>
                   )
                 })()}
@@ -536,15 +459,6 @@ export function LdapSettingsClient({
                   >
                     <Plug className="size-4 mr-1.5" />
                     Test Connection
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSync(config.id)}
-                    disabled={!config.enabled}
-                  >
-                    <RefreshCw className="size-4 mr-1.5" />
-                    Sync Now
                   </Button>
                   <Button
                     variant="outline"
@@ -707,16 +621,6 @@ export function LdapSettingsClient({
                 value={editForm.groupSearchFilter}
                 onChange={(e) => setEditForm({ ...editForm, groupSearchFilter: e.target.value })}
                 placeholder="(objectClass=groupOfNames)"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Sync Interval (minutes)</Label>
-              <Input
-                type="number"
-                value={editForm.syncIntervalMinutes}
-                onChange={(e) => setEditForm({ ...editForm, syncIntervalMinutes: Number(e.target.value) })}
-                min={5}
-                max={1440}
               />
             </div>
             <div className="flex items-center justify-between">

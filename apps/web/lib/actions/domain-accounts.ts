@@ -2,17 +2,16 @@
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { domainAccounts } from '@/lib/db/schema'
+import { domainAccounts, ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
-import type { DomainAccount, DomainAccountSource, DomainAccountStatus } from '@/lib/db/schema'
+import type { DomainAccount, DomainAccountStatus } from '@/lib/db/schema'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type DomainAccountListFilters = {
-  source?: DomainAccountSource
   status?: DomainAccountStatus
   search?: string
-  sortBy?: 'username' | 'display_name' | 'last_synced'
+  sortBy?: 'username' | 'display_name' | 'status'
   sortDir?: 'asc' | 'desc'
   limit?: number
   offset?: number
@@ -20,13 +19,15 @@ export type DomainAccountListFilters = {
 
 export type DomainAccountCounts = {
   total: number
-  ldap: number
-  activeDirectory: number
-  manual: number
   active: number
   disabled: number
   locked: number
   expired: number
+}
+
+export type LdapConfigOption = {
+  id: string
+  name: string
 }
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -35,11 +36,14 @@ const createDomainAccountSchema = z.object({
   username: z.string().min(1, 'Username is required').max(255),
   displayName: z.string().max(255).optional(),
   email: z.string().email().optional().or(z.literal('')),
-  source: z.enum(['ldap', 'active_directory', 'manual']).default('manual'),
+  ldapConfigurationId: z.string().nullable().optional(),
+  passwordExpiresAt: z.string().nullable().optional(),
   distinguishedName: z.string().max(1000).optional(),
   samAccountName: z.string().max(255).optional(),
   userPrincipalName: z.string().max(255).optional(),
   groups: z.array(z.string()).optional(),
+  accountLocked: z.boolean().optional(),
+  passwordLastChangedAt: z.string().nullable().optional(),
 })
 
 const updateDomainAccountSchema = z.object({
@@ -47,6 +51,8 @@ const updateDomainAccountSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   status: z.enum(['active', 'disabled', 'locked', 'expired']).optional(),
   groups: z.array(z.string()).optional(),
+  ldapConfigurationId: z.string().nullable().optional(),
+  passwordExpiresAt: z.string().nullable().optional(),
 })
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -56,7 +62,6 @@ export async function getDomainAccounts(
   filters: DomainAccountListFilters = {},
 ): Promise<DomainAccount[]> {
   const {
-    source,
     status,
     search,
     sortBy = 'username',
@@ -67,8 +72,6 @@ export async function getDomainAccounts(
 
   const conditions = [
     eq(domainAccounts.organisationId, orgId),
-    isNull(domainAccounts.deletedAt),
-    ...(source != null ? [eq(domainAccounts.source, source)] : []),
     ...(status != null ? [eq(domainAccounts.status, status)] : []),
     ...(search != null && search !== ''
       ? [sql`(${domainAccounts.username} ILIKE ${'%' + search + '%'} OR ${domainAccounts.displayName} ILIKE ${'%' + search + '%'})`]
@@ -78,8 +81,8 @@ export async function getDomainAccounts(
   const orderCol =
     sortBy === 'display_name'
       ? domainAccounts.displayName
-      : sortBy === 'last_synced'
-        ? domainAccounts.lastSyncedAt
+      : sortBy === 'status'
+        ? domainAccounts.status
         : domainAccounts.username
 
   const order = sortDir === 'desc' ? desc(orderCol) : asc(orderCol)
@@ -100,7 +103,6 @@ export async function getDomainAccount(
     where: and(
       eq(domainAccounts.id, accountId),
       eq(domainAccounts.organisationId, orgId),
-      isNull(domainAccounts.deletedAt),
     ),
   })
   return result ?? null
@@ -109,44 +111,25 @@ export async function getDomainAccount(
 export async function getDomainAccountCounts(
   orgId: string,
 ): Promise<DomainAccountCounts> {
-  const [sourceRows, statusRows] = await Promise.all([
-    db
-      .select({
-        source: domainAccounts.source,
-        count: sql<number>`cast(count(*) as int)`,
-      })
-      .from(domainAccounts)
-      .where(and(eq(domainAccounts.organisationId, orgId), isNull(domainAccounts.deletedAt)))
-      .groupBy(domainAccounts.source),
-    db
-      .select({
-        status: domainAccounts.status,
-        count: sql<number>`cast(count(*) as int)`,
-      })
-      .from(domainAccounts)
-      .where(and(eq(domainAccounts.organisationId, orgId), isNull(domainAccounts.deletedAt)))
-      .groupBy(domainAccounts.status),
-  ])
+  const statusRows = await db
+    .select({
+      status: domainAccounts.status,
+      count: sql<number>`cast(count(*) as int)`,
+    })
+    .from(domainAccounts)
+    .where(eq(domainAccounts.organisationId, orgId))
+    .groupBy(domainAccounts.status)
 
   const counts: DomainAccountCounts = {
     total: 0,
-    ldap: 0,
-    activeDirectory: 0,
-    manual: 0,
     active: 0,
     disabled: 0,
     locked: 0,
     expired: 0,
   }
 
-  for (const row of sourceRows) {
-    counts.total += row.count
-    if (row.source === 'ldap') counts.ldap = row.count
-    else if (row.source === 'active_directory') counts.activeDirectory = row.count
-    else if (row.source === 'manual') counts.manual = row.count
-  }
-
   for (const row of statusRows) {
+    counts.total += row.count
     if (row.status === 'active') counts.active = row.count
     else if (row.status === 'disabled') counts.disabled = row.count
     else if (row.status === 'locked') counts.locked = row.count
@@ -154,6 +137,21 @@ export async function getDomainAccountCounts(
   }
 
   return counts
+}
+
+export async function getLdapConfigOptions(
+  orgId: string,
+): Promise<LdapConfigOption[]> {
+  const rows = await db.query.ldapConfigurations.findMany({
+    where: and(
+      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.enabled, true),
+      isNull(ldapConfigurations.deletedAt),
+    ),
+    columns: { id: true, name: true },
+    orderBy: ldapConfigurations.name,
+  })
+  return rows
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -175,11 +173,19 @@ export async function createDomainAccount(
         username: parsed.data.username,
         displayName: parsed.data.displayName || null,
         email: parsed.data.email || null,
-        source: parsed.data.source,
+        source: 'manual',
+        ldapConfigurationId: parsed.data.ldapConfigurationId || null,
         distinguishedName: parsed.data.distinguishedName || null,
         samAccountName: parsed.data.samAccountName || null,
         userPrincipalName: parsed.data.userPrincipalName || null,
         groups: parsed.data.groups ?? null,
+        accountLocked: parsed.data.accountLocked ?? false,
+        passwordExpiresAt: parsed.data.passwordExpiresAt
+          ? new Date(parsed.data.passwordExpiresAt)
+          : null,
+        passwordLastChangedAt: parsed.data.passwordLastChangedAt
+          ? new Date(parsed.data.passwordLastChangedAt)
+          : null,
       })
       .returning({ id: domainAccounts.id })
 
@@ -188,10 +194,10 @@ export async function createDomainAccount(
   } catch (err) {
     const message = err instanceof Error ? err.message : ''
     if (message.includes('domain_accounts_org_source_username_idx')) {
-      return { error: 'An account with this username and source already exists' }
+      return { error: 'An account with this username already exists' }
     }
-    console.error('Failed to create domain account:', err)
-    return { error: 'Failed to create domain account' }
+    console.error('Failed to create service account:', err)
+    return { error: 'Failed to create service account' }
   }
 }
 
@@ -209,7 +215,6 @@ export async function updateDomainAccount(
     where: and(
       eq(domainAccounts.id, accountId),
       eq(domainAccounts.organisationId, orgId),
-      isNull(domainAccounts.deletedAt),
     ),
   })
   if (!existing) return { error: 'Account not found' }
@@ -221,6 +226,12 @@ export async function updateDomainAccount(
       ...(parsed.data.email !== undefined && { email: parsed.data.email || null }),
       ...(parsed.data.status !== undefined && { status: parsed.data.status }),
       ...(parsed.data.groups !== undefined && { groups: parsed.data.groups }),
+      ...(parsed.data.ldapConfigurationId !== undefined && { ldapConfigurationId: parsed.data.ldapConfigurationId || null }),
+      ...(parsed.data.passwordExpiresAt !== undefined && {
+        passwordExpiresAt: parsed.data.passwordExpiresAt
+          ? new Date(parsed.data.passwordExpiresAt)
+          : null,
+      }),
       updatedAt: new Date(),
     })
     .where(and(eq(domainAccounts.id, accountId), eq(domainAccounts.organisationId, orgId)))
@@ -236,14 +247,12 @@ export async function deleteDomainAccount(
     where: and(
       eq(domainAccounts.id, accountId),
       eq(domainAccounts.organisationId, orgId),
-      isNull(domainAccounts.deletedAt),
     ),
   })
   if (!existing) return { error: 'Account not found' }
 
   await db
-    .update(domainAccounts)
-    .set({ deletedAt: new Date() })
+    .delete(domainAccounts)
     .where(and(eq(domainAccounts.id, accountId), eq(domainAccounts.organisationId, orgId)))
 
   return { success: true }

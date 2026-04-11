@@ -45,7 +45,7 @@ const primaryNav: NavItem[] = [
   { title: 'Hosts', href: '/hosts', icon: Server },
   { title: 'Checks & Alerts', href: '/alerts', icon: Bell },
   { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
-  { title: 'Directory Accounts', href: '/service-accounts', icon: Key },
+  { title: 'Service Accounts', href: '/service-accounts', icon: Key },
 ]
 
 const toolingNav: NavItem[] = [

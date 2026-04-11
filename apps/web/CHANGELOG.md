@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.18.0...web/v0.19.0) (2026-04-11)
+
+
+### Features
+
+* **profile:** add dark mode with per-user theme preference ([065b7b3](https://github.com/simonjcarr/infrawatch/commit/065b7b38d4a336a46108d3e4c3c2672658ebe9e5))
+* **profile:** add dark mode with per-user theme preference ([ad01296](https://github.com/simonjcarr/infrawatch/commit/ad012966aeac57873897c1e23679353adb8c17a2))
+
 ## [0.18.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.17.1...web/v0.18.0) (2026-04-11)
 
 

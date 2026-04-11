@@ -1,0 +1,2 @@
+ALTER TABLE "domain_accounts" ADD COLUMN "ldap_configuration_id" text;--> statement-breakpoint
+ALTER TABLE "domain_accounts" ADD CONSTRAINT "domain_accounts_ldap_configuration_id_ldap_configurations_id_fk" FOREIGN KEY ("ldap_configuration_id") REFERENCES "public"."ldap_configurations"("id") ON DELETE no action ON UPDATE no action;

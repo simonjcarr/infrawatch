@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -109,11 +110,6 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 	}
 	slog.Info("agent identity ready", "data_dir", cfg.Agent.DataDir)
 
-	state, err := identity.LoadState(cfg.Agent.DataDir)
-	if err != nil {
-		return err
-	}
-
 	// dialFunc creates a fresh gRPC connection each time it is called. The
 	// heartbeat runner calls it once per stream attempt so that a stuck or
 	// stale ClientConn from a previous attempt can never block reconnection.
@@ -121,30 +117,51 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 		return agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile, cfg.Ingest.TLSSkipVerify)
 	}
 
-	if state.JWTToken == "" {
-		slog.Info("registering agent", "address", cfg.Ingest.Address)
-		regConn, err := dialFunc()
-		if err != nil {
-			slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
-			return err
-		}
-		registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.OrgToken, version)
-		newState, err := registrar.Register(ctx, state.AgentID)
-		regConn.Close()
-		if err != nil {
-			return err
-		}
-		state = newState
-		if err := identity.SaveState(cfg.Agent.DataDir, state); err != nil {
-			return err
-		}
-		slog.Info("agent registered and active", "agent_id", state.AgentID)
-	} else {
-		slog.Info("agent already registered", "agent_id", state.AgentID)
-	}
-
-	slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
 	executor := checks.NewExecutor()
-	hb := heartbeat.New(dialFunc, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)
-	return hb.Run(ctx)
+
+	for {
+		state, err := identity.LoadState(cfg.Agent.DataDir)
+		if err != nil {
+			return err
+		}
+
+		if state.JWTToken == "" {
+			slog.Info("registering agent", "address", cfg.Ingest.Address)
+			regConn, err := dialFunc()
+			if err != nil {
+				slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
+				return err
+			}
+			registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.OrgToken, version)
+			newState, err := registrar.Register(ctx, state.AgentID)
+			regConn.Close()
+			if err != nil {
+				return err
+			}
+			state = newState
+			if err := identity.SaveState(cfg.Agent.DataDir, state); err != nil {
+				return err
+			}
+			slog.Info("agent registered and active", "agent_id", state.AgentID)
+		} else {
+			slog.Info("agent already registered", "agent_id", state.AgentID)
+		}
+
+		slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
+		hb := heartbeat.New(dialFunc, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)
+		err = hb.Run(ctx)
+
+		if errors.Is(err, heartbeat.ErrAgentDeregistered) {
+			// Server rejected this agent — clear local state so the next loop
+			// iteration triggers a fresh registration with the same keypair.
+			slog.Warn("agent deregistered by server, clearing state and re-registering")
+			if clearErr := identity.SaveState(cfg.Agent.DataDir, &identity.AgentState{}); clearErr != nil {
+				slog.Error("clearing agent state", "err", clearErr)
+				return clearErr
+			}
+			continue
+		}
+
+		return err
+	}
 }

@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { db } from '@/lib/db'
-import { users, agents, organisations } from '@/lib/db/schema'
+import { users, agents, hosts, organisations } from '@/lib/db/schema'
 import { eq, and, isNull, count } from 'drizzle-orm'
 import pkg from '../../../../package.json'
 
@@ -26,6 +26,7 @@ export async function GET() {
     db
       .select({ status: agents.status, count: count() })
       .from(agents)
+      .innerJoin(hosts, and(eq(hosts.agentId, agents.id), isNull(hosts.deletedAt)))
       .where(and(eq(agents.organisationId, orgId), isNull(agents.deletedAt)))
       .groupBy(agents.status),
 

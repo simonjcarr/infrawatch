@@ -127,6 +127,20 @@
       "when": 1775900000009,
       "tag": "0017_chilly_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1775900000010,
+      "tag": "0018_organic_romulus",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1775900000011,
+      "tag": "0019_military_lionheart",
+      "breakpoints": true
     }
   ]
 }

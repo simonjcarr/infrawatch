@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   User,
   Mail,
-  Globe,
   FolderTree,
   Shield,
   Pencil,
@@ -42,20 +41,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { updateDomainAccount, deleteDomainAccount } from '@/lib/actions/domain-accounts'
-import type { DomainAccount, DomainAccountSource, DomainAccountStatus } from '@/lib/db/schema'
-
-function SourceBadge({ source }: { source: DomainAccountSource }) {
-  switch (source) {
-    case 'ldap':
-      return <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">LDAP</Badge>
-    case 'active_directory':
-      return <Badge className="bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100">Active Directory</Badge>
-    case 'manual':
-      return <Badge variant="outline">Manual</Badge>
-    default:
-      return <Badge variant="outline">{source}</Badge>
-  }
-}
+import type { LdapConfigOption } from '@/lib/actions/domain-accounts'
+import type { DomainAccount, DomainAccountStatus } from '@/lib/db/schema'
 
 function StatusBadge({ status }: { status: DomainAccountStatus }) {
   switch (status) {
@@ -107,27 +94,42 @@ function InfoCard({
   )
 }
 
-export function DirectoryAccountDetailClient({
+export function ServiceAccountDetailClient({
   orgId,
   account,
+  ldapConfigs,
 }: {
   orgId: string
   account: DomainAccount
+  ldapConfigs: LdapConfigOption[]
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const isManual = account.source === 'manual'
 
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({
     displayName: account.displayName ?? '',
     email: account.email ?? '',
     status: account.status as DomainAccountStatus,
+    ldapConfigurationId: account.ldapConfigurationId ?? null as string | null,
+    passwordExpiresAt: account.passwordExpiresAt
+      ? new Date(account.passwordExpiresAt).toISOString().split('T')[0]
+      : '',
   })
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
+  const ldapConfigName = account.ldapConfigurationId
+    ? (ldapConfigs.find((c) => c.id === account.ldapConfigurationId)?.name ?? 'LDAP')
+    : null
+
   const updateMutation = useMutation({
-    mutationFn: () => updateDomainAccount(orgId, account.id, editForm),
+    mutationFn: () => updateDomainAccount(orgId, account.id, {
+      displayName: editForm.displayName,
+      email: editForm.email,
+      status: editForm.status,
+      ldapConfigurationId: editForm.ldapConfigurationId,
+      passwordExpiresAt: editForm.ldapConfigurationId ? null : (editForm.passwordExpiresAt || null),
+    }),
     onSuccess: (result) => {
       if ('error' in result) return
       setEditing(false)
@@ -159,7 +161,6 @@ export function DirectoryAccountDetailClient({
             <h1 className="text-2xl font-semibold text-foreground font-mono">
               {account.username}
             </h1>
-            <SourceBadge source={account.source as DomainAccountSource} />
             <StatusBadge status={account.status as DomainAccountStatus} />
           </div>
           {account.displayName && (
@@ -167,49 +168,45 @@ export function DirectoryAccountDetailClient({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {isManual && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditing(!editing)}
-              >
-                <Pencil className="size-4 mr-1.5" />
-                Edit
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing(!editing)}
+          >
+            <Pencil className="size-4 mr-1.5" />
+            Edit
+          </Button>
+          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Trash2 className="size-4 mr-1.5" />
+                Delete
               </Button>
-              <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                    <Trash2 className="size-4 mr-1.5" />
-                    Delete
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Delete Account</DialogTitle>
-                    <DialogDescription>
-                      Are you sure you want to delete the account &quot;{account.username}&quot;? This action cannot be undone.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => deleteMutation.mutate()}
-                      disabled={deleteMutation.isPending}
-                    >
-                      {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Account</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete the account &quot;{account.username}&quot;? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Edit form (manual accounts only) */}
-      {editing && isManual && (
+      {/* Edit form */}
+      {editing && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Edit Account</CardTitle>
@@ -247,6 +244,38 @@ export function DirectoryAccountDetailClient({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Directory Server</Label>
+              <Select
+                value={editForm.ldapConfigurationId ?? 'none'}
+                onValueChange={(v) => setEditForm({ ...editForm, ldapConfigurationId: v === 'none' ? null : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (not on a directory)</SelectItem>
+                  {ldapConfigs.map((config) => (
+                    <SelectItem key={config.id} value={config.id}>
+                      {config.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {!editForm.ldapConfigurationId && (
+              <div className="space-y-1.5">
+                <Label>Password Expiry Date</Label>
+                <Input
+                  type="date"
+                  value={editForm.passwordExpiresAt}
+                  onChange={(e) => setEditForm({ ...editForm, passwordExpiresAt: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank if the password doesn&apos;t expire.
+                </p>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -267,7 +296,11 @@ export function DirectoryAccountDetailClient({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <InfoCard label="Username" value={account.username} icon={User} />
         <InfoCard label="Email" value={account.email ?? '—'} icon={Mail} />
-        <InfoCard label="Source" value={<SourceBadge source={account.source as DomainAccountSource} />} icon={Globe} />
+        <InfoCard
+          label="Directory"
+          value={ldapConfigName ?? 'None'}
+          icon={FolderTree}
+        />
         <InfoCard label="Status" value={<StatusBadge status={account.status as DomainAccountStatus} />} icon={Shield} />
       </div>
 
@@ -335,40 +368,6 @@ export function DirectoryAccountDetailClient({
         </CardContent>
       </Card>
 
-      {/* LDAP/AD Properties */}
-      {(account.distinguishedName || account.samAccountName || account.userPrincipalName) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <FolderTree className="size-4" />
-              Directory Properties
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-3 text-sm">
-              {account.distinguishedName && (
-                <div>
-                  <dt className="text-muted-foreground">Distinguished Name (DN)</dt>
-                  <dd className="font-mono text-xs mt-0.5 break-all">{account.distinguishedName}</dd>
-                </div>
-              )}
-              {account.samAccountName && (
-                <div>
-                  <dt className="text-muted-foreground">sAMAccountName</dt>
-                  <dd className="font-mono text-sm mt-0.5">{account.samAccountName}</dd>
-                </div>
-              )}
-              {account.userPrincipalName && (
-                <div>
-                  <dt className="text-muted-foreground">User Principal Name (UPN)</dt>
-                  <dd className="font-mono text-sm mt-0.5">{account.userPrincipalName}</dd>
-                </div>
-              )}
-            </dl>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Groups */}
       <Card>
         <CardHeader>
@@ -395,7 +394,7 @@ export function DirectoryAccountDetailClient({
           <CardTitle className="text-base">Timestamps</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+          <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-muted-foreground">Created</dt>
               <dd className="font-medium mt-0.5">{formatDate(account.createdAt)}</dd>
@@ -403,14 +402,6 @@ export function DirectoryAccountDetailClient({
             <div>
               <dt className="text-muted-foreground">Updated</dt>
               <dd className="font-medium mt-0.5">{formatDate(account.updatedAt)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Last Synced</dt>
-              <dd className="font-medium mt-0.5">
-                {account.lastSyncedAt
-                  ? formatDistanceToNow(new Date(account.lastSyncedAt), { addSuffix: true })
-                  : '—'}
-              </dd>
             </div>
           </dl>
         </CardContent>

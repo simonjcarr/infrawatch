@@ -2,8 +2,26 @@
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { agents, agentStatusHistory, agentEnrolmentTokens, hosts, hostMetrics } from '@/lib/db/schema'
-import { eq, and, isNull, gt, gte, asc, sql } from 'drizzle-orm'
+import {
+  agents,
+  agentStatusHistory,
+  agentEnrolmentTokens,
+  hosts,
+  hostMetrics,
+  checks,
+  checkResults,
+  alertRules,
+  alertInstances,
+  alertSilences,
+  certificates,
+  certificateEvents,
+  serviceAccounts,
+  sshKeys,
+  identityEvents,
+  agentQueries,
+  resourceTags,
+} from '@/lib/db/schema'
+import { eq, and, isNull, gt, gte, asc, sql, inArray } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { getOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
@@ -441,5 +459,137 @@ export async function getHost(orgId: string, hostId: string): Promise<HostWithAg
   return {
     ...row.hosts,
     agent: row.agents ?? null,
+  }
+}
+
+export async function deleteHost(
+  orgId: string,
+  hostId: string,
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const host = await db.query.hosts.findFirst({
+      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),
+    })
+    if (!host) return { error: 'Host not found' }
+
+    await db.transaction(async (tx) => {
+      // 1. Identity events (references service_account_id, ssh_key_id, host_id)
+      await tx
+        .delete(identityEvents)
+        .where(and(eq(identityEvents.hostId, hostId), eq(identityEvents.organisationId, orgId)))
+
+      // 2. SSH keys (references host_id, service_account_id)
+      await tx
+        .delete(sshKeys)
+        .where(and(eq(sshKeys.hostId, hostId), eq(sshKeys.organisationId, orgId)))
+
+      // 3. Service accounts
+      await tx
+        .delete(serviceAccounts)
+        .where(and(eq(serviceAccounts.hostId, hostId), eq(serviceAccounts.organisationId, orgId)))
+
+      // 4. Check results (references check_id which references host_id)
+      await tx
+        .delete(checkResults)
+        .where(and(eq(checkResults.hostId, hostId), eq(checkResults.organisationId, orgId)))
+
+      // 5. Certificate events & certificates (certificates reference both
+      //    discovered_by_host_id AND check_id, so must be deleted before checks)
+      const hostCheckIds = (
+        await tx
+          .select({ id: checks.id })
+          .from(checks)
+          .where(and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)))
+      ).map((c) => c.id)
+
+      const hostCerts = await tx
+        .select({ id: certificates.id })
+        .from(certificates)
+        .where(and(
+          eq(certificates.organisationId, orgId),
+          sql`(${certificates.discoveredByHostId} = ${hostId}${
+            hostCheckIds.length > 0
+              ? sql` OR ${certificates.checkId} IN (${sql.join(hostCheckIds.map((id) => sql`${id}`), sql`, `)})`
+              : sql``
+          })`,
+        ))
+
+      if (hostCerts.length > 0) {
+        const certIds = hostCerts.map((c) => c.id)
+        await tx
+          .delete(certificateEvents)
+          .where(and(
+            inArray(certificateEvents.certificateId, certIds),
+            eq(certificateEvents.organisationId, orgId),
+          ))
+        await tx
+          .delete(certificates)
+          .where(and(
+            inArray(certificates.id, certIds),
+            eq(certificates.organisationId, orgId),
+          ))
+      }
+
+      // 6. Checks (host-specific only — now safe, certificates removed above)
+      await tx
+        .delete(checks)
+        .where(and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)))
+
+      // 7. Alert instances
+      await tx
+        .delete(alertInstances)
+        .where(and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId)))
+
+      // 8. Alert silences (host-specific only)
+      await tx
+        .delete(alertSilences)
+        .where(and(eq(alertSilences.hostId, hostId), eq(alertSilences.organisationId, orgId)))
+
+      // 9. Alert rules (host-specific only)
+      await tx
+        .delete(alertRules)
+        .where(and(eq(alertRules.hostId, hostId), eq(alertRules.organisationId, orgId)))
+
+      // 11. Agent queries
+      await tx
+        .delete(agentQueries)
+        .where(and(eq(agentQueries.hostId, hostId), eq(agentQueries.organisationId, orgId)))
+
+      // 12. Host metrics
+      await tx
+        .delete(hostMetrics)
+        .where(and(eq(hostMetrics.hostId, hostId), eq(hostMetrics.organisationId, orgId)))
+
+      // 13. Resource tags
+      await tx
+        .delete(resourceTags)
+        .where(and(
+          eq(resourceTags.resourceId, hostId),
+          eq(resourceTags.resourceType, 'host'),
+          eq(resourceTags.organisationId, orgId),
+        ))
+
+      // 14. Host itself
+      await tx
+        .delete(hosts)
+        .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+
+      // 15. Agent status history + agent (host deletion revokes the agent so it
+      //     can no longer connect; without this the agent keeps heartbeating
+      //     against a host row that no longer exists)
+      if (host.agentId) {
+        await tx
+          .delete(agentStatusHistory)
+          .where(eq(agentStatusHistory.agentId, host.agentId))
+        await tx
+          .delete(agents)
+          .where(eq(agents.id, host.agentId))
+      }
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.error('Failed to delete host:', err)
+    return { error: 'An unexpected error occurred while deleting the host' }
   }
 }

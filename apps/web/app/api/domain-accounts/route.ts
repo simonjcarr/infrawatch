@@ -6,7 +6,7 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getDomainAccounts } from '@/lib/actions/domain-accounts'
 import type { DomainAccountListFilters } from '@/lib/actions/domain-accounts'
-import type { DomainAccountSource, DomainAccountStatus } from '@/lib/db/schema'
+import type { DomainAccountStatus } from '@/lib/db/schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl
   const filters: DomainAccountListFilters = {
-    source: (searchParams.get('source') as DomainAccountSource) ?? undefined,
     status: (searchParams.get('status') as DomainAccountStatus) ?? undefined,
     search: searchParams.get('search') ?? undefined,
     sortBy: (searchParams.get('sortBy') as DomainAccountListFilters['sortBy']) ?? undefined,

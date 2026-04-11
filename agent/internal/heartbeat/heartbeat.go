@@ -2,6 +2,7 @@ package heartbeat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,11 +15,18 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/infrawatch/agent/internal/checks"
 	"github.com/infrawatch/agent/internal/updater"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
+
+// ErrAgentDeregistered is returned when the server rejects the agent with
+// NotFound or PermissionDenied, signalling that the local state should be
+// cleared and the agent should re-register from scratch.
+var ErrAgentDeregistered = errors.New("agent deregistered by server — re-registration required")
 
 // Runner manages the bidirectional heartbeat stream with the ingest service.
 type Runner struct {
@@ -92,6 +100,13 @@ func (r *Runner) Run(ctx context.Context) error {
 		err := r.runStream(ctx)
 		if err == nil || err == context.Canceled || err == context.DeadlineExceeded {
 			return err
+		}
+
+		// Server explicitly rejected this agent — do not retry; propagate so
+		// the caller can clear local state and trigger re-registration.
+		if isFatalAgentError(err) {
+			slog.Warn("server rejected agent — clearing state for re-registration", "err", err)
+			return ErrAgentDeregistered
 		}
 
 		if time.Since(start) >= minStableTime {
@@ -481,4 +496,20 @@ func splitLines(s string) []string {
 		}
 	}
 	return lines
+}
+
+// isFatalAgentError returns true when the error chain contains a gRPC status
+// that means the server has permanently rejected this agent identity.
+// These errors must not be retried — the agent must re-register instead.
+func isFatalAgentError(err error) bool {
+	for err != nil {
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.NotFound, codes.PermissionDenied, codes.Unauthenticated:
+				return true
+			}
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }

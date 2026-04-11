@@ -2,11 +2,12 @@
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { ldapConfigurations, domainAccounts } from '@/lib/db/schema'
+import { ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import type { LdapConfiguration } from '@/lib/db/schema'
 import { encrypt } from '@/lib/crypto/encrypt'
 import { testConnection as ldapTestConnection, searchUsers } from '@/lib/ldap/client'
+import type { LdapUser } from '@/lib/ldap/client'
 
 const createLdapConfigSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
@@ -209,10 +210,41 @@ export async function testLdapConnection(
   return ldapTestConnection(config)
 }
 
-export async function syncLdapAccounts(
+export type LdapUserResult = {
+  username: string
+  displayName: string | null
+  email: string | null
+  dn: string
+  groups: string[]
+  samAccountName?: string
+  userPrincipalName?: string
+  accountLocked: boolean
+  passwordExpiresAt: string | null
+  passwordLastChangedAt: string | null
+}
+
+function toLdapUserResult(user: LdapUser): LdapUserResult {
+  return {
+    username: user.username,
+    displayName: user.displayName,
+    email: user.email,
+    dn: user.dn,
+    groups: user.groups,
+    samAccountName: user.samAccountName,
+    userPrincipalName: user.userPrincipalName,
+    accountLocked: user.accountLocked ?? false,
+    passwordExpiresAt: user.passwordExpiresAt?.toISOString() ?? null,
+    passwordLastChangedAt: user.passwordLastChangedAt?.toISOString() ?? null,
+  }
+}
+
+export async function searchLdapDirectory(
   orgId: string,
   configId: string,
-): Promise<{ success: true; count: number } | { error: string }> {
+  query: string,
+): Promise<{ success: true; users: LdapUserResult[] } | { error: string }> {
+  if (!query.trim()) return { success: true, users: [] }
+
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
@@ -222,80 +254,13 @@ export async function syncLdapAccounts(
   })
   if (!config) return { error: 'Configuration not found' }
 
-  // Mark sync as running
-  await db
-    .update(ldapConfigurations)
-    .set({ lastSyncStatus: 'running', lastSyncAt: new Date(), updatedAt: new Date() })
-    .where(eq(ldapConfigurations.id, configId))
-
   try {
-    const users = await searchUsers(config)
-
-    const source = config.name.toLowerCase().includes('active directory')
-      ? 'active_directory' as const
-      : 'ldap' as const
-
-    let syncedCount = 0
-    for (const user of users) {
-      if (!user.username) continue
-
-      // Upsert: try insert, on conflict update
-      const status = user.accountLocked ? 'locked' as const : 'active' as const
-
-      await db
-        .insert(domainAccounts)
-        .values({
-          organisationId: orgId,
-          username: user.username,
-          displayName: user.displayName,
-          email: user.email,
-          source,
-          distinguishedName: user.dn,
-          samAccountName: user.samAccountName ?? null,
-          userPrincipalName: user.userPrincipalName ?? null,
-          groups: user.groups.length > 0 ? user.groups : null,
-          status,
-          accountLocked: user.accountLocked ?? false,
-          passwordExpiresAt: user.passwordExpiresAt ?? null,
-          passwordLastChangedAt: user.passwordLastChangedAt ?? null,
-          lastSyncedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: [domainAccounts.organisationId, domainAccounts.source, domainAccounts.username],
-          set: {
-            displayName: user.displayName,
-            email: user.email,
-            distinguishedName: user.dn,
-            samAccountName: user.samAccountName ?? null,
-            userPrincipalName: user.userPrincipalName ?? null,
-            groups: user.groups.length > 0 ? user.groups : null,
-            status,
-            accountLocked: user.accountLocked ?? false,
-            passwordExpiresAt: user.passwordExpiresAt ?? null,
-            passwordLastChangedAt: user.passwordLastChangedAt ?? null,
-            lastSyncedAt: new Date(),
-            updatedAt: new Date(),
-          },
-        })
-
-      syncedCount++
-    }
-
-    // Mark sync as successful
-    await db
-      .update(ldapConfigurations)
-      .set({ lastSyncStatus: 'success', lastSyncError: null, updatedAt: new Date() })
-      .where(eq(ldapConfigurations.id, configId))
-
-    return { success: true, count: syncedCount }
+    const filter = config.userSearchFilter.replace('{{username}}', `${query.trim()}*`)
+    const users = await searchUsers(config, filter)
+    return { success: true, users: users.slice(0, 5).map(toLdapUserResult) }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    await db
-      .update(ldapConfigurations)
-      .set({ lastSyncStatus: 'error', lastSyncError: message, updatedAt: new Date() })
-      .where(eq(ldapConfigurations.id, configId))
-
-    return { error: `Sync failed: ${message}` }
+    return { error: `Directory search failed: ${message}` }
   }
 }
 

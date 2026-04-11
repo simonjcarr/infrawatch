@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
   ArrowLeft,
@@ -14,7 +14,10 @@ import {
   Clock,
   XCircle,
   Activity,
+  Trash2,
+  Loader2,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   LineChart,
@@ -32,7 +35,18 @@ import {
   ReferenceArea,
 } from 'recharts'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Table,
   TableBody,
@@ -41,7 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getHost, getHostMetrics, getAgentOfflinePeriods, getHeartbeatHistory } from '@/lib/actions/agents'
+import { getHost, getHostMetrics, getAgentOfflinePeriods, getHeartbeatHistory, deleteHost } from '@/lib/actions/agents'
 import type { HostWithAgent, MetricsRange, OfflinePeriod, HeartbeatPoint } from '@/lib/actions/agents'
 import { useHostStream } from '@/hooks/use-host-stream'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
@@ -178,6 +192,38 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export function HostDetailClient({ host: initialHost, orgId, currentUserId, latestAgentVersion }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState<MetricsRange>('24h')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const router = useRouter()
+  const queryClient = useQueryClient()
+
+  const { mutate: removeHost, isPending: isDeleting } = useMutation({
+    mutationFn: () => deleteHost(orgId, initialHost.id),
+    onSuccess: (result) => {
+      if ('success' in result) {
+        // Cancel and remove all queries for this host before navigating away
+        // to stop refetchInterval timers from firing against a deleted resource
+        queryClient.cancelQueries({ queryKey: ['host', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-metrics', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-offline-periods', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-heartbeat-history', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['alerts', orgId, 'firing', initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-collection-settings', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['local-users-count', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['checks-history', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-metrics', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-offline-periods', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-heartbeat-history', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['alerts', orgId, 'firing', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-collection-settings', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['local-users-count', orgId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['checks-history', orgId, initialHost.id] })
+        // Also invalidate the hosts list so it reflects the deletion
+        queryClient.invalidateQueries({ queryKey: ['hosts'] })
+        router.push('/hosts')
+      }
+    },
+  })
 
   useHostStream({ hostId: initialHost.id, orgId })
 
@@ -296,12 +342,27 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
           <ArrowLeft className="size-4" />
           Back to hosts
         </Link>
-        <div className="flex items-center gap-3">
-          <Server className="size-6 text-muted-foreground" />
-          <h1 className="text-2xl font-semibold text-foreground">
-            {host.displayName ?? host.hostname}
-          </h1>
-          <StatusBadge status={host.status} />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Server className="size-6 text-muted-foreground" />
+            <h1 className="text-2xl font-semibold text-foreground">
+              {host.displayName ?? host.hostname}
+            </h1>
+            <StatusBadge status={host.status} />
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <Loader2 className="size-4 mr-1 animate-spin" />
+            ) : (
+              <Trash2 className="size-4 mr-1" />
+            )}
+            Delete Host
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           Last seen {formatLastSeen(host.lastSeenAt)}
@@ -819,6 +880,37 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete host</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete{' '}
+              <strong>{host.displayName ?? host.hostname}</strong>? This will
+              remove all associated data including metrics, checks, alerts,
+              certificates, users, and SSH keys. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+              onClick={() => removeHost()}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="size-4 mr-1 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                'Delete permanently'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

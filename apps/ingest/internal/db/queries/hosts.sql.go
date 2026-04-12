@@ -31,6 +31,19 @@ func GetHostByAgentID(ctx context.Context, pool *pgxpool.Pool, agentID string) (
 	return id, err
 }
 
+// GetHostAgentStatus returns the agent status and agent_id for a given host ID.
+// Used for terminal diagnostics to verify the heartbeat is active.
+func GetHostAgentStatus(ctx context.Context, pool *pgxpool.Pool, hostID string) (agentID, agentStatus string, err error) {
+	const q = `
+		SELECT COALESCE(h.agent_id, ''), COALESCE(a.status, 'none')
+		FROM hosts h
+		LEFT JOIN agents a ON a.id = h.agent_id
+		WHERE h.id = $1 AND h.deleted_at IS NULL
+	`
+	err = pool.QueryRow(ctx, q, hostID).Scan(&agentID, &agentStatus)
+	return
+}
+
 // UpdateHostVitals overwrites the latest vitals on the host row for a given agent.
 func UpdateHostVitals(ctx context.Context, pool *pgxpool.Pool, agentID string, cpu, mem, disk float32, uptime int64, ipAddresses []string, osVersion, agentOS, agentArch, disksJSON, netJSON string) error {
 	const q = `

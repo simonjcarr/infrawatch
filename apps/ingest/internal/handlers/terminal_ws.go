@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -116,9 +117,14 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					slog.Warn("terminal ws: diag status query failed", "session_id", sessionID, "err", err)
 					continue
 				}
+				// Run the same query the heartbeat uses to find pending sessions
+				pendingSessions, _ := queries.GetPendingTerminalSessionsForHost(ctx, h.pool, info.HostID)
+				// Check if the store has this session registered
+				_, inStore := h.store.Get(sessionID)
 				diagMsg, _ := json.Marshal(wsMessage{
 					Type: "diagnostic",
-					Msg:  "session_status=" + dbStatus + " host_id=" + info.HostID,
+					Msg: fmt.Sprintf("status=%s host_id=%s poll_would_find=%d in_store=%v",
+						dbStatus, info.HostID, len(pendingSessions), inStore),
 				})
 				if err := conn.Write(ctx, websocket.MessageText, diagMsg); err != nil {
 					return

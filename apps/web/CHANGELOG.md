@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.23.0...web/v0.23.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* **terminal:** show xterm container during connecting state to fix 0x0 dimensions ([e40f6d6](https://github.com/simonjcarr/infrawatch/commit/e40f6d6784d3037feb8e747439c35097673e5f94))
+* **terminal:** show xterm container during connecting to fix 0x0 PTY ([48032dc](https://github.com/simonjcarr/infrawatch/commit/48032dced6c0fe0152cea59f2ac1d4581e2dddcb))
+
 ## [0.23.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.22.0...web/v0.23.0) (2026-04-12)
 
 

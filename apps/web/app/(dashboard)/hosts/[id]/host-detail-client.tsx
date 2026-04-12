@@ -20,21 +20,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  Cell,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceArea,
-} from 'recharts'
+import { HostMetricsLineChart, HostHeartbeatBarChart } from '@/components/charts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,9 +42,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getHost, getHostMetrics, getAgentOfflinePeriods, getHeartbeatHistory, deleteHost } from '@/lib/actions/agents'
-import type { HostWithAgent, MetricsRange, OfflinePeriod, HeartbeatPoint } from '@/lib/actions/agents'
+import { getHost, getHostMetrics, getHeartbeatHistory, deleteHost } from '@/lib/actions/agents'
+import type { HostWithAgent, MetricsPreset, MetricsQuery, HeartbeatPoint } from '@/lib/actions/agents'
 import { useHostStream } from '@/hooks/use-host-stream'
+import { useChartZoom } from '@/hooks/use-chart-zoom'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
 import { ChecksTab } from './checks-tab'
 import { AlertsTab } from './alerts-tab'
@@ -196,11 +183,37 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 export function HostDetailClient({ host: initialHost, orgId, currentUserId, latestAgentVersion }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
-  const [metricsRange, setMetricsRange] = useState<MetricsRange>('24h')
+  const [metricsRange, setMetricsRange] = useState<MetricsPreset>('24h')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [addGroupOpen, setAddGroupOpen] = useState(false)
   const router = useRouter()
   const queryClient = useQueryClient()
+
+  const { zoomedBounds, isZoomed, chartHandlers, chartCursor, selectionRange, resetZoom } = useChartZoom()
+
+  // Either the committed zoom window or the active preset — drives all three metric queries
+  const activeQuery: MetricsQuery = zoomedBounds ?? metricsRange
+
+  // Stable timestamp for this render pass — used for domain boundaries and the sentinel point.
+  // Defined here (before queries) so xAxisDomain is available when chart props are assembled.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => Date.now(), [metricsRange, zoomedBounds])
+
+  // X-axis domain — always explicit so the chart spans the full intended range even when
+  // data has gaps or fewer points than expected (e.g. hourly buckets for 7d).
+  const presetHours: Record<MetricsPreset, number> = { '1h': 1, '6h': 6, '24h': 24, '7d': 168, '30d': 720 }
+  const xAxisDomain: [number, number] = zoomedBounds
+    ? [zoomedBounds.from, zoomedBounds.to]
+    : [now - presetHours[metricsRange] * 3_600_000, now]
+
+  // Derive visible span hours for tick format and label decisions
+  const spanHours = zoomedBounds
+    ? (zoomedBounds.to - zoomedBounds.from) / 3_600_000
+    : metricsRange === '1h' ? 1
+    : metricsRange === '6h' ? 6
+    : metricsRange === '24h' ? 24
+    : metricsRange === '7d' ? 168
+    : 720
 
   const { mutate: removeHost, isPending: isDeleting } = useMutation({
     mutationFn: () => deleteHost(orgId, initialHost.id),
@@ -210,7 +223,6 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
         // to stop refetchInterval timers from firing against a deleted resource
         queryClient.cancelQueries({ queryKey: ['host', orgId, initialHost.id] })
         queryClient.cancelQueries({ queryKey: ['host-metrics', orgId, initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['host-offline-periods', orgId, initialHost.id] })
         queryClient.cancelQueries({ queryKey: ['host-heartbeat-history', orgId, initialHost.id] })
         queryClient.cancelQueries({ queryKey: ['alerts', orgId, 'firing', initialHost.id] })
         queryClient.cancelQueries({ queryKey: ['host-collection-settings', orgId, initialHost.id] })
@@ -218,7 +230,6 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
         queryClient.cancelQueries({ queryKey: ['checks-history', orgId, initialHost.id] })
         queryClient.removeQueries({ queryKey: ['host', orgId, initialHost.id] })
         queryClient.removeQueries({ queryKey: ['host-metrics', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['host-offline-periods', orgId, initialHost.id] })
         queryClient.removeQueries({ queryKey: ['host-heartbeat-history', orgId, initialHost.id] })
         queryClient.removeQueries({ queryKey: ['alerts', orgId, 'firing', initialHost.id] })
         queryClient.removeQueries({ queryKey: ['host-collection-settings', orgId, initialHost.id] })
@@ -241,27 +252,17 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
   })
 
   const { data: metricsData = [], isLoading: metricsLoading } = useQuery({
-    queryKey: ['host-metrics', orgId, initialHost.id, metricsRange],
-    queryFn: () => getHostMetrics(orgId, initialHost.id, metricsRange),
+    queryKey: ['host-metrics', orgId, initialHost.id, activeQuery],
+    queryFn: () => getHostMetrics(orgId, initialHost.id, activeQuery),
     enabled: activeTab === 'metrics',
-    refetchInterval: 60_000,
-  })
-
-  const { data: offlinePeriods = [] } = useQuery<OfflinePeriod[]>({
-    queryKey: ['host-offline-periods', orgId, initialHost.id, metricsRange],
-    queryFn: () =>
-      initialHost.agentId
-        ? getAgentOfflinePeriods(orgId, initialHost.agentId, metricsRange)
-        : Promise.resolve([]),
-    enabled: activeTab === 'metrics' && !!initialHost.agentId,
-    refetchInterval: 60_000,
+    refetchInterval: isZoomed ? false : 60_000,
   })
 
   const { data: heartbeatData = [] } = useQuery<HeartbeatPoint[]>({
-    queryKey: ['host-heartbeat-history', orgId, initialHost.id, metricsRange],
-    queryFn: () => getHeartbeatHistory(orgId, initialHost.id, metricsRange),
+    queryKey: ['host-heartbeat-history', orgId, initialHost.id, activeQuery],
+    queryFn: () => getHeartbeatHistory(orgId, initialHost.id, activeQuery),
     enabled: activeTab === 'metrics',
-    refetchInterval: 60_000,
+    refetchInterval: isZoomed ? false : 60_000,
   })
 
   const { data: activeAlerts = [] } = useQuery({
@@ -312,23 +313,13 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
     },
   })
 
-  const tickFormat = metricsRange === '7d' ? 'MMM d HH:mm' : 'HH:mm'
+  const tickFormat =
+    spanHours <= 2  ? 'HH:mm:ss' :
+    spanHours <= 72 ? 'HH:mm'    : 'MMM d HH:mm'
 
-  // Capture the current timestamp once per data refresh so it's stable within a single
-  // render pass. The disable comment is intentional: Date.now() inside useMemo is safe
-  // because the result is memoized and only recomputed when chart data changes.
-  // eslint-disable-next-line react-hooks/purity
-  const now = useMemo(() => Date.now(), [metricsData, heartbeatData, offlinePeriods])
-
-  // Use numeric ms timestamps so we can control the X-axis domain precisely.
-  // Zero-boundary points are injected at the start and end of each offline period
-  // so the lines visually drop to 0 when the agent goes offline and rise again on
-  // reconnect. A sentinel null point at `now` keeps the right edge current.
-  const offlineBoundaries = offlinePeriods.flatMap((p) => [
-    { time: p.start, cpu: 0, memory: 0, disk: 0 },
-    ...(p.end != null ? [{ time: p.end, cpu: 0, memory: 0, disk: 0 }] : []),
-  ])
-
+  // Sentinel null point keeps the right edge of the chart at "now" on live preset views.
+  // Omit it when zoomed: the sentinel sits at the current time, which falls outside the
+  // zoom window and causes Recharts to expand the X-axis domain beyond zoomedBounds.to.
   const chartData = [
     ...metricsData.map((row) => ({
       time: new Date(row.recordedAt).getTime(),
@@ -336,8 +327,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
       memory: row.memoryPercent != null ? parseFloat(row.memoryPercent.toFixed(1)) : null,
       disk: row.diskPercent != null ? parseFloat(row.diskPercent.toFixed(1)) : null,
     })),
-    ...offlineBoundaries,
-    { time: now, cpu: null, memory: null, disk: null },
+    ...(zoomedBounds ? [] : [{ time: now, cpu: null, memory: null, disk: null }]),
   ].sort((a, b) => a.time - b.time)
 
   if (!host) return null
@@ -629,20 +619,33 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
       {activeTab === 'metrics' && (
         <div className="space-y-4">
           {/* Range selector */}
-          <div className="flex items-center gap-2">
-            {(['1h', '24h', '7d'] as MetricsRange[]).map((r) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            {(['1h', '6h', '24h', '7d', '30d'] as MetricsPreset[]).map((r) => (
               <button
                 key={r}
-                onClick={() => setMetricsRange(r)}
+                onClick={() => { resetZoom(); setMetricsRange(r) }}
                 className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                  metricsRange === r
+                  metricsRange === r && !isZoomed
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background text-muted-foreground border-border hover:text-foreground'
                 }`}
               >
-                {r === '1h' ? 'Last hour' : r === '24h' ? 'Last 24 hours' : 'Last 7 days'}
+                {r === '1h' ? 'Last hour' : r === '6h' ? 'Last 6h' : r === '24h' ? 'Last 24h' : r === '7d' ? 'Last 7 days' : 'Last 30 days'}
               </button>
             ))}
+            {isZoomed && (
+              <button
+                onClick={resetZoom}
+                className="px-3 py-1.5 text-sm rounded-md border transition-colors bg-background text-muted-foreground border-border hover:text-foreground"
+              >
+                Reset zoom
+              </button>
+            )}
+            {isZoomed && zoomedBounds && (
+              <span className="text-xs text-muted-foreground">
+                {format(zoomedBounds.from, 'MMM d HH:mm')} → {format(zoomedBounds.to, 'MMM d HH:mm')}
+              </span>
+            )}
           </div>
 
           {metricsLoading ? (
@@ -671,76 +674,14 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis
-                        dataKey="time"
-                        type="number"
-                        scale="time"
-                        domain={['dataMin', () => Date.now()]}
-                        tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                        tickLine={false}
-                        tickFormatter={(ts: number) => format(new Date(ts), tickFormat)}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                        tickLine={false}
-                        tickFormatter={(v: number) => `${v}%`}
-                        width={40}
-                      />
-                      <Tooltip
-                        formatter={(value) => [`${value}%`]}
-                        labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--popover))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px',
-                          color: 'hsl(var(--popover-foreground))',
-                          fontSize: '12px',
-                        }}
-                      />
-                      <Legend
-                        wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }}
-                      />
-                      {offlinePeriods.map((period, i) => (
-                        <ReferenceArea
-                          key={i}
-                          x1={period.start}
-                          x2={period.end ?? now}
-                          fill="hsl(220, 13%, 60%)"
-                          fillOpacity={0.15}
-                          label={{ value: 'Offline', position: 'insideTop', fontSize: 11, fill: 'hsl(220, 13%, 30%)', fontWeight: 500 }}
-                        />
-                      ))}
-                      <Line
-                        type="monotone"
-                        dataKey="cpu"
-                        name="CPU"
-                        stroke="hsl(221, 83%, 53%)"
-                        dot={false}
-                        strokeWidth={2}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="memory"
-                        name="Memory"
-                        stroke="hsl(142, 71%, 45%)"
-                        dot={false}
-                        strokeWidth={2}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="disk"
-                        name="Disk"
-                        stroke="hsl(38, 92%, 50%)"
-                        dot={false}
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <HostMetricsLineChart
+                    data={chartData}
+                    xAxisDomain={xAxisDomain}
+                    tickFormat={tickFormat}
+                    selectionRange={selectionRange}
+                    chartHandlers={chartHandlers}
+                    chartCursor={chartCursor}
+                  />
                 </CardContent>
               </Card>
 
@@ -751,7 +692,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
                     Heartbeat Interval
                     <span className="text-xs font-normal text-muted-foreground">
                       — seconds between consecutive heartbeats
-                      {metricsRange !== '1h' && ' (max per bucket)'}
+                      {spanHours > 2 && ' (max per bucket)'}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -761,69 +702,14 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, late
                       No heartbeat data for this period.
                     </p>
                   ) : (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={heartbeatData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                        <XAxis
-                          dataKey="time"
-                          type="number"
-                          scale="time"
-                          domain={['dataMin', () => Date.now()]}
-                          tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                          tickLine={false}
-                          tickFormatter={(ts: number) => format(new Date(ts), tickFormat)}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis
-                          tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                          tickLine={false}
-                          tickFormatter={(v: number) => `${v}s`}
-                          width={40}
-                        />
-                        <Tooltip
-                          formatter={(value) => [`${value}s`, 'Interval']}
-                          labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--popover))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '6px',
-                            color: 'hsl(var(--popover-foreground))',
-                            fontSize: '12px',
-                          }}
-                        />
-                        {/* Expected heartbeat interval reference line */}
-                        <ReferenceLine
-                          y={30}
-                          stroke="hsl(var(--muted-foreground))"
-                          strokeDasharray="4 2"
-                          strokeOpacity={0.5}
-                          label={{ value: '30s', position: 'insideTopRight', fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                        />
-                        {offlinePeriods.map((period, i) => (
-                          <ReferenceArea
-                            key={i}
-                            x1={period.start}
-                            x2={period.end ?? now}
-                            fill="hsl(220, 13%, 60%)"
-                            fillOpacity={0.15}
-                          />
-                        ))}
-                        <Bar dataKey="intervalSecs" name="Interval" radius={[2, 2, 0, 0]} maxBarSize={24}>
-                          {heartbeatData.map((entry, i) => (
-                            <Cell
-                              key={i}
-                              fill={
-                                entry.intervalSecs <= 45
-                                  ? 'hsl(142, 71%, 45%)'
-                                  : entry.intervalSecs <= 120
-                                    ? 'hsl(38, 92%, 50%)'
-                                    : 'hsl(0, 84%, 60%)'
-                              }
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <HostHeartbeatBarChart
+                      data={heartbeatData}
+                      xAxisDomain={xAxisDomain}
+                      tickFormat={tickFormat}
+                      selectionRange={selectionRange}
+                      chartHandlers={chartHandlers}
+                      chartCursor={chartCursor}
+                    />
                   )}
                 </CardContent>
               </Card>

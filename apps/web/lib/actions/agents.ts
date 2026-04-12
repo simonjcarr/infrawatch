@@ -21,7 +21,7 @@ import {
   agentQueries,
   resourceTags,
 } from '@/lib/db/schema'
-import { eq, and, isNull, gt, gte, asc, sql, inArray } from 'drizzle-orm'
+import { eq, and, isNull, gt, gte, lte, asc, sql, inArray } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { getOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
@@ -231,69 +231,173 @@ export async function getActiveEnrolmentToken(token: string) {
   })
 }
 
-export type MetricsRange = '1h' | '24h' | '7d'
+export type MetricsPreset = '1h' | '6h' | '24h' | '7d' | '30d'
+export type MetricsRange = MetricsPreset
+export type MetricsBounds = { from: number; to: number }
+export type MetricsQuery = MetricsPreset | MetricsBounds
+
+// Maximum data points returned by any metrics query — keeps payloads small and charts fast
+const MAX_DATA_POINTS = 300
+
+// Bucket intervals in seconds from finest to coarsest (all must be clean divisors of their neighbours)
+const NICE_BUCKET_INTERVALS_S = [60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400]
+
+type BucketMode =
+  | { kind: 'raw' }
+  | { kind: 'bucket'; intervalSecs: number; useAggregate: 'hourly' | 'daily' | null }
+
+function resolveTimeBounds(query: MetricsQuery): {
+  from: Date
+  to: Date
+  fromISO: string
+  toISO: string
+} {
+  let fromMs: number, toMs: number
+  if (typeof query === 'string') {
+    toMs = Date.now()
+    const h: Record<MetricsPreset, number> = { '1h': 1, '6h': 6, '24h': 24, '7d': 168, '30d': 720 }
+    fromMs = toMs - h[query] * 3_600_000
+  } else {
+    fromMs = query.from
+    toMs = query.to
+  }
+  const from = new Date(fromMs)
+  const to = new Date(toMs)
+  return { from, to, fromISO: from.toISOString(), toISO: to.toISOString() }
+}
+
+// Computes the coarsest bucket that keeps point count ≤ MAX_DATA_POINTS.
+// Returns 'raw' when the span is short enough that raw data fits within the cap.
+function computeBucketMode(spanMs: number): BucketMode {
+  const idealSecs = spanMs / (MAX_DATA_POINTS * 1000)
+  if (idealSecs <= 30) {
+    // Raw heartbeat interval is ~30s — raw rows will fit within the cap
+    return { kind: 'raw' }
+  }
+  const intervalSecs = NICE_BUCKET_INTERVALS_S.find((n) => n >= idealSecs) ?? 86400
+  return {
+    kind: 'bucket',
+    intervalSecs,
+    // Use pre-computed TimescaleDB continuous aggregates when the interval exactly matches
+    useAggregate: intervalSecs === 3600 ? 'hourly' : intervalSecs === 86400 ? 'daily' : null,
+  }
+}
+
+// Returns a PostgreSQL interval string for use in time_bucket() calls
+function bucketIntervalStr(intervalSecs: number): string {
+  if (intervalSecs < 3600) return `${intervalSecs / 60} minutes`
+  if (intervalSecs < 86400) return `${intervalSecs / 3600} hours`
+  return `${intervalSecs / 86400} days`
+}
 
 export async function getHostMetrics(
   orgId: string,
   hostId: string,
-  range: MetricsRange,
+  query: MetricsQuery,
 ): Promise<HostMetric[]> {
-  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
-  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
-  // db.execute() does not serialise Date parameters — use ISO string instead
-  const cutoffISO = cutoff.toISOString()
+  const { from, to, fromISO, toISO } = resolveTimeBounds(query)
+  const bucketMode = computeBucketMode(to.getTime() - from.getTime())
 
-  // For 7d and 24h ranges, try to use the continuous aggregate views (TimescaleDB).
-  // Falls back to raw table on plain PostgreSQL or if the view doesn't exist yet.
-  if (range === '7d' || range === '24h') {
-    const view = range === '7d' ? 'host_metrics_daily' : 'host_metrics_hourly'
+  if (bucketMode.kind === 'bucket') {
+    // Continuous aggregate path — fast pre-computed 1h or 1d buckets
+    if (bucketMode.useAggregate != null) {
+      const view = bucketMode.useAggregate === 'daily' ? 'host_metrics_daily' : 'host_metrics_hourly'
+      try {
+        const rows = await db.execute<{
+          id: string
+          organisation_id: string
+          host_id: string
+          recorded_at: Date
+          cpu_percent: number | null
+          memory_percent: number | null
+          disk_percent: number | null
+          uptime_seconds: number | null
+          created_at: Date
+        }>(sql`
+          SELECT
+            concat(${hostId}, '-', bucket::text) AS id,
+            ${orgId}                             AS organisation_id,
+            ${hostId}                            AS host_id,
+            bucket                               AS recorded_at,
+            cpu_percent,
+            memory_percent,
+            disk_percent,
+            NULL::integer                        AS uptime_seconds,
+            bucket                               AS created_at
+          FROM ${sql.identifier(view)}
+          WHERE organisation_id = ${orgId}
+            AND host_id         = ${hostId}
+            AND bucket         >= ${fromISO}
+            AND bucket         <= ${toISO}
+          ORDER BY bucket ASC
+          LIMIT ${MAX_DATA_POINTS}
+        `)
+        const rowArr = Array.from(rows)
+        if (rowArr.length > 0) {
+          return rowArr.map((r) => ({
+            id: r.id,
+            organisationId: r.organisation_id,
+            hostId: r.host_id,
+            recordedAt: new Date(r.recorded_at),
+            cpuPercent: r.cpu_percent,
+            memoryPercent: r.memory_percent,
+            diskPercent: r.disk_percent,
+            uptimeSeconds: r.uptime_seconds,
+            createdAt: new Date(r.created_at),
+          }))
+        }
+      } catch {
+        // Aggregate view not available — fall through to time_bucket
+      }
+    }
+
+    // On-the-fly time_bucket for other intervals (or fallback from aggregate)
+    // Use sql.raw() for the interval so every occurrence shares the same literal —
+    // Drizzle's parameterised $N placeholders make PostgreSQL treat each reference as a
+    // distinct expression, which breaks GROUP BY validation.
+    const intervalStr = bucketIntervalStr(bucketMode.intervalSecs)
+    const bucket = sql.raw(`time_bucket('${intervalStr}'::interval, recorded_at)`)
     try {
       const rows = await db.execute<{
-        id: string
-        organisation_id: string
-        host_id: string
         recorded_at: Date
         cpu_percent: number | null
         memory_percent: number | null
         disk_percent: number | null
-        uptime_seconds: number | null
-        created_at: Date
       }>(sql`
         SELECT
-          concat(${hostId}, '-', bucket::text) AS id,
-          ${orgId}                             AS organisation_id,
-          ${hostId}                            AS host_id,
-          bucket                               AS recorded_at,
-          cpu_percent,
-          memory_percent,
-          disk_percent,
-          NULL::integer                        AS uptime_seconds,
-          bucket                               AS created_at
-        FROM ${sql.identifier(view)}
+          ${bucket}                  AS recorded_at,
+          AVG(cpu_percent)::real     AS cpu_percent,
+          AVG(memory_percent)::real  AS memory_percent,
+          AVG(disk_percent)::real    AS disk_percent
+        FROM host_metrics
         WHERE organisation_id = ${orgId}
           AND host_id         = ${hostId}
-          AND bucket         >= ${cutoffISO}
-        ORDER BY bucket ASC
+          AND recorded_at    >= ${fromISO}
+          AND recorded_at    <= ${toISO}
+        GROUP BY ${bucket}
+        ORDER BY 1 ASC
+        LIMIT ${MAX_DATA_POINTS}
       `)
       const rowArr = Array.from(rows)
       if (rowArr.length > 0) {
         return rowArr.map((r) => ({
-          id: r.id,
-          organisationId: r.organisation_id,
-          hostId: r.host_id,
+          id: `${hostId}-${r.recorded_at}`,
+          organisationId: orgId,
+          hostId,
           recordedAt: new Date(r.recorded_at),
           cpuPercent: r.cpu_percent,
           memoryPercent: r.memory_percent,
           diskPercent: r.disk_percent,
-          uptimeSeconds: r.uptime_seconds,
-          createdAt: new Date(r.created_at),
+          uptimeSeconds: null,
+          createdAt: new Date(r.recorded_at),
         }))
       }
     } catch {
-      // Aggregate view not available — fall through to raw query
+      // time_bucket not available — fall through to raw
     }
   }
 
+  // Raw path (short spans) or final fallback — always capped to prevent huge payloads
   return db
     .select()
     .from(hostMetrics)
@@ -301,22 +405,24 @@ export async function getHostMetrics(
       and(
         eq(hostMetrics.organisationId, orgId),
         eq(hostMetrics.hostId, hostId),
-        gte(hostMetrics.recordedAt, cutoff),
+        gte(hostMetrics.recordedAt, from),
+        lte(hostMetrics.recordedAt, to),
       ),
     )
     .orderBy(asc(hostMetrics.recordedAt))
+    .limit(MAX_DATA_POINTS)
 }
 
 export async function getAgentOfflinePeriods(
   orgId: string,
   agentId: string,
-  range: MetricsRange,
+  query: MetricsQuery,
 ): Promise<OfflinePeriod[]> {
-  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
-  const windowStart = Date.now() - hours * 60 * 60 * 1000
+  const { from, to } = resolveTimeBounds(query)
+  const windowStart = from.getTime()
   // Look back one extra hour before the window to capture an offline event that
   // started before the visible range.
-  const lookback = new Date(windowStart - 60 * 60 * 1000)
+  const lookback = new Date(from.getTime() - 3_600_000)
 
   const events = await db
     .select({ status: agentStatusHistory.status, createdAt: agentStatusHistory.createdAt })
@@ -326,6 +432,7 @@ export async function getAgentOfflinePeriods(
         eq(agentStatusHistory.agentId, agentId),
         eq(agentStatusHistory.organisationId, orgId),
         gte(agentStatusHistory.createdAt, lookback),
+        lte(agentStatusHistory.createdAt, to),
       ),
     )
     .orderBy(asc(agentStatusHistory.createdAt))
@@ -344,7 +451,7 @@ export async function getAgentOfflinePeriods(
     }
   }
 
-  // Agent is still offline — period extends to now
+  // Agent is still offline — period extends to end of window
   if (offlineStart !== null) {
     periods.push({ start: offlineStart, end: null })
   }
@@ -357,14 +464,12 @@ export type HeartbeatPoint = { time: number; intervalSecs: number }
 export async function getHeartbeatHistory(
   orgId: string,
   hostId: string,
-  range: MetricsRange,
+  query: MetricsQuery,
 ): Promise<HeartbeatPoint[]> {
-  const hours = range === '1h' ? 1 : range === '24h' ? 24 : 168
-  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
-  // db.execute() does not serialise Date parameters — use ISO string instead
-  const cutoffISO = cutoff.toISOString()
+  const { from, to, fromISO, toISO } = resolveTimeBounds(query)
+  const bucketMode = computeBucketMode(to.getTime() - from.getTime())
 
-  if (range === '1h') {
+  if (bucketMode.kind === 'raw') {
     // Individual intervals — LAG() gives the gap between consecutive heartbeats
     const rows = await db.execute<{ recorded_at: string; interval_secs: number | null }>(sql`
       SELECT
@@ -375,8 +480,10 @@ export async function getHeartbeatHistory(
       FROM host_metrics
       WHERE organisation_id = ${orgId}
         AND host_id         = ${hostId}
-        AND recorded_at    >= ${cutoffISO}
+        AND recorded_at    >= ${fromISO}
+        AND recorded_at    <= ${toISO}
       ORDER BY recorded_at ASC
+      LIMIT ${MAX_DATA_POINTS}
     `)
     return Array.from(rows)
       .filter((r) => r.interval_secs != null)
@@ -386,11 +493,10 @@ export async function getHeartbeatHistory(
       }))
   }
 
-  // 24h/7d: bucket by 5-minute or 1-hour windows and take the MAX gap per
-  // bucket so outages are visible even when there are many healthy heartbeats
-  // in the same window. Uses TimescaleDB time_bucket; falls back to raw LAG
-  // on plain PostgreSQL.
-  const bucketInterval = range === '24h' ? sql.raw("'5 minutes'") : sql.raw("'1 hour'")
+  // Bucketed: take the MAX gap per bucket so outages are visible even when
+  // there are many healthy heartbeats within the same window.
+  // Uses TimescaleDB time_bucket; falls back to raw LAG on plain PostgreSQL.
+  const intervalStr = bucketIntervalStr(bucketMode.intervalSecs)
   try {
     const rows = await db.execute<{ bucket: string; max_interval_secs: number | null }>(sql`
       WITH intervals AS (
@@ -402,15 +508,17 @@ export async function getHeartbeatHistory(
         FROM host_metrics
         WHERE organisation_id = ${orgId}
           AND host_id         = ${hostId}
-          AND recorded_at    >= ${cutoffISO}
+          AND recorded_at    >= ${fromISO}
+          AND recorded_at    <= ${toISO}
       )
       SELECT
-        time_bucket(${bucketInterval}::interval, recorded_at) AS bucket,
-        MAX(interval_secs)                                     AS max_interval_secs
+        time_bucket(${intervalStr}::interval, recorded_at) AS bucket,
+        MAX(interval_secs)                                 AS max_interval_secs
       FROM intervals
       WHERE interval_secs IS NOT NULL
       GROUP BY bucket
       ORDER BY bucket ASC
+      LIMIT ${MAX_DATA_POINTS}
     `)
     return Array.from(rows)
       .filter((r) => r.max_interval_secs != null)
@@ -419,7 +527,7 @@ export async function getHeartbeatHistory(
         intervalSecs: parseFloat(Number(r.max_interval_secs).toFixed(1)),
       }))
   } catch {
-    // Plain PostgreSQL fallback — raw intervals, capped to avoid massive payloads
+    // Plain PostgreSQL fallback — raw intervals with cap
     const rows = await db.execute<{ recorded_at: string; interval_secs: number | null }>(sql`
       SELECT
         recorded_at,
@@ -429,9 +537,10 @@ export async function getHeartbeatHistory(
       FROM host_metrics
       WHERE organisation_id = ${orgId}
         AND host_id         = ${hostId}
-        AND recorded_at    >= ${cutoffISO}
+        AND recorded_at    >= ${fromISO}
+        AND recorded_at    <= ${toISO}
       ORDER BY recorded_at ASC
-      LIMIT 500
+      LIMIT ${MAX_DATA_POINTS}
     `)
     return Array.from(rows)
       .filter((r) => r.interval_secs != null)

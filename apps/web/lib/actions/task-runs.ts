@@ -14,6 +14,8 @@ import type {
   TaskType,
   TaskConfig,
   PatchTaskConfig,
+  CustomScriptTaskConfig,
+  ServiceTaskConfig,
   Host,
 } from '@/lib/db/schema'
 
@@ -162,7 +164,7 @@ export async function listTaskRunsForHost(
       inArray(taskRuns.id, runIds),
       eq(taskRuns.organisationId, orgId),
       isNull(taskRuns.deletedAt),
-      ...(taskType ? [eq(taskRuns.taskType, taskType as 'patch' | 'custom_script')] : []),
+      ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
     ),
     orderBy: [desc(taskRuns.createdAt)],
     limit: 50,
@@ -186,7 +188,7 @@ export async function listTaskRunsForGroup(
       eq(taskRuns.targetType, 'group'),
       eq(taskRuns.targetId, groupId),
       isNull(taskRuns.deletedAt),
-      ...(taskType ? [eq(taskRuns.taskType, taskType as 'patch' | 'custom_script')] : []),
+      ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
     ),
     orderBy: [desc(taskRuns.createdAt)],
     limit: 50,
@@ -269,6 +271,148 @@ export async function cancelTaskRun(
   } catch (err) {
     console.error('Failed to cancel task run:', err)
     return { error: 'Failed to cancel task run' }
+  }
+}
+
+// ── Custom script actions ─────────────────────────────────────────────────────
+
+/**
+ * Triggers a custom script run against a single host.
+ * Works on any OS — the agent will return an error if the interpreter is absent.
+ */
+export async function triggerCustomScriptRun(
+  orgId: string,
+  userId: string,
+  hostId: string,
+  script: string,
+  interpreter: 'sh' | 'bash' | 'python3',
+  timeoutSeconds?: number,
+): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  const host = await db.query.hosts.findFirst({
+    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+  })
+  if (!host) return { error: 'Host not found' }
+
+  const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
+  return createTaskRun(orgId, userId, 'host', hostId, 'custom_script', config, 1, [hostId], [])
+}
+
+/**
+ * Triggers a custom script run against all hosts in a group.
+ * All hosts are targeted regardless of OS — the agent handles interpreter availability.
+ */
+export async function triggerGroupCustomScriptRun(
+  orgId: string,
+  userId: string,
+  groupId: string,
+  script: string,
+  interpreter: 'sh' | 'bash' | 'python3',
+  maxParallel: number,
+  timeoutSeconds?: number,
+): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  const members = await db.query.hostGroupMembers.findMany({
+    where: and(
+      eq(hostGroupMembers.groupId, groupId),
+      eq(hostGroupMembers.organisationId, orgId),
+      isNull(hostGroupMembers.deletedAt),
+    ),
+    columns: { hostId: true },
+  })
+  if (members.length === 0) return { error: 'Group has no members' }
+
+  const hostIds = members.map((m) => m.hostId)
+  const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
+  return createTaskRun(orgId, userId, 'group', groupId, 'custom_script', config, maxParallel, hostIds, [])
+}
+
+// ── Service management actions ────────────────────────────────────────────────
+
+/**
+ * Triggers a systemctl service action against a single Linux host.
+ * Returns an error for non-Linux hosts.
+ */
+export async function triggerServiceAction(
+  orgId: string,
+  userId: string,
+  hostId: string,
+  serviceName: string,
+  action: 'start' | 'stop' | 'restart' | 'status',
+): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  const host = await db.query.hosts.findFirst({
+    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+  })
+  if (!host) return { error: 'Host not found' }
+  if (host.os?.toLowerCase() !== 'linux') {
+    return { error: 'Service management is only supported on Linux hosts' }
+  }
+
+  const config: ServiceTaskConfig = { service_name: serviceName, action }
+  return createTaskRun(orgId, userId, 'host', hostId, 'service', config, 1, [hostId], [])
+}
+
+/**
+ * Triggers a systemctl service action against all Linux hosts in a group.
+ * Non-Linux hosts are immediately recorded as 'skipped'.
+ */
+export async function triggerGroupServiceAction(
+  orgId: string,
+  userId: string,
+  groupId: string,
+  serviceName: string,
+  action: 'start' | 'stop' | 'restart' | 'status',
+  maxParallel: number,
+): Promise<
+  { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
+> {
+  const members = await db.query.hostGroupMembers.findMany({
+    where: and(
+      eq(hostGroupMembers.groupId, groupId),
+      eq(hostGroupMembers.organisationId, orgId),
+      isNull(hostGroupMembers.deletedAt),
+    ),
+    columns: { hostId: true },
+  })
+  if (members.length === 0) return { error: 'Group has no members' }
+
+  const hostIds = members.map((m) => m.hostId)
+  const groupHosts = await db.query.hosts.findMany({
+    where: and(
+      inArray(hosts.id, hostIds),
+      eq(hosts.organisationId, orgId),
+      isNull(hosts.deletedAt),
+    ),
+  })
+
+  const pendingHostIds: string[] = []
+  const skipHosts: { hostId: string; reason: string }[] = []
+
+  for (const host of groupHosts) {
+    if (host.os?.toLowerCase() === 'linux') {
+      pendingHostIds.push(host.id)
+    } else {
+      skipHosts.push({
+        hostId: host.id,
+        reason: `non-Linux host (os: ${host.os ?? 'unknown'})`,
+      })
+    }
+  }
+
+  if (pendingHostIds.length === 0 && skipHosts.length === 0) {
+    return { error: 'No hosts found in group' }
+  }
+
+  const config: ServiceTaskConfig = { service_name: serviceName, action }
+  const result = await createTaskRun(
+    orgId, userId, 'group', groupId, 'service', config, maxParallel, pendingHostIds, skipHosts,
+  )
+
+  if ('error' in result) return result
+
+  return {
+    success: true,
+    taskRunId: result.taskRunId,
+    targetedCount: pendingHostIds.length,
+    skippedCount: skipHosts.length,
   }
 }
 

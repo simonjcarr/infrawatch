@@ -12,10 +12,15 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Terminal,
+  Power,
+  AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -33,9 +38,20 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Label } from '@/components/ui/label'
-import { triggerPatchRun, listTaskRunsForHost } from '@/lib/actions/task-runs'
+import {
+  triggerPatchRun,
+  triggerCustomScriptRun,
+  triggerServiceAction,
+  listTaskRunsForHost,
+} from '@/lib/actions/task-runs'
 import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
-import type { PatchTaskConfig, PatchTaskResult } from '@/lib/db/schema'
+import type {
+  PatchTaskConfig,
+  PatchTaskResult,
+  CustomScriptTaskConfig,
+  ServiceTaskConfig,
+  ServiceTaskResult,
+} from '@/lib/db/schema'
 import type { HostWithAgent } from '@/lib/actions/agents'
 import { useRouter } from 'next/navigation'
 
@@ -84,12 +100,84 @@ function RunStatusBadge({ status }: { status: string }) {
   }
 }
 
+function taskTypeLabel(taskType: string): string {
+  switch (taskType) {
+    case 'patch': return 'Patch'
+    case 'custom_script': return 'Script'
+    case 'service': return 'Service'
+    default: return taskType
+  }
+}
+
+function TaskDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: string }) {
+  const thisHost = run.hosts.find((h) => h.hostId === hostId)
+
+  if (run.taskType === 'patch') {
+    const config = run.config as PatchTaskConfig
+    const result = thisHost?.result as PatchTaskResult | null
+    return (
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground">
+          {config.mode === 'security' ? 'Security only' : 'All updates'}
+        </p>
+        {result?.reboot_required && (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs">
+            <RotateCcw className="size-3 mr-1" />
+            Reboot req.
+          </Badge>
+        )}
+      </div>
+    )
+  }
+
+  if (run.taskType === 'custom_script') {
+    const config = run.config as CustomScriptTaskConfig
+    return <span className="text-sm text-muted-foreground">{config.interpreter}</span>
+  }
+
+  if (run.taskType === 'service') {
+    const config = run.config as ServiceTaskConfig
+    const result = thisHost?.result as ServiceTaskResult | null
+    return (
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground capitalize">
+          {config.action} · {config.service_name}
+        </p>
+        {result !== null && result !== undefined && (
+          <Badge
+            className={
+              result.is_active
+                ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100 text-xs'
+                : 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100 text-xs'
+            }
+          >
+            {result.is_active ? 'Active' : 'Inactive'}
+          </Badge>
+        )}
+      </div>
+    )
+  }
+
+  return <span className="text-sm text-muted-foreground">—</span>
+}
+
 export function TasksTab({ orgId, host, userId }: Props) {
   const router = useRouter()
+  const isLinux = host.os?.toLowerCase() === 'linux'
+
+  // Patch dialog state
   const [patchOpen, setPatchOpen] = useState(false)
   const [patchMode, setPatchMode] = useState<'all' | 'security'>('all')
 
-  const isLinux = host.os?.toLowerCase() === 'linux'
+  // Script dialog state
+  const [scriptOpen, setScriptOpen] = useState(false)
+  const [scriptBody, setScriptBody] = useState('')
+  const [interpreter, setInterpreter] = useState<'sh' | 'bash' | 'python3'>('sh')
+
+  // Service dialog state
+  const [serviceOpen, setServiceOpen] = useState(false)
+  const [serviceName, setServiceName] = useState('')
+  const [serviceAction, setServiceAction] = useState<'start' | 'stop' | 'restart' | 'status'>('restart')
 
   const { data: taskRuns = [] } = useQuery({
     queryKey: ['task-runs-host', orgId, host.id],
@@ -104,9 +192,23 @@ export function TasksTab({ orgId, host, userId }: Props) {
     mutationFn: () => triggerPatchRun(orgId, userId, host.id, patchMode),
     onSuccess: (result) => {
       setPatchOpen(false)
-      if ('taskRunId' in result) {
-        router.push(`/tasks/${result.taskRunId}`)
-      }
+      if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
+    },
+  })
+
+  const { mutate: doScriptRun, isPending: isScripting } = useMutation({
+    mutationFn: () => triggerCustomScriptRun(orgId, userId, host.id, scriptBody, interpreter),
+    onSuccess: (result) => {
+      setScriptOpen(false)
+      if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
+    },
+  })
+
+  const { mutate: doServiceAction, isPending: isServicing } = useMutation({
+    mutationFn: () => triggerServiceAction(orgId, userId, host.id, serviceName, serviceAction),
+    onSuccess: (result) => {
+      setServiceOpen(false)
+      if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
     },
   })
 
@@ -117,102 +219,80 @@ export function TasksTab({ orgId, host, userId }: Props) {
         <div>
           <h3 className="text-base font-semibold text-foreground">Task Runs</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Run built-in operations against this host.
+            Run operations against this host.
           </p>
         </div>
-        {isLinux && (
-          <Button onClick={() => setPatchOpen(true)} size="sm">
-            <Shield className="size-4 mr-1.5" />
-            Run Patch
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setScriptOpen(true)}>
+            <Terminal className="size-4 mr-1.5" />
+            Run Script
           </Button>
-        )}
+          {isLinux && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setServiceOpen(true)}>
+                <Power className="size-4 mr-1.5" />
+                Service
+              </Button>
+              <Button size="sm" onClick={() => setPatchOpen(true)}>
+                <Shield className="size-4 mr-1.5" />
+                Run Patch
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Non-Linux notice */}
-      {!isLinux && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <Shield className="size-7 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm font-medium text-foreground">Task execution not supported</p>
+      {/* Task run history */}
+      {taskRuns.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-10 text-center">
+          <RefreshCw className="size-7 mx-auto text-muted-foreground mb-3" />
+          <p className="text-sm font-medium text-foreground">No task runs yet</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Built-in tasks such as patching are only available on Linux hosts.
-            {host.os ? ` This host is running ${host.os}.` : ''}
+            Use the buttons above to run a task on this host.
           </p>
         </div>
-      )}
-
-      {/* Task run history */}
-      {isLinux && (
-        <>
-          {taskRuns.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-10 text-center">
-              <RefreshCw className="size-7 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm font-medium text-foreground">No task runs yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Run Patch to start the first task run on this host.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Task</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Reboot</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead className="w-20" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {taskRuns.map((run) => {
-                    const config = run.config as PatchTaskConfig
-                    const thisHost = run.hosts.find((h) => h.hostId === host.id)
-                    const result = thisHost?.result as PatchTaskResult | null
-                    const rebootRequired = result?.reboot_required ?? false
-
-                    return (
-                      <TableRow key={run.id}>
-                        <TableCell className="font-medium capitalize">
-                          {run.taskType === 'patch' ? 'Patch' : run.taskType}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground capitalize">
-                          {config.mode === 'security' ? 'Security only' : 'All updates'}
-                        </TableCell>
-                        <TableCell>
-                          <RunStatusBadge status={run.status} />
-                        </TableCell>
-                        <TableCell>
-                          {rebootRequired ? (
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs">
-                              <RotateCcw className="size-3 mr-1" />
-                              Required
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {run.startedAt
-                            ? formatDistanceToNow(new Date(run.startedAt), { addSuffix: true })
-                            : formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
-                        </TableCell>
-                        <TableCell>
-                          <Link href={`/tasks/${run.id}`}>
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-                              {isRunActive(run.status) ? 'View live' : 'View'}
-                              <ExternalLink className="size-3" />
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </>
+      ) : (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Task</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Started</TableHead>
+                <TableHead className="w-20" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {taskRuns.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell className="font-medium">
+                    {taskTypeLabel(run.taskType)}
+                  </TableCell>
+                  <TableCell>
+                    <TaskDetailsCell run={run} hostId={host.id} />
+                  </TableCell>
+                  <TableCell>
+                    <RunStatusBadge status={run.status} />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {run.startedAt
+                      ? formatDistanceToNow(new Date(run.startedAt), { addSuffix: true })
+                      : formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/tasks/${run.id}`}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
+                        {isRunActive(run.status) ? 'View live' : 'View'}
+                        <ExternalLink className="size-3" />
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* Patch dialog */}
@@ -252,12 +332,127 @@ export function TasksTab({ orgId, host, userId }: Props) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPatchOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setPatchOpen(false)}>Cancel</Button>
             <Button onClick={() => doPatchRun()} disabled={isPatching}>
               {isPatching && <Loader2 className="size-4 mr-1 animate-spin" />}
               Run Patch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Script dialog */}
+      <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Run Script</DialogTitle>
+            <DialogDescription>
+              Write a script to execute on this host. Output is streamed in real time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Interpreter</Label>
+              <div className="flex gap-2">
+                {(['sh', 'bash', 'python3'] as const).map((i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInterpreter(i)}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-mono transition-colors ${
+                      interpreter === i
+                        ? 'border-primary bg-primary/5 text-foreground font-medium'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Script</Label>
+              <Textarea
+                placeholder={`#!/bin/${interpreter}\necho "Hello from $(hostname)"`}
+                value={scriptBody}
+                onChange={(e) => setScriptBody(e.target.value)}
+                className="font-mono text-xs min-h-36 resize-y"
+                rows={8}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScriptOpen(false)}>Cancel</Button>
+            <Button onClick={() => doScriptRun()} disabled={isScripting || !scriptBody.trim()}>
+              {isScripting && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Run Script
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Service dialog */}
+      <Dialog open={serviceOpen} onOpenChange={setServiceOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Service Action</DialogTitle>
+            <DialogDescription>
+              Run a systemctl command against a service on this host.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Service name</Label>
+              <Input
+                placeholder="e.g. nginx, postgresql, ssh"
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Action</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { value: 'start', desc: 'Start the service' },
+                    { value: 'stop', desc: 'Stop the service' },
+                    { value: 'restart', desc: 'Restart the service' },
+                    { value: 'status', desc: 'Check current status' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setServiceAction(opt.value)}
+                    className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                      serviceAction === opt.value
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-foreground capitalize">{opt.value}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {!isLinux && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+                <AlertTriangle className="size-3.5 inline mr-1" />
+                Service management requires systemctl (Linux only).
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServiceOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => doServiceAction()}
+              disabled={isServicing || !serviceName.trim()}
+            >
+              {isServicing && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Run Action
             </Button>
           </DialogFooter>
         </DialogContent>

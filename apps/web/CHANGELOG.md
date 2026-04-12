@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.19.0...web/v0.20.0) (2026-04-12)
+
+
+### Features
+
+* **metrics:** add chart zoom and smart metrics bucketing ([73db515](https://github.com/simonjcarr/infrawatch/commit/73db515b24540a3767e188e9badc9b073e4a14c9))
+* **metrics:** add chart zoom and smart metrics bucketing ([07b12cd](https://github.com/simonjcarr/infrawatch/commit/07b12cda4c32c4e63fd32042590caff4c5827afd))
+
 ## [0.19.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.18.0...web/v0.19.0) (2026-04-11)
 
 

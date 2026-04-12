@@ -134,6 +134,8 @@ export function TerminalTab({ orgId, host }: Props) {
           clearTimeout(waitingTimer)
           term.writeln('\r\n\x1b[90mSession ended.\x1b[0m')
           setStatus('closed')
+        } else if (msg.type === 'diagnostic' && msg.message) {
+          term.writeln('\x1b[90m[diag] ' + msg.message + '\x1b[0m')
         } else if (msg.type === 'error' && msg.message) {
           clearTimeout(waitingTimer)
           term.writeln('\r\n\x1b[31mError: ' + msg.message + '\x1b[0m')

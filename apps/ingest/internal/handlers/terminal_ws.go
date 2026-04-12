@@ -73,7 +73,7 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("terminal ws: session activated", "session_id", sessionID, "host_id", info.HostID)
+	slog.Info("terminal ws: session activated", "session_id", sessionID, "host_id", info.HostID, "org_id", info.OrganisationID)
 
 	// Register in terminal store so the gRPC Terminal handler can find us
 	sess, sessCtx := h.store.Register(sessionID, info.LoggingEnabled)
@@ -94,17 +94,39 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer close(done)
 
-		// Wait for the agent to connect via gRPC and bridge this session.
-		select {
-		case <-sess.agentConnected:
-			slog.Info("terminal ws: agent connected, bridge is up", "session_id", sessionID)
-			agentMsg, _ := json.Marshal(wsMessage{Type: "agent_connected"})
-			if err := conn.Write(ctx, websocket.MessageText, agentMsg); err != nil {
+		// Poll DB status every 3s and report to browser while waiting for agent.
+		// This helps diagnose whether the heartbeat finds and pushes the session.
+		diagTicker := time.NewTicker(3 * time.Second)
+		defer diagTicker.Stop()
+
+		for {
+			select {
+			case <-sess.agentConnected:
+				slog.Info("terminal ws: agent connected, bridge is up", "session_id", sessionID)
+				agentMsg, _ := json.Marshal(wsMessage{Type: "agent_connected"})
+				if err := conn.Write(ctx, websocket.MessageText, agentMsg); err != nil {
+					return
+				}
+				goto relayOutput
+			case <-sessCtx.Done():
 				return
+			case <-diagTicker.C:
+				dbStatus, err := queries.GetTerminalSessionStatus(ctx, h.pool, sessionID)
+				if err != nil {
+					slog.Warn("terminal ws: diag status query failed", "session_id", sessionID, "err", err)
+					continue
+				}
+				diagMsg, _ := json.Marshal(wsMessage{
+					Type: "diagnostic",
+					Msg:  "session_status=" + dbStatus + " host_id=" + info.HostID,
+				})
+				if err := conn.Write(ctx, websocket.MessageText, diagMsg); err != nil {
+					return
+				}
 			}
-		case <-sessCtx.Done():
-			return
 		}
+
+	relayOutput:
 
 		// Relay PTY output from the gRPC handler to the browser.
 		for {

@@ -110,6 +110,14 @@ func SetTerminalSessionError(ctx context.Context, pool *pgxpool.Pool, sessionID,
 	return nil
 }
 
+// GetTerminalSessionStatus returns the current status of a terminal session by session_id.
+func GetTerminalSessionStatus(ctx context.Context, pool *pgxpool.Pool, sessionID string) (string, error) {
+	const q = `SELECT status FROM terminal_sessions WHERE session_id = $1`
+	var status string
+	err := pool.QueryRow(ctx, q, sessionID).Scan(&status)
+	return status, err
+}
+
 // CleanupTerminalSessionsForHost marks all pending/active terminal sessions for
 // a host as 'error'. Used when an agent disconnects.
 func CleanupTerminalSessionsForHost(ctx context.Context, pool *pgxpool.Pool, hostID string) error {

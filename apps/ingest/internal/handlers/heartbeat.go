@@ -201,9 +201,7 @@ loop:
 			pending, err := queries.GetPendingQueriesForHost(ctx, h.pool, hostID)
 			if err != nil {
 				slog.Warn("fetching pending queries", "host_id", hostID, "err", err)
-				continue
-			}
-			if len(pending) > 0 {
+			} else if len(pending) > 0 {
 				pqs := make([]*agentv1.AgentQuery, 0, len(pending))
 				for _, p := range pending {
 					pqs = append(pqs, &agentv1.AgentQuery{QueryId: p.ID, QueryType: p.QueryType})
@@ -216,18 +214,14 @@ loop:
 			}
 
 			// Dispatch the next eligible task (parallelism enforced in SQL).
-			pendingTasks, err := queries.GetPendingTasksForHost(ctx, h.pool, hostID)
-			if err != nil {
-				slog.Warn("fetching pending tasks", "host_id", hostID, "err", err)
-				continue
-			}
-			if len(pendingTasks) > 0 {
+			pendingTasks, taskErr := queries.GetPendingTasksForHost(ctx, h.pool, hostID)
+			if taskErr != nil {
+				slog.Warn("fetching pending tasks", "host_id", hostID, "err", taskErr)
+			} else if len(pendingTasks) > 0 {
 				t := pendingTasks[0]
 				if err := queries.MarkTaskRunHostRunning(ctx, h.pool, t.ID); err != nil {
 					slog.Warn("marking task run host running", "task_run_host_id", t.ID, "err", err)
-					continue
-				}
-				if err := stream.Send(&agentv1.HeartbeatResponse{
+				} else if err := stream.Send(&agentv1.HeartbeatResponse{
 					Ok: true,
 					PendingTask: &agentv1.AgentTask{
 						TaskId:     t.ID,
@@ -237,15 +231,15 @@ loop:
 				}); err != nil {
 					slog.Warn("pushing pending task to agent", "task_run_host_id", t.ID, "err", err)
 					return err
+				} else {
+					slog.Info("dispatched task to agent", "host_id", hostID, "task_run_host_id", t.ID, "task_type", t.TaskType)
 				}
-				slog.Info("dispatched task to agent", "host_id", hostID, "task_run_host_id", t.ID, "task_type", t.TaskType)
 			}
-		}
 
 			// Send cancellation signals for any tasks the user has stopped.
-			cancelIDs, err := queries.GetCancellingTasksForHost(ctx, h.pool, hostID)
-			if err != nil {
-				slog.Warn("fetching cancelling tasks", "host_id", hostID, "err", err)
+			cancelIDs, cancelErr := queries.GetCancellingTasksForHost(ctx, h.pool, hostID)
+			if cancelErr != nil {
+				slog.Warn("fetching cancelling tasks", "host_id", hostID, "err", cancelErr)
 			} else if len(cancelIDs) > 0 {
 				if err := stream.Send(&agentv1.HeartbeatResponse{
 					Ok:            true,
@@ -273,6 +267,7 @@ loop:
 					slog.Info("pushed pending terminal sessions to agent", "host_id", hostID, "count", len(pendingSessions))
 				}
 			}
+		}
 	}
 
 	// Mark agent and host offline on stream close

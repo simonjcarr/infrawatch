@@ -23,6 +23,7 @@ import {
   Terminal,
   Power,
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -67,6 +68,7 @@ import {
   triggerGroupCustomScriptRun,
   triggerGroupServiceAction,
   listTaskRunsForGroup,
+  deleteTaskRuns,
 } from '@/lib/actions/task-runs'
 import type { HostGroupWithMembers } from '@/lib/actions/host-groups'
 import type { HostWithAgent } from '@/lib/actions/agents'
@@ -190,6 +192,9 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
   const [serviceAction, setServiceAction] = useState<'start' | 'stop' | 'restart' | 'status'>('restart')
   const [serviceMaxParallel, setServiceMaxParallel] = useState(1)
 
+  // Selection state for task history
+  const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set())
+
   const { data: group } = useQuery({
     queryKey: ['host-group', orgId, initialGroup.id],
     queryFn: () => getGroup(orgId, initialGroup.id),
@@ -254,6 +259,14 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
     onSuccess: (result) => {
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
+    },
+  })
+
+  const { mutate: doDeleteRuns, isPending: isDeletingRuns } = useMutation({
+    mutationFn: () => deleteTaskRuns(orgId, [...selectedRunIds]),
+    onSuccess: () => {
+      setSelectedRunIds(new Set())
+      queryClient.invalidateQueries({ queryKey: ['task-runs-group', orgId, initialGroup.id] })
     },
   })
 
@@ -383,6 +396,29 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
       {/* Task History */}
       <div className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Task History</h2>
+
+        {/* Selection toolbar */}
+        {selectedRunIds.size > 0 && (
+          <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2">
+            <span className="text-sm text-muted-foreground">
+              {selectedRunIds.size} selected
+            </span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => doDeleteRuns()}
+              disabled={isDeletingRuns}
+            >
+              {isDeletingRuns ? (
+                <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Trash2 className="size-3.5 mr-1.5" />
+              )}
+              Delete {selectedRunIds.size}
+            </Button>
+          </div>
+        )}
+
         {taskRuns.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <Terminal className="size-7 mx-auto text-muted-foreground mb-3" />
@@ -396,6 +432,19 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={taskRuns.length > 0 && selectedRunIds.size === taskRuns.length}
+                      onCheckedChange={() => {
+                        if (selectedRunIds.size === taskRuns.length) {
+                          setSelectedRunIds(new Set())
+                        } else {
+                          setSelectedRunIds(new Set(taskRuns.map((r) => r.id)))
+                        }
+                      }}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Task</TableHead>
                   <TableHead>Details</TableHead>
                   <TableHead>Status</TableHead>
@@ -413,7 +462,21 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
                   const pendingCount = run.hosts.filter((h) => h.status === 'pending').length
 
                   return (
-                    <TableRow key={run.id}>
+                    <TableRow key={run.id} data-state={selectedRunIds.has(run.id) ? 'selected' : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedRunIds.has(run.id)}
+                          onCheckedChange={() => {
+                            setSelectedRunIds((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(run.id)) next.delete(run.id)
+                              else next.add(run.id)
+                              return next
+                            })
+                          }}
+                          aria-label={`Select run ${run.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         {run.taskType === 'patch' ? 'Patch'
                           : run.taskType === 'custom_script' ? 'Script'

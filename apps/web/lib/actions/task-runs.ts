@@ -416,6 +416,49 @@ export async function triggerGroupServiceAction(
   }
 }
 
+// ── Deletion ──────────────────────────────────────────────────────────────────
+
+/**
+ * Soft-deletes one or more task runs (and their host rows).
+ * Both tables filter by isNull(deletedAt) in all queries, so the rows
+ * disappear automatically after this call.
+ */
+export async function deleteTaskRuns(
+  orgId: string,
+  taskRunIds: string[],
+): Promise<{ success: true } | { error: string }> {
+  if (taskRunIds.length === 0) return { success: true }
+  try {
+    const now = new Date()
+    await db.transaction(async (tx) => {
+      await tx
+        .update(taskRunHosts)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(
+          and(
+            inArray(taskRunHosts.taskRunId, taskRunIds),
+            eq(taskRunHosts.organisationId, orgId),
+            isNull(taskRunHosts.deletedAt),
+          ),
+        )
+      await tx
+        .update(taskRuns)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(
+          and(
+            inArray(taskRuns.id, taskRunIds),
+            eq(taskRuns.organisationId, orgId),
+            isNull(taskRuns.deletedAt),
+          ),
+        )
+    })
+    return { success: true }
+  } catch (err) {
+    console.error('Failed to delete task runs:', err)
+    return { error: 'Failed to delete task runs' }
+  }
+}
+
 // ── Patch-specific actions ────────────────────────────────────────────────────
 
 /**

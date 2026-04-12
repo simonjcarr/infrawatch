@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import {
   Shield,
@@ -15,12 +15,15 @@ import {
   Terminal,
   Power,
   AlertTriangle,
+  Trash2,
+  Search,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -43,6 +46,7 @@ import {
   triggerCustomScriptRun,
   triggerServiceAction,
   listTaskRunsForHost,
+  deleteTaskRuns,
 } from '@/lib/actions/task-runs'
 import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
 import type {
@@ -51,6 +55,8 @@ import type {
   CustomScriptTaskConfig,
   ServiceTaskConfig,
   ServiceTaskResult,
+  AgentQueryStatus,
+  ServiceInfoResult,
 } from '@/lib/db/schema'
 import type { HostWithAgent } from '@/lib/actions/agents'
 import { useRouter } from 'next/navigation'
@@ -59,6 +65,12 @@ interface Props {
   orgId: string
   host: HostWithAgent
   userId: string
+}
+
+type AgentQueryPollResponse = {
+  status: AgentQueryStatus
+  result?: { services?: ServiceInfoResult[] }
+  error?: string
 }
 
 const TERMINAL_RUN_STATUSES = new Set(['completed', 'failed'])
@@ -163,6 +175,7 @@ function TaskDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: strin
 
 export function TasksTab({ orgId, host, userId }: Props) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const isLinux = host.os?.toLowerCase() === 'linux'
 
   // Patch dialog state
@@ -178,6 +191,11 @@ export function TasksTab({ orgId, host, userId }: Props) {
   const [serviceOpen, setServiceOpen] = useState(false)
   const [serviceName, setServiceName] = useState('')
   const [serviceAction, setServiceAction] = useState<'start' | 'stop' | 'restart' | 'status'>('restart')
+  const [svcQueryId, setSvcQueryId] = useState<string | null>(null)
+  const [svcQueryError, setSvcQueryError] = useState<string | null>(null)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: taskRuns = [] } = useQuery({
     queryKey: ['task-runs-host', orgId, host.id],
@@ -187,6 +205,36 @@ export function TasksTab({ orgId, host, userId }: Props) {
       return runs.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
     },
   })
+
+  // Service autocomplete query polling
+  const { data: svcQueryData } = useQuery<AgentQueryPollResponse>({
+    queryKey: ['agent-query', host.id, svcQueryId],
+    queryFn: async () => {
+      const res = await fetch(`/api/hosts/${host.id}/queries/${svcQueryId}`)
+      return res.json()
+    },
+    enabled: svcQueryId !== null,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status
+      return s === 'complete' || s === 'error' ? false : 1_000
+    },
+  })
+
+  async function querySvcServices() {
+    setSvcQueryId(null)
+    setSvcQueryError(null)
+    const res = await fetch(`/api/hosts/${host.id}/queries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queryType: 'list_services' }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setSvcQueryError(data.error ?? 'Failed to query services')
+      return
+    }
+    setSvcQueryId(data.id)
+  }
 
   const { mutate: doPatchRun, isPending: isPatching } = useMutation({
     mutationFn: () => triggerPatchRun(orgId, userId, host.id, patchMode),
@@ -211,6 +259,31 @@ export function TasksTab({ orgId, host, userId }: Props) {
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
     },
   })
+
+  const { mutate: doDelete, isPending: isDeleting } = useMutation({
+    mutationFn: () => deleteTaskRuns(orgId, [...selectedIds]),
+    onSuccess: () => {
+      setSelectedIds(new Set())
+      queryClient.invalidateQueries({ queryKey: ['task-runs-host', orgId, host.id] })
+    },
+  })
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === taskRuns.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(taskRuns.map((r) => r.id)))
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -242,6 +315,28 @@ export function TasksTab({ orgId, host, userId }: Props) {
         </div>
       </div>
 
+      {/* Selection toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2">
+          <span className="text-sm text-muted-foreground">
+            {selectedIds.size} selected
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => doDelete()}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Trash2 className="size-3.5 mr-1.5" />
+            )}
+            Delete {selectedIds.size}
+          </Button>
+        </div>
+      )}
+
       {/* Task run history */}
       {taskRuns.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
@@ -256,6 +351,13 @@ export function TasksTab({ orgId, host, userId }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={taskRuns.length > 0 && selectedIds.size === taskRuns.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Task</TableHead>
                 <TableHead>Details</TableHead>
                 <TableHead>Status</TableHead>
@@ -265,7 +367,14 @@ export function TasksTab({ orgId, host, userId }: Props) {
             </TableHeader>
             <TableBody>
               {taskRuns.map((run) => (
-                <TableRow key={run.id}>
+                <TableRow key={run.id} data-state={selectedIds.has(run.id) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(run.id)}
+                      onCheckedChange={() => toggleSelect(run.id)}
+                      aria-label={`Select run ${run.id}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">
                     {taskTypeLabel(run.taskType)}
                   </TableCell>
@@ -393,7 +502,16 @@ export function TasksTab({ orgId, host, userId }: Props) {
       </Dialog>
 
       {/* Service dialog */}
-      <Dialog open={serviceOpen} onOpenChange={setServiceOpen}>
+      <Dialog
+        open={serviceOpen}
+        onOpenChange={(open) => {
+          setServiceOpen(open)
+          if (!open) {
+            setSvcQueryId(null)
+            setSvcQueryError(null)
+          }
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Service Action</DialogTitle>
@@ -405,11 +523,52 @@ export function TasksTab({ orgId, host, userId }: Props) {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Service name</Label>
-              <Input
-                placeholder="e.g. nginx, postgresql, ssh"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. nginx, postgresql, ssh"
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={querySvcServices}
+                  disabled={svcQueryId !== null && svcQueryData?.status !== 'complete' && svcQueryData?.status !== 'error'}
+                  title="Query running services from the host"
+                >
+                  {svcQueryId !== null && svcQueryData?.status !== 'complete' && svcQueryData?.status !== 'error' ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Search className="size-4" />
+                  )}
+                </Button>
+              </div>
+              {svcQueryError && (
+                <p className="text-xs text-destructive">{svcQueryError}</p>
+              )}
+              {svcQueryData?.status === 'complete' && svcQueryData.result?.services && svcQueryData.result.services.length > 0 && (
+                <div className="rounded-md border bg-muted/50 max-h-48 overflow-y-auto divide-y">
+                  {svcQueryData.result.services.map((s) => (
+                    <button
+                      key={s.name}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
+                      onClick={() => {
+                        setServiceName(s.name.replace(/\.service$/, ''))
+                        setSvcQueryId(null)
+                      }}
+                    >
+                      <span className="font-mono text-foreground">{s.name.replace(/\.service$/, '')}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{s.active_sub}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {svcQueryData?.status === 'error' && (
+                <p className="text-xs text-destructive">
+                  {svcQueryData.error ?? 'Failed to query services'}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Action</Label>

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.23.1...web/v0.23.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* **terminal:** add agent connection signaling and diagnostic messages ([ae7183f](https://github.com/simonjcarr/infrawatch/commit/ae7183f9861af42921ee3b37f12bf80edc991e21))
+* **terminal:** add agent connection signaling and diagnostics ([c4549e5](https://github.com/simonjcarr/infrawatch/commit/c4549e5d41f7484302f2632f1c95fd8b05d9fd1c))
+
 ## [0.23.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.23.0...web/v0.23.1) (2026-04-12)
 
 

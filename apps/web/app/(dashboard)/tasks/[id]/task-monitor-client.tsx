@@ -31,7 +31,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cancelTaskRun, getTaskRun } from '@/lib/actions/task-runs'
 import type { TaskRunWithHosts, TaskRunHostWithHost } from '@/lib/actions/task-runs'
-import type { PatchTaskResult, PatchTaskConfig } from '@/lib/db/schema'
+import type {
+  PatchTaskResult,
+  PatchTaskConfig,
+  CustomScriptTaskConfig,
+  ServiceTaskConfig,
+  ServiceTaskResult,
+} from '@/lib/db/schema'
 
 interface Props {
   orgId: string
@@ -102,7 +108,15 @@ function useElapsedSeconds(startedAt: Date | null | string | undefined, active: 
 
 // ── Output panel ──────────────────────────────────────────────────────────────
 
-function OutputPanel({ hostRow, isLive }: { hostRow: TaskRunHostWithHost; isLive: boolean }) {
+function OutputPanel({
+  hostRow,
+  isLive,
+  taskType,
+}: {
+  hostRow: TaskRunHostWithHost
+  isLive: boolean
+  taskType: string
+}) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
@@ -130,7 +144,8 @@ function OutputPanel({ hostRow, isLive }: { hostRow: TaskRunHostWithHost; isLive
     setAutoScroll(atBottom)
   }
 
-  const result = hostRow.result as PatchTaskResult | null
+  const patchResult = taskType === 'patch' ? (hostRow.result as PatchTaskResult | null) : null
+  const serviceResult = taskType === 'service' ? (hostRow.result as ServiceTaskResult | null) : null
 
   const elapsedLabel =
     elapsedSecs > 0
@@ -149,10 +164,21 @@ function OutputPanel({ hostRow, isLive }: { hostRow: TaskRunHostWithHost; isLive
           <span className="text-zinc-500 ml-1">({elapsedLabel})</span>
         )}
         {isLive && <span className="ml-auto text-blue-400 animate-pulse">● live</span>}
-        {result?.reboot_required && (
+        {patchResult?.reboot_required && (
           <Badge className="ml-auto bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs">
             <RotateCcw className="size-3 mr-1" />
             Reboot required
+          </Badge>
+        )}
+        {serviceResult !== null && serviceResult !== undefined && (
+          <Badge
+            className={`ml-auto text-xs ${
+              serviceResult.is_active
+                ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100'
+                : 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100'
+            }`}
+          >
+            {serviceResult.is_active ? 'Active' : 'Inactive'}
           </Badge>
         )}
       </div>
@@ -211,10 +237,10 @@ function OutputPanel({ hostRow, isLive }: { hostRow: TaskRunHostWithHost; isLive
       </div>
 
       {/* Result summary */}
-      {result && result.packages_updated && result.packages_updated.length > 0 && (
+      {patchResult && patchResult.packages_updated && patchResult.packages_updated.length > 0 && (
         <div className="border-t px-3 py-2 bg-muted text-xs">
           <span className="text-muted-foreground">
-            {result.packages_updated.length} package{result.packages_updated.length !== 1 ? 's' : ''} updated
+            {patchResult.packages_updated.length} package{patchResult.packages_updated.length !== 1 ? 's' : ''} updated
           </span>
         </div>
       )}
@@ -312,7 +338,6 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
 
   if (!taskRun) return null
 
-  const config = taskRun.config as PatchTaskConfig
   const totalHosts = taskRun.hosts.length
   const doneHosts = taskRun.hosts.filter((h) => isHostTerminal(h.status)).length
   const successHosts = taskRun.hosts.filter((h) => h.status === 'success').length
@@ -322,9 +347,9 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
     (h) => h.status === 'cancelled' || h.status === 'cancelling',
   ).length
   const canStop = taskRun.status === 'pending' || taskRun.status === 'running'
-  const rebootRequired = taskRun.hosts.some(
-    (h) => (h.result as PatchTaskResult | null)?.reboot_required,
-  )
+  const rebootRequired =
+    taskRun.taskType === 'patch' &&
+    taskRun.hosts.some((h) => (h.result as PatchTaskResult | null)?.reboot_required)
   const progressPct = totalHosts > 0 ? Math.round((doneHosts / totalHosts) * 100) : 0
 
   // Determine back link based on target type.
@@ -334,10 +359,21 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
       : `/hosts/${taskRun.targetId}`
   const backLabel = taskRun.targetType === 'group' ? 'Back to group' : 'Back to host'
 
-  const taskLabel =
-    taskRun.taskType === 'patch'
-      ? `Patch — ${config.mode === 'security' ? 'security updates' : 'all updates'}`
-      : taskRun.taskType
+  const taskLabel = (() => {
+    if (taskRun.taskType === 'patch') {
+      const config = taskRun.config as PatchTaskConfig
+      return `Patch — ${config.mode === 'security' ? 'security updates' : 'all updates'}`
+    }
+    if (taskRun.taskType === 'custom_script') {
+      const config = taskRun.config as CustomScriptTaskConfig
+      return `Script — ${config.interpreter}`
+    }
+    if (taskRun.taskType === 'service') {
+      const config = taskRun.config as ServiceTaskConfig
+      return `Service — ${config.action} ${config.service_name}`
+    }
+    return taskRun.taskType
+  })()
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -417,7 +453,8 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
           </div>
           <div className="flex-1 overflow-y-auto divide-y">
             {taskRun.hosts.map((h) => {
-              const patchResult = h.result as PatchTaskResult | null
+              const hostPatchResult = taskRun.taskType === 'patch' ? (h.result as PatchTaskResult | null) : null
+              const hostServiceResult = taskRun.taskType === 'service' ? (h.result as ServiceTaskResult | null) : null
               const isSelected = h.hostId === selectedHost?.hostId
               return (
                 <button
@@ -435,10 +472,15 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
                     {h.host.displayName && (
                       <p className="text-xs text-muted-foreground truncate">{h.host.hostname}</p>
                     )}
-                    {patchResult?.reboot_required && (
+                    {hostPatchResult?.reboot_required && (
                       <p className="text-xs text-amber-600 flex items-center gap-0.5 mt-0.5">
                         <RotateCcw className="size-2.5" />
                         Reboot required
+                      </p>
+                    )}
+                    {hostServiceResult !== null && hostServiceResult !== undefined && (
+                      <p className={`text-xs mt-0.5 ${hostServiceResult.is_active ? 'text-green-600' : 'text-red-500'}`}>
+                        {hostServiceResult.is_active ? 'Active' : 'Inactive'}
                       </p>
                     )}
                     {h.status === 'skipped' && (
@@ -460,6 +502,7 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
             <OutputPanel
               hostRow={selectedHost}
               isLive={!isHostTerminal(selectedHost.status) && active}
+              taskType={taskRun.taskType}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">

@@ -4,13 +4,22 @@ import { organisations } from './organisations'
 import { hosts } from './hosts'
 import { users } from './auth'
 
-export type TaskType = 'patch' | 'custom_script'
+export type TaskType = 'patch' | 'custom_script' | 'service'
 export type TaskRunStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed'
 export type TaskRunHostStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'success' | 'failed' | 'skipped'
 
 // Config shapes — discriminated by task_type
 export interface PatchTaskConfig { mode: 'security' | 'all' }
-export type TaskConfig = PatchTaskConfig // union extended when new types added
+export interface CustomScriptTaskConfig {
+  script: string
+  interpreter: 'sh' | 'bash' | 'python3'
+  timeout_seconds?: number
+}
+export interface ServiceTaskConfig {
+  service_name: string
+  action: 'start' | 'stop' | 'restart' | 'status'
+}
+export type TaskConfig = PatchTaskConfig | CustomScriptTaskConfig | ServiceTaskConfig
 
 // Result shapes
 export interface PackageUpdate {
@@ -22,7 +31,15 @@ export interface PatchTaskResult {
   packages_updated: PackageUpdate[]
   reboot_required: boolean
 }
-export type TaskResult = PatchTaskResult // union extended when new types added
+export interface CustomScriptTaskResult {
+  exit_code: number
+}
+export interface ServiceTaskResult {
+  service_name: string
+  action: string
+  is_active: boolean
+}
+export type TaskResult = PatchTaskResult | CustomScriptTaskResult | ServiceTaskResult
 
 export const taskRuns = pgTable('task_runs', {
   id: text('id').primaryKey().$defaultFn(() => createId()),

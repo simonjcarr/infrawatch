@@ -20,11 +20,14 @@ import {
   ExternalLink,
   RotateCcw,
   SkipForward,
+  Terminal,
+  Power,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
@@ -59,11 +62,22 @@ import {
   removeHostFromGroup,
 } from '@/lib/actions/host-groups'
 import { listHosts } from '@/lib/actions/agents'
-import { triggerGroupPatchRun, listTaskRunsForGroup } from '@/lib/actions/task-runs'
+import {
+  triggerGroupPatchRun,
+  triggerGroupCustomScriptRun,
+  triggerGroupServiceAction,
+  listTaskRunsForGroup,
+} from '@/lib/actions/task-runs'
 import type { HostGroupWithMembers } from '@/lib/actions/host-groups'
 import type { HostWithAgent } from '@/lib/actions/agents'
 import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
-import type { Host, PatchTaskConfig } from '@/lib/db/schema'
+import type {
+  Host,
+  PatchTaskConfig,
+  CustomScriptTaskConfig,
+  ServiceTaskConfig,
+  ServiceTaskResult,
+} from '@/lib/db/schema'
 
 const PARALLEL_OPTIONS = [
   { value: 1, label: '1 (sequential)' },
@@ -164,6 +178,18 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
   const [patchMode, setPatchMode] = useState<'all' | 'security'>('all')
   const [maxParallel, setMaxParallel] = useState(1)
 
+  // Script dialog state
+  const [scriptOpen, setScriptOpen] = useState(false)
+  const [scriptBody, setScriptBody] = useState('')
+  const [interpreter, setInterpreter] = useState<'sh' | 'bash' | 'python3'>('sh')
+  const [scriptMaxParallel, setScriptMaxParallel] = useState(1)
+
+  // Service dialog state
+  const [serviceOpen, setServiceOpen] = useState(false)
+  const [serviceName, setServiceName] = useState('')
+  const [serviceAction, setServiceAction] = useState<'start' | 'stop' | 'restart' | 'status'>('restart')
+  const [serviceMaxParallel, setServiceMaxParallel] = useState(1)
+
   const { data: group } = useQuery({
     queryKey: ['host-group', orgId, initialGroup.id],
     queryFn: () => getGroup(orgId, initialGroup.id),
@@ -209,9 +235,25 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
       triggerGroupPatchRun(orgId, userId, initialGroup.id, patchMode, maxParallel),
     onSuccess: (result) => {
       setPatchOpen(false)
-      if ('taskRunId' in result) {
-        router.push(`/tasks/${result.taskRunId}`)
-      }
+      if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
+    },
+  })
+
+  const { mutate: doGroupScript, isPending: isScripting } = useMutation({
+    mutationFn: () =>
+      triggerGroupCustomScriptRun(orgId, userId, initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
+    onSuccess: (result) => {
+      setScriptOpen(false)
+      if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
+    },
+  })
+
+  const { mutate: doGroupService, isPending: isServicing } = useMutation({
+    mutationFn: () =>
+      triggerGroupServiceAction(orgId, userId, initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
+    onSuccess: (result) => {
+      setServiceOpen(false)
+      if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
     },
   })
 
@@ -219,6 +261,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const memberIds = new Set(group.members.map((h) => h.id))
   const nonLinuxCount = group.members.filter((h) => h.os?.toLowerCase() !== 'linux').length
+  const linuxCount = group.members.length - nonLinuxCount
 
   const filteredSearch = allHosts.filter((h) => {
     if (memberIds.has(h.id)) return false
@@ -250,6 +293,14 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setScriptOpen(true)}>
+              <Terminal className="size-4 mr-1" />
+              Run Script
+            </Button>
+            <Button variant="outline" onClick={() => setServiceOpen(true)}>
+              <Power className="size-4 mr-1" />
+              Service Action
+            </Button>
             <Button variant="outline" onClick={() => setPatchOpen(true)}>
               <Shield className="size-4 mr-1" />
               Patch Group
@@ -334,10 +385,10 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
         <h2 className="text-base font-semibold text-foreground">Task History</h2>
         {taskRuns.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
-            <Shield className="size-7 mx-auto text-muted-foreground mb-3" />
+            <Terminal className="size-7 mx-auto text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-foreground">No task runs yet</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Use &quot;Patch Group&quot; to start the first task run on this group.
+              Use the buttons above to run a task on this group.
             </p>
           </div>
         ) : (
@@ -346,33 +397,72 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
               <TableHeader>
                 <TableRow>
                   <TableHead>Task</TableHead>
-                  <TableHead>Mode</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Hosts</TableHead>
-                  <TableHead>Reboot</TableHead>
                   <TableHead>Started</TableHead>
                   <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {taskRuns.map((run) => {
-                  const config = run.config as PatchTaskConfig
                   const successCount = run.hosts.filter((h) => h.status === 'success').length
                   const failedCount = run.hosts.filter((h) => h.status === 'failed').length
                   const skippedCount = run.hosts.filter((h) => h.status === 'skipped').length
                   const runningCount = run.hosts.filter((h) => h.status === 'running').length
                   const pendingCount = run.hosts.filter((h) => h.status === 'pending').length
-                  const rebootCount = run.hosts.filter(
-                    (h) => (h.result as { reboot_required?: boolean } | null)?.reboot_required,
-                  ).length
 
                   return (
                     <TableRow key={run.id}>
-                      <TableCell className="font-medium capitalize">
-                        {run.taskType === 'patch' ? 'Patch' : run.taskType}
+                      <TableCell className="font-medium">
+                        {run.taskType === 'patch' ? 'Patch'
+                          : run.taskType === 'custom_script' ? 'Script'
+                          : run.taskType === 'service' ? 'Service'
+                          : run.taskType}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">
-                        {config.mode === 'security' ? 'Security only' : 'All updates'}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {run.taskType === 'patch' && (() => {
+                          const config = run.config as PatchTaskConfig
+                          const rebootCount = run.hosts.filter(
+                            (h) => (h.result as { reboot_required?: boolean } | null)?.reboot_required,
+                          ).length
+                          return (
+                            <div className="space-y-1">
+                              <p>{config.mode === 'security' ? 'Security only' : 'All updates'}</p>
+                              {rebootCount > 0 && (
+                                <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs">
+                                  <RotateCcw className="size-3 mr-1" />
+                                  {rebootCount} reboot{rebootCount !== 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                          )
+                        })()}
+                        {run.taskType === 'custom_script' && (
+                          (run.config as CustomScriptTaskConfig).interpreter
+                        )}
+                        {run.taskType === 'service' && (() => {
+                          const config = run.config as ServiceTaskConfig
+                          const activeCount = run.hosts.filter(
+                            (h) => (h.result as ServiceTaskResult | null)?.is_active,
+                          ).length
+                          const doneCount = run.hosts.filter(
+                            (h) => h.status === 'success' || h.status === 'failed',
+                          ).length
+                          return (
+                            <div className="space-y-1">
+                              <p className="capitalize">{config.action} · {config.service_name}</p>
+                              {doneCount > 0 && (
+                                <p className="text-xs">
+                                  <span className="text-green-700">{activeCount} active</span>
+                                  {doneCount - activeCount > 0 && (
+                                    <span className="text-muted-foreground"> · {doneCount - activeCount} inactive</span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell>
                         <RunStatusBadge status={run.status} />
@@ -399,16 +489,6 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {rebootCount > 0 ? (
-                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-xs">
-                            <RotateCcw className="size-3 mr-1" />
-                            {rebootCount} host{rebootCount !== 1 ? 's' : ''}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {run.startedAt
                           ? formatDistanceToNow(new Date(run.startedAt), { addSuffix: true })
@@ -430,6 +510,160 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
           </div>
         )}
       </div>
+
+      {/* Script Group Dialog */}
+      <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Run Script on &quot;{group.name}&quot;</DialogTitle>
+            <DialogDescription>
+              Execute a script on all hosts in this group. Output is streamed in real time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Interpreter</Label>
+              <div className="flex gap-2">
+                {(['sh', 'bash', 'python3'] as const).map((i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInterpreter(i)}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-mono transition-colors ${
+                      interpreter === i
+                        ? 'border-primary bg-primary/5 text-foreground font-medium'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Script</Label>
+              <Textarea
+                placeholder={`#!/bin/${interpreter}\necho "Hello from $(hostname)"`}
+                value={scriptBody}
+                onChange={(e) => setScriptBody(e.target.value)}
+                className="font-mono text-xs min-h-36 resize-y"
+                rows={8}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Max parallel hosts</Label>
+              <div className="flex flex-wrap gap-2">
+                {PARALLEL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setScriptMaxParallel(opt.value)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                      scriptMaxParallel === opt.value
+                        ? 'border-primary bg-primary/5 text-foreground font-medium'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScriptOpen(false)}>Cancel</Button>
+            <Button onClick={() => doGroupScript()} disabled={isScripting || !scriptBody.trim()}>
+              {isScripting && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Run Script
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Service Group Dialog */}
+      <Dialog open={serviceOpen} onOpenChange={setServiceOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Service Action on &quot;{group.name}&quot;</DialogTitle>
+            <DialogDescription>
+              Run a systemctl command against Linux hosts in this group.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Service name</Label>
+              <Input
+                placeholder="e.g. nginx, postgresql, ssh"
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Action</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { value: 'start', desc: 'Start the service' },
+                    { value: 'stop', desc: 'Stop the service' },
+                    { value: 'restart', desc: 'Restart the service' },
+                    { value: 'status', desc: 'Check current status' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setServiceAction(opt.value)}
+                    className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                      serviceAction === opt.value
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-foreground capitalize">{opt.value}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Max parallel hosts</Label>
+              <div className="flex flex-wrap gap-2">
+                {PARALLEL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setServiceMaxParallel(opt.value)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                      serviceMaxParallel === opt.value
+                        ? 'border-primary bg-primary/5 text-foreground font-medium'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {nonLinuxCount > 0 && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+                <AlertTriangle className="size-3.5 inline mr-1" />
+                {nonLinuxCount} non-Linux host{nonLinuxCount !== 1 ? 's' : ''} will be skipped.
+                {linuxCount === 0 && ' No Linux hosts in this group.'}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServiceOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => doGroupService()}
+              disabled={isServicing || !serviceName.trim() || linuxCount === 0}
+            >
+              {isServicing && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Run Action
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Hosts Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

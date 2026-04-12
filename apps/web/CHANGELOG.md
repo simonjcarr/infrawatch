@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.23.2...web/v0.23.3) (2026-04-12)
+
+
+### Bug Fixes
+
+* **terminal:** add DB session diagnostics for agent connection debugging ([fbf89b9](https://github.com/simonjcarr/infrawatch/commit/fbf89b9acd8becd505e8f582641f41444fdee87f))
+* **terminal:** add real-time session diagnostics to trace agent connection failure ([6bb458e](https://github.com/simonjcarr/infrawatch/commit/6bb458e615d14dc8f1f66f0121f98cb1f73374c2))
+
 ## [0.23.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.23.1...web/v0.23.2) (2026-04-12)
 
 

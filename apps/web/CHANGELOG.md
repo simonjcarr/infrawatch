@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.21.0...web/v0.22.0) (2026-04-12)
+
+
+### Features
+
+* **tasks:** add service autocomplete, interactive terminal, and task history management ([6246d21](https://github.com/simonjcarr/infrawatch/commit/6246d2145488f9be2f13ff7df6c6e5930b2d4d8f))
+* **tasks:** service autocomplete, interactive terminal, and task history management ([b2601a1](https://github.com/simonjcarr/infrawatch/commit/b2601a133b6539fbc956a7bd99645fdc514d4e6d))
+
+
+### Bug Fixes
+
+* **terminal:** replace useEffect setState with setInterval callback to satisfy react-hooks/set-state-in-effect ([3ac45f6](https://github.com/simonjcarr/infrawatch/commit/3ac45f6c5b43be5b8f8f17d5efc9059972fb8694))
+
 ## [0.21.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.20.0...web/v0.21.0) (2026-04-12)
 
 

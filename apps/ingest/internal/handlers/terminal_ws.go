@@ -121,10 +121,17 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				pendingSessions, _ := queries.GetPendingTerminalSessionsForHost(ctx, h.pool, info.HostID)
 				// Check if the store has this session registered
 				_, inStore := h.store.Get(sessionID)
+				// Check agent status and verify host_id reverse-lookup
+				agentID, agentStatus, _ := queries.GetHostAgentStatus(ctx, h.pool, info.HostID)
+				reverseHostID := ""
+				if agentID != "" {
+					reverseHostID, _ = queries.GetHostByAgentID(ctx, h.pool, agentID)
+				}
+				hostMatch := reverseHostID == info.HostID
 				diagMsg, _ := json.Marshal(wsMessage{
 					Type: "diagnostic",
-					Msg: fmt.Sprintf("status=%s host_id=%s poll_would_find=%d in_store=%v",
-						dbStatus, info.HostID, len(pendingSessions), inStore),
+					Msg: fmt.Sprintf("status=%s host_id=%s poll_would_find=%d in_store=%v agent=%s(%s) host_match=%v",
+						dbStatus, info.HostID, len(pendingSessions), inStore, agentStatus, agentID, hostMatch),
 				})
 				if err := conn.Write(ctx, websocket.MessageText, diagMsg); err != nil {
 					return

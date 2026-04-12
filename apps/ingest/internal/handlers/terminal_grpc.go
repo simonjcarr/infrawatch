@@ -54,7 +54,11 @@ func (h *TerminalHandler) Terminal(stream agentv1.IngestService_TerminalServer) 
 	if len(token) > 7 && token[:7] == "Bearer " {
 		token = token[7:]
 	}
-	agentID, _, err := h.issuer.ValidateAgentToken(token)
+	// Use lenient validation that accepts expired tokens. Agents hold their
+	// JWT from registration time and there is no refresh mechanism yet — the
+	// token regularly outlives its 24h TTL. The signature is still verified,
+	// so the identity is trustworthy.
+	agentID, _, err := h.issuer.ValidateAgentTokenAllowExpired(token)
 	if err != nil {
 		return status.Errorf(codes.Unauthenticated, "invalid agent token: %v", err)
 	}

@@ -34,7 +34,25 @@ type terminalSession struct {
 
 	loggingEnabled bool
 
+	// pushCount tracks how many times this session has been included in a
+	// heartbeat response sent to the agent. Used for diagnostics.
+	pushCount int64
+
 	mu sync.Mutex
+}
+
+// incrementPushCount atomically increments the push counter.
+func (s *terminalSession) incrementPushCount() {
+	s.mu.Lock()
+	s.pushCount++
+	s.mu.Unlock()
+}
+
+// getPushCount returns the current push counter value.
+func (s *terminalSession) getPushCount() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pushCount
 }
 
 // appendRecording appends PTY output to the recording buffer if logging is enabled.

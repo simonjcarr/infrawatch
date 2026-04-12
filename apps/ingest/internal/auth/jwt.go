@@ -76,6 +76,37 @@ func (j *JWTIssuer) ValidateAgentToken(tokenStr string) (agentID, orgID string, 
 	return agentID, orgID, nil
 }
 
+// ValidateAgentTokenAllowExpired parses an agent JWT, verifying the signature
+// and issuer but tolerating an expired token. This is used for the Terminal
+// gRPC handler where the agent may hold a JWT that outlived its TTL — the
+// agent identity is still trustworthy because the signature is valid.
+func (j *JWTIssuer) ValidateAgentTokenAllowExpired(tokenStr string) (agentID, orgID string, err error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return &j.privateKey.PublicKey, nil
+	}, jwt.WithIssuedAt(), jwt.WithIssuer(j.issuer), jwt.WithExpirationRequired(),
+		// Accept tokens even if expired — we still verify the signature.
+		jwt.WithLeeway(100*365*24*time.Hour))
+
+	if err != nil {
+		return "", "", fmt.Errorf("invalid token: %w", err)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return "", "", fmt.Errorf("invalid token claims")
+	}
+
+	agentID, _ = claims["sub"].(string)
+	orgID, _ = claims["org"].(string)
+	if agentID == "" {
+		return "", "", fmt.Errorf("token missing sub claim")
+	}
+	return agentID, orgID, nil
+}
+
 // JWKSHandler returns an HTTP handler that serves the public key as JWKS.
 func (j *JWTIssuer) JWKSHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {

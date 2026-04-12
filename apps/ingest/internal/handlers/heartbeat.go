@@ -264,6 +264,11 @@ loop:
 						slog.Warn("pushing terminal sessions to agent", "host_id", hostID, "err", err)
 						return err
 					}
+					for _, ps := range pendingSessions {
+						if sess, ok := h.terminalStore.Get(ps.SessionId); ok {
+							sess.incrementPushCount()
+						}
+					}
 					slog.Info("pushed pending terminal sessions to agent", "host_id", hostID, "count", len(pendingSessions))
 				}
 			}
@@ -486,6 +491,11 @@ func (h *HeartbeatHandler) processHeartbeat(
 				slog.Warn("fetching terminal sessions in heartbeat response", "host_id", hostID, "err", tsErr)
 			} else if len(pendingSessions) > 0 {
 				resp.PendingTerminalSessions = pendingSessions
+				for _, ps := range pendingSessions {
+					if sess, ok := h.terminalStore.Get(ps.SessionId); ok {
+						sess.incrementPushCount()
+					}
+				}
 				slog.Info("including terminal sessions in heartbeat response", "host_id", hostID, "count", len(pendingSessions))
 			}
 		}

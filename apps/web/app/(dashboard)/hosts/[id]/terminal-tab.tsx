@@ -82,9 +82,15 @@ export function TerminalTab({ orgId, host }: Props) {
     term.loadAddon(fitAddon)
     term.loadAddon(webLinksAddon)
     term.open(containerRef.current)
-    fitAddon.fit()
     termRef.current = term
     fitRef.current = fitAddon
+
+    // Defer fit to next frame so the container is visible (display: block)
+    // after React processes the 'connecting' status. Without this, fit()
+    // calculates 0 cols/rows because the container is still display: none.
+    requestAnimationFrame(() => {
+      fitAddon.fit()
+    })
 
     term.writeln('\x1b[90mConnecting to ' + (host.displayName ?? host.hostname) + '...\x1b[0m')
 
@@ -95,7 +101,8 @@ export function TerminalTab({ orgId, host }: Props) {
     ws.onopen = () => {
       setStatus('connected')
       term.writeln('\x1b[32mConnected.\x1b[0m\r\n')
-      // Send initial size
+      // Send initial size — fit has already run by now so cols/rows are correct
+      fitAddon.fit()
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
@@ -181,7 +188,7 @@ export function TerminalTab({ orgId, host }: Props) {
     setStatus('closed')
   }, [])
 
-  const showTerminal = status === 'connected' || status === 'closed'
+  const showTerminal = status === 'connecting' || status === 'connected' || status === 'closed'
 
   return (
     <div className="space-y-3">
@@ -234,18 +241,10 @@ export function TerminalTab({ orgId, host }: Props) {
         }}
       />
 
-      {/* Placeholder states */}
+      {/* Placeholder state — shown only when idle (terminal container is hidden) */}
       {!showTerminal && !errorMsg && (
         <div className="rounded-lg bg-zinc-950 border border-border flex items-center justify-center" style={{ height: '500px' }}>
-          {status === 'idle' && (
-            <p className="text-zinc-500 text-sm">Click Connect to start a terminal session</p>
-          )}
-          {status === 'connecting' && (
-            <div className="flex items-center gap-2 text-zinc-400">
-              <Loader2 className="size-5 animate-spin" />
-              <span className="text-sm">Establishing connection...</span>
-            </div>
-          )}
+          <p className="text-zinc-500 text-sm">Click Connect to start a terminal session</p>
         </div>
       )}
 

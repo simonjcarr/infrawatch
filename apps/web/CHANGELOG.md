@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.20.0...web/v0.21.0) (2026-04-12)
+
+
+### Features
+
+* **tasks:** add custom script runner and service management task types ([50c5eaa](https://github.com/simonjcarr/infrawatch/commit/50c5eaaadf6eb7b089d7d46e8a4d3871a88b072f))
+* **tasks:** add custom script runner and service management task types ([471baf1](https://github.com/simonjcarr/infrawatch/commit/471baf1b5a4519e7ab99218a847dc6cd88726b23))
+
 ## [0.20.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.19.0...web/v0.20.0) (2026-04-12)
 
 

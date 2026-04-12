@@ -476,6 +476,19 @@ func (h *HeartbeatHandler) processHeartbeat(
 			}
 			resp.Checks = defs
 		}
+
+		// Also include pending terminal sessions in every heartbeat response.
+		// This is redundant with the queryPollTicker push but ensures the agent
+		// sees terminal sessions even if the poll ticker is delayed.
+		if h.terminalStore != nil {
+			pendingSessions, tsErr := queries.GetPendingTerminalSessionsForHost(ctx, h.pool, hostID)
+			if tsErr != nil {
+				slog.Warn("fetching terminal sessions in heartbeat response", "host_id", hostID, "err", tsErr)
+			} else if len(pendingSessions) > 0 {
+				resp.PendingTerminalSessions = pendingSessions
+				slog.Info("including terminal sessions in heartbeat response", "host_id", hostID, "count", len(pendingSessions))
+			}
+		}
 	}
 
 	return stream.Send(resp)

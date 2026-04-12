@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.22.0...web/v0.23.0) (2026-04-12)
+
+
+### Features
+
+* **terminal:** add WebSocket terminal and restructure host page tabs ([8313aa4](https://github.com/simonjcarr/infrawatch/commit/8313aa4b05811a5cff994a8532531426fb2c14ae))
+* **terminal:** add WebSocket terminal and restructure host page tabs ([71d37d3](https://github.com/simonjcarr/infrawatch/commit/71d37d3dde252fa5d2494a2d4d77c385d9255b30))
+
 ## [0.22.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.21.0...web/v0.22.0) (2026-04-12)
 
 

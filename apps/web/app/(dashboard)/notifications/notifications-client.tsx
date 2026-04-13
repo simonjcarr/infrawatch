@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { formatDistanceToNow, format, parseISO } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import { Bell, CheckCircle2, ExternalLink, Trash2, X } from 'lucide-react'
 import {
   PieChart,
@@ -23,6 +23,13 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   getNotifications,
   getUnreadCount,
   markAsRead,
@@ -33,7 +40,29 @@ import {
   getNotificationStats,
   getNotificationsOverTime,
 } from '@/lib/actions/notifications'
+import type { TrendRange } from '@/lib/actions/notifications'
 import type { Notification } from '@/lib/db/schema'
+
+const TREND_RANGE_OPTIONS: { value: TrendRange; label: string }[] = [
+  { value: '1h',  label: 'Last 1 hour'  },
+  { value: '6h',  label: 'Last 6 hours' },
+  { value: '12h', label: 'Last 12 hours' },
+  { value: '24h', label: 'Last 24 hours' },
+  { value: '7d',  label: 'Last 7 days'  },
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 3 months' },
+]
+
+function formatTrendDate(raw: string, range: TrendRange): string {
+  // Hourly ranges: raw is a Postgres timestamp text like "2026-04-13 20:00:00"
+  // Daily ranges: raw is a date string like "2026-04-13"
+  const d = new Date(raw)
+  if (range === '1h' || range === '6h' || range === '12h' || range === '24h') {
+    return format(d, 'HH:mm')
+  }
+  if (range === '7d') return format(d, 'MMM d')
+  return format(d, 'MMM d')
+}
 
 const PAGE_SIZE = 25
 
@@ -74,6 +103,8 @@ function SeverityDot({ severity }: { severity: string }) {
 }
 
 function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }) {
+  const [trendRange, setTrendRange] = useState<TrendRange>('30d')
+
   const { data: stats } = useQuery({
     queryKey: ['notifications-stats', orgId, userId],
     queryFn: () => getNotificationStats(orgId, userId),
@@ -81,8 +112,8 @@ function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }
   })
 
   const { data: timeSeries } = useQuery({
-    queryKey: ['notifications-time-series', orgId, userId],
-    queryFn: () => getNotificationsOverTime(orgId, userId, 30),
+    queryKey: ['notifications-time-series', orgId, userId, trendRange],
+    queryFn: () => getNotificationsOverTime(orgId, userId, trendRange),
     refetchInterval: 60_000,
   })
 
@@ -96,7 +127,7 @@ function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }
 
   const lineData = (timeSeries ?? []).map((point) => ({
     ...point,
-    date: format(parseISO(point.date), 'MMM d'),
+    date: formatTrendDate(point.date, trendRange),
   }))
 
   return (
@@ -145,9 +176,24 @@ function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Notification Trend</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-sm font-medium">Notification Trend</CardTitle>
+            <Select value={trendRange} onValueChange={(v) => setTrendRange(v as TrendRange)}>
+              <SelectTrigger className="h-7 w-36 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TREND_RANGE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <CardDescription className="text-xs">
-            Critical &amp; warning notifications over the last 30 days
+            Critical &amp; warning notifications —{' '}
+            {TREND_RANGE_OPTIONS.find((o) => o.value === trendRange)?.label.toLowerCase()}
           </CardDescription>
         </CardHeader>
         <CardContent>

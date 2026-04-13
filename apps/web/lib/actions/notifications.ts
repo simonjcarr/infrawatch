@@ -181,8 +181,20 @@ export async function getNotificationStats(
   return results.map((r) => ({ severity: r.severity, total: Number(r.total) }))
 }
 
+export type TrendRange = '1h' | '6h' | '12h' | '24h' | '7d' | '30d' | '90d'
+
+const TREND_RANGE_CONFIG: Record<TrendRange, { cutoffMs: number; trunc: 'hour' | 'day' }> = {
+  '1h':  { cutoffMs: 1  * 60 * 60 * 1000,          trunc: 'hour' },
+  '6h':  { cutoffMs: 6  * 60 * 60 * 1000,          trunc: 'hour' },
+  '12h': { cutoffMs: 12 * 60 * 60 * 1000,          trunc: 'hour' },
+  '24h': { cutoffMs: 24 * 60 * 60 * 1000,          trunc: 'hour' },
+  '7d':  { cutoffMs: 7  * 24 * 60 * 60 * 1000,     trunc: 'day'  },
+  '30d': { cutoffMs: 30 * 24 * 60 * 60 * 1000,     trunc: 'day'  },
+  '90d': { cutoffMs: 90 * 24 * 60 * 60 * 1000,     trunc: 'day'  },
+}
+
 export type NotificationTimeSeriesPoint = {
-  date: string
+  date: string  // ISO timestamp (hourly) or ISO date string (daily)
   critical: number
   warning: number
   info: number
@@ -191,15 +203,24 @@ export type NotificationTimeSeriesPoint = {
 export async function getNotificationsOverTime(
   orgId: string,
   userId: string,
-  days = 30,
+  range: TrendRange = '30d',
 ): Promise<NotificationTimeSeriesPoint[]> {
   // Intentionally does NOT filter on deletedAt so that deleting notifications
-  // from the inbox does not affect the historical trend. Retains up to 90 days.
-  const cutoff = new Date(Date.now() - Math.min(days, 90) * 24 * 60 * 60 * 1000)
+  // from the inbox does not affect the historical trend.
+  const config = TREND_RANGE_CONFIG[range]
+  const cutoff = new Date(Date.now() - config.cutoffMs)
+
+  const truncExpr = config.trunc === 'hour'
+    ? sql<string>`date_trunc('hour', ${notifications.createdAt})::text`
+    : sql<string>`date_trunc('day', ${notifications.createdAt})::date::text`
+
+  const truncGroup = config.trunc === 'hour'
+    ? sql`date_trunc('hour', ${notifications.createdAt})`
+    : sql`date_trunc('day', ${notifications.createdAt})::date`
 
   const rows = await db
     .select({
-      date: sql<string>`date_trunc('day', ${notifications.createdAt})::date::text`,
+      date: truncExpr,
       severity: notifications.severity,
       total: count(),
     })
@@ -211,11 +232,8 @@ export async function getNotificationsOverTime(
         gte(notifications.createdAt, cutoff),
       ),
     )
-    .groupBy(
-      sql`date_trunc('day', ${notifications.createdAt})::date`,
-      notifications.severity,
-    )
-    .orderBy(sql`date_trunc('day', ${notifications.createdAt})::date`)
+    .groupBy(truncGroup, notifications.severity)
+    .orderBy(truncGroup)
 
   const map = new Map<string, NotificationTimeSeriesPoint>()
   for (const row of rows) {

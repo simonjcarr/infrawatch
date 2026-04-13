@@ -3,15 +3,45 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { formatDistanceToNow, format } from 'date-fns'
-import { Bell, CheckCircle2, ExternalLink, Trash2 } from 'lucide-react'
+import { formatDistanceToNow, format, parseISO } from 'date-fns'
+import { Bell, CheckCircle2, ExternalLink, Trash2, X } from 'lucide-react'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+} from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification } from '@/lib/actions/notifications'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  getNotifications,
+  getUnreadCount,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  deleteNotifications,
+  markBatchReadStatus,
+  getNotificationStats,
+  getNotificationsOverTime,
+} from '@/lib/actions/notifications'
 import type { Notification } from '@/lib/db/schema'
 
 const PAGE_SIZE = 25
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: '#ef4444',
+  warning: '#f59e0b',
+  info: '#3b82f6',
+}
 
 interface NotificationsClientProps {
   orgId: string
@@ -43,6 +73,133 @@ function SeverityDot({ severity }: { severity: string }) {
   return <span className={`inline-block size-2.5 rounded-full shrink-0 mt-1 ${cls}`} />
 }
 
+function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }) {
+  const { data: stats } = useQuery({
+    queryKey: ['notifications-stats', orgId, userId],
+    queryFn: () => getNotificationStats(orgId, userId),
+    refetchInterval: 60_000,
+  })
+
+  const { data: timeSeries } = useQuery({
+    queryKey: ['notifications-time-series', orgId, userId],
+    queryFn: () => getNotificationsOverTime(orgId, userId, 30),
+    refetchInterval: 60_000,
+  })
+
+  const pieData = (stats ?? []).map((s) => ({
+    name: s.severity.charAt(0).toUpperCase() + s.severity.slice(1),
+    value: s.total,
+    fill: SEVERITY_COLORS[s.severity] ?? '#94a3b8',
+  }))
+
+  const totalPie = pieData.reduce((sum, d) => sum + d.value, 0)
+
+  const lineData = (timeSeries ?? []).map((point) => ({
+    ...point,
+    date: format(parseISO(point.date), 'MMM d'),
+  }))
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Severity Breakdown</CardTitle>
+          <CardDescription className="text-xs">
+            All notifications by severity
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {totalPie === 0 ? (
+            <div className="h-48 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">No data</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={75}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={index} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value, name) => {
+                    const n = typeof value === 'number' ? value : 0
+                    return [`${n} (${Math.round((n / totalPie) * 100)}%)`, String(name)]
+                  }}
+                  contentStyle={{ fontSize: 12 }}
+                />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Notification Trend</CardTitle>
+          <CardDescription className="text-xs">
+            Critical &amp; warning notifications over the last 30 days
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {lineData.length === 0 ? (
+            <div className="h-48 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">No data</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={lineData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                />
+                <Tooltip contentStyle={{ fontSize: 12 }} />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+                <Line
+                  type="monotone"
+                  dataKey="critical"
+                  name="Critical"
+                  stroke={SEVERITY_COLORS.critical}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="warning"
+                  name="Warning"
+                  stroke={SEVERITY_COLORS.warning}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function NotificationsClient({
   orgId,
   userId,
@@ -54,6 +211,7 @@ export function NotificationsClient({
   const [offset, setOffset] = useState(0)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: unread = initialUnread } = useQuery({
     queryKey: ['notifications-unread', orgId, userId],
@@ -95,12 +253,48 @@ export function NotificationsClient({
     },
   })
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => deleteNotifications(orgId, userId, ids),
+    onSuccess: () => {
+      setSelectedIds(new Set())
+      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-stats', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-time-series', orgId, userId] })
+    },
+  })
+
+  const bulkMarkReadMutation = useMutation({
+    mutationFn: ({ ids, read }: { ids: string[]; read: boolean }) =>
+      markBatchReadStatus(orgId, userId, ids, read),
+    onSuccess: () => {
+      setSelectedIds(new Set())
+      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+    },
+  })
+
   function handleNotificationClick(n: Notification) {
     if (!n.read) markReadMutation.mutate(n.id)
     setExpandedId(expandedId === n.id ? null : n.id)
   }
 
+  function toggleSelectItem(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
   const displayed = filter === 'unread' ? notifications.filter((n) => !n.read) : notifications
+  const allSelected = displayed.length > 0 && displayed.every((n) => selectedIds.has(n.id))
+  const someSelected = displayed.some((n) => selectedIds.has(n.id))
+  const selectedCount = displayed.filter((n) => selectedIds.has(n.id)).length
+  const selectedInDisplayed = displayed.filter((n) => selectedIds.has(n.id)).map((n) => n.id)
+  const bulkPending = bulkDeleteMutation.isPending || bulkMarkReadMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -129,6 +323,8 @@ export function NotificationsClient({
         </div>
       </div>
 
+      <NotificationCharts orgId={orgId} userId={userId} />
+
       {/* Filter tabs */}
       <div className="flex items-center gap-1 border-b">
         <button
@@ -137,7 +333,7 @@ export function NotificationsClient({
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
-          onClick={() => setFilter('all')}
+          onClick={() => { setFilter('all'); setSelectedIds(new Set()) }}
         >
           All
         </button>
@@ -147,7 +343,7 @@ export function NotificationsClient({
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
-          onClick={() => setFilter('unread')}
+          onClick={() => { setFilter('unread'); setSelectedIds(new Set()) }}
         >
           Unread
           {unread > 0 && (
@@ -169,16 +365,90 @@ export function NotificationsClient({
         </Card>
       ) : (
         <div className="space-y-2">
+          {/* Select all + bulk action toolbar */}
+          <div className="flex items-center gap-3 px-1 py-1.5">
+            <Checkbox
+              checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setSelectedIds(new Set(displayed.map((n) => n.id)))
+                } else {
+                  setSelectedIds(new Set())
+                }
+              }}
+              aria-label="Select all notifications"
+            />
+            <span className="text-xs text-muted-foreground">
+              {selectedCount > 0 ? `${selectedCount} selected` : 'Select all'}
+            </span>
+
+            {selectedCount > 0 && (
+              <>
+                <div className="h-4 w-px bg-border" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  disabled={bulkPending}
+                  onClick={() => bulkMarkReadMutation.mutate({ ids: selectedInDisplayed, read: true })}
+                >
+                  <CheckCircle2 className="size-3 mr-1" />
+                  Mark as read
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  disabled={bulkPending}
+                  onClick={() => bulkMarkReadMutation.mutate({ ids: selectedInDisplayed, read: false })}
+                >
+                  Mark as unread
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  disabled={bulkPending}
+                  onClick={() => bulkDeleteMutation.mutate(selectedInDisplayed)}
+                >
+                  <Trash2 className="size-3 mr-1" />
+                  Delete
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs ml-auto"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  <X className="size-3 mr-1" />
+                  Clear
+                </Button>
+              </>
+            )}
+          </div>
+
           {displayed.map((n) => (
             <Card
               key={n.id}
-              className={`transition-colors ${!n.read ? 'border-blue-200 bg-blue-50/30' : ''}`}
+              className={`transition-colors ${!n.read ? 'border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/20' : ''} ${
+                selectedIds.has(n.id) ? 'ring-1 ring-primary' : ''
+              }`}
             >
               <CardHeader
                 className="py-3 px-4 cursor-pointer"
                 onClick={() => handleNotificationClick(n)}
               >
                 <div className="flex items-start gap-3">
+                  <div
+                    className="mt-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={selectedIds.has(n.id)}
+                      onCheckedChange={(checked) => toggleSelectItem(n.id, !!checked)}
+                      aria-label={`Select notification: ${n.subject}`}
+                    />
+                  </div>
                   <SeverityDot severity={n.severity} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -216,7 +486,7 @@ export function NotificationsClient({
                         <ExternalLink className="size-3.5 mr-1.5" />
                         View {n.resourceType}
                       </Button>
-                      {!n.read && (
+                      {!n.read ? (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -225,6 +495,18 @@ export function NotificationsClient({
                         >
                           <CheckCircle2 className="size-3.5 mr-1.5" />
                           Mark as read
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => markBatchReadStatus(orgId, userId, [n.id], false).then(() => {
+                            qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
+                            qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
+                            qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+                          })}
+                        >
+                          Mark as unread
                         </Button>
                       )}
                       <Button
@@ -252,7 +534,7 @@ export function NotificationsClient({
               variant="outline"
               size="sm"
               disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+              onClick={() => { setOffset(Math.max(0, offset - PAGE_SIZE)); setSelectedIds(new Set()) }}
             >
               Previous
             </Button>
@@ -263,7 +545,7 @@ export function NotificationsClient({
               variant="outline"
               size="sm"
               disabled={notifications.length < PAGE_SIZE}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
+              onClick={() => { setOffset(offset + PAGE_SIZE); setSelectedIds(new Set()) }}
             >
               Next
             </Button>

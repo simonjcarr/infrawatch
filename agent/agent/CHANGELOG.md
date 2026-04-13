@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.2](https://github.com/simonjcarr/infrawatch/compare/agent/v0.21.1...agent/v0.21.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* **terminal:** cross-distro su with dropped privileges ([9a0e6b0](https://github.com/simonjcarr/infrawatch/commit/9a0e6b0596c0b851c2607e1b9de45e5dfc0c4a78))
+* **terminal:** use su with dropped privileges instead of login for cross-distro compatibility ([dcc6857](https://github.com/simonjcarr/infrawatch/commit/dcc68577b3bbc09e7f92c411e1efcacb68b74afe))
+
 ## [0.21.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.21.0...agent/v0.21.1) (2026-04-13)
 
 

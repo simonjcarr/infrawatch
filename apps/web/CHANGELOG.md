@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.25.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.24.0...web/v0.25.0) (2026-04-13)
+
+
+### Features
+
+* **terminal:** persistent bottom panel with tabs ([67aad5d](https://github.com/simonjcarr/infrawatch/commit/67aad5da8982cef5b61f35170556bf064e3a5bf3))
+* **terminal:** redesign as persistent bottom panel with tabs ([1031bfd](https://github.com/simonjcarr/infrawatch/commit/1031bfd8f707508cee73c02c8dd3db9824ceef56))
+
+
+### Bug Fixes
+
+* **terminal:** resolve lint errors for setState-in-effect and unused vars ([ca5e9fe](https://github.com/simonjcarr/infrawatch/commit/ca5e9fe86dae719276257091dc21e20215928326))
+
 ## [0.24.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.23.3...web/v0.24.0) (2026-04-13)
 
 

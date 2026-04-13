@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.27.0...web/v0.28.0) (2026-04-13)
+
+
+### Features
+
+* **notifications:** add Slack, Telegram, and in-app notification channels ([69c00ff](https://github.com/simonjcarr/infrawatch/commit/69c00ff0d6937befff9c7da3a3a019582df395cf))
+* **notifications:** Slack, Telegram, and in-app notification channels ([6bc5799](https://github.com/simonjcarr/infrawatch/commit/6bc579968babac3881c6abe8c5c0b1b266667217))
+
 ## [0.27.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.26.0...web/v0.27.0) (2026-04-13)
 
 

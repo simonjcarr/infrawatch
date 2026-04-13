@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.27.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.26.0...web/v0.27.0) (2026-04-13)
+
+
+### Features
+
+* **terminal:** remember last username and reconnect on exit ([33711ea](https://github.com/simonjcarr/infrawatch/commit/33711eaf3e43cf41db95b49c901e643383871c88))
+* **terminal:** remember last username and reconnect on exit ([167b83a](https://github.com/simonjcarr/infrawatch/commit/167b83a85e98cc4189bd90f6bab9d28c5a1ba404))
+
+
+### Bug Fixes
+
+* **terminal:** use useMemo instead of useEffect for saved username ([f5ff889](https://github.com/simonjcarr/infrawatch/commit/f5ff8899df68a7cfa52f6e43d3f393ac08a5aad4))
+
 ## [0.26.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.25.1...web/v0.26.0) (2026-04-13)
 
 

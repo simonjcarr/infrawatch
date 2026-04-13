@@ -8,7 +8,10 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
+	"strconv"
+	"syscall"
 
 	"github.com/creack/pty"
 	"google.golang.org/grpc"
@@ -77,19 +80,35 @@ func OpenSession(dialFunc func() (*grpc.ClientConn, error), jwtToken string, req
 		cmd.Env = env
 		slog.Info("terminal: direct access mode", "session_id", sessionID, "shell", shell)
 	} else if req.Username != "" {
-		// Per-user mode: validate username and use login to authenticate.
-		// login always authenticates via PAM (unlike su, which skips auth from root).
-		// The user will see a "Password:" prompt in the terminal.
+		// Per-user mode: validate username and force authentication via su.
+		//
+		// su from root skips password authentication, so we drop privileges to
+		// the "nobody" user first using SysProcAttr.Credential. Running su as
+		// nobody forces PAM authentication — the user sees a "Password:" prompt.
+		//
+		// This approach works on both Debian/Ubuntu and RHEL/AlmaLinux, unlike
+		// the login command which has cross-distro PAM/SELinux differences.
 		if len(req.Username) > 256 || !validUsernameRE.MatchString(req.Username) {
 			sendClosedMsg(stream, sessionID, -1)
 			return fmt.Errorf("terminal: invalid username %q", req.Username)
 		}
-		cmd = exec.Command("login", "-p", req.Username)
+		nobodyUID, nobodyGID, err := lookupNobody()
+		if err != nil {
+			sendClosedMsg(stream, sessionID, -1)
+			return fmt.Errorf("terminal: cannot look up nobody user: %w", err)
+		}
+		cmd = exec.Command("su", "-", req.Username)
 		cmd.Dir = "/"
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: nobodyUID,
+				Gid: nobodyGID,
+			},
+		}
 		env := os.Environ()
 		env = setEnv(env, "TERM", "xterm-256color")
 		cmd.Env = env
-		slog.Info("terminal: per-user mode (login)", "session_id", sessionID, "username", req.Username)
+		slog.Info("terminal: per-user mode", "session_id", sessionID, "username", req.Username)
 	} else {
 		// No username and not direct access — refuse session
 		sendClosedMsg(stream, sessionID, -1)
@@ -187,6 +206,25 @@ func OpenSession(dialFunc func() (*grpc.ClientConn, error), jwtToken string, req
 
 	slog.Info("terminal session ended", "session_id", sessionID, "exit_code", exitCode)
 	return nil
+}
+
+// lookupNobody returns the UID and GID of the "nobody" user.
+// Falls back to 65534:65534 if the user cannot be found.
+func lookupNobody() (uint32, uint32, error) {
+	u, err := user.Lookup("nobody")
+	if err != nil {
+		// Fall back to the conventional nobody UID/GID
+		return 65534, 65534, nil
+	}
+	uid, err := strconv.ParseUint(u.Uid, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse nobody uid: %w", err)
+	}
+	gid, err := strconv.ParseUint(u.Gid, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse nobody gid: %w", err)
+	}
+	return uint32(uid), uint32(gid), nil
 }
 
 // homeDir returns the current user's home directory, falling back to /root.

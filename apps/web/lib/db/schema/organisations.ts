@@ -2,11 +2,18 @@ import { pgTable, text, timestamp, jsonb, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import type { HostCollectionSettings } from './hosts'
 
+export interface OrgNotificationSettings {
+  inAppEnabled?: boolean      // default true — master switch for in-app notifications
+  inAppRoles?: string[]       // default ['super_admin','org_admin','engineer']
+  allowUserOptOut?: boolean   // default true — whether users can individually opt out
+}
+
 export interface OrgMetadata {
   defaultCollectionSettings?: HostCollectionSettings
   terminalEnabled?: boolean
   terminalLoggingEnabled?: boolean
   terminalDirectAccess?: boolean
+  notificationSettings?: OrgNotificationSettings
 }
 
 export const organisations = pgTable('organisations', {

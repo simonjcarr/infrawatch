@@ -68,6 +68,7 @@ const primaryNav: NavItem[] = [
     ],
   },
   { title: 'Checks & Alerts', href: '/alerts', icon: Bell },
+  { title: 'Notifications', href: '/notifications', icon: BellPlus },
   { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
   { title: 'Service Accounts', href: '/service-accounts', icon: Key },
 ]

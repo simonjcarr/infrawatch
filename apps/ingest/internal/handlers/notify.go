@@ -12,8 +12,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/infrawatch/ingest/internal/db/queries"
 )
@@ -197,5 +200,222 @@ func dispatchSmtp(smtpChannels []queries.SmtpChannelRow, event AlertEvent) {
 				slog.Warn("smtp: delivery failed", "host", c.Host, "err", err)
 			}
 		}(cfg)
+	}
+}
+
+// ─── Slack ────────────────────────────────────────────────────────────────────
+
+type slackChannelConfig struct {
+	WebhookURL string `json:"webhookUrl"`
+}
+
+// severityEmoji maps alert severity to a Slack emoji prefix.
+func severityEmoji(severity string) string {
+	switch severity {
+	case "critical":
+		return ":red_circle:"
+	case "warning":
+		return ":large_yellow_circle:"
+	default:
+		return ":large_blue_circle:"
+	}
+}
+
+// postSlack POSTs an AlertEvent to a Slack incoming webhook URL.
+// Failures are logged and discarded — delivery is best-effort.
+func postSlack(ctx context.Context, webhookURL string, event AlertEvent) {
+	emoji := severityEmoji(event.Severity)
+	eventLabel := map[string]string{
+		"alert.fired":    "FIRING",
+		"alert.resolved": "RESOLVED",
+		"alert.test":     "TEST",
+	}[event.Event]
+	if eventLabel == "" {
+		eventLabel = strings.ToUpper(event.Event)
+	}
+
+	payload := map[string]interface{}{
+		"blocks": []map[string]interface{}{
+			{
+				"type": "header",
+				"text": map[string]string{
+					"type": "plain_text",
+					"text": fmt.Sprintf("%s [%s] %s on %s", emoji, eventLabel, event.Rule, event.Host),
+				},
+			},
+			{
+				"type": "section",
+				"fields": []map[string]string{
+					{"type": "mrkdwn", "text": fmt.Sprintf("*Severity:*\n%s", event.Severity)},
+					{"type": "mrkdwn", "text": fmt.Sprintf("*Host:*\n%s", event.Host)},
+					{"type": "mrkdwn", "text": fmt.Sprintf("*Rule:*\n%s", event.Rule)},
+					{"type": "mrkdwn", "text": fmt.Sprintf("*Time:*\n%s", event.Timestamp)},
+				},
+			},
+			{
+				"type": "section",
+				"text": map[string]string{
+					"type": "mrkdwn",
+					"text": fmt.Sprintf("*Message:*\n%s", event.Message),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		slog.Warn("slack: marshalling payload", "err", err)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
+	if err != nil {
+		slog.Warn("slack: building request", "err", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.Warn("slack: delivery failed", "err", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		slog.Warn("slack: non-2xx response", "status", resp.StatusCode)
+	}
+}
+
+// dispatchSlack fans out an AlertEvent to all configured Slack channels.
+func dispatchSlack(ctx context.Context, channels []queries.SlackChannelRow, event AlertEvent) {
+	for _, ch := range channels {
+		var cfg slackChannelConfig
+		if err := json.Unmarshal([]byte(ch.ConfigJSON), &cfg); err != nil {
+			slog.Warn("dispatchSlack: unmarshal channel config", "channel_id", ch.ID, "err", err)
+			continue
+		}
+		go postSlack(ctx, cfg.WebhookURL, event)
+	}
+}
+
+// ─── Telegram ─────────────────────────────────────────────────────────────────
+
+type telegramChannelConfig struct {
+	BotToken string `json:"botToken"`
+	ChatID   string `json:"chatId"`
+}
+
+// postTelegram sends an AlertEvent via the Telegram Bot API.
+// Failures are logged and discarded — delivery is best-effort.
+func postTelegram(ctx context.Context, botToken, chatID string, event AlertEvent) {
+	eventLabel := map[string]string{
+		"alert.fired":    "🔴 FIRING",
+		"alert.resolved": "✅ RESOLVED",
+		"alert.test":     "🔵 TEST",
+	}[event.Event]
+	if eventLabel == "" {
+		eventLabel = strings.ToUpper(event.Event)
+	}
+
+	text := fmt.Sprintf(
+		"<b>%s</b>\n\n<b>Rule:</b> %s\n<b>Host:</b> %s\n<b>Severity:</b> %s\n<b>Message:</b> %s\n<b>Time:</b> %s",
+		eventLabel, event.Rule, event.Host, event.Severity, event.Message, event.Timestamp,
+	)
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", url.PathEscape(botToken))
+	payload := map[string]string{
+		"chat_id":    chatID,
+		"text":       text,
+		"parse_mode": "HTML",
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		slog.Warn("telegram: marshalling payload", "err", err)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		slog.Warn("telegram: building request", "err", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.Warn("telegram: delivery failed", "err", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		slog.Warn("telegram: non-2xx response", "status", resp.StatusCode)
+	}
+}
+
+// dispatchTelegram fans out an AlertEvent to all configured Telegram channels.
+func dispatchTelegram(ctx context.Context, channels []queries.TelegramChannelRow, event AlertEvent) {
+	for _, ch := range channels {
+		var cfg telegramChannelConfig
+		if err := json.Unmarshal([]byte(ch.ConfigJSON), &cfg); err != nil {
+			slog.Warn("dispatchTelegram: unmarshal channel config", "channel_id", ch.ID, "err", err)
+			continue
+		}
+		go postTelegram(ctx, cfg.BotToken, cfg.ChatID, event)
+	}
+}
+
+// ─── In-app notifications ─────────────────────────────────────────────────────
+
+// dispatchInApp creates an in-app notification row for each eligible user in the org.
+// alertInstanceID may be empty (cert alerts use a different instance query).
+func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, orgID, alertInstanceID, resourceType, resourceID string, event AlertEvent) {
+	settings, err := queries.GetOrgNotificationSettings(ctx, pool, orgID)
+	if err != nil {
+		slog.Warn("dispatchInApp: fetching org notification settings", "org_id", orgID, "err", err)
+		// Proceed with defaults (already set by the query function on error)
+	}
+
+	if !settings.InAppEnabled {
+		return
+	}
+
+	userIDs, err := queries.GetAlertTargetUsers(ctx, pool, orgID, settings.InAppRoles, settings.AllowUserOptOut)
+	if err != nil {
+		slog.Warn("dispatchInApp: fetching target users", "org_id", orgID, "err", err)
+		return
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+
+	eventLabel := map[string]string{
+		"alert.fired":    "FIRING",
+		"alert.resolved": "RESOLVED",
+	}[event.Event]
+	if eventLabel == "" {
+		eventLabel = strings.ToUpper(event.Event)
+	}
+
+	subject := fmt.Sprintf("[%s] %s on %s", eventLabel, event.Rule, event.Host)
+
+	rows := make([]queries.NotificationInsert, 0, len(userIDs))
+	for _, uid := range userIDs {
+		rows = append(rows, queries.NotificationInsert{
+			OrgID:           orgID,
+			UserID:          uid,
+			AlertInstanceID: alertInstanceID,
+			Subject:         subject,
+			Body:            event.Message,
+			Severity:        event.Severity,
+			ResourceType:    resourceType,
+			ResourceID:      resourceID,
+		})
+	}
+
+	if err := queries.InsertNotificationBatch(ctx, pool, rows); err != nil {
+		slog.Warn("dispatchInApp: inserting notifications", "org_id", orgID, "err", err)
 	}
 }

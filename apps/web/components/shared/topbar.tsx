@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { LogOut, User } from 'lucide-react'
+import { NotificationBell } from './notification-bell'
 
 function getInitials(name: string): string {
   return name
@@ -24,7 +25,11 @@ function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-export function Topbar() {
+interface TopbarProps {
+  orgId: string
+}
+
+export function Topbar({ orgId }: TopbarProps) {
   const { data: session } = useSession()
   const router = useRouter()
 
@@ -34,11 +39,15 @@ export function Topbar() {
 
   const userName = session?.user?.name ?? 'User'
   const userEmail = session?.user?.email ?? ''
+  const userId = session?.user?.id
 
   return (
     <header className="flex h-14 items-center gap-3 border-b bg-background px-4">
       <SidebarTrigger />
       <div className="flex-1" />
+      {userId && orgId && (
+        <NotificationBell orgId={orgId} userId={userId} />
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full">

@@ -10,8 +10,10 @@ import {
   FlaskConical,
   Loader2,
   Mail,
+  MessageSquare,
   Pencil,
   Plus,
+  Send,
   Trash2,
   VolumeX,
   Webhook,
@@ -407,7 +409,7 @@ function AddSmtpDialog({
 
 interface TestLogEntry {
   channelName: string
-  channelType: 'webhook' | 'smtp'
+  channelType: 'webhook' | 'smtp' | 'slack' | 'telegram'
   ok: boolean
   message: string
   at: Date
@@ -719,6 +721,328 @@ function EditSmtpDialog({
   )
 }
 
+// ─── Slack Dialogs ────────────────────────────────────────────────────────────
+
+const slackFormSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  webhookUrl: z.string().url('Must be a valid URL'),
+})
+
+type SlackFormValues = z.infer<typeof slackFormSchema>
+
+function AddSlackDialog({
+  orgId,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  orgId: string
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SlackFormValues>({ resolver: zodResolver(slackFormSchema) })
+
+  async function onSubmit(values: SlackFormValues) {
+    const result = await createNotificationChannel(orgId, {
+      name: values.name,
+      type: 'slack',
+      config: { webhookUrl: values.webhookUrl },
+    })
+    if ('error' in result) return
+    reset()
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Slack Channel</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="slack-name">Name</Label>
+            <Input id="slack-name" placeholder="e.g. #alerts-channel" {...register('name')} />
+            {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="slack-url">Incoming Webhook URL</Label>
+            <Input
+              id="slack-url"
+              placeholder="https://hooks.slack.com/services/..."
+              type="url"
+              {...register('webhookUrl')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Create an incoming webhook in your Slack workspace settings
+            </p>
+            {errors.webhookUrl && <p className="text-sm text-red-600">{errors.webhookUrl.message}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Add Channel
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditSlackDialog({
+  orgId,
+  channel,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  orgId: string
+  channel: NotificationChannelSafe & { type: 'slack' }
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SlackFormValues>({ resolver: zodResolver(slackFormSchema) })
+
+  useEffect(() => {
+    if (open) reset({ name: channel.name, webhookUrl: channel.config.webhookUrl })
+  }, [open, channel, reset])
+
+  async function onSubmit(values: SlackFormValues) {
+    const result = await updateNotificationChannel(orgId, channel.id, {
+      name: values.name,
+      webhookUrl: values.webhookUrl,
+    })
+    if ('error' in result) return
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Slack Channel</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-slack-name">Name</Label>
+            <Input id="edit-slack-name" {...register('name')} />
+            {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-slack-url">Incoming Webhook URL</Label>
+            <Input id="edit-slack-url" type="url" {...register('webhookUrl')} />
+            {errors.webhookUrl && <p className="text-sm text-red-600">{errors.webhookUrl.message}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Telegram Dialogs ─────────────────────────────────────────────────────────
+
+const telegramFormSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  botToken: z.string().min(1, 'Bot token is required'),
+  chatId: z.string().min(1, 'Chat ID is required'),
+})
+
+type TelegramFormValues = z.infer<typeof telegramFormSchema>
+
+function AddTelegramDialog({
+  orgId,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  orgId: string
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<TelegramFormValues>({ resolver: zodResolver(telegramFormSchema) })
+
+  async function onSubmit(values: TelegramFormValues) {
+    const result = await createNotificationChannel(orgId, {
+      name: values.name,
+      type: 'telegram',
+      config: { botToken: values.botToken, chatId: values.chatId },
+    })
+    if ('error' in result) return
+    reset()
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Telegram Channel</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="tg-name">Name</Label>
+            <Input id="tg-name" placeholder="e.g. Ops Team Telegram" {...register('name')} />
+            {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tg-token">Bot Token</Label>
+            <Input
+              id="tg-token"
+              placeholder="123456789:ABCdef..."
+              type="password"
+              {...register('botToken')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Create a bot via @BotFather on Telegram and paste the token here
+            </p>
+            {errors.botToken && <p className="text-sm text-red-600">{errors.botToken.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tg-chat">Chat ID</Label>
+            <Input
+              id="tg-chat"
+              placeholder="-1001234567890"
+              {...register('chatId')}
+            />
+            <p className="text-xs text-muted-foreground">
+              The numeric ID of the chat, group, or channel to send messages to
+            </p>
+            {errors.chatId && <p className="text-sm text-red-600">{errors.chatId.message}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Add Channel
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+const editTelegramFormSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  botToken: z.string().optional(),
+  chatId: z.string().min(1, 'Chat ID is required'),
+})
+
+type EditTelegramFormValues = z.infer<typeof editTelegramFormSchema>
+
+function EditTelegramDialog({
+  orgId,
+  channel,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  orgId: string
+  channel: NotificationChannelSafe & { type: 'telegram' }
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSuccess: () => void
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<EditTelegramFormValues>({ resolver: zodResolver(editTelegramFormSchema) })
+
+  useEffect(() => {
+    if (open) reset({ name: channel.name, botToken: '', chatId: channel.config.chatId })
+  }, [open, channel, reset])
+
+  async function onSubmit(values: EditTelegramFormValues) {
+    const result = await updateNotificationChannel(orgId, channel.id, {
+      name: values.name,
+      botToken: values.botToken || undefined,
+      chatId: values.chatId,
+    })
+    if ('error' in result) return
+    onSuccess()
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Telegram Channel</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-tg-name">Name</Label>
+            <Input id="edit-tg-name" {...register('name')} />
+            {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-tg-token">
+              Bot Token{' '}
+              {channel.config.hasBotToken && (
+                <span className="text-muted-foreground font-normal">(leave blank to keep existing)</span>
+              )}
+            </Label>
+            <Input
+              id="edit-tg-token"
+              type="password"
+              placeholder={channel.config.hasBotToken ? '••••••••' : '123456789:ABCdef...'}
+              {...register('botToken')}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-tg-chat">Chat ID</Label>
+            <Input id="edit-tg-chat" {...register('chatId')} />
+            {errors.chatId && <p className="text-sm text-red-600">{errors.chatId.message}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Add Silence Dialog ────────────────────────────────────────────────────────
 
 function toLocalDatetimeValue(d: Date): string {
@@ -867,6 +1191,8 @@ export function AlertsClient({
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all')
   const [addWebhookOpen, setAddWebhookOpen] = useState(false)
   const [addSmtpOpen, setAddSmtpOpen] = useState(false)
+  const [addSlackOpen, setAddSlackOpen] = useState(false)
+  const [addTelegramOpen, setAddTelegramOpen] = useState(false)
   const [addSilenceOpen, setAddSilenceOpen] = useState(false)
   const [editingChannel, setEditingChannel] = useState<NotificationChannelSafe | null>(null)
   const [testingChannelId, setTestingChannelId] = useState<string | null>(null)
@@ -1311,7 +1637,7 @@ export function AlertsClient({
               Channels that receive alert fired/resolved events
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             <Button
               size="sm"
               variant="outline"
@@ -1327,6 +1653,22 @@ export function AlertsClient({
             >
               <Plus className="size-3.5 mr-1" />
               Add SMTP
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddSlackOpen(true)}
+            >
+              <Plus className="size-3.5 mr-1" />
+              Add Slack
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddTelegramOpen(true)}
+            >
+              <Plus className="size-3.5 mr-1" />
+              Add Telegram
             </Button>
           </div>
         </CardHeader>
@@ -1355,6 +1697,16 @@ export function AlertsClient({
                           <Mail className="size-3" />
                           SMTP
                         </Badge>
+                      ) : ch.type === 'slack' ? (
+                        <Badge variant="outline" className="gap-1">
+                          <MessageSquare className="size-3" />
+                          Slack
+                        </Badge>
+                      ) : ch.type === 'telegram' ? (
+                        <Badge variant="outline" className="gap-1">
+                          <Send className="size-3" />
+                          Telegram
+                        </Badge>
                       ) : (
                         <Badge variant="outline" className="gap-1">
                           <Webhook className="size-3" />
@@ -1367,6 +1719,10 @@ export function AlertsClient({
                         <span>
                           {ch.config.host}:{ch.config.port} ({ch.config.encryption.toUpperCase()}) → {ch.config.toAddresses.join(', ')}
                         </span>
+                      ) : ch.type === 'slack' ? (
+                        <span className="font-mono truncate block max-w-xs">{ch.config.webhookUrl}</span>
+                      ) : ch.type === 'telegram' ? (
+                        <span>Chat ID: {ch.config.chatId}</span>
                       ) : (
                         <span className="font-mono truncate block max-w-xs">{ch.config.url}</span>
                       )}
@@ -1436,6 +1792,18 @@ export function AlertsClient({
         onOpenChange={setAddSmtpOpen}
         onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
       />
+      <AddSlackDialog
+        orgId={orgId}
+        open={addSlackOpen}
+        onOpenChange={setAddSlackOpen}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+      />
+      <AddTelegramDialog
+        orgId={orgId}
+        open={addTelegramOpen}
+        onOpenChange={setAddTelegramOpen}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+      />
       {testLog && (
         <TestLogDialog entry={testLog} onClose={() => setTestLog(null)} />
       )}
@@ -1453,6 +1821,30 @@ export function AlertsClient({
       )}
       {editingChannel?.type === 'smtp' && (
         <EditSmtpDialog
+          orgId={orgId}
+          channel={editingChannel}
+          open={true}
+          onOpenChange={(v) => { if (!v) setEditingChannel(null) }}
+          onSuccess={() => {
+            setEditingChannel(null)
+            qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+          }}
+        />
+      )}
+      {editingChannel?.type === 'slack' && (
+        <EditSlackDialog
+          orgId={orgId}
+          channel={editingChannel}
+          open={true}
+          onOpenChange={(v) => { if (!v) setEditingChannel(null) }}
+          onSuccess={() => {
+            setEditingChannel(null)
+            qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+          }}
+        />
+      )}
+      {editingChannel?.type === 'telegram' && (
+        <EditTelegramDialog
           orgId={orgId}
           channel={editingChannel}
           open={true}

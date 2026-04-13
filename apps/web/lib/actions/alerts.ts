@@ -16,6 +16,8 @@ import type {
   WebhookChannelConfig,
   SmtpChannelConfig,
   SmtpEncryption,
+  SlackChannelConfig,
+  TelegramChannelConfig,
   AlertSilence,
 } from '@/lib/db/schema'
 
@@ -84,6 +86,21 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
       fromAddress: z.string().email(),
       fromName: z.string().optional(),
       toAddresses: z.array(z.string().email()).min(1),
+    }),
+  }),
+  z.object({
+    name: z.string().min(1).max(100),
+    type: z.literal('slack'),
+    config: z.object({
+      webhookUrl: z.string().url(),
+    }),
+  }),
+  z.object({
+    name: z.string().min(1).max(100),
+    type: z.literal('telegram'),
+    config: z.object({
+      botToken: z.string().min(1, 'Bot token is required'),
+      chatId: z.string().min(1, 'Chat ID is required'),
     }),
   }),
 ])
@@ -428,6 +445,8 @@ export type NotificationChannelSafe = Omit<NotificationChannel, 'config' | 'type
         hasPassword: boolean
       }
     }
+  | { type: 'slack'; config: { webhookUrl: string } }
+  | { type: 'telegram'; config: { chatId: string; hasBotToken: boolean } }
 )
 
 /** Normalise SMTP config rows written before the encryption field was introduced. */
@@ -465,6 +484,22 @@ export async function getNotificationChannels(orgId: string): Promise<Notificati
           toAddresses: cfg.toAddresses,
           hasPassword: !!(cfg.password),
         },
+      }
+    }
+    if (ch.type === 'slack') {
+      const cfg = ch.config as SlackChannelConfig
+      return {
+        ...ch,
+        type: 'slack' as const,
+        config: { webhookUrl: cfg.webhookUrl },
+      }
+    }
+    if (ch.type === 'telegram') {
+      const cfg = ch.config as TelegramChannelConfig
+      return {
+        ...ch,
+        type: 'telegram' as const,
+        config: { chatId: cfg.chatId, hasBotToken: !!(cfg.botToken) },
       }
     }
     const cfg = ch.config as WebhookChannelConfig
@@ -548,6 +583,17 @@ const updateSmtpChannelSchema = z.object({
   toAddresses: z.array(z.string().email()).min(1),
 })
 
+const updateSlackChannelSchema = z.object({
+  name: z.string().min(1).max(100),
+  webhookUrl: z.string().url(),
+})
+
+const updateTelegramChannelSchema = z.object({
+  name: z.string().min(1).max(100),
+  botToken: z.string().optional(),
+  chatId: z.string().min(1),
+})
+
 export async function updateNotificationChannel(
   orgId: string,
   channelId: string,
@@ -570,14 +616,13 @@ export async function updateNotificationChannel(
       const existingConfig = existing.config as WebhookChannelConfig
       const newConfig: WebhookChannelConfig = {
         url,
-        // Non-empty string replaces; empty/absent keeps existing
         secret: secret || existingConfig.secret,
       }
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
         .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
-    } else {
+    } else if (existing.type === 'smtp') {
       const parsed = updateSmtpChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, host, port, encryption, username, password, fromAddress, fromName, toAddresses } = parsed.data
@@ -587,11 +632,32 @@ export async function updateNotificationChannel(
         port,
         encryption,
         username: username || undefined,
-        // Non-empty string replaces; empty/absent keeps existing
         password: password || existingConfig.password,
         fromAddress,
         fromName: fromName || undefined,
         toAddresses,
+      }
+      await db
+        .update(notificationChannels)
+        .set({ name, config: newConfig, updatedAt: new Date() })
+        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
+    } else if (existing.type === 'slack') {
+      const parsed = updateSlackChannelSchema.safeParse(input)
+      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+      const { name, webhookUrl } = parsed.data
+      const newConfig: SlackChannelConfig = { webhookUrl }
+      await db
+        .update(notificationChannels)
+        .set({ name, config: newConfig, updatedAt: new Date() })
+        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
+    } else if (existing.type === 'telegram') {
+      const parsed = updateTelegramChannelSchema.safeParse(input)
+      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+      const { name, botToken, chatId } = parsed.data
+      const existingConfig = existing.config as TelegramChannelConfig
+      const newConfig: TelegramChannelConfig = {
+        botToken: botToken || existingConfig.botToken,
+        chatId,
       }
       await db
         .update(notificationChannels)
@@ -652,7 +718,7 @@ export async function sendTestNotification(
     } catch (err) {
       return { error: err instanceof Error ? err.message : 'Request failed' }
     }
-  } else {
+  } else if (existing.type === 'smtp') {
     const cfg = normaliseSmtpConfig(existing.config)
     const transporter = nodemailer.createTransport({
       host: cfg.host,
@@ -674,6 +740,56 @@ export async function sendTestNotification(
     } catch (err) {
       return { error: err instanceof Error ? err.message : 'Failed to send email' }
     }
+  } else if (existing.type === 'slack') {
+    const cfg = existing.config as SlackChannelConfig
+    const payload = JSON.stringify({
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: ':large_blue_circle: [TEST] Infrawatch Test Notification' },
+        },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: 'Your Slack notification channel is configured correctly.' },
+        },
+      ],
+    })
+    try {
+      const res = await fetch(cfg.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!res.ok) return { error: `Slack returned ${res.status} ${res.statusText}` }
+      return { success: true }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : 'Request failed' }
+    }
+  } else if (existing.type === 'telegram') {
+    const cfg = existing.config as TelegramChannelConfig
+    const apiUrl = `https://api.telegram.org/bot${encodeURIComponent(cfg.botToken)}/sendMessage`
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: cfg.chatId,
+          text: '<b>🔵 TEST</b>\n\nYour Telegram notification channel is configured correctly.',
+          parse_mode: 'HTML',
+        }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        return { error: `Telegram returned ${res.status}: ${body}` }
+      }
+      return { success: true }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : 'Request failed' }
+    }
+  } else {
+    return { error: 'Unsupported channel type' }
   }
 }
 

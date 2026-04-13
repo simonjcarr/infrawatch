@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <SidebarProvider>
         <AppSidebar orgId={orgId} />
         <TerminalContentWrapper orgId={orgId}>
-          <Topbar />
+          <Topbar orgId={orgId} />
           <main className="flex-1 p-6 overflow-auto min-h-0">{children}</main>
         </TerminalContentWrapper>
       </SidebarProvider>

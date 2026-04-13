@@ -4,6 +4,8 @@ import { organisations } from './organisations'
 import { hosts } from './hosts'
 import { users } from './auth'
 
+export type NotificationResourceType = 'host' | 'certificate'
+
 export interface CheckStatusConfig {
   checkId: string
   failureThreshold: number
@@ -45,7 +47,16 @@ export interface SmtpChannelConfig {
   toAddresses: string[]
 }
 
-export type NotificationChannelType = 'webhook' | 'smtp'
+export interface SlackChannelConfig {
+  webhookUrl: string
+}
+
+export interface TelegramChannelConfig {
+  botToken: string
+  chatId: string
+}
+
+export type NotificationChannelType = 'webhook' | 'smtp' | 'slack' | 'telegram'
 
 export const alertRules = pgTable('alert_rules', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
@@ -89,7 +100,7 @@ export const notificationChannels = pgTable('notification_channels', {
   organisationId: text('organisation_id').notNull().references(() => organisations.id),
   name: text('name').notNull(),
   type: text('type').notNull().$type<NotificationChannelType>(),
-  config: jsonb('config').notNull().$type<WebhookChannelConfig | SmtpChannelConfig>(),
+  config: jsonb('config').notNull().$type<WebhookChannelConfig | SmtpChannelConfig | SlackChannelConfig | TelegramChannelConfig>(),
   enabled: boolean('enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -97,6 +108,24 @@ export const notificationChannels = pgTable('notification_channels', {
   metadata: jsonb('metadata'),
 }, (table) => [
   index('notification_channels_org_enabled_idx').on(table.organisationId, table.enabled),
+])
+
+export const notifications = pgTable('notifications', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  alertInstanceId: text('alert_instance_id').references(() => alertInstances.id),
+  subject: text('subject').notNull(),
+  body: text('body').notNull(),
+  severity: text('severity').notNull().$type<'info' | 'warning' | 'critical'>(),
+  resourceType: text('resource_type').notNull().$type<NotificationResourceType>(),
+  resourceId: text('resource_id').notNull(),
+  read: boolean('read').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('notifications_user_read_idx').on(table.userId, table.read),
+  index('notifications_org_user_idx').on(table.organisationId, table.userId),
+  index('notifications_user_created_idx').on(table.userId, table.createdAt),
 ])
 
 export const alertSilences = pgTable('alert_silences', {
@@ -125,3 +154,5 @@ export type NotificationChannel = typeof notificationChannels.$inferSelect
 export type NewNotificationChannel = typeof notificationChannels.$inferInsert
 export type AlertSilence = typeof alertSilences.$inferSelect
 export type NewAlertSilence = typeof alertSilences.$inferInsert
+export type Notification = typeof notifications.$inferSelect
+export type NewNotification = typeof notifications.$inferInsert

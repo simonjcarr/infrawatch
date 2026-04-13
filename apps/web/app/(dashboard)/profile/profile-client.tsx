@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, ShieldCheck, Sun, Moon, Monitor } from 'lucide-react'
-import { updateName, updatePassword, updateTheme } from '@/lib/actions/profile'
+import { Switch } from '@/components/ui/switch'
+import { CheckCircle2, ShieldCheck, Sun, Moon, Monitor, Bell } from 'lucide-react'
+import { updateName, updatePassword, updateTheme, updateNotificationPreference } from '@/lib/actions/profile'
+import { getOrgNotificationSettings } from '@/lib/actions/notification-settings'
 import type { SessionUser } from '@/lib/auth/session'
 
 type Theme = 'light' | 'dark' | 'system'
@@ -56,14 +58,38 @@ type PasswordValues = z.infer<typeof passwordSchema>
 
 interface ProfileClientProps {
   user: SessionUser
+  orgId: string
 }
 
-export function ProfileClient({ user }: ProfileClientProps) {
+export function ProfileClient({ user, orgId }: ProfileClientProps) {
   const [nameSaveSuccess, setNameSaveSuccess] = useState(false)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [currentTheme, setCurrentTheme] = useState<Theme>((user.theme as Theme) ?? 'system')
   const [themeSaving, setThemeSaving] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(user.notificationsEnabled)
+  const [notifSaveSuccess, setNotifSaveSuccess] = useState(false)
+  const [notifError, setNotifError] = useState<string | null>(null)
+
+  const { data: orgNotifSettings } = useQuery({
+    queryKey: ['org-notification-settings', orgId],
+    queryFn: () => getOrgNotificationSettings(orgId),
+    enabled: !!orgId,
+  })
+
+  const notifMutation = useMutation({
+    mutationFn: (enabled: boolean) => updateNotificationPreference(user.id, orgId, enabled),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setNotifError(result.error)
+        setNotificationsEnabled(user.notificationsEnabled) // revert
+        return
+      }
+      setNotifSaveSuccess(true)
+      setNotifError(null)
+      setTimeout(() => setNotifSaveSuccess(false), 3000)
+    },
+  })
 
   const nameForm = useForm<NameValues>({
     resolver: zodResolver(nameSchema),
@@ -289,6 +315,50 @@ export function ProfileClient({ user }: ProfileClientProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Notifications */}
+      {orgNotifSettings?.inAppEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="size-4 text-muted-foreground" />
+              Notifications
+            </CardTitle>
+            <CardDescription>
+              {orgNotifSettings.allowUserOptOut
+                ? 'Control whether you receive in-app notifications for alert events'
+                : 'Your organisation requires in-app notifications for your role'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm">In-app notifications</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Receive a notification when alerts fire or resolve
+                </p>
+              </div>
+              <Switch
+                checked={notificationsEnabled}
+                disabled={!orgNotifSettings.allowUserOptOut || notifMutation.isPending}
+                onCheckedChange={(checked) => {
+                  setNotificationsEnabled(checked)
+                  notifMutation.mutate(checked)
+                }}
+              />
+            </div>
+            {notifError && (
+              <p className="text-xs text-destructive">{notifError}</p>
+            )}
+            {notifSaveSuccess && (
+              <span className="flex items-center gap-1 text-sm text-green-700">
+                <CheckCircle2 className="size-4" />
+                Saved
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

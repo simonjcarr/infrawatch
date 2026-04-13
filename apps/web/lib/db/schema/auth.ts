@@ -18,6 +18,7 @@ export const users = pgTable('user', {
   twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   theme: text('theme').notNull().default('system'),
+  notificationsEnabled: boolean('notifications_enabled').notNull().default(true),
 })
 
 export const sessions = pgTable('session', {

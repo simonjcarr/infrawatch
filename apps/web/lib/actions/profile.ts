@@ -2,9 +2,10 @@
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
+import { users, organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { headers, cookies } from 'next/headers'
+import type { OrgMetadata } from '@/lib/db/schema/organisations'
 
 const updateNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -97,6 +98,34 @@ export async function updateTheme(
   } catch (err) {
     console.error('Failed to update theme:', err)
     return { error: 'An unexpected error occurred' }
+  }
+}
+
+export async function updateNotificationPreference(
+  userId: string,
+  orgId: string,
+  enabled: boolean,
+): Promise<{ success: true } | { error: string }> {
+  // Check whether the org allows users to opt out
+  const org = await db.query.organisations.findFirst({
+    where: eq(organisations.id, orgId),
+    columns: { metadata: true },
+  })
+  const meta = (org?.metadata ?? {}) as OrgMetadata
+  const allowOptOut = meta.notificationSettings?.allowUserOptOut !== false
+
+  if (!allowOptOut && !enabled) {
+    return { error: 'Your organisation does not allow opting out of notifications' }
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ notificationsEnabled: enabled, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+    return { success: true }
+  } catch {
+    return { error: 'Failed to update notification preference' }
   }
 }
 

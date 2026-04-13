@@ -183,6 +183,13 @@
       "when": 1776060859671,
       "tag": "0025_luxuriant_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776086940630,
+      "tag": "0026_youthful_anthem",
+      "breakpoints": true
     }
   ]
 }

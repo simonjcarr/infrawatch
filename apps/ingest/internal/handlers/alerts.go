@@ -42,6 +42,8 @@ type webhookChannelConfig struct {
 type notifChannels struct {
 	webhooks []queries.WebhookChannelRow
 	smtp     []queries.SmtpChannelRow
+	slack    []queries.SlackChannelRow
+	telegram []queries.TelegramChannelRow
 }
 
 // evaluateAlerts is called after check results are persisted for a heartbeat.
@@ -85,6 +87,20 @@ func evaluateAlerts(
 		slog.Warn("evaluateAlerts: fetching smtp channels", "org_id", orgID, "err", err)
 	} else {
 		channels.smtp = smtpChs
+	}
+
+	slackChs, err := queries.GetEnabledSlackChannels(ctx, pool, orgID)
+	if err != nil {
+		slog.Warn("evaluateAlerts: fetching slack channels", "org_id", orgID, "err", err)
+	} else {
+		channels.slack = slackChs
+	}
+
+	telegramChs, err := queries.GetEnabledTelegramChannels(ctx, pool, orgID)
+	if err != nil {
+		slog.Warn("evaluateAlerts: fetching telegram channels", "org_id", orgID, "err", err)
+	} else {
+		channels.telegram = telegramChs
 	}
 
 	for _, rule := range rules {
@@ -160,6 +176,9 @@ func evaluateCheckStatusRule(
 		}
 		dispatchWebhooks(ctx, channels.webhooks, ev)
 		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, rule.OrgID, id, "host", hostID, ev)
 		return
 	}
 
@@ -180,6 +199,9 @@ func evaluateCheckStatusRule(
 		}
 		dispatchWebhooks(ctx, channels.webhooks, ev)
 		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, rule.OrgID, existing.ID, "host", hostID, ev)
 	}
 }
 
@@ -241,6 +263,9 @@ func evaluateMetricThresholdRule(
 		}
 		dispatchWebhooks(ctx, channels.webhooks, ev)
 		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, rule.OrgID, id, "host", hostID, ev)
 		return
 	}
 
@@ -260,6 +285,9 @@ func evaluateMetricThresholdRule(
 		}
 		dispatchWebhooks(ctx, channels.webhooks, ev)
 		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, rule.OrgID, existing.ID, "host", hostID, ev)
 	}
 }
 
@@ -290,7 +318,9 @@ func evaluateCertExpiryForCert(
 
 	webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
 	smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
-	channels := notifChannels{webhooks: webhooks, smtp: smtpChs}
+	slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, orgID)
+	telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, orgID)
+	channels := notifChannels{webhooks: webhooks, smtp: smtpChs, slack: slackChs, telegram: telegramChs}
 
 	cert := queries.CertSummary{
 		ID:         certID,
@@ -374,6 +404,9 @@ func evaluateCertExpiryRule(
 		}
 		dispatchWebhooks(ctx, channels.webhooks, ev)
 		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, orgID, id, "certificate", cert.ID, ev)
 		return
 	}
 
@@ -394,6 +427,9 @@ func evaluateCertExpiryRule(
 		}
 		dispatchWebhooks(ctx, channels.webhooks, ev)
 		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, orgID, existing.ID, "certificate", cert.ID, ev)
 	}
 }
 
@@ -434,7 +470,9 @@ func runCertExpirySweep(ctx context.Context, pool *pgxpool.Pool) {
 
 		webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
 		smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
-		channels := notifChannels{webhooks: webhooks, smtp: smtpChs}
+		slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, orgID)
+		telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, orgID)
+		channels := notifChannels{webhooks: webhooks, smtp: smtpChs, slack: slackChs, telegram: telegramChs}
 
 		for _, rule := range rules {
 			var cfg certExpiryConfig

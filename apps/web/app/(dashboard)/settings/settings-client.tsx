@@ -10,15 +10,25 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert, Bell } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { updateOrgName, saveLicenceKey, updateMetricRetention } from '@/lib/actions/settings'
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
+import { getOrgNotificationSettings, updateOrgNotificationSettings } from '@/lib/actions/notification-settings'
 import type { OrgTerminalSettings } from '@/lib/actions/terminal'
+import type { OrgNotificationSettingsFull } from '@/lib/actions/notification-settings'
 import type { Organisation, HostCollectionSettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
+
+const ALL_ROLES = [
+  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'org_admin', label: 'Org Admin' },
+  { value: 'engineer', label: 'Engineer' },
+  { value: 'read_only', label: 'Read Only' },
+]
 
 const orgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -153,6 +163,31 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       setTerminalSaveSuccess(true)
       queryClient.invalidateQueries({ queryKey: ['org-terminal-settings', org.id] })
       setTimeout(() => setTerminalSaveSuccess(false), 3000)
+    },
+  })
+
+  // Notification settings
+  const [notificationSaveSuccess, setNotificationSaveSuccess] = useState(false)
+  const { data: notificationDefaults } = useQuery({
+    queryKey: ['org-notification-settings', org.id],
+    queryFn: () => getOrgNotificationSettings(org.id),
+  })
+  const [localNotificationSettings, setLocalNotificationSettings] = useState<OrgNotificationSettingsFull | null>(null)
+  const currentNotificationSettings = localNotificationSettings ?? notificationDefaults ?? {
+    inAppEnabled: true,
+    inAppRoles: ['super_admin', 'org_admin', 'engineer'],
+    allowUserOptOut: true,
+  }
+  const notificationDirty = localNotificationSettings !== null
+
+  const notificationMutation = useMutation({
+    mutationFn: (settings: OrgNotificationSettingsFull) => updateOrgNotificationSettings(org.id, settings),
+    onSuccess: (result) => {
+      if ('error' in result) return
+      setLocalNotificationSettings(null)
+      setNotificationSaveSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ['org-notification-settings', org.id] })
+      setTimeout(() => setNotificationSaveSuccess(false), 3000)
     },
   })
 
@@ -467,6 +502,116 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 <>
                   <p>Session Logging: {currentTerminalSettings.terminalLoggingEnabled ? 'Enabled' : 'Disabled'}</p>
                   <p>Direct Access (Legacy): {currentTerminalSettings.terminalDirectAccess ? 'Enabled' : 'Disabled'}</p>
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Notification Settings section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="size-4 text-muted-foreground" />
+            Notification Settings
+          </CardTitle>
+          <CardDescription>
+            Control in-app notifications and which roles receive them.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isAdmin ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm">Enable In-App Notifications</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When enabled, alert events appear in the notification bell for eligible users
+                  </p>
+                </div>
+                <Switch
+                  checked={currentNotificationSettings.inAppEnabled}
+                  onCheckedChange={(checked) =>
+                    setLocalNotificationSettings({
+                      ...currentNotificationSettings,
+                      inAppEnabled: checked,
+                    })
+                  }
+                />
+              </div>
+              {currentNotificationSettings.inAppEnabled && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Roles that receive notifications</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Select which roles get in-app notifications when alerts fire or resolve
+                    </p>
+                    <div className="space-y-2 pt-1">
+                      {ALL_ROLES.map((role) => (
+                        <div key={role.value} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`role-${role.value}`}
+                            checked={currentNotificationSettings.inAppRoles.includes(role.value)}
+                            onCheckedChange={(checked) => {
+                              const roles = checked
+                                ? [...currentNotificationSettings.inAppRoles, role.value]
+                                : currentNotificationSettings.inAppRoles.filter((r) => r !== role.value)
+                              setLocalNotificationSettings({
+                                ...currentNotificationSettings,
+                                inAppRoles: roles,
+                              })
+                            }}
+                          />
+                          <Label htmlFor={`role-${role.value}`} className="text-sm font-normal cursor-pointer">
+                            {role.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Allow users to opt out</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        When enabled, users can turn off their own in-app notifications in their profile
+                      </p>
+                    </div>
+                    <Switch
+                      checked={currentNotificationSettings.allowUserOptOut}
+                      onCheckedChange={(checked) =>
+                        setLocalNotificationSettings({
+                          ...currentNotificationSettings,
+                          allowUserOptOut: checked,
+                        })
+                      }
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-3 pt-2 border-t">
+                <Button
+                  size="sm"
+                  disabled={!notificationDirty || notificationMutation.isPending}
+                  onClick={() => notificationMutation.mutate(currentNotificationSettings)}
+                >
+                  {notificationMutation.isPending ? 'Saving...' : 'Save'}
+                </Button>
+                {notificationSaveSuccess && (
+                  <span className="flex items-center gap-1 text-sm text-green-700">
+                    <CheckCircle2 className="size-4" />
+                    Saved
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <p>In-App Notifications: {currentNotificationSettings.inAppEnabled ? 'Enabled' : 'Disabled'}</p>
+              {currentNotificationSettings.inAppEnabled && (
+                <>
+                  <p>Receiving roles: {currentNotificationSettings.inAppRoles.join(', ')}</p>
+                  <p>User opt-out: {currentNotificationSettings.allowUserOptOut ? 'Allowed' : 'Not allowed'}</p>
                 </>
               )}
             </div>

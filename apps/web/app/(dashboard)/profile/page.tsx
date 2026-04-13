@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 
 export default async function ProfilePage() {
   const session = await getRequiredSession()
-  return <ProfileClient user={session.user} />
+  return <ProfileClient user={session.user} orgId={session.user.organisationId ?? ''} />
 }

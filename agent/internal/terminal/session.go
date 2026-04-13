@@ -77,17 +77,19 @@ func OpenSession(dialFunc func() (*grpc.ClientConn, error), jwtToken string, req
 		cmd.Env = env
 		slog.Info("terminal: direct access mode", "session_id", sessionID, "shell", shell)
 	} else if req.Username != "" {
-		// Per-user mode: validate username and use su to authenticate
+		// Per-user mode: validate username and use login to authenticate.
+		// login always authenticates via PAM (unlike su, which skips auth from root).
+		// The user will see a "Password:" prompt in the terminal.
 		if len(req.Username) > 256 || !validUsernameRE.MatchString(req.Username) {
 			sendClosedMsg(stream, sessionID, -1)
 			return fmt.Errorf("terminal: invalid username %q", req.Username)
 		}
-		cmd = exec.Command("su", "-", req.Username)
+		cmd = exec.Command("login", "-p", req.Username)
 		cmd.Dir = "/"
 		env := os.Environ()
 		env = setEnv(env, "TERM", "xterm-256color")
 		cmd.Env = env
-		slog.Info("terminal: per-user mode", "session_id", sessionID, "username", req.Username)
+		slog.Info("terminal: per-user mode (login)", "session_id", sessionID, "username", req.Username)
 	} else {
 		// No username and not direct access — refuse session
 		sendClosedMsg(stream, sessionID, -1)

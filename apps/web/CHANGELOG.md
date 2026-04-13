@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.29.0...web/v0.29.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **notifications:** soft-delete notifications and fix chart axis label colours ([1508afb](https://github.com/simonjcarr/infrawatch/commit/1508afbc2d49c0123fc7a77ce6f5c05bae94c79c))
+* **notifications:** soft-delete notifications and fix chart axis label colours ([5742c30](https://github.com/simonjcarr/infrawatch/commit/5742c30d975d2793f910e41ade217eb7a4b93855))
+
 ## [0.29.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.28.0...web/v0.29.0) (2026-04-13)
 
 

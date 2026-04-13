@@ -9,11 +9,66 @@
 **Phase 5 — Tooling (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — Task framework expanded with custom script runner, service management (start/stop/restart/status), and service autocomplete from live host queries. Metrics charts upgraded with click-drag zoom and adaptive bucketing. WebSocket-based interactive terminal fully implemented: persistent bottom panel with tabs, per-user host authentication, cross-distro su/login support, username memory, session persistence across browser refresh, and reconnect-on-exit. Terminal is now a VS Code-style panel visible on all pages.
+🟢 Phase 5 progressing — Notification channels expanded: Slack (Incoming Webhooks) and Telegram (Bot API) added alongside webhook and SMTP. In-app notifications implemented end-to-end: Go ingest fan-out → `notifications` table → bell icon in topbar with red unread badge, dropdown, and full `/notifications` page. Org-level notification settings (roles, opt-out) in Settings; per-user opt-out toggle in Profile.
 
 ---
 
 ## What Has Been Built
+
+### Session 34 — Slack, Telegram, and in-app notification channels
+
+**Database** (`apps/web/lib/db/schema/alerts.ts`, `auth.ts`, `organisations.ts`, migration `0026_youthful_anthem`)
+- `notifications` table: per-user rows with subject, body, severity, resourceType, resourceId, read flag, alertInstanceId FK
+- `notificationsEnabled` column added to `user` table (default true)
+- `OrgNotificationSettings` added to `OrgMetadata` JSONB: `inAppEnabled`, `inAppRoles`, `allowUserOptOut`
+- `NotificationChannelType` expanded to `'webhook' | 'smtp' | 'slack' | 'telegram'`
+- `SlackChannelConfig { webhookUrl }` and `TelegramChannelConfig { botToken; chatId }` interfaces added
+
+**Go ingest service** (`apps/ingest/internal/`)
+- `alerts.sql.go`: `GetEnabledSlackChannels`, `GetEnabledTelegramChannels`, `GetOrgNotificationSettings`, `GetAlertTargetUsers` (role + opt-out filter), `InsertNotificationBatch` (pgx.Batch)
+- `notify.go`: `postSlack` (Block Kit JSON), `dispatchSlack`, `postTelegram` (Bot API HTML mode), `dispatchTelegram`, `dispatchInApp` (org settings → user targeting → batch insert)
+- `alerts.go`: `notifChannels` struct expanded; all evaluators (`check_status`, `metric_threshold`, `cert_expiry`) call Slack + Telegram + in-app dispatch on fire and resolve
+
+**TypeScript actions** (`apps/web/lib/actions/`)
+- `alerts.ts`: Zod discriminated union extended for Slack/Telegram; `NotificationChannelSafe` union updated (Telegram masks botToken as `hasBotToken`); `updateNotificationChannel` and `sendTestNotification` handle all four types
+- `notifications.ts`: `getNotifications`, `getUnreadCount`, `markAsRead`, `markAllAsRead`, `deleteNotification`
+- `notification-settings.ts`: `getOrgNotificationSettings` (with defaults), `updateOrgNotificationSettings` (admin-only, Zod-validated)
+- `profile.ts`: `updateNotificationPreference` (respects org `allowUserOptOut`)
+
+**UI — Alerts page** (`apps/web/app/(dashboard)/alerts/alerts-client.tsx`)
+- `AddSlackDialog`, `EditSlackDialog`, `AddTelegramDialog`, `EditTelegramDialog` components following existing dialog pattern
+- "Add Slack" and "Add Telegram" buttons in channels card header
+- Type badges (MessageSquare for Slack, Send for Telegram); details column shows webhookUrl/chatId
+
+**UI — Notification bell** (`apps/web/components/shared/notification-bell.tsx`, `topbar.tsx`)
+- Topbar Bell icon with absolute-positioned red badge showing unread count (capped at 99+)
+- Dropdown: 10 most recent notifications with severity dot, bold subject (unread), relative timestamp, blue dot indicator
+- Click: `markAsRead` + navigate to resource (`/hosts/{id}` or `/certificates/{id}`)
+- Footer: "View all notifications" → `/notifications`
+- Polls every 20 s via TanStack Query `refetchInterval`
+
+**UI — Notifications page** (`apps/web/app/(dashboard)/notifications/`)
+- Server component fetches initial 25 notifications + unread count for SSR
+- Filter tabs: All / Unread (with badge)
+- Cards: severity dot, subject, severity badge, relative + absolute timestamps; click to expand body + resource link + mark-read + delete
+- "Mark all read" header button; Previous/Next pagination (PAGE_SIZE=25)
+- Polls every 30 s
+
+**UI — Settings** (`apps/web/app/(dashboard)/settings/settings-client.tsx`)
+- "Notification Settings" card: Enable in-app toggle, role checkboxes (super_admin/org_admin/engineer/read_only), Allow user opt-out toggle; admin-only
+
+**UI — Profile** (`apps/web/app/(dashboard)/profile/profile-client.tsx`)
+- "Notifications" card: toggle visible when org `inAppEnabled`; disabled with explanatory text when org disallows opt-out
+
+**Sidebar** (`apps/web/components/shared/sidebar.tsx`)
+- "Notifications" entry added to Monitoring group (BellPlus icon, `/notifications`)
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./...` — zero errors ✅
+- PR: simonjcarr/infrawatch#155
+
+---
 
 ### Session 33 — Terminal UX polish: saved username and reconnect on exit
 
@@ -1126,7 +1181,9 @@ Phase 3 is complete and all known technical debt is resolved. Phase 4 starts her
 - [x] Metric graphs (Recharts)
 - [x] Alert rule builder (check_status + metric_threshold, per-host + org-wide)
 - [x] Alert state machine (fire/resolve in ingest; acknowledge in web)
-- [x] Notification channels (webhook with HMAC-SHA256 signing)
+- [x] Notification channels (webhook HMAC-SHA256, SMTP, Slack, Telegram, in-app)
+- [x] In-app notification bell, dropdown, and /notifications page
+- [x] Org notification settings (roles, opt-out) + per-user opt-out
 - [x] Alert silencing
 - [x] Alert acknowledgement
 - [x] Alert history pagination + date/severity filter

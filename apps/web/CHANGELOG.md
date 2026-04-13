@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.28.0...web/v0.29.0) (2026-04-13)
+
+
+### Features
+
+* **notifications:** add bulk actions, charts, and mark-unread support ([31a956f](https://github.com/simonjcarr/infrawatch/commit/31a956f8e41b6b7045afa3d6bed509753fabae4e))
+* **notifications:** bulk actions, severity charts, and mark-unread support ([25671ef](https://github.com/simonjcarr/infrawatch/commit/25671efb36d72ec0f6cfd28226e675a83465cdb9))
+
 ## [0.28.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.27.0...web/v0.28.0) (2026-04-13)
 
 

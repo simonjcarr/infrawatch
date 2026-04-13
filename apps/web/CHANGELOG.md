@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.30.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.29.1...web/v0.30.0) (2026-04-13)
+
+
+### Features
+
+* **notifications:** add time-range selector to notification trend chart ([04c2392](https://github.com/simonjcarr/infrawatch/commit/04c23929c2ef4066efd9a83f052c1a91290e2753))
+* **notifications:** time-range selector on notification trend chart ([40e8b96](https://github.com/simonjcarr/infrawatch/commit/40e8b96e5e6a054b73b485b892fb56ab1e75c417))
+
 ## [0.29.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.29.0...web/v0.29.1) (2026-04-13)
 
 

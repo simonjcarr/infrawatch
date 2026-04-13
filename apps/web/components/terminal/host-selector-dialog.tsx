@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search, Server, Terminal, User, Loader2, WifiOff } from 'lucide-react'
 import {
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { listHosts } from '@/lib/actions/agents'
 import { checkTerminalAccess } from '@/lib/actions/terminal'
+import { useSession } from '@/lib/auth/client'
 import { useTerminalPanel } from './terminal-panel-context'
 
 interface Props {
@@ -32,6 +33,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const { openTerminal } = useTerminalPanel()
+  const { data: session } = useSession()
 
   const { data: hosts = [], isLoading } = useQuery({
     queryKey: ['hosts', orgId],
@@ -73,6 +75,17 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
 
   const directAccess = terminalAccess?.allowed === true ? terminalAccess.directAccess : false
 
+  // Pre-fill with last-used username when a host is selected
+  useEffect(() => {
+    if (!selectedHostId || !session?.user?.id) return
+    try {
+      const saved = localStorage.getItem(`terminal-username:${session.user.id}:${selectedHostId}`)
+      if (saved) setUsername(saved)
+    } catch {
+      // localStorage may be unavailable
+    }
+  }, [selectedHostId, session?.user?.id])
+
   const handleConnect = async () => {
     if (!selectedHost) return
 
@@ -88,6 +101,15 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
 
     setConnecting(true)
     setError(null)
+
+    // Save last-used username for this host
+    if (!directAccess && username.trim() && session?.user?.id && selectedHostId) {
+      try {
+        localStorage.setItem(`terminal-username:${session.user.id}:${selectedHostId}`, username.trim())
+      } catch {
+        // localStorage may be unavailable
+      }
+    }
 
     openTerminal({
       hostId: selectedHost.id,

@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db'
 import { notifications } from '@/lib/db/schema'
-import { eq, and, desc, count, inArray, gte, sql } from 'drizzle-orm'
+import { eq, and, desc, count, inArray, gte, sql, isNull } from 'drizzle-orm'
 import type { Notification } from '@/lib/db/schema'
 
 export async function getNotifications(
@@ -15,6 +15,7 @@ export async function getNotifications(
     where: and(
       eq(notifications.organisationId, orgId),
       eq(notifications.userId, userId),
+      isNull(notifications.deletedAt),
     ),
     orderBy: desc(notifications.createdAt),
     limit,
@@ -31,6 +32,7 @@ export async function getUnreadCount(orgId: string, userId: string): Promise<num
         eq(notifications.organisationId, orgId),
         eq(notifications.userId, userId),
         eq(notifications.read, false),
+        isNull(notifications.deletedAt),
       ),
     )
   return result?.value ?? 0
@@ -50,6 +52,7 @@ export async function markAsRead(
           eq(notifications.id, notificationId),
           eq(notifications.organisationId, orgId),
           eq(notifications.userId, userId),
+          isNull(notifications.deletedAt),
         ),
       )
     return { success: true }
@@ -71,6 +74,7 @@ export async function markAllAsRead(
           eq(notifications.organisationId, orgId),
           eq(notifications.userId, userId),
           eq(notifications.read, false),
+          isNull(notifications.deletedAt),
         ),
       )
     return { success: true }
@@ -86,12 +90,14 @@ export async function deleteNotification(
 ): Promise<{ success: true } | { error: string }> {
   try {
     await db
-      .delete(notifications)
+      .update(notifications)
+      .set({ deletedAt: new Date() })
       .where(
         and(
           eq(notifications.id, notificationId),
           eq(notifications.organisationId, orgId),
           eq(notifications.userId, userId),
+          isNull(notifications.deletedAt),
         ),
       )
     return { success: true }
@@ -108,12 +114,14 @@ export async function deleteNotifications(
   if (ids.length === 0) return { success: true }
   try {
     await db
-      .delete(notifications)
+      .update(notifications)
+      .set({ deletedAt: new Date() })
       .where(
         and(
           inArray(notifications.id, ids),
           eq(notifications.organisationId, orgId),
           eq(notifications.userId, userId),
+          isNull(notifications.deletedAt),
         ),
       )
     return { success: true }
@@ -138,6 +146,7 @@ export async function markBatchReadStatus(
           inArray(notifications.id, ids),
           eq(notifications.organisationId, orgId),
           eq(notifications.userId, userId),
+          isNull(notifications.deletedAt),
         ),
       )
     return { success: true }
@@ -165,6 +174,7 @@ export async function getNotificationStats(
       and(
         eq(notifications.organisationId, orgId),
         eq(notifications.userId, userId),
+        isNull(notifications.deletedAt),
       ),
     )
     .groupBy(notifications.severity)
@@ -183,7 +193,9 @@ export async function getNotificationsOverTime(
   userId: string,
   days = 30,
 ): Promise<NotificationTimeSeriesPoint[]> {
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  // Intentionally does NOT filter on deletedAt so that deleting notifications
+  // from the inbox does not affect the historical trend. Retains up to 90 days.
+  const cutoff = new Date(Date.now() - Math.min(days, 90) * 24 * 60 * 60 * 1000)
 
   const rows = await db
     .select({

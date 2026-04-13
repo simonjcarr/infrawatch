@@ -3,7 +3,7 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/shared/sidebar'
 import { Topbar } from '@/components/shared/topbar'
 import { getRequiredSession } from '@/lib/auth/session'
-import { TerminalLayoutWrapper } from '@/components/terminal/terminal-layout-wrapper'
+import { TerminalProviderWrapper, TerminalContentWrapper } from '@/components/terminal/terminal-layout-wrapper'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getRequiredSession()
@@ -23,12 +23,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const orgId = session.user.organisationId
 
   return (
-    <SidebarProvider>
-      <AppSidebar orgId={orgId} />
-      <TerminalLayoutWrapper orgId={orgId}>
-        <Topbar />
-        <main className="flex-1 p-6 overflow-auto min-h-0">{children}</main>
-      </TerminalLayoutWrapper>
-    </SidebarProvider>
+    <TerminalProviderWrapper>
+      <SidebarProvider>
+        <AppSidebar orgId={orgId} />
+        <TerminalContentWrapper orgId={orgId}>
+          <Topbar />
+          <main className="flex-1 p-6 overflow-auto min-h-0">{children}</main>
+        </TerminalContentWrapper>
+      </SidebarProvider>
+    </TerminalProviderWrapper>
   )
 }

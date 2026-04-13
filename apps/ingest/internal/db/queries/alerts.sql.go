@@ -325,6 +325,11 @@ func GetOrgNotificationSettings(ctx context.Context, pool *pgxpool.Pool, orgID s
 			AllowUserOptOut: true,
 		}, err
 	}
+	// ARRAY(SELECT ...) returns '{}' (not NULL) when the JSON key is absent, so
+	// COALESCE in SQL never fires. Apply the default here instead.
+	if len(row.InAppRoles) == 0 {
+		row.InAppRoles = []string{"super_admin", "org_admin", "engineer"}
+	}
 	return row, nil
 }
 

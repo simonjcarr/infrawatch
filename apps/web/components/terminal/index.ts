@@ -1,5 +1,5 @@
 export { TerminalPanelProvider, useTerminalPanel } from './terminal-panel-context'
 export type { TerminalTabInfo } from './terminal-panel-context'
 export { TerminalPanel, TerminalPanelTrigger } from './terminal-panel'
-export { TerminalLayoutWrapper } from './terminal-layout-wrapper'
+export { TerminalProviderWrapper, TerminalContentWrapper } from './terminal-layout-wrapper'
 export { HostSelectorDialog } from './host-selector-dialog'

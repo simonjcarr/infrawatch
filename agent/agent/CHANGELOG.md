@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.21.0...agent/v0.21.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **terminal:** use login instead of su for per-user auth ([a6fa358](https://github.com/simonjcarr/infrawatch/commit/a6fa3585ad3daf30a1ef885fb055e3db47909112))
+* **terminal:** use login instead of su for per-user authentication ([d07b957](https://github.com/simonjcarr/infrawatch/commit/d07b9572240a4a9f371cb4dfea80a8fc506c1394))
+
 ## [0.21.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.20.1...agent/v0.21.0) (2026-04-13)
 
 

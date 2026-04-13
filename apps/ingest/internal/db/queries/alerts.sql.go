@@ -389,11 +389,11 @@ func InsertNotificationBatch(ctx context.Context, pool *pgxpool.Pool, rows []Not
 	batch := &pgx.Batch{}
 	const q = `
 		INSERT INTO notifications
-		  (organisation_id, user_id, alert_instance_id, subject, body, severity, resource_type, resource_id)
-		VALUES ($1, $2, NULLIF($3,''), $4, $5, $6, $7, $8)
+		  (id, organisation_id, user_id, alert_instance_id, subject, body, severity, resource_type, resource_id)
+		VALUES ($1, $2, $3, NULLIF($4,''), $5, $6, $7, $8, $9)
 	`
 	for _, r := range rows {
-		batch.Queue(q, r.OrgID, r.UserID, r.AlertInstanceID, r.Subject, r.Body, r.Severity, r.ResourceType, r.ResourceID)
+		batch.Queue(q, newCUID(), r.OrgID, r.UserID, r.AlertInstanceID, r.Subject, r.Body, r.Severity, r.ResourceType, r.ResourceID)
 	}
 
 	br := pool.SendBatch(ctx, batch)

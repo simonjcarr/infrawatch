@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.30.0...web/v0.31.0) (2026-04-13)
+
+
+### Features
+
+* **hosts:** add notification severity and trend charts to metrics tab ([e009d6c](https://github.com/simonjcarr/infrawatch/commit/e009d6c8c10c10e34073778304968de895f7d407))
+* **hosts:** notification severity and trend charts on metrics tab ([271df68](https://github.com/simonjcarr/infrawatch/commit/271df684725ef3f80b2d5dd04e084477b52c6ee6))
+
 ## [0.30.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.29.1...web/v0.30.0) (2026-04-13)
 
 

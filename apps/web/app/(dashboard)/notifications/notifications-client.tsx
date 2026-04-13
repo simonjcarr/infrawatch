@@ -156,17 +156,18 @@ function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }
               <p className="text-sm text-muted-foreground">No data</p>
             </div>
           ) : (
+            <div className="text-muted-foreground">
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={lineData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
                   tickLine={false}
                   axisLine={false}
                   allowDecimals={false}
@@ -193,6 +194,7 @@ function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }
                 />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>

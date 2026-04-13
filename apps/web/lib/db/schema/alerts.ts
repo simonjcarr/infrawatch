@@ -122,6 +122,7 @@ export const notifications = pgTable('notifications', {
   resourceId: text('resource_id').notNull(),
   read: boolean('read').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => [
   index('notifications_user_read_idx').on(table.userId, table.read),
   index('notifications_org_user_idx').on(table.organisationId, table.userId),

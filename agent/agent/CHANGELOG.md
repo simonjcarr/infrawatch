@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.22.0...agent/v0.22.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **agent:** escape systemd cgroup when uninstalling remotely ([a05f6c9](https://github.com/simonjcarr/infrawatch/commit/a05f6c91907b71a7b2320eac25319fa46e9a053d))
+* **agent:** escape systemd cgroup when uninstalling remotely ([d36111b](https://github.com/simonjcarr/infrawatch/commit/d36111b9c8b4642a25e7dbf11f89c200ecf433b3))
+
 ## [0.22.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.21.2...agent/v0.22.0) (2026-04-14)
 
 

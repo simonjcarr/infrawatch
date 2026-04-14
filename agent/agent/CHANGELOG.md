@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.23.0...agent/v0.23.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **agent:** alias windows/registry import to avoid conflict with tasks.registry var ([492502f](https://github.com/simonjcarr/infrawatch/commit/492502f14cacab60403b2d9c1f21f0d69fc703b8))
+* **agent:** alias windows/registry import to avoid conflict with tasks.registry var ([6f6d08f](https://github.com/simonjcarr/infrawatch/commit/6f6d08f49d2e68f5d31b5803aacbce184632d1b5))
+
 ## [0.23.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.22.1...agent/v0.23.0) (2026-04-14)
 
 

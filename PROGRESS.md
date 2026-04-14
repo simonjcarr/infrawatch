@@ -9,11 +9,46 @@
 **Phase 5 — Tooling (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — Notification channels expanded: Slack (Incoming Webhooks) and Telegram (Bot API) added alongside webhook and SMTP. In-app notifications implemented end-to-end: Go ingest fan-out → `notifications` table → bell icon in topbar with red unread badge, dropdown, and full `/notifications` page. Org-level notification settings (roles, opt-out) in Settings; per-user opt-out toggle in Profile.
+🟢 Phase 5 progressing — Notifications significantly enhanced: bulk actions (select-all, bulk mark read/unread, bulk delete), severity pie chart and notification trend line chart on the /notifications page, soft-delete to preserve trend history, time-range dropdown on the trend chart (1h → 3 months), and both charts replicated on the host detail Metrics tab filtered per-host.
 
 ---
 
 ## What Has Been Built
+
+### Session 35 — Notification enhancements: bulk actions, charts, soft-delete, and host metrics integration
+
+**Database** (`apps/web/lib/db/schema/alerts.ts`, migration `0027_ambiguous_manta`)
+- `deleted_at` column added to `notifications` table — brings it in line with the project's universal soft-delete convention (was the only major table missing it)
+
+**TypeScript actions** (`apps/web/lib/actions/notifications.ts`)
+- `deleteNotification` / `deleteNotifications` — converted from hard delete to soft delete (set `deleted_at`)
+- All inbox queries (`getNotifications`, `getUnreadCount`, `markAsRead`, `markAllAsRead`, `markBatchReadStatus`) now filter `WHERE deleted_at IS NULL`
+- `deleteNotifications(orgId, userId, ids[])` — new batch soft-delete action
+- `markBatchReadStatus(orgId, userId, ids[], read)` — new batch read/unread toggle
+- `getNotificationStats(orgId, userId, hostId?)` — counts per severity for pie chart; optional `hostId` scopes to a specific host
+- `getNotificationsOverTime(orgId, userId, range, hostId?)` — daily or hourly aggregation for line chart; intentionally omits `deleted_at` filter so deleting from the inbox never affects historical trend data; optional `hostId` scopes to a specific host; enforces 90-day maximum retention window
+- `TrendRange` type exported: `'1h' | '6h' | '12h' | '24h' | '7d' | '30d' | '90d'`
+
+**UI — Notifications page** (`apps/web/app/(dashboard)/notifications/notifications-client.tsx`)
+- **Bulk selection**: checkbox on every notification card + select-all checkbox with indeterminate state
+- **Bulk action toolbar**: appears when ≥1 item selected — "Mark as read", "Mark as unread", "Delete", "Clear selection"
+- **Per-card mark as unread**: expanded card now shows "Mark as unread" for already-read notifications (was read-only before)
+- **Severity breakdown pie chart** (donut): critical / warning / info distribution with percentage tooltips; updates on query refetch; "No data" placeholder when empty
+- **Notification trend line chart**: critical & warning daily/hourly counts with a time-range dropdown; description subtitle updates dynamically; `fill: currentColor` + parent `text-muted-foreground` wrapper fixes SVG axis label visibility in dark mode
+- **Time-range dropdown** on trend chart: 1h · 6h · 12h · 24h · 7d · 30d · 3 months; sub-24h ranges aggregate per hour (HH:mm labels), longer ranges per day (MMM d labels); TanStack Query key includes range so switching triggers a fresh fetch
+- Selection is cleared on filter tab change and pagination
+
+**UI — Host detail / Metrics tab** (`apps/web/app/(dashboard)/hosts/[id]/host-notification-charts.tsx`, `host-detail-client.tsx`)
+- New `HostNotificationCharts` component renders both charts below the Heartbeat Interval chart on the Monitoring → Metrics tab
+- Charts are scoped to the specific host via the `hostId` filter on both server actions
+- Same time-range dropdown and dark-mode-safe axis labels as the global notifications page
+- "No notifications for this host" / "No data for this period" placeholders shown when empty
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- PRs: simonjcarr/infrawatch#159, #161, #163, #165
+
+---
 
 ### Session 34 — Slack, Telegram, and in-app notification channels
 
@@ -1123,18 +1158,20 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 18 — Phase 4: Service Accounts & Identity**
+**Session 36 — Notification UX polish and Phase 4 start**
 
-Phase 3 is complete and all known technical debt is resolved. Phase 4 starts here:
+Notification work is feature-complete. Suggested next steps:
 
-1. **Service account inventory** — schema (`service_accounts` table with name, type, owner, expiry); list UI with expiry countdown badges; soft delete
-2. **SSH key inventory** — track SSH public keys linked to service accounts; fingerprint, last-used-at, expiry
-3. **Expiry tracking + alerting** — new alert condition type `service_account_expiry`; ingest evaluator + sweeper (mirrors cert_expiry pattern)
-4. **LDAP/AD integration** — community-tier LDAP sync; imports users and service accounts from directory
+1. **Notification data hygiene** — periodic hard-purge of soft-deleted notifications older than 90 days (background job or pg_cron rule) to prevent unbounded table growth
+2. **Phase 4: Service Accounts & Identity** — schema (`service_accounts` table with name, type, owner, expiry); list UI with expiry countdown badges; soft delete
+3. **SSH key inventory** — track SSH public keys linked to service accounts; fingerprint, last-used-at, expiry
+4. **Expiry tracking + alerting** — new alert condition type `service_account_expiry`; ingest evaluator + sweeper (mirrors cert_expiry pattern)
+5. **LDAP/AD integration** — community-tier LDAP sync; imports users and service accounts from directory
 
 **Outstanding technical debt (carry forward):**
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
+- Soft-deleted notifications accumulate indefinitely — purge job not yet implemented
 
 ---
 
@@ -1184,6 +1221,11 @@ Phase 3 is complete and all known technical debt is resolved. Phase 4 starts her
 - [x] Notification channels (webhook HMAC-SHA256, SMTP, Slack, Telegram, in-app)
 - [x] In-app notification bell, dropdown, and /notifications page
 - [x] Org notification settings (roles, opt-out) + per-user opt-out
+- [x] Notification bulk actions (select-all, bulk mark read/unread, bulk delete)
+- [x] Notification severity pie chart + trend line chart on /notifications page
+- [x] Notification charts on host detail Metrics tab (host-scoped)
+- [x] Soft-delete on notifications (preserves trend history through deletions)
+- [x] Trend chart time-range selector (1h → 3 months, hourly/daily auto-granularity)
 - [x] Alert silencing
 - [x] Alert acknowledgement
 - [x] Alert history pagination + date/severity filter

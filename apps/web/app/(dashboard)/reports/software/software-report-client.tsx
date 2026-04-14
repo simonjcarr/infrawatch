@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { Fragment, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useQueryState } from 'nuqs'
 import { formatDistanceToNow } from 'date-fns'
@@ -98,20 +98,6 @@ const SOURCE_OPTIONS = [
   { value: 'macapps', label: 'macOS Apps' },
 ]
 
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const debounced = useCallback(
-    (next: T) => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setDebouncedValue(next), delay)
-    },
-    [delay],
-  )
-
-  return debouncedValue
-}
 
 export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
   const queryClient = useQueryClient()
@@ -517,9 +503,8 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                       const key = `${row.name}\0${row.version}`
                       const expanded = expandedRows.has(key)
                       return (
-                        <>
+                        <Fragment key={key}>
                           <TableRow
-                            key={key}
                             className="cursor-pointer hover:bg-muted/50"
                             onClick={() => toggleRowExpanded(key)}
                           >
@@ -550,7 +535,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                             </TableCell>
                           </TableRow>
                           {expanded && (
-                            <TableRow key={`${key}-expanded`}>
+                            <TableRow>
                               <TableCell colSpan={6} className="bg-muted/30 px-8 py-3">
                                 <p className="text-xs font-medium text-muted-foreground mb-2">
                                   All hosts with {row.name} {row.version}
@@ -565,7 +550,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                               </TableCell>
                             </TableRow>
                           )}
-                        </>
+                        </Fragment>
                       )
                     })}
                   </TableBody>

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.32.0...web/v0.33.0) (2026-04-14)
+
+
+### Features
+
+* **software-inventory:** full software inventory and reporting feature ([e98cf6f](https://github.com/simonjcarr/infrawatch/commit/e98cf6fb030a9f3900358f352179b43128b98761))
+* **software-inventory:** installed software tracking, global reports, and export ([903e772](https://github.com/simonjcarr/infrawatch/commit/903e77247ae4041ed9471f649c4bd603c9509c68))
+
 ## [0.32.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.31.1...web/v0.32.0) (2026-04-14)
 
 

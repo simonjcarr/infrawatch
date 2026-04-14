@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.22.1...agent/v0.23.0) (2026-04-14)
+
+
+### Features
+
+* **software-inventory:** full software inventory and reporting feature ([e98cf6f](https://github.com/simonjcarr/infrawatch/commit/e98cf6fb030a9f3900358f352179b43128b98761))
+* **software-inventory:** installed software tracking, global reports, and export ([903e772](https://github.com/simonjcarr/infrawatch/commit/903e77247ae4041ed9471f649c4bd603c9509c68))
+
 ## [0.22.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.22.0...agent/v0.22.1) (2026-04-14)
 
 

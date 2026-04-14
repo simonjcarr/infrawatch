@@ -43,6 +43,7 @@ func RunUninstall(ctx context.Context, configJSON string, progressFn func(chunk 
 	progressFn("Agent uninstall requested.\n")
 	progressFn(fmt.Sprintf("Binary: %s\n", binPath))
 	progressFn("Spawning detached uninstaller process in 3 seconds.\n")
+	progressFn("On systemd hosts the uninstaller is launched as a transient systemd unit (systemd-run) so it survives the agent cgroup being torn down.\n")
 	progressFn("The agent service will stop shortly after; uninstaller output is written to /tmp/infrawatch-uninstall.log on the host.\n")
 
 	// Run the launcher in a goroutine so the result below is shipped first.

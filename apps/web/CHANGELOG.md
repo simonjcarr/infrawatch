@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.31.1...web/v0.32.0) (2026-04-14)
+
+
+### Features
+
+* **hosts:** remote agent uninstall on host deletion ([0613f6c](https://github.com/simonjcarr/infrawatch/commit/0613f6ce238cefd999183bc59851632bbdc42b78))
+* **hosts:** remote agent uninstall on host deletion ([8b3fe3d](https://github.com/simonjcarr/infrawatch/commit/8b3fe3d7f03a07ee99da727ed046795be8e5e56f))
+
 ## [0.31.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.31.0...web/v0.31.1) (2026-04-14)
 
 

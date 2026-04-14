@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.31.0...web/v0.31.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **terminal:** pin terminal panel to bottom of viewport ([8c648cc](https://github.com/simonjcarr/infrawatch/commit/8c648cc37af1c48251ddee56e69bc73a6861a471))
+* **terminal:** pin terminal panel to bottom of viewport ([4e532e1](https://github.com/simonjcarr/infrawatch/commit/4e532e1c27a0f8847cd22021d8e66107734334b9))
+
 ## [0.31.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.30.0...web/v0.31.0) (2026-04-13)
 
 

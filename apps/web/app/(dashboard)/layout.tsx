@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <TerminalProviderWrapper>
-      <SidebarProvider>
+      <SidebarProvider className="h-svh overflow-hidden">
         <AppSidebar orgId={orgId} />
         <TerminalContentWrapper orgId={orgId}>
           <Topbar orgId={orgId} />

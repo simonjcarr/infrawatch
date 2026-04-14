@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"golang.org/x/sys/windows/registry"
+	winreg "golang.org/x/sys/windows/registry"
 )
 
 // collectPackages — Windows implementation: walks both 32- and 64-bit
@@ -28,7 +28,7 @@ func collectWindowsPackages() ([]collectedPackage, error) {
 	var pkgs []collectedPackage
 
 	for _, keyPath := range []string{uninstallKey64, uninstallKey32} {
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.READ)
+		k, err := winreg.OpenKey(winreg.LOCAL_MACHINE, keyPath, winreg.READ)
 		if err != nil {
 			slog.Debug("software_inventory: opening registry key", "path", keyPath, "err", err)
 			continue
@@ -41,7 +41,7 @@ func collectWindowsPackages() ([]collectedPackage, error) {
 		}
 
 		for _, sub := range subkeys {
-			sk, err := registry.OpenKey(k, sub, registry.READ)
+			sk, err := winreg.OpenKey(k, sub, winreg.READ)
 			if err != nil {
 				continue
 			}

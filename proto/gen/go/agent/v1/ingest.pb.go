@@ -10,6 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
+	sync "sync"
 	unsafe "unsafe"
 )
 
@@ -20,36 +21,279 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// SoftwareInventoryChunk carries a batch of packages from a single scan.
+type SoftwareInventoryChunk struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScanId        string                 `protobuf:"bytes,1,opt,name=scan_id,json=scanId,proto3" json:"scan_id,omitempty"` // task_run_hosts.id that triggered this scan
+	AgentId       string                 `protobuf:"bytes,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"` // "rpm" | "dpkg" | "pacman" | "apk" | "winreg" | etc.
+	ChunkIndex    int32                  `protobuf:"varint,4,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
+	IsLast        bool                   `protobuf:"varint,5,opt,name=is_last,json=isLast,proto3" json:"is_last,omitempty"` // set true on the final chunk
+	Packages      []*SoftwarePackage     `protobuf:"bytes,6,rep,name=packages,proto3" json:"packages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SoftwareInventoryChunk) Reset() {
+	*x = SoftwareInventoryChunk{}
+	mi := &file_agent_v1_ingest_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SoftwareInventoryChunk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SoftwareInventoryChunk) ProtoMessage() {}
+
+func (x *SoftwareInventoryChunk) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_ingest_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SoftwareInventoryChunk.ProtoReflect.Descriptor instead.
+func (*SoftwareInventoryChunk) Descriptor() ([]byte, []int) {
+	return file_agent_v1_ingest_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *SoftwareInventoryChunk) GetScanId() string {
+	if x != nil {
+		return x.ScanId
+	}
+	return ""
+}
+
+func (x *SoftwareInventoryChunk) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *SoftwareInventoryChunk) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *SoftwareInventoryChunk) GetChunkIndex() int32 {
+	if x != nil {
+		return x.ChunkIndex
+	}
+	return 0
+}
+
+func (x *SoftwareInventoryChunk) GetIsLast() bool {
+	if x != nil {
+		return x.IsLast
+	}
+	return false
+}
+
+func (x *SoftwareInventoryChunk) GetPackages() []*SoftwarePackage {
+	if x != nil {
+		return x.Packages
+	}
+	return nil
+}
+
+// SoftwarePackage is a single installed package entry.
+type SoftwarePackage struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Version         string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	Architecture    string                 `protobuf:"bytes,3,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	Publisher       string                 `protobuf:"bytes,4,opt,name=publisher,proto3" json:"publisher,omitempty"`
+	InstallDateUnix int64                  `protobuf:"varint,5,opt,name=install_date_unix,json=installDateUnix,proto3" json:"install_date_unix,omitempty"` // Unix timestamp; 0 if unknown
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SoftwarePackage) Reset() {
+	*x = SoftwarePackage{}
+	mi := &file_agent_v1_ingest_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SoftwarePackage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SoftwarePackage) ProtoMessage() {}
+
+func (x *SoftwarePackage) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_ingest_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SoftwarePackage.ProtoReflect.Descriptor instead.
+func (*SoftwarePackage) Descriptor() ([]byte, []int) {
+	return file_agent_v1_ingest_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SoftwarePackage) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SoftwarePackage) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *SoftwarePackage) GetArchitecture() string {
+	if x != nil {
+		return x.Architecture
+	}
+	return ""
+}
+
+func (x *SoftwarePackage) GetPublisher() string {
+	if x != nil {
+		return x.Publisher
+	}
+	return ""
+}
+
+func (x *SoftwarePackage) GetInstallDateUnix() int64 {
+	if x != nil {
+		return x.InstallDateUnix
+	}
+	return 0
+}
+
+// SoftwareInventoryAck is returned once the server has processed all chunks.
+type SoftwareInventoryAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Received      int32                  `protobuf:"varint,1,opt,name=received,proto3" json:"received,omitempty"` // total packages received across all chunks
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SoftwareInventoryAck) Reset() {
+	*x = SoftwareInventoryAck{}
+	mi := &file_agent_v1_ingest_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SoftwareInventoryAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SoftwareInventoryAck) ProtoMessage() {}
+
+func (x *SoftwareInventoryAck) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_ingest_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SoftwareInventoryAck.ProtoReflect.Descriptor instead.
+func (*SoftwareInventoryAck) Descriptor() ([]byte, []int) {
+	return file_agent_v1_ingest_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SoftwareInventoryAck) GetReceived() int32 {
+	if x != nil {
+		return x.Received
+	}
+	return 0
+}
+
 var File_agent_v1_ingest_proto protoreflect.FileDescriptor
 
 const file_agent_v1_ingest_proto_rawDesc = "" +
 	"\n" +
-	"\x15agent/v1/ingest.proto\x12\bagent.v1\x1a\x1bagent/v1/registration.proto\x1a\x18agent/v1/heartbeat.proto\x1a\x17agent/v1/terminal.proto2\xed\x01\n" +
+	"\x15agent/v1/ingest.proto\x12\bagent.v1\x1a\x1bagent/v1/registration.proto\x1a\x18agent/v1/heartbeat.proto\x1a\x17agent/v1/terminal.proto\"\xd5\x01\n" +
+	"\x16SoftwareInventoryChunk\x12\x17\n" +
+	"\ascan_id\x18\x01 \x01(\tR\x06scanId\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\tR\aagentId\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\x12\x1f\n" +
+	"\vchunk_index\x18\x04 \x01(\x05R\n" +
+	"chunkIndex\x12\x17\n" +
+	"\ais_last\x18\x05 \x01(\bR\x06isLast\x125\n" +
+	"\bpackages\x18\x06 \x03(\v2\x19.agent.v1.SoftwarePackageR\bpackages\"\xad\x01\n" +
+	"\x0fSoftwarePackage\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\"\n" +
+	"\farchitecture\x18\x03 \x01(\tR\farchitecture\x12\x1c\n" +
+	"\tpublisher\x18\x04 \x01(\tR\tpublisher\x12*\n" +
+	"\x11install_date_unix\x18\x05 \x01(\x03R\x0finstallDateUnix\"2\n" +
+	"\x14SoftwareInventoryAck\x12\x1a\n" +
+	"\breceived\x18\x01 \x01(\x05R\breceived2\xcc\x02\n" +
 	"\rIngestService\x12A\n" +
 	"\bRegister\x12\x19.agent.v1.RegisterRequest\x1a\x1a.agent.v1.RegisterResponse\x12H\n" +
 	"\tHeartbeat\x12\x1a.agent.v1.HeartbeatRequest\x1a\x1b.agent.v1.HeartbeatResponse(\x010\x01\x12O\n" +
-	"\bTerminal\x12\x1e.agent.v1.TerminalAgentMessage\x1a\x1f.agent.v1.TerminalServerMessage(\x010\x01B.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\bTerminal\x12\x1e.agent.v1.TerminalAgentMessage\x1a\x1f.agent.v1.TerminalServerMessage(\x010\x01\x12]\n" +
+	"\x17SubmitSoftwareInventory\x12 .agent.v1.SoftwareInventoryChunk\x1a\x1e.agent.v1.SoftwareInventoryAck(\x01B.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
 
+var (
+	file_agent_v1_ingest_proto_rawDescOnce sync.Once
+	file_agent_v1_ingest_proto_rawDescData []byte
+)
+
+func file_agent_v1_ingest_proto_rawDescGZIP() []byte {
+	file_agent_v1_ingest_proto_rawDescOnce.Do(func() {
+		file_agent_v1_ingest_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_agent_v1_ingest_proto_rawDesc), len(file_agent_v1_ingest_proto_rawDesc)))
+	})
+	return file_agent_v1_ingest_proto_rawDescData
+}
+
+var file_agent_v1_ingest_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_agent_v1_ingest_proto_goTypes = []any{
-	(*RegisterRequest)(nil),       // 0: agent.v1.RegisterRequest
-	(*HeartbeatRequest)(nil),      // 1: agent.v1.HeartbeatRequest
-	(*TerminalAgentMessage)(nil),  // 2: agent.v1.TerminalAgentMessage
-	(*RegisterResponse)(nil),      // 3: agent.v1.RegisterResponse
-	(*HeartbeatResponse)(nil),     // 4: agent.v1.HeartbeatResponse
-	(*TerminalServerMessage)(nil), // 5: agent.v1.TerminalServerMessage
+	(*SoftwareInventoryChunk)(nil), // 0: agent.v1.SoftwareInventoryChunk
+	(*SoftwarePackage)(nil),        // 1: agent.v1.SoftwarePackage
+	(*SoftwareInventoryAck)(nil),   // 2: agent.v1.SoftwareInventoryAck
+	(*RegisterRequest)(nil),        // 3: agent.v1.RegisterRequest
+	(*HeartbeatRequest)(nil),       // 4: agent.v1.HeartbeatRequest
+	(*TerminalAgentMessage)(nil),   // 5: agent.v1.TerminalAgentMessage
+	(*RegisterResponse)(nil),       // 6: agent.v1.RegisterResponse
+	(*HeartbeatResponse)(nil),      // 7: agent.v1.HeartbeatResponse
+	(*TerminalServerMessage)(nil),  // 8: agent.v1.TerminalServerMessage
 }
 var file_agent_v1_ingest_proto_depIdxs = []int32{
-	0, // 0: agent.v1.IngestService.Register:input_type -> agent.v1.RegisterRequest
-	1, // 1: agent.v1.IngestService.Heartbeat:input_type -> agent.v1.HeartbeatRequest
-	2, // 2: agent.v1.IngestService.Terminal:input_type -> agent.v1.TerminalAgentMessage
-	3, // 3: agent.v1.IngestService.Register:output_type -> agent.v1.RegisterResponse
-	4, // 4: agent.v1.IngestService.Heartbeat:output_type -> agent.v1.HeartbeatResponse
-	5, // 5: agent.v1.IngestService.Terminal:output_type -> agent.v1.TerminalServerMessage
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: agent.v1.SoftwareInventoryChunk.packages:type_name -> agent.v1.SoftwarePackage
+	3, // 1: agent.v1.IngestService.Register:input_type -> agent.v1.RegisterRequest
+	4, // 2: agent.v1.IngestService.Heartbeat:input_type -> agent.v1.HeartbeatRequest
+	5, // 3: agent.v1.IngestService.Terminal:input_type -> agent.v1.TerminalAgentMessage
+	0, // 4: agent.v1.IngestService.SubmitSoftwareInventory:input_type -> agent.v1.SoftwareInventoryChunk
+	6, // 5: agent.v1.IngestService.Register:output_type -> agent.v1.RegisterResponse
+	7, // 6: agent.v1.IngestService.Heartbeat:output_type -> agent.v1.HeartbeatResponse
+	8, // 7: agent.v1.IngestService.Terminal:output_type -> agent.v1.TerminalServerMessage
+	2, // 8: agent.v1.IngestService.SubmitSoftwareInventory:output_type -> agent.v1.SoftwareInventoryAck
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_ingest_proto_init() }
@@ -66,12 +310,13 @@ func file_agent_v1_ingest_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_ingest_proto_rawDesc), len(file_agent_v1_ingest_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   0,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_agent_v1_ingest_proto_goTypes,
 		DependencyIndexes: file_agent_v1_ingest_proto_depIdxs,
+		MessageInfos:      file_agent_v1_ingest_proto_msgTypes,
 	}.Build()
 	File_agent_v1_ingest_proto = out.File
 	file_agent_v1_ingest_proto_goTypes = nil

@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Layers,
   Terminal,
+  FileBarChart,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -71,6 +72,17 @@ const primaryNav: NavItem[] = [
   { title: 'Notifications', href: '/notifications', icon: BellPlus },
   { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
   { title: 'Service Accounts', href: '/service-accounts', icon: Key },
+]
+
+const reportingNav: NavItem[] = [
+  {
+    title: 'Reports',
+    href: '/reports',
+    icon: FileBarChart,
+    children: [
+      { title: 'Installed Software', href: '/reports/software', icon: Package },
+    ],
+  },
 ]
 
 const toolingNav: NavItem[] = [
@@ -221,6 +233,7 @@ export function AppSidebar({ orgId }: { orgId: string }) {
       </SidebarHeader>
       <SidebarContent>
         <NavGroup label="Monitoring" items={primaryNav} />
+        <NavGroup label="Reporting" items={reportingNav} />
         <SidebarGroup>
           <SidebarGroupLabel>Tooling</SidebarGroupLabel>
           <SidebarGroupContent>

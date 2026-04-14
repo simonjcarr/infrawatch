@@ -1,0 +1,1 @@
+ALTER TABLE "task_runs" ALTER COLUMN "triggered_by" DROP NOT NULL;

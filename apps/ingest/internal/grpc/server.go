@@ -21,6 +21,7 @@ type ingestService struct {
 	reg      *handlers.RegisterHandler
 	hb       *handlers.HeartbeatHandler
 	terminal *handlers.TerminalHandler
+	inv      *handlers.InventoryHandler
 }
 
 func (s *ingestService) Register(ctx context.Context, req *agentv1.RegisterRequest) (*agentv1.RegisterResponse, error) {
@@ -35,13 +36,17 @@ func (s *ingestService) Terminal(stream agentv1.IngestService_TerminalServer) er
 	return s.terminal.Terminal(stream)
 }
 
+func (s *ingestService) SubmitSoftwareInventory(stream agentv1.IngestService_SubmitSoftwareInventoryServer) error {
+	return s.inv.SubmitSoftwareInventory(stream)
+}
+
 // Serve starts the gRPC server on the given port with TLS credentials.
 // Blocks until the server stops. When ctx is cancelled (e.g. SIGTERM), Serve
 // sends a gRPC GOAWAY to all connected agents so they reconnect immediately
 // rather than hitting exponential backoff. If streams don't drain within 30s,
 // the server is force-stopped — this covers the case where a container is
 // killed before context cancellation can propagate.
-func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, terminal *handlers.TerminalHandler) error {
+func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, terminal *handlers.TerminalHandler, inv *handlers.InventoryHandler) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("listening on :%d: %w", port, err)
@@ -68,7 +73,7 @@ func Serve(ctx context.Context, port int, creds credentials.TransportCredentials
 	}
 	grpcServer := grpc.NewServer(opts...)
 
-	svc := &ingestService{reg: reg, hb: hb, terminal: terminal}
+	svc := &ingestService{reg: reg, hb: hb, terminal: terminal, inv: inv}
 	agentv1.RegisterIngestServiceServer(grpcServer, svc)
 
 	// Graceful shutdown on context cancellation. GracefulStop sends GOAWAY

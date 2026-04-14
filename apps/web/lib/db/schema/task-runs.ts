@@ -4,7 +4,7 @@ import { organisations } from './organisations'
 import { hosts } from './hosts'
 import { users } from './auth'
 
-export type TaskType = 'patch' | 'custom_script' | 'service' | 'agent_uninstall'
+export type TaskType = 'patch' | 'custom_script' | 'service' | 'agent_uninstall' | 'software_inventory'
 export type TaskRunStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed'
 export type TaskRunHostStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'success' | 'failed' | 'skipped'
 
@@ -21,7 +21,9 @@ export interface ServiceTaskConfig {
 }
 // agent_uninstall carries no parameters today; reserved for future flags.
 export type AgentUninstallTaskConfig = Record<string, never>
-export type TaskConfig = PatchTaskConfig | CustomScriptTaskConfig | ServiceTaskConfig | AgentUninstallTaskConfig
+// software_inventory carries no config; OS detection is on-agent.
+export type SoftwareInventoryTaskConfig = Record<string, never>
+export type TaskConfig = PatchTaskConfig | CustomScriptTaskConfig | ServiceTaskConfig | AgentUninstallTaskConfig | SoftwareInventoryTaskConfig
 
 // Result shapes
 export interface PackageUpdate {
@@ -46,12 +48,22 @@ export interface AgentUninstallTaskResult {
   status: 'scheduled'
   note?: string
 }
-export type TaskResult = PatchTaskResult | CustomScriptTaskResult | ServiceTaskResult | AgentUninstallTaskResult
+// software_inventory result carries only counts; the package list is submitted
+// via the dedicated SubmitSoftwareInventory gRPC stream.
+export interface SoftwareInventoryTaskResult {
+  scan_id: string
+  package_count: number
+  source: string
+  started_at: string
+  completed_at: string
+}
+export type TaskResult = PatchTaskResult | CustomScriptTaskResult | ServiceTaskResult | AgentUninstallTaskResult | SoftwareInventoryTaskResult
 
 export const taskRuns = pgTable('task_runs', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   organisationId: text('organisation_id').notNull().references(() => organisations.id),
-  triggeredBy: text('triggered_by').notNull().references(() => users.id),
+  // NULL when created by the system sweeper (e.g. automated software inventory scans).
+  triggeredBy: text('triggered_by').references(() => users.id),
   targetType: text('target_type').notNull().$type<'host' | 'group'>(),
   targetId: text('target_id').notNull(),
   taskType: text('task_type').notNull().$type<TaskType>(),

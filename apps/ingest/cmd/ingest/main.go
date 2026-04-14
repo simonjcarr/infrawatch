@@ -73,6 +73,7 @@ func main() {
 	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, terminalStore)
 	terminalHandler := handlers.NewTerminalHandler(pool, issuer, terminalStore)
 	terminalWSHandler := handlers.NewTerminalWSHandler(pool, terminalStore)
+	inventoryHandler := handlers.NewInventoryHandler(pool, issuer)
 
 	// Start JWKS HTTP server
 	go func() {
@@ -92,11 +93,14 @@ func main() {
 	// Start cert expiry sweeper goroutine
 	go handlers.RunCertExpirySweeper(ctx, pool, 15*time.Minute)
 
+	// Start software inventory sweeper goroutine
+	go handlers.RunSoftwareSweeper(ctx, pool)
+
 	// Start gRPC server in goroutine
 	grpcErr := make(chan error, 1)
 	go func() {
 		slog.Info("gRPC server starting", "port", cfg.GRPCPort)
-		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, terminalHandler)
+		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, terminalHandler, inventoryHandler)
 	}()
 
 	select {

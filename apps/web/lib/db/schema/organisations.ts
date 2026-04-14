@@ -8,12 +8,20 @@ export interface OrgNotificationSettings {
   allowUserOptOut?: boolean   // default true — whether users can individually opt out
 }
 
+export interface SoftwareInventorySettings {
+  enabled: boolean
+  intervalHours: number          // default 24
+  includeSnapFlatpak?: boolean
+  includeWindowsStore?: boolean
+}
+
 export interface OrgMetadata {
   defaultCollectionSettings?: HostCollectionSettings
   terminalEnabled?: boolean
   terminalLoggingEnabled?: boolean
   terminalDirectAccess?: boolean
   notificationSettings?: OrgNotificationSettings
+  softwareInventorySettings?: SoftwareInventorySettings
 }
 
 export const organisations = pgTable('organisations', {

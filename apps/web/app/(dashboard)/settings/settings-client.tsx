@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert, Bell } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert, Bell, ScanLine } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,9 +18,10 @@ import { updateOrgName, saveLicenceKey, updateMetricRetention } from '@/lib/acti
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
 import { getOrgNotificationSettings, updateOrgNotificationSettings } from '@/lib/actions/notification-settings'
+import { getSoftwareInventorySettings, updateSoftwareInventorySettings } from '@/lib/actions/software-inventory'
 import type { OrgTerminalSettings } from '@/lib/actions/terminal'
 import type { OrgNotificationSettingsFull } from '@/lib/actions/notification-settings'
-import type { Organisation, HostCollectionSettings } from '@/lib/db/schema'
+import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 
 const ALL_ROLES = [
@@ -188,6 +189,27 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       setNotificationSaveSuccess(true)
       queryClient.invalidateQueries({ queryKey: ['org-notification-settings', org.id] })
       setTimeout(() => setNotificationSaveSuccess(false), 3000)
+    },
+  })
+
+  // Software inventory settings
+  const [swInvSaveSuccess, setSwInvSaveSuccess] = useState(false)
+  const { data: swInvDefaults } = useQuery({
+    queryKey: ['org-software-inventory-settings', org.id],
+    queryFn: () => getSoftwareInventorySettings(org.id),
+  })
+  const [localSwInvSettings, setLocalSwInvSettings] = useState<SoftwareInventorySettings | null>(null)
+  const currentSwInvSettings = localSwInvSettings ?? swInvDefaults ?? { enabled: false, intervalHours: 24 }
+  const swInvDirty = localSwInvSettings !== null
+
+  const swInvMutation = useMutation({
+    mutationFn: (settings: SoftwareInventorySettings) => updateSoftwareInventorySettings(org.id, settings),
+    onSuccess: (result) => {
+      if ('error' in result) return
+      setLocalSwInvSettings(null)
+      setSwInvSaveSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ['org-software-inventory-settings', org.id] })
+      setTimeout(() => setSwInvSaveSuccess(false), 3000)
     },
   })
 
@@ -613,6 +635,122 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                   <p>Receiving roles: {currentNotificationSettings.inAppRoles.join(', ')}</p>
                   <p>User opt-out: {currentNotificationSettings.allowUserOptOut ? 'Allowed' : 'Not allowed'}</p>
                 </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Software Inventory section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ScanLine className="size-4 text-muted-foreground" />
+            Software Inventory
+          </CardTitle>
+          <CardDescription>
+            Automatically scan hosts for installed packages. Results appear on each host&apos;s Inventory tab and the global Installed Software report.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isAdmin ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm">Enable software inventory scanning</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Agents will scan installed packages at the configured interval
+                  </p>
+                </div>
+                <Switch
+                  checked={currentSwInvSettings.enabled}
+                  onCheckedChange={(checked) =>
+                    setLocalSwInvSettings({ ...currentSwInvSettings, enabled: checked })
+                  }
+                />
+              </div>
+              {currentSwInvSettings.enabled && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sw-inv-interval" className="text-sm">
+                      Scan interval (hours)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      How often each host is scanned. Min 1 hour, max 720 hours (30 days).
+                    </p>
+                    <Input
+                      id="sw-inv-interval"
+                      type="number"
+                      min={1}
+                      max={720}
+                      className="w-32"
+                      value={currentSwInvSettings.intervalHours}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10)
+                        if (!isNaN(n)) {
+                          setLocalSwInvSettings({ ...currentSwInvSettings, intervalHours: n })
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Additional package sources</Label>
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="sw-inv-snap"
+                          checked={currentSwInvSettings.includeSnapFlatpak ?? false}
+                          onCheckedChange={(checked) =>
+                            setLocalSwInvSettings({
+                              ...currentSwInvSettings,
+                              includeSnapFlatpak: !!checked,
+                            })
+                          }
+                        />
+                        <Label htmlFor="sw-inv-snap" className="text-sm font-normal cursor-pointer">
+                          Include Snap and Flatpak packages (Linux)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="sw-inv-winstore"
+                          checked={currentSwInvSettings.includeWindowsStore ?? false}
+                          onCheckedChange={(checked) =>
+                            setLocalSwInvSettings({
+                              ...currentSwInvSettings,
+                              includeWindowsStore: !!checked,
+                            })
+                          }
+                        />
+                        <Label htmlFor="sw-inv-winstore" className="text-sm font-normal cursor-pointer">
+                          Include Windows Store apps
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-3 pt-2 border-t">
+                <Button
+                  size="sm"
+                  disabled={!swInvDirty || swInvMutation.isPending}
+                  onClick={() => swInvMutation.mutate(currentSwInvSettings)}
+                >
+                  {swInvMutation.isPending ? 'Saving…' : 'Save'}
+                </Button>
+                {swInvSaveSuccess && (
+                  <span className="flex items-center gap-1 text-sm text-green-700">
+                    <CheckCircle2 className="size-4" />
+                    Saved
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2 text-sm text-foreground">
+              <p>Software scanning: {currentSwInvSettings.enabled ? 'Enabled' : 'Disabled'}</p>
+              {currentSwInvSettings.enabled && (
+                <p>Scan interval: every {currentSwInvSettings.intervalHours} hour{currentSwInvSettings.intervalHours === 1 ? '' : 's'}</p>
               )}
             </div>
           )}

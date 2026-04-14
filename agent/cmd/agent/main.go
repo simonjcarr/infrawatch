@@ -20,6 +20,7 @@ import (
 	"github.com/infrawatch/agent/internal/identity"
 	"github.com/infrawatch/agent/internal/install"
 	"github.com/infrawatch/agent/internal/registration"
+	"github.com/infrawatch/agent/internal/tasks"
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
 
@@ -117,6 +118,10 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 		return agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile, cfg.Ingest.TLSSkipVerify)
 	}
 
+	// Inject dial function into the tasks package so the software_inventory
+	// handler can open its own streaming gRPC connection.
+	tasks.SetDialFunc(dialFunc)
+
 	executor := checks.NewExecutor()
 
 	for {
@@ -146,6 +151,11 @@ func runAgent(ctx context.Context, cfg *config.Config) error {
 		} else {
 			slog.Info("agent already registered", "agent_id", state.AgentID)
 		}
+
+		// Keep the tasks package updated with the current agent identity so
+		// the software_inventory handler can auth its stream.
+		tasks.SetAgentID(state.AgentID)
+		tasks.SetJWTToken(state.JWTToken)
 
 		slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
 		hb := heartbeat.New(dialFunc, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)

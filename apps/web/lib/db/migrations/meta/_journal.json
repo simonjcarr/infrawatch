@@ -197,6 +197,20 @@
       "when": 1776113082382,
       "tag": "0027_ambiguous_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1776165144152,
+      "tag": "0028_moaning_scream",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776171978830,
+      "tag": "0029_heavy_pepper_potts",
+      "breakpoints": true
     }
   ]
 }

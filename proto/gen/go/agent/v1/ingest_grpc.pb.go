@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IngestService_Register_FullMethodName  = "/agent.v1.IngestService/Register"
-	IngestService_Heartbeat_FullMethodName = "/agent.v1.IngestService/Heartbeat"
-	IngestService_Terminal_FullMethodName  = "/agent.v1.IngestService/Terminal"
+	IngestService_Register_FullMethodName                = "/agent.v1.IngestService/Register"
+	IngestService_Heartbeat_FullMethodName               = "/agent.v1.IngestService/Heartbeat"
+	IngestService_Terminal_FullMethodName                = "/agent.v1.IngestService/Terminal"
+	IngestService_SubmitSoftwareInventory_FullMethodName = "/agent.v1.IngestService/SubmitSoftwareInventory"
 )
 
 // IngestServiceClient is the client API for IngestService service.
@@ -39,6 +40,10 @@ type IngestServiceClient interface {
 	// HeartbeatResponse. Data flows in real-time between the browser (via
 	// WebSocket on the ingest HTTP server) and the agent's PTY.
 	Terminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TerminalAgentMessage, TerminalServerMessage], error)
+	// SubmitSoftwareInventory is a client-streaming RPC. The agent opens a
+	// stream, sends chunks of 500 packages each, and signals completion with
+	// is_last=true. The server upserts packages and responds with a final ack.
+	SubmitSoftwareInventory(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[SoftwareInventoryChunk, SoftwareInventoryAck], error)
 }
 
 type ingestServiceClient struct {
@@ -85,6 +90,19 @@ func (c *ingestServiceClient) Terminal(ctx context.Context, opts ...grpc.CallOpt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type IngestService_TerminalClient = grpc.BidiStreamingClient[TerminalAgentMessage, TerminalServerMessage]
 
+func (c *ingestServiceClient) SubmitSoftwareInventory(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[SoftwareInventoryChunk, SoftwareInventoryAck], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &IngestService_ServiceDesc.Streams[2], IngestService_SubmitSoftwareInventory_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SoftwareInventoryChunk, SoftwareInventoryAck]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IngestService_SubmitSoftwareInventoryClient = grpc.ClientStreamingClient[SoftwareInventoryChunk, SoftwareInventoryAck]
+
 // IngestServiceServer is the server API for IngestService service.
 // All implementations must embed UnimplementedIngestServiceServer
 // for forward compatibility.
@@ -100,6 +118,10 @@ type IngestServiceServer interface {
 	// HeartbeatResponse. Data flows in real-time between the browser (via
 	// WebSocket on the ingest HTTP server) and the agent's PTY.
 	Terminal(grpc.BidiStreamingServer[TerminalAgentMessage, TerminalServerMessage]) error
+	// SubmitSoftwareInventory is a client-streaming RPC. The agent opens a
+	// stream, sends chunks of 500 packages each, and signals completion with
+	// is_last=true. The server upserts packages and responds with a final ack.
+	SubmitSoftwareInventory(grpc.ClientStreamingServer[SoftwareInventoryChunk, SoftwareInventoryAck]) error
 	mustEmbedUnimplementedIngestServiceServer()
 }
 
@@ -118,6 +140,9 @@ func (UnimplementedIngestServiceServer) Heartbeat(grpc.BidiStreamingServer[Heart
 }
 func (UnimplementedIngestServiceServer) Terminal(grpc.BidiStreamingServer[TerminalAgentMessage, TerminalServerMessage]) error {
 	return status.Error(codes.Unimplemented, "method Terminal not implemented")
+}
+func (UnimplementedIngestServiceServer) SubmitSoftwareInventory(grpc.ClientStreamingServer[SoftwareInventoryChunk, SoftwareInventoryAck]) error {
+	return status.Error(codes.Unimplemented, "method SubmitSoftwareInventory not implemented")
 }
 func (UnimplementedIngestServiceServer) mustEmbedUnimplementedIngestServiceServer() {}
 func (UnimplementedIngestServiceServer) testEmbeddedByValue()                       {}
@@ -172,6 +197,13 @@ func _IngestService_Terminal_Handler(srv interface{}, stream grpc.ServerStream) 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type IngestService_TerminalServer = grpc.BidiStreamingServer[TerminalAgentMessage, TerminalServerMessage]
 
+func _IngestService_SubmitSoftwareInventory_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(IngestServiceServer).SubmitSoftwareInventory(&grpc.GenericServerStream[SoftwareInventoryChunk, SoftwareInventoryAck]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IngestService_SubmitSoftwareInventoryServer = grpc.ClientStreamingServer[SoftwareInventoryChunk, SoftwareInventoryAck]
+
 // IngestService_ServiceDesc is the grpc.ServiceDesc for IngestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -195,6 +227,11 @@ var IngestService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "Terminal",
 			Handler:       _IngestService_Terminal_Handler,
 			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "SubmitSoftwareInventory",
+			Handler:       _IngestService_SubmitSoftwareInventory_Handler,
 			ClientStreams: true,
 		},
 	},

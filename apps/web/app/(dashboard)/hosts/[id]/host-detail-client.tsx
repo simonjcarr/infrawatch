@@ -60,6 +60,7 @@ import { HostNotificationCharts } from './host-notification-charts'
 import { SettingsTab } from './settings-tab'
 import { LocalUsersTab } from './local-users-tab'
 import { TasksTab } from './tasks-tab'
+import { InventoryTab } from './inventory-tab'
 import { HostTerminalLauncher } from './host-terminal-launcher'
 import { checkTerminalAccess } from '@/lib/actions/terminal'
 import { getAlertInstances } from '@/lib/actions/alerts'
@@ -69,8 +70,8 @@ import { listGroupsForHost, listGroups, addHostToGroup, removeHostFromGroup } fr
 import type { HostGroup } from '@/lib/db/schema'
 import type { HostGroupWithCount } from '@/lib/actions/host-groups'
 
-type ParentTabId = 'overview' | 'monitoring' | 'infrastructure' | 'management' | 'tools'
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'tasks' | 'terminal'
+type ParentTabId = 'overview' | 'monitoring' | 'infrastructure' | 'inventory' | 'management' | 'tools'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'tasks' | 'terminal' | 'packages'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -84,6 +85,7 @@ const TAB_LABELS: Record<Tab, string> = {
   groups: 'Groups',
   tasks: 'Tasks',
   terminal: 'Terminal',
+  packages: 'Packages',
 }
 
 const PARENT_TABS: Array<{
@@ -95,6 +97,7 @@ const PARENT_TABS: Array<{
   { id: 'overview', label: 'Overview', defaultTab: 'overview', children: null },
   { id: 'monitoring', label: 'Monitoring', defaultTab: 'metrics', children: ['metrics', 'checks', 'alerts'] },
   { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network'] },
+  { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages'] },
   { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'settings'] },
   { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'terminal'] },
 ]
@@ -975,6 +978,11 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Inventory Tab */}
+      {activeTab === 'packages' && (
+        <InventoryTab orgId={orgId} hostId={initialHost.id} />
       )}
 
       {/* Tasks Tab */}

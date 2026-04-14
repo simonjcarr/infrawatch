@@ -44,6 +44,7 @@ export interface HostMetadata {
   collectionSettings?: HostCollectionSettings
   terminalEnabled?: boolean
   terminalAllowedUsers?: string[]
+  lastSoftwareScanAt?: string    // ISO timestamp; avoid Date in JSONB (use .toISOString())
 }
 
 export const hosts = pgTable('hosts', {

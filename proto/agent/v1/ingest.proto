@@ -22,4 +22,33 @@ service IngestService {
   // HeartbeatResponse. Data flows in real-time between the browser (via
   // WebSocket on the ingest HTTP server) and the agent's PTY.
   rpc Terminal(stream TerminalAgentMessage) returns (stream TerminalServerMessage);
+
+  // SubmitSoftwareInventory is a client-streaming RPC. The agent opens a
+  // stream, sends chunks of 500 packages each, and signals completion with
+  // is_last=true. The server upserts packages and responds with a final ack.
+  rpc SubmitSoftwareInventory(stream SoftwareInventoryChunk) returns (SoftwareInventoryAck);
+}
+
+// SoftwareInventoryChunk carries a batch of packages from a single scan.
+message SoftwareInventoryChunk {
+  string scan_id    = 1;  // task_run_hosts.id that triggered this scan
+  string agent_id   = 2;
+  string source     = 3;  // "rpm" | "dpkg" | "pacman" | "apk" | "winreg" | etc.
+  int32  chunk_index = 4;
+  bool   is_last    = 5;  // set true on the final chunk
+  repeated SoftwarePackage packages = 6;
+}
+
+// SoftwarePackage is a single installed package entry.
+message SoftwarePackage {
+  string name         = 1;
+  string version      = 2;
+  string architecture = 3;
+  string publisher    = 4;
+  int64  install_date_unix = 5;  // Unix timestamp; 0 if unknown
+}
+
+// SoftwareInventoryAck is returned once the server has processed all chunks.
+message SoftwareInventoryAck {
+  int32 received = 1;  // total packages received across all chunks
 }

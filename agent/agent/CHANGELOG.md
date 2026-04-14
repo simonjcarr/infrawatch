@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.2](https://github.com/simonjcarr/infrawatch/compare/agent/v0.23.1...agent/v0.23.2) (2026-04-14)
+
+
+### Bug Fixes
+
+* **monitoring:** eliminate false 100% CPU spikes and fix alert double-evaluation ([01e7146](https://github.com/simonjcarr/infrawatch/commit/01e71469ae1d4040f4f5da99bd7532ce4c477322))
+* **monitoring:** eliminate false 100% CPU spikes and fix alert double-evaluation ([4e6ca6a](https://github.com/simonjcarr/infrawatch/commit/4e6ca6af9018eedd0f2d53c6b50ff70e3053f259))
+
 ## [0.23.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.23.0...agent/v0.23.1) (2026-04-14)
 
 

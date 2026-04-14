@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.33.0...web/v0.33.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **reports:** remove dead useDebounce hook and fix React fragment key ([1802104](https://github.com/simonjcarr/infrawatch/commit/1802104819e1a869383a4a3dcbcd47eb2cc55270))
+* **reports:** remove dead useDebounce hook and fix React fragment keys ([923b4b7](https://github.com/simonjcarr/infrawatch/commit/923b4b7c20bff1c65acd95ab659fe6d1b81901be))
+
 ## [0.33.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.32.0...web/v0.33.0) (2026-04-14)
 
 

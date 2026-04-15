@@ -76,6 +76,8 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 		return status.Error(codes.Internal, "internal error")
 	}
 
+	slog.Info("inventory: scan started", "scan_id", scanID, "agent_id", agentID, "host_id", hostOrg.HostID, "source", source)
+
 	// ── Create software_scans row ─────────────────────────────────────────────
 	startedAt := time.Now()
 	softwareScanID, err := queries.InsertSoftwareScan(ctx, h.pool, hostOrg.OrgID, hostOrg.HostID, scanID, source, startedAt)

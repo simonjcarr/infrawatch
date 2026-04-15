@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -40,9 +41,16 @@ func collectLinuxPackages(ctx context.Context) ([]collectedPackage, string, erro
 		{"apk", collectApk},
 	} {
 		pkgs, err := c.fn(ctx)
-		if err == nil && len(pkgs) > 0 {
-			return pkgs, c.source, nil
+		if err != nil {
+			slog.Info("software_inventory: collector failed, trying next", "source", c.source, "err", err)
+			continue
 		}
+		if len(pkgs) == 0 {
+			slog.Warn("software_inventory: collector returned 0 packages, trying next", "source", c.source)
+			continue
+		}
+		slog.Info("software_inventory: collector succeeded", "source", c.source, "packages", len(pkgs))
+		return pkgs, c.source, nil
 	}
 	return nil, "other", fmt.Errorf("no supported package manager found (dpkg/rpm/pacman/apk)")
 }

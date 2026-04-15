@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.36.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.35.1...web/v0.36.0) (2026-04-15)
+
+
+### Features
+
+* **reports:** add first-seen column, OS/version charts, and fix export data ([83ecf13](https://github.com/simonjcarr/infrawatch/commit/83ecf13ca5854d874962fa558a4498edcdc6f498))
+* **reports:** first-seen column, OS/version charts, and fix export data ([dc12bd9](https://github.com/simonjcarr/infrawatch/commit/dc12bd95f31d5853f6c0876ec9a9fc17a7e49858))
+
 ## [0.35.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.35.0...web/v0.35.1) (2026-04-15)
 
 

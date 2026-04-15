@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.33.3...web/v0.34.0) (2026-04-15)
+
+
+### Features
+
+* **reports:** overhaul software report UX and fix inventory wipe bug ([19167fe](https://github.com/simonjcarr/infrawatch/commit/19167fe7906d44e987bd6119c34b4a66697d333c))
+* **reports:** overhaul software report UX and fix inventory wipe bug ([4f49c92](https://github.com/simonjcarr/infrawatch/commit/4f49c927d4daea923a0c772e4f01d6032f94d6a9))
+
 ## [0.33.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.33.2...web/v0.33.3) (2026-04-14)
 
 

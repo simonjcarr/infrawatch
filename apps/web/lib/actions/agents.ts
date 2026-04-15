@@ -13,6 +13,7 @@ import {
   alertRules,
   alertInstances,
   alertSilences,
+  notifications,
   certificates,
   certificateEvents,
   serviceAccounts,
@@ -649,7 +650,20 @@ export async function deleteHost(
         .delete(checks)
         .where(and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)))
 
-      // 7. Alert instances
+      // 7a. Notifications referencing this host's alert instances (FK constraint)
+      await tx
+        .delete(notifications)
+        .where(and(
+          inArray(
+            notifications.alertInstanceId,
+            tx
+              .select({ id: alertInstances.id })
+              .from(alertInstances)
+              .where(and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId))),
+          ),
+        ))
+
+      // 7b. Alert instances
       await tx
         .delete(alertInstances)
         .where(and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId)))

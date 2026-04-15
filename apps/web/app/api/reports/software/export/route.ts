@@ -15,7 +15,7 @@ import { compareVersions } from '@/lib/version-compare'
  * Note: this is per-process; a multi-instance deployment needs Redis.
  */
 const rateLimitMap = new Map<string, number>()
-const RATE_LIMIT_MS = 30_000
+const RATE_LIMIT_MS = 10_000
 
 function checkRateLimit(userId: string): boolean {
   const last = rateLimitMap.get(userId) ?? 0

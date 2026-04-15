@@ -629,8 +629,9 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
               {/* Distribution charts — shown when results are available */}
               {!detailsLoading && displayedRows.length > 0 && (
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-md border p-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-3">OS distribution</p>
+                  {/* text-muted-foreground sets `color` on the div; SVG currentColor inherits it */}
+                  <div className="rounded-md border p-4 text-muted-foreground">
+                    <p className="text-xs font-medium mb-3">OS distribution</p>
                     <ResponsiveContainer width="100%" height={Math.max(80, osChartData.length * 36)}>
                       <BarChart
                         data={osChartData}
@@ -642,9 +643,16 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                           type="category"
                           dataKey="name"
                           width={80}
-                          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                          tick={{ fontSize: 11, fill: 'currentColor' }}
                         />
-                        <Tooltip contentStyle={{ fontSize: 12 }} />
+                        <Tooltip
+                          contentStyle={{
+                            fontSize: 12,
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
+                            color: 'hsl(var(--popover-foreground))',
+                          }}
+                        />
                         <Bar dataKey="count" radius={[0, 3, 3, 0]}>
                           {osChartData.map((_, i) => (
                             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -653,8 +661,8 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="rounded-md border p-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-3">Version distribution</p>
+                  <div className="rounded-md border p-4 text-muted-foreground">
+                    <p className="text-xs font-medium mb-3">Version distribution</p>
                     <ResponsiveContainer width="100%" height={Math.max(80, versionChartData.length * 36)}>
                       <BarChart
                         data={versionChartData}
@@ -666,9 +674,16 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                           type="category"
                           dataKey="version"
                           width={160}
-                          tick={{ fontSize: 10, fontFamily: 'monospace', fill: 'hsl(var(--muted-foreground))' }}
+                          tick={{ fontSize: 10, fontFamily: 'monospace', fill: 'currentColor' }}
                         />
-                        <Tooltip contentStyle={{ fontSize: 12 }} />
+                        <Tooltip
+                          contentStyle={{
+                            fontSize: 12,
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
+                            color: 'hsl(var(--popover-foreground))',
+                          }}
+                        />
                         <Bar dataKey="count" radius={[0, 3, 3, 0]}>
                           {versionChartData.map((_, i) => (
                             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />

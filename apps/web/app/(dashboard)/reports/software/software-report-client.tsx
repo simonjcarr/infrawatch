@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useQueryState } from 'nuqs'
 import { formatDistanceToNow } from 'date-fns'
@@ -609,7 +610,12 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                       {displayedRows.map((row) => (
                         <TableRow key={`${row.hostId}:${row.version}:${row.architecture ?? ''}`}>
                           <TableCell className="font-medium text-sm">
-                            {row.displayName ?? row.hostname}
+                            <Link
+                              href={`/hosts/${row.hostId}`}
+                              className="text-primary hover:underline"
+                            >
+                              {row.displayName ?? row.hostname}
+                            </Link>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {row.osVersion ?? row.os ?? '—'}

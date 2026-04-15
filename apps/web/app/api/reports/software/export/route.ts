@@ -81,15 +81,15 @@ export async function GET(req: NextRequest) {
   // Parse + validate query params
   const sp = req.nextUrl.searchParams
   const rawParams = {
-    format: sp.get('format'),
-    name: sp.get('name'),
-    vm: sp.get('vm'),
-    ve: sp.get('ve'),
-    vp: sp.get('vp'),
-    vl: sp.get('vl'),
-    vh: sp.get('vh'),
-    of: sp.get('of'),
-    hostId: sp.get('hostId'),
+    format: sp.get('format') ?? undefined,
+    name: sp.get('name') ?? undefined,
+    vm: sp.get('vm') ?? undefined,
+    ve: sp.get('ve') ?? undefined,
+    vp: sp.get('vp') ?? undefined,
+    vl: sp.get('vl') ?? undefined,
+    vh: sp.get('vh') ?? undefined,
+    of: sp.get('of') ?? undefined,
+    hostId: sp.get('hostId') ?? undefined,
   }
 
   const parsed = filterSchema.safeParse(rawParams)

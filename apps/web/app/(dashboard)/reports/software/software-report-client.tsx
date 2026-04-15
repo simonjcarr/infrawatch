@@ -132,6 +132,8 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
   const [saveName, setSaveName] = useState('')
   const [savedReportsOpen, setSavedReportsOpen] = useState(false)
   const [newWindowDays, setNewWindowDays] = useState<7 | 30>(7)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
 
   // Sort state for the unified results table
   const [sortKey, setSortKey] = useState<SortKey>('version')
@@ -241,7 +243,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
     setActiveView('search')
   }
 
-  function handleExport(format: 'csv' | 'pdf') {
+  async function handleExport(format: 'csv' | 'pdf') {
     const params = new URLSearchParams()
     params.set('format', format)
     if (filters.name) params.set('name', filters.name)
@@ -251,7 +253,29 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
     if (filters.versionLow) params.set('vl', filters.versionLow)
     if (filters.versionHigh) params.set('vh', filters.versionHigh)
     if (filters.osFamily) params.set('of', filters.osFamily)
-    window.open(`/api/reports/software/export?${params.toString()}`, '_blank')
+
+    setExportLoading(true)
+    try {
+      const res = await fetch(`/api/reports/software/export?${params.toString()}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setExportError((data as { error?: string }).error ?? 'Export failed. Please try again.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const disposition = res.headers.get('Content-Disposition') ?? ''
+      const match = disposition.match(/filename="(.+?)"/)
+      a.download = match?.[1] ?? `software-report.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError('Export failed due to a network error. Please try again.')
+    } finally {
+      setExportLoading(false)
+    }
   }
 
 // Client-side version filtering + flattening + sorting of package detail rows
@@ -615,12 +639,12 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                     <Save className="size-3.5 mr-1.5" />
                     Save filters
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
-                    <Download className="size-3.5 mr-1.5" />
+                  <Button variant="outline" size="sm" onClick={() => handleExport('csv')} disabled={exportLoading}>
+                    {exportLoading ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Download className="size-3.5 mr-1.5" />}
                     CSV
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleExport('pdf')}>
-                    <Download className="size-3.5 mr-1.5" />
+                  <Button variant="outline" size="sm" onClick={() => handleExport('pdf')} disabled={exportLoading}>
+                    {exportLoading ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Download className="size-3.5 mr-1.5" />}
                     PDF
                   </Button>
                 </div>
@@ -884,6 +908,19 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
           )}
         </div>
       )}
+
+      {/* Export error dialog */}
+      <Dialog open={!!exportError} onOpenChange={() => setExportError(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export failed</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{exportError}</p>
+          <DialogFooter>
+            <Button onClick={() => setExportError(null)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Save report dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>

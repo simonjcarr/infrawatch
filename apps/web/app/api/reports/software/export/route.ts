@@ -11,17 +11,20 @@ import { compareVersions } from '@/lib/version-compare'
 
 /**
  * Simple in-memory per-user rate limiter.
- * One export per user per 30 seconds.
+ * Allows up to 3 exports per user per 10 seconds (sliding window).
  * Note: this is per-process; a multi-instance deployment needs Redis.
  */
-const rateLimitMap = new Map<string, number>()
-const RATE_LIMIT_MS = 10_000
+const rateLimitMap = new Map<string, number[]>()
+const RATE_LIMIT_WINDOW_MS = 10_000
+const RATE_LIMIT_MAX = 3
 
 function checkRateLimit(userId: string): boolean {
-  const last = rateLimitMap.get(userId) ?? 0
   const now = Date.now()
-  if (now - last < RATE_LIMIT_MS) return false
-  rateLimitMap.set(userId, now)
+  const timestamps = rateLimitMap.get(userId) ?? []
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
+  if (recent.length >= RATE_LIMIT_MAX) return false
+  recent.push(now)
+  rateLimitMap.set(userId, recent)
   return true
 }
 
@@ -70,7 +73,7 @@ export async function GET(req: NextRequest) {
   // Rate limit
   if (!checkRateLimit(session.user.id)) {
     return NextResponse.json(
-      { error: 'Rate limited — please wait 30 seconds between exports.' },
+      { error: 'Rate limited — you can export up to 3 times per 10 seconds. Please wait a moment and try again.' },
       { status: 429 },
     )
   }

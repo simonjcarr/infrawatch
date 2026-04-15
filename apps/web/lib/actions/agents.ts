@@ -8,6 +8,7 @@ import {
   agentEnrolmentTokens,
   hosts,
   hostMetrics,
+  hostGroupMembers,
   checks,
   checkResults,
   alertRules,
@@ -23,6 +24,9 @@ import {
   resourceTags,
   taskRuns,
   taskRunHosts,
+  terminalSessions,
+  softwarePackages,
+  softwareScans,
 } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, lte, asc, sql, inArray } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
@@ -715,7 +719,25 @@ export async function deleteHost(
           eq(taskRuns.targetId, hostId),
         ))
 
-      // 14. Host itself
+      // 14a. Terminal sessions (FK to hosts)
+      await tx
+        .delete(terminalSessions)
+        .where(and(eq(terminalSessions.hostId, hostId), eq(terminalSessions.organisationId, orgId)))
+
+      // 14b. Software scans + packages (FK to hosts)
+      await tx
+        .delete(softwarePackages)
+        .where(and(eq(softwarePackages.hostId, hostId), eq(softwarePackages.organisationId, orgId)))
+      await tx
+        .delete(softwareScans)
+        .where(and(eq(softwareScans.hostId, hostId), eq(softwareScans.organisationId, orgId)))
+
+      // 14c. Host group memberships (FK to hosts)
+      await tx
+        .delete(hostGroupMembers)
+        .where(eq(hostGroupMembers.hostId, hostId))
+
+      // 15. Host itself
       await tx
         .delete(hosts)
         .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))

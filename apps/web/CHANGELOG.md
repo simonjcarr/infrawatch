@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.35.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.35.0...web/v0.35.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* **reports:** clickable hostnames and fix CSV/PDF export ([b17e619](https://github.com/simonjcarr/infrawatch/commit/b17e619e6faf337441f047c8fb6bf3ee185372f8))
+* **reports:** make hostnames clickable and fix CSV/PDF export parameters ([6843695](https://github.com/simonjcarr/infrawatch/commit/68436951d3f784a48dee5177dd317eec03cde777))
+
 ## [0.35.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.6...web/v0.35.0) (2026-04-15)
 
 

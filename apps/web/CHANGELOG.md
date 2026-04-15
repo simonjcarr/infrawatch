@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.4](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.3...web/v0.34.4) (2026-04-15)
+
+
+### Bug Fixes
+
+* **agents:** delete notifications before alert_instances when deleting host ([fd0e78d](https://github.com/simonjcarr/infrawatch/commit/fd0e78d9d926f1325175bd849421598f9c7546dc))
+* **agents:** delete notifications before alert_instances when deleting host ([4a38216](https://github.com/simonjcarr/infrawatch/commit/4a382164aac8a533977189129afd43da0fa9e17e))
+
 ## [0.34.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.2...web/v0.34.3) (2026-04-15)
 
 

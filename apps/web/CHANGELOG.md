@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.0...web/v0.34.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* **inventory:** poll for scan completion and show live scan status ([7276799](https://github.com/simonjcarr/infrawatch/commit/7276799540e0c5c6ca8e63b6045102bbb02f4772))
+* **inventory:** poll for scan completion and show live scan status ([8f7eae3](https://github.com/simonjcarr/infrawatch/commit/8f7eae30101028c98810182e3b5e25c96a48610b))
+
 ## [0.34.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.33.3...web/v0.34.0) (2026-04-15)
 
 

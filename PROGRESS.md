@@ -9,11 +9,152 @@
 **Phase 5 — Tooling (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — Terminal panel pinned to viewport bottom; dashboard layout bounded to `h-svh` so the persistent terminal never scrolls off-screen on long pages.
+🟢 Phase 5 progressing — Full software inventory and reporting shipped; Docusaurus documentation site live on GitHub Pages; remote agent uninstall from host delete dialog.
 
 ---
 
 ## What Has Been Built
+
+### Session 42 — Docusaurus documentation site
+
+**Documentation site** (`apps/docs/`)
+- New `apps/docs/` workspace: Docusaurus v3 with dark mode, indigo theme, VS Dark code blocks, full-text local search (`@easyops-cn/docusaurus-search-local`, air-gap compatible)
+- 15 documentation pages covering all features, architecture, and deployment profiles
+- Sidebar structure in `apps/docs/sidebars.ts`; "Edit this page" GitHub links on every page
+- Dockerfile for local development: Node build → nginx serve
+- GitHub Actions workflow (`.github/workflows/deploy-docs.yml`) auto-deploys to GitHub Pages on push to `main`
+- `Documentation Rules` section added to `CLAUDE.md` — docs must be updated in the same PR as any feature change
+- webpack pinned to 5.99.0 in workspace overrides for Docusaurus compatibility
+- pnpm version pinned to 10.6.5 in CI workflow to match `packageManager` field
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- PR: simonjcarr/infrawatch#212 (`feat/docusaurus-docs-site`)
+
+---
+
+### Session 41 — Software report enhancements (unified table, charts, export)
+
+**Software report** (`apps/web/app/(dashboard)/reports/software/software-report-client.tsx`)
+- **Unified table**: all software search results combined into a single sortable table (was separate sections per version) — PR simonjcarr/infrawatch#202
+- **Clickable hostnames**: clicking a host in the results opens its detail page — PR simonjcarr/infrawatch#204
+- **First-seen column**: added to results table to show when a package was first observed — PR simonjcarr/infrawatch#206
+- **OS distribution chart**: pie/bar breakdown of hosts by OS type per package — PR simonjcarr/infrawatch#206
+- **Version breakdown chart**: for the selected package shows distribution of installed versions — PR simonjcarr/infrawatch#206
+- **Dark mode chart labels**: axis and legend labels now visible in dark mode — PR simonjcarr/infrawatch#208
+- **Export rate limiting**: sliding window 3-per-10-seconds limit; export errors now shown in a modal dialog — PR simonjcarr/infrawatch#210
+- **CSV/PDF export fixes**: correct parameter passing for filters; export respects OS family and version filters — PR simonjcarr/infrawatch#204
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 40 — deleteHost cascade, JWT key persistence, inventory scan reliability
+
+**deleteHost cascade** (`apps/web/lib/actions/agents.ts`)
+- Full FK deletion order: notifications → alert_instances → software_scans → task_run_hosts → remaining FKs → host record
+- PRs: simonjcarr/infrawatch#196 (notifications), #198 (all FKs), #200 (software_scans)
+
+**JWT signing key persistence** (`apps/ingest/internal/`)
+- Ingest service now persists its JWT signing key in the database (org settings table) on first start
+- Survives Docker volume resets — agents no longer get 401s after a volume wipe
+- PR: simonjcarr/infrawatch#194
+
+**Inventory scan reliability** (`apps/ingest/`, `apps/web/`)
+- Inventory tab polls for scan completion and shows live status while a scan is running — PR simonjcarr/infrawatch#187
+- Per-collector logging and ingest scan-start diagnostics added — PR simonjcarr/infrawatch#189
+- Failed scan errors surfaced in the host Inventory tab (was silently ignored) — PR simonjcarr/infrawatch#191
+- Ingest accepts expired agent JWTs in the inventory stream handler to prevent scan failures during token rotation — PR simonjcarr/infrawatch#193
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./...` — zero errors ✅
+
+---
+
+### Session 39 — Software report overhaul and monitoring fixes
+
+**Software report UX overhaul** (`apps/web/app/(dashboard)/reports/software/software-report-client.tsx`)
+- Replaced paginated table with per-package detail view: typeahead combobox selects a package; results show all hosts grouped by version with hostname, OS version, source, architecture, last seen
+- Exact version filter shows a dropdown of versions from the DB when a specific package is selected
+- Source filter replaced with OS type filter (Linux / macOS / Windows) using `hosts.os` field
+- `getPackageDetails` and `getPackageVersions` server actions added
+- Export route updated to pass `osFamily` filter
+- **Inventory wipe bug fixed** — if `collectPackages` returns an error, the task now fails immediately rather than streaming 0 packages; streaming 0 packages caused `MarkRemovedPackages` to wipe the host's entire inventory
+- PR: simonjcarr/infrawatch#185
+
+**Monitoring reliability** (`agent/internal/heartbeat/heartbeat.go`, `apps/ingest/internal/db/queries/alerts.sql.go`, `apps/web/app/(dashboard)/hosts/[id]/alerts-tab.tsx`)
+- **CPU spike elimination**: `resultsReady` heartbeats now send a cached `hostMetricsSnapshot` collected on the regular 30s tick rather than re-sampling CPU — prevents near-zero delta windows inflating readings to 100%
+- **Alert double-evaluation fix**: `GetAlertRulesForHost` now filters `is_global_default = false` — global defaults (templates) were being evaluated alongside their host-specific clones
+- **Global defaults visible**: Alerts tab on host detail shows a read-only "Organisation-wide Default Rules" section linking to Settings → Alerts
+- PR: simonjcarr/infrawatch#183
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./...` — zero errors ✅
+
+---
+
+### Session 38 — Full software inventory feature
+
+**Agent** (`agent/internal/tasks/`)
+- New `software_inventory` task handler with cross-platform package collection:
+  - Linux: dpkg → rpm → pacman → apk (ordered by availability)
+  - macOS: `system_profiler SPApplicationsDataType` + Homebrew
+  - Windows: registry walk (`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`)
+- Snap/Flatpak/Windows Store sources toggleable via org settings
+- Streams packages in 500-package chunks via new `SubmitSoftwareInventory` gRPC endpoint
+- `task_id` injected into context from `runner.go` so handlers use it as `scan_id`
+
+**Ingest** (`apps/ingest/internal/handlers/`)
+- `inventory.go`: JWT-authenticated client-streaming RPC; bulk UNNEST upsert, marks removed rows on `is_last`, completes `task_run_hosts` row
+- `software_sweeper.go`: 60s ticker creates `software_inventory` tasks for hosts overdue per org `intervalHours` setting
+- `software.sql.go`: bulk UNNEST upsert, removed-package marking, scan tracking queries
+
+**Database** (`apps/web/lib/db/schema/software.ts`, migrations `0028`, `0029`)
+- `software_packages` — per-host package rows with name, version, source, architecture, first_seen, last_seen, is_removed
+- `software_scans` — per-scan metadata (started_at, completed_at, package_count, status)
+- `saved_software_reports` — per-user saved filter presets
+
+**Web** (`apps/web/`)
+- **Host Inventory tab** (`hosts/[id]/inventory-tab.tsx`): last scan banner, Rescan button, CSV export, Compare button, stale-scan alert, show-removed toggle, client-side search
+- **Host Compare page** (`hosts/[id]/compare/`): side-by-side diff of packages between two hosts
+- **Reports → Installed Software** (`reports/software/`): URL-synced filters (name typeahead, version modes, source, host group), new-in-window, package drift, compare two hosts, saved report filters
+- **Export route** (`api/reports/software/export/route.ts`): CSV (injection-safe field escaping) + PDF (`@react-pdf/renderer` server-side)
+- **Settings card** (`settings/settings-client.tsx`): enable/disable inventory, interval hours, Snap/Flatpak/Windows Store source toggles
+
+**Proto** (`proto/agent/v1/ingest.proto`)
+- `SubmitSoftwareInventory` client-streaming RPC added to `IngestService`
+- Generated Go bindings updated
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./...` — zero errors ✅
+- PRs: simonjcarr/infrawatch#175 (`feature/software-inventory`), #177, #179, #181
+
+---
+
+### Session 37 — Remote agent uninstall on host deletion
+
+**Agent** (`agent/internal/tasks/uninstall.go`, `uninstall_unix.go`, `uninstall_windows.go`)
+- New `agent_uninstall` task type — agent returns a `scheduled` result then spawns a detached child process to run the existing `-uninstall` flow
+- The detached process survives the service manager terminating the original agent
+- Linux: uses `systemd-run --no-block --collect` to place the uninstaller in its own transient cgroup (prevents systemd `KillMode=control-group` from killing it when the agent service is stopped); falls back to `setsid` for non-systemd Linux
+- macOS: `setsid`-style process detach (launchd tracks by PID, not cgroup)
+- Windows: `CREATE_NEW_PROCESS_GROUP` flag
+
+**Web** (`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`, `apps/web/lib/actions/agents.ts`)
+- Host delete dialog adds "Also uninstall agent from the remote host" checkbox — visible only when the agent is online
+- On confirm, dispatches the `agent_uninstall` task before deleting the host record
+- `deleteHost` action fixed: `task_run_hosts` rows now cleaned up before deleting the host (latent FK violation)
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./agent/...` — zero errors ✅
+- PRs: simonjcarr/infrawatch#171 (`feature/host-delete-uninstall-agent`), #173
+
+---
 
 ### Session 36 — Terminal panel viewport fix
 

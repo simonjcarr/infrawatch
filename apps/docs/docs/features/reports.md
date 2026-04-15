@@ -12,29 +12,34 @@ The Reports section provides fleet-wide views that aggregate data across all hos
 
 Navigate to **Reports → Software** to see all software packages installed across your fleet.
 
-### What's included
+### Package detail view
 
-The software inventory aggregates installed packages from every online host:
+The report centres on a **package search combobox** (typeahead). Start typing a package name and select from matching results. Once a package is selected:
 
-- Package name
-- Version(s) installed
-- Number of hosts it's installed on
-- First seen timestamp
-- Operating system / distribution breakdown
+- All hosts with that package installed are listed, grouped by version
+- Each row shows: hostname (clickable — opens the host detail page), OS version, source (dpkg/rpm/brew/etc.), architecture, and last seen timestamp
+- The **first-seen** column shows when the package was first observed anywhere in your fleet
 
-### Searching and filtering
+### Filtering
 
-The table supports:
-- **Free-text search** — matches on package name
-- **OS filter** — filter to a specific platform or distribution
-- **Version filter** — find all hosts running a specific version of a package
-- **Sortable columns** — sort by name, version, host count, or first seen
+| Filter | Description |
+|---|---|
+| **Package name** | Typeahead combobox — start typing to search |
+| **Version** | Dropdown of versions present in the DB for the selected package; pick one to see only hosts on that version |
+| **OS type** | Linux / macOS / Windows (derived from `hosts.os`) |
+| **Host group** | Limit results to hosts in a specific host group |
 
-Results from multiple hosts running the same package+version are unified into a single row with a host count.
+### Saved filters
+
+Click **Save filters** to store the current filter combination under a name. Saved filters appear in a dropdown — select one to restore all filter values instantly. Saved filters are per-user and stored in the database.
+
+### Comparing hosts
+
+Select a package, then click **Compare hosts** to open a side-by-side diff between two hosts showing which packages differ — useful for diagnosing why two nominally identical hosts behave differently.
 
 ### Identifying outdated software
 
-The version column shows all distinct versions of a package across your fleet. If you see multiple versions of the same package, you can drill down to see which hosts are running each version — useful for identifying hosts that missed a patch cycle.
+With a package selected, the version filter shows every distinct version installed across your fleet. Select a specific version to see exactly which hosts are running it — useful for tracking down hosts that missed a patch cycle.
 
 ---
 
@@ -42,7 +47,7 @@ The version column shows all distinct versions of a package across your fleet. I
 
 ### CSV Export
 
-Click **Export CSV** to download the current filtered view as a comma-separated values file. The export respects active filters and search terms.
+Click **Export CSV** to download the current filtered view as a comma-separated values file. The export respects the active package, version, OS type, and host group filters.
 
 ### PDF Export
 
@@ -53,18 +58,34 @@ Click **Export PDF** to generate a formatted PDF of the current view. The PDF in
 
 ### Rate limiting
 
-Exports are rate-limited to prevent overloading the server on large fleets. You can export once every 10 seconds. If you click Export before the cooldown has elapsed, a countdown timer shows when the next export is available.
+Exports use a **sliding window** rate limit: up to 3 exports per 10-second window. If the limit is reached, the button shows a countdown and any error is displayed in a modal dialog.
 
 ---
 
 ## OS and Version Charts
 
-The software report page includes two summary charts:
+The software report page includes two summary charts for the selected package:
 
 - **OS distribution** — pie/bar chart showing the proportion of hosts by operating system
-- **Version breakdown** — for the selected package, shows the distribution of installed versions across the fleet
+- **Version breakdown** — distribution of installed versions across the fleet
 
-These charts help you quickly assess the homogeneity of your fleet and identify stragglers that haven't been updated.
+Chart axis labels are theme-aware and remain visible in both light and dark mode.
+
+These charts help you quickly assess fleet homogeneity and identify hosts that haven't been updated.
+
+---
+
+## Software Inventory Settings
+
+Navigate to **Settings → Software Inventory** to configure fleet-wide collection behaviour:
+
+| Setting | Description |
+|---|---|
+| **Enable inventory** | Master toggle — disables the sweeper and removes the Inventory tab when off |
+| **Scan interval (hours)** | How often the sweeper dispatches a scan task per host |
+| **Snap packages** | Include Snap packages on Linux |
+| **Flatpak packages** | Include Flatpak packages on Linux |
+| **Windows Store apps** | Include Windows Store applications on Windows |
 
 ---
 

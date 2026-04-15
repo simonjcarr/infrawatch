@@ -70,6 +70,15 @@ The host detail page (`/hosts/[id]`) provides a full view of a single host:
 - Local and domain accounts present on this host
 - Synced via LDAP/Active Directory integration
 
+### Inventory tab
+- All software packages installed on this host, collected by the agent
+- Last scan timestamp and a **Rescan** button to trigger an immediate inventory collection
+- Stale-scan warning if the last scan is older than the configured interval
+- **Show removed** toggle to include packages no longer present on the host
+- Client-side search to filter the package list
+- **CSV export** of the current host's package list
+- **Compare** button to open a side-by-side diff against another host
+
 ### Terminal tab
 - Live WebSocket PTY terminal session directly to the host via the agent
 
@@ -98,3 +107,12 @@ Hosts can be organised into **Host Groups** for bulk operations, scoped alert ru
 ## Deleting a Host
 
 Hosts are soft-deleted — the record is retained for audit purposes but the host is hidden from the inventory. To permanently remove a host, revoke its agent and delete the host record from the detail page.
+
+If the agent is currently **online**, the delete dialog offers an **"Also uninstall agent from the remote host"** checkbox. When checked, Infrawatch dispatches an `agent_uninstall` task before removing the host record. The agent runs the uninstaller as a detached child process so it can complete even after the service manager terminates the agent process:
+
+- **Linux (systemd)**: uninstaller runs in a transient systemd unit (`systemd-run --no-block`) so it is not killed when the agent's cgroup is torn down
+- **Linux (non-systemd)**: falls back to a new session (`setsid`)
+- **macOS**: uses `setsid`-style detach
+- **Windows**: uses `CREATE_NEW_PROCESS_GROUP`
+
+If the agent is offline at deletion time, leave the checkbox unchecked and uninstall the agent binary manually.

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.36.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.36.0...web/v0.36.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* **reports:** chart labels visible in dark mode, reduce export rate limit ([31d0a0d](https://github.com/simonjcarr/infrawatch/commit/31d0a0dcd7b467c4ed54af4bd95ccea9b69e23a0))
+* **reports:** chart labels visible in dark mode, reduce export rate limit to 10s ([f1eadce](https://github.com/simonjcarr/infrawatch/commit/f1eadce213c3f199dae15633dce8fb824b5641c0))
+
 ## [0.36.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.35.1...web/v0.36.0) (2026-04-15)
 
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -60,6 +60,11 @@ export function InventoryTab({ hostId, orgId }: Props) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['host-software-inventory', hostId, showRemoved],
     queryFn: () => getHostSoftwareInventory(orgId, hostId, showRemoved),
+    // Poll every 5 s while a scan is queued or running, stop when it completes.
+    refetchInterval: (query) => {
+      const activeScan = (query.state.data as Awaited<ReturnType<typeof getHostSoftwareInventory>> | undefined)?.activeScan
+      return activeScan ? 5_000 : false
+    },
   })
 
   const triggerMutation = useMutation({
@@ -206,11 +211,20 @@ export function InventoryTab({ hostId, orgId }: Props) {
         </Alert>
       )}
 
-      {/* Trigger success */}
-      {triggerMutation.isSuccess && 'success' in (triggerMutation.data ?? {}) && (
+      {/* Active scan status */}
+      {data?.activeScan === 'pending' && (
         <Alert>
+          <Loader2 className="size-4 animate-spin" />
           <AlertDescription>
-            Scan queued — results will appear after the agent next checks in.
+            Scan queued — waiting for the agent to pick it up…
+          </AlertDescription>
+        </Alert>
+      )}
+      {data?.activeScan === 'running' && (
+        <Alert>
+          <Loader2 className="size-4 animate-spin" />
+          <AlertDescription>
+            Scan in progress — collecting packages…
           </AlertDescription>
         </Alert>
       )}

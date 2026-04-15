@@ -139,6 +139,7 @@ export interface HostSoftwareInventory {
   packages: SoftwarePackage[]
   lastScan: SoftwareScan | null
   settings: SoftwareInventorySettings
+  activeScan: 'pending' | 'running' | null
 }
 
 export async function getHostSoftwareInventory(
@@ -146,7 +147,7 @@ export async function getHostSoftwareInventory(
   hostId: string,
   includeRemoved = false,
 ): Promise<HostSoftwareInventory> {
-  const [packages, scans, settings] = await Promise.all([
+  const [packages, scans, settings, activeTaskRows] = await Promise.all([
     db.query.softwarePackages.findMany({
       where: and(
         eq(softwarePackages.organisationId, orgId),
@@ -165,9 +166,34 @@ export async function getHostSoftwareInventory(
       limit: 1,
     }),
     getSoftwareInventorySettings(orgId),
+    db
+      .select({ status: taskRunHosts.status })
+      .from(taskRunHosts)
+      .innerJoin(
+        taskRuns,
+        and(
+          eq(taskRuns.id, taskRunHosts.taskRunId),
+          eq(taskRuns.taskType, 'software_inventory'),
+          isNull(taskRuns.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(taskRunHosts.hostId, hostId),
+          eq(taskRunHosts.organisationId, orgId),
+          inArray(taskRunHosts.status, ['pending', 'running']),
+          isNull(taskRunHosts.deletedAt),
+        ),
+      )
+      .limit(1),
   ])
 
-  return { packages, lastScan: scans[0] ?? null, settings }
+  const activeRow = activeTaskRows[0]
+  const activeScan = activeRow
+    ? (activeRow.status as 'pending' | 'running')
+    : null
+
+  return { packages, lastScan: scans[0] ?? null, settings, activeScan }
 }
 
 // ── Global report search ──────────────────────────────────────────────────────

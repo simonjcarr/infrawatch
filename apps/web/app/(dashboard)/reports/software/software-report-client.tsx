@@ -2,6 +2,15 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useQueryState } from 'nuqs'
 import { formatDistanceToNow } from 'date-fns'
@@ -79,7 +88,7 @@ interface Props {
 
 type ActiveView = 'search' | 'new-packages' | 'drift'
 
-type SortKey = 'host' | 'os' | 'version' | 'source' | 'architecture' | 'lastSeen'
+type SortKey = 'host' | 'os' | 'version' | 'source' | 'architecture' | 'firstSeen' | 'lastSeen'
 type SortDir = 'asc' | 'desc'
 
 const VERSION_MODE_LABELS: Record<VersionMode, string> = {
@@ -133,8 +142,8 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
-      // Version and lastSeen feel more natural starting desc; others asc.
-      setSortDir(key === 'version' || key === 'lastSeen' ? 'desc' : 'asc')
+      // Version and date columns feel more natural starting desc; others asc.
+      setSortDir(key === 'version' || key === 'lastSeen' || key === 'firstSeen' ? 'desc' : 'asc')
     }
   }
 
@@ -293,6 +302,10 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
             (a.architecture ?? '').toLowerCase(),
             (b.architecture ?? '').toLowerCase(),
           )
+        case 'firstSeen':
+          return (
+            (new Date(a.firstSeenAt).getTime() - new Date(b.firstSeenAt).getTime()) * dirMul
+          )
         case 'lastSeen':
           return (
             (new Date(a.lastSeenAt).getTime() - new Date(b.lastSeenAt).getTime()) * dirMul
@@ -309,6 +322,31 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
     sortKey,
     sortDir,
   ])
+
+  // Chart data derived from the filtered/sorted rows
+  const osChartData = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of displayedRows) {
+      const label = row.os ?? 'Unknown'
+      counts.set(label, (counts.get(label) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [displayedRows])
+
+  const versionChartData = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of displayedRows) {
+      counts.set(row.version, (counts.get(row.version) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([version, count]) => ({ version, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15)
+  }, [displayedRows])
+
+  const CHART_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#14b8a6', '#f97316', '#a855f7', '#84cc16']
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -588,6 +626,60 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                 </div>
               </div>
 
+              {/* Distribution charts — shown when results are available */}
+              {!detailsLoading && displayedRows.length > 0 && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-md border p-4">
+                    <p className="text-xs font-medium text-muted-foreground mb-3">OS distribution</p>
+                    <ResponsiveContainer width="100%" height={Math.max(80, osChartData.length * 36)}>
+                      <BarChart
+                        data={osChartData}
+                        layout="vertical"
+                        margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
+                      >
+                        <XAxis type="number" hide />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={80}
+                          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        />
+                        <Tooltip contentStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="count" radius={[0, 3, 3, 0]}>
+                          {osChartData.map((_, i) => (
+                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="rounded-md border p-4">
+                    <p className="text-xs font-medium text-muted-foreground mb-3">Version distribution</p>
+                    <ResponsiveContainer width="100%" height={Math.max(80, versionChartData.length * 36)}>
+                      <BarChart
+                        data={versionChartData}
+                        layout="vertical"
+                        margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
+                      >
+                        <XAxis type="number" hide />
+                        <YAxis
+                          type="category"
+                          dataKey="version"
+                          width={160}
+                          tick={{ fontSize: 10, fontFamily: 'monospace', fill: 'hsl(var(--muted-foreground))' }}
+                        />
+                        <Tooltip contentStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="count" radius={[0, 3, 3, 0]}>
+                          {versionChartData.map((_, i) => (
+                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
               {detailsLoading ? (
                 <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
                   <Loader2 className="size-4 animate-spin" />
@@ -603,6 +695,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                         <SortableTh label="Version" sortKey="version" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                         <SortableTh label="Source" sortKey="source" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                         <SortableTh label="Architecture" sortKey="architecture" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                        <SortableTh label="First seen" sortKey="firstSeen" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                         <SortableTh label="Last seen" sortKey="lastSeen" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
                       </TableRow>
                     </TableHeader>
@@ -630,6 +723,9 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {row.architecture ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(row.firstSeenAt), { addSuffix: true })}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(row.lastSeenAt), { addSuffix: true })}

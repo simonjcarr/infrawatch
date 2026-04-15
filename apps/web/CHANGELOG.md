@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.2...web/v0.34.3) (2026-04-15)
+
+
+### Bug Fixes
+
+* **ingest:** persist JWT signing key in database to survive volume resets ([385caa2](https://github.com/simonjcarr/infrawatch/commit/385caa2ea5318d949924d1a88c2aafbda9bdaaa9))
+* **ingest:** persist JWT signing key in database to survive volume resets ([661d2a3](https://github.com/simonjcarr/infrawatch/commit/661d2a39e5043f5d8d8df467819256977734fc00))
+
 ## [0.34.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.1...web/v0.34.2) (2026-04-15)
 
 

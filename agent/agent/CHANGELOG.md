@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.24.0](https://github.com/simonjcarr/infrawatch/compare/agent/v0.23.2...agent/v0.24.0) (2026-04-15)
+
+
+### Features
+
+* **reports:** overhaul software report UX and fix inventory wipe bug ([19167fe](https://github.com/simonjcarr/infrawatch/commit/19167fe7906d44e987bd6119c34b4a66697d333c))
+* **reports:** overhaul software report UX and fix inventory wipe bug ([4f49c92](https://github.com/simonjcarr/infrawatch/commit/4f49c927d4daea923a0c772e4f01d6032f94d6a9))
+
 ## [0.23.2](https://github.com/simonjcarr/infrawatch/compare/agent/v0.23.1...agent/v0.23.2) (2026-04-14)
 
 

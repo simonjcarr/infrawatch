@@ -550,6 +550,7 @@ export interface PackageHostInfo {
   source: string
   architecture: string | null
   version: string
+  firstSeenAt: Date
   lastSeenAt: Date
 }
 
@@ -575,6 +576,7 @@ export async function getPackageDetails(
       version: softwarePackages.version,
       source: softwarePackages.source,
       architecture: softwarePackages.architecture,
+      firstSeenAt: softwarePackages.firstSeenAt,
       lastSeenAt: softwarePackages.lastSeenAt,
       hostname: hosts.hostname,
       displayName: hosts.displayName,
@@ -614,6 +616,7 @@ export async function getPackageDetails(
       source: pkg.source,
       architecture: pkg.architecture,
       version: pkg.version,
+      firstSeenAt: pkg.firstSeenAt,
       lastSeenAt: pkg.lastSeenAt,
     }
     const existing = versionMap.get(pkg.version)

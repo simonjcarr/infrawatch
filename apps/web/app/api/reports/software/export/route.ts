@@ -3,13 +3,11 @@ import { z } from 'zod'
 import { renderToBuffer, type DocumentProps } from '@react-pdf/renderer'
 import { createElement, type ReactElement } from 'react'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getSoftwareReport } from '@/lib/actions/software-inventory'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { escapeLikePattern } from '@/lib/utils'
+import { organisations, softwarePackages, hosts } from '@/lib/db/schema'
+import { eq, and, isNull, ilike } from 'drizzle-orm'
 import { SoftwareReportPDF } from '@/lib/pdf/software-report'
-import type { SoftwareReportFilters, VersionMode } from '@/lib/actions/software-inventory'
+import { compareVersions } from '@/lib/version-compare'
 
 /**
  * Simple in-memory per-user rate limiter.
@@ -36,13 +34,12 @@ const filterSchema = z.object({
   vl: z.string().max(100).optional(),
   vh: z.string().max(100).optional(),
   of: z.string().max(20).optional(),
-  hostId: z.string().max(50).optional(), // single-host CSV from the inventory tab
+  hostId: z.string().max(50).optional(),
 })
 
 /** Escape a CSV cell value. Prefixes formula-injection chars with a literal '. */
 function escapeCsvCell(value: string | number | null | undefined): string {
   const str = String(value ?? '')
-  // Guard against CSV injection
   if (/^[=+\-@\t\r\n]/.test(str)) {
     return `"'${str.replace(/"/g, '""')}"`
   }
@@ -97,43 +94,80 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
   }
 
-  const { format, name, vm, ve, vp, vl, vh, of: osFamily, hostId } = parsed.data
+  const { format, name, vm, ve, vp, vl, vh, of: osFamily } = parsed.data
 
-  const filters: SoftwareReportFilters = {
-    name: name || undefined,
-    versionMode: (vm ?? 'any') as VersionMode,
-    versionExact: ve || undefined,
-    versionPrefix: vp || undefined,
-    versionLow: vl || undefined,
-    versionHigh: vh || undefined,
-    osFamily: osFamily || undefined,
-    page: 1,
-    pageSize: 250_000, // hard cap enforced below
-  }
+  // ── Fetch per-host rows (exact name match — same as the UI table) ─────────────
+  const whereConditions = and(
+    eq(softwarePackages.organisationId, orgId),
+    name ? eq(softwarePackages.name, name) : undefined,
+    isNull(softwarePackages.removedAt),
+    isNull(softwarePackages.deletedAt),
+    isNull(hosts.deletedAt),
+    osFamily ? ilike(hosts.os, `%${osFamily}%`) : undefined,
+  )
 
-  // Run report
-  const report = await getSoftwareReport(orgId, filters)
+  let rows = await db
+    .select({
+      name: softwarePackages.name,
+      version: softwarePackages.version,
+      source: softwarePackages.source,
+      architecture: softwarePackages.architecture,
+      firstSeenAt: softwarePackages.firstSeenAt,
+      lastSeenAt: softwarePackages.lastSeenAt,
+      hostname: hosts.hostname,
+      displayName: hosts.displayName,
+      os: hosts.os,
+      osVersion: hosts.osVersion,
+    })
+    .from(softwarePackages)
+    .innerJoin(hosts, eq(hosts.id, softwarePackages.hostId))
+    .where(whereConditions)
+    .orderBy(softwarePackages.name, softwarePackages.version, hosts.hostname)
+    .limit(250_001)
 
-  // Enforce row cap
-  if (report.total > 250_000) {
+  if (rows.length > 250_000) {
     return NextResponse.json(
-      {
-        error: `Result set too large (${report.total.toLocaleString()} rows). Narrow your filters and try again.`,
-      },
+      { error: 'Result set too large (>250,000 rows). Narrow your filters and try again.' },
       { status: 413 },
     )
   }
 
+  // Apply version filtering server-side (mirrors client-side logic)
+  const versionMode = vm ?? 'any'
+  if (versionMode !== 'any') {
+    if (versionMode === 'exact' && ve) {
+      rows = rows.filter((r) => r.version === ve)
+    } else if (versionMode === 'prefix' && vp) {
+      rows = rows.filter((r) => r.version.startsWith(vp))
+    } else if (versionMode === 'between' && vl && vh) {
+      rows = rows.filter((r) => {
+        const cmpLow = compareVersions(r.version, vl)
+        const cmpHigh = compareVersions(r.version, vh)
+        return cmpLow >= 0 && cmpHigh <= 0
+      })
+    }
+  }
+
   const generatedAt = new Date()
+  const packageName = name ?? 'All packages'
 
   // ── CSV ──────────────────────────────────────────────────────────────────────
   if (format === 'csv') {
     const lines: string[] = [
-      rowToCsv(['Package', 'Version', 'Hosts', 'Sources', 'Host names']),
+      rowToCsv(['Package', 'Host', 'OS', 'Version', 'Source', 'Architecture', 'First seen', 'Last seen']),
     ]
-    for (const row of report.rows) {
+    for (const row of rows) {
       lines.push(
-        rowToCsv([row.name, row.version, row.hostCount, row.sources.join('; '), row.hostNames.join('; ')]),
+        rowToCsv([
+          row.name,
+          row.displayName ?? row.hostname,
+          row.osVersion ?? row.os ?? '',
+          row.version,
+          row.source,
+          row.architecture ?? '',
+          row.firstSeenAt.toISOString().slice(0, 10),
+          row.lastSeenAt.toISOString().slice(0, 10),
+        ]),
       )
     }
     const csv = lines.join('\r\n')
@@ -156,15 +190,13 @@ export async function GET(req: NextRequest) {
 
   const pdfElement = createElement(SoftwareReportPDF, {
     orgName,
-    filters,
-    rows: report.rows,
-    total: report.total,
-    uniquePackages: report.uniquePackages,
-    hostsWithData: report.hostsWithData,
+    packageName,
+    versionFilter: vm && vm !== 'any' ? { mode: vm, exact: ve, prefix: vp, low: vl, high: vh } : undefined,
+    osFamily,
+    rows,
     generatedAt,
   }) as ReactElement<DocumentProps>
   const pdfBuffer = await renderToBuffer(pdfElement)
-  // renderToBuffer returns a Node.js Buffer; NextResponse accepts Uint8Array.
   const pdfBytes = new Uint8Array(pdfBuffer as unknown as ArrayBuffer)
 
   const filename = `software-report-${generatedAt.toISOString().slice(0, 10)}.pdf`

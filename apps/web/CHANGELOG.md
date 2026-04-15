@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.35.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.6...web/v0.35.0) (2026-04-15)
+
+
+### Features
+
+* **reports:** unify software search results into a single sortable table ([1ae7c42](https://github.com/simonjcarr/infrawatch/commit/1ae7c42f4e28267484db5eec7396e8b02c78eda3))
+* **reports:** unify software search results into single sortable table ([5ad70bb](https://github.com/simonjcarr/infrawatch/commit/5ad70bb7a627d0ee022b3f8ba2cd0c8295748806))
+
 ## [0.34.6](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.5...web/v0.34.6) (2026-04-15)
 
 

@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # Ingest Service
 
 The ingest service is a stateless gRPC server that sits between the agents and the database. It is the only service that agents communicate with directly — the web app reads from the same database and never talks to ingest in the request path.

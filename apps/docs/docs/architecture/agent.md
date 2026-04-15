@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Agent Architecture
 
 The Infrawatch agent is a statically compiled Go binary. It has no runtime dependencies — just copy the binary to a host and run it. It is designed to work in fully air-gapped environments.
@@ -168,7 +164,44 @@ level=INFO msg="heartbeat stream opened"
 
 ---
 
+## Software Inventory
+
+The agent collects the full list of installed software packages and streams them to the ingest service in 500-package chunks via the `SubmitSoftwareInventory` gRPC RPC.
+
+### Collection sources
+
+| Platform | Sources |
+|---|---|
+| **Linux** | dpkg (Debian/Ubuntu) → rpm (RHEL/Fedora/AlmaLinux) → pacman (Arch) → apk (Alpine) — first available wins |
+| **macOS** | `system_profiler SPApplicationsDataType` + Homebrew (`brew list`) |
+| **Windows** | Registry walk under `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` |
+
+Optional sources (Snap, Flatpak, Windows Store) can be enabled per-org in **Settings → Software Inventory**.
+
+### Scheduling
+
+The ingest service's `SoftwareSweeper` runs every 60 seconds and dispatches a `software_inventory` task to any host whose last scan is older than the org-level `intervalHours` setting. Admins can also trigger an immediate rescan from the host detail Inventory tab.
+
+### Package tracking
+
+- **Upsert on scan**: packages are inserted or updated by `(host_id, name, version, source)`
+- **Removed packages**: when a scan completes (`is_last=true`), any packages not seen in the current scan are marked `is_removed=true` — they remain in the database and can be shown via the "Show removed" toggle
+- **First seen**: the `first_seen` timestamp is never overwritten after initial insert
+
+---
+
 ## Uninstalling an Agent
+
+### Remote uninstall (recommended when agent is online)
+
+When deleting a host from the UI while its agent is **online**, check **"Also uninstall agent from the remote host"**. Infrawatch dispatches an `agent_uninstall` task; the agent runs the uninstaller as a detached child process that survives the service manager terminating the agent:
+
+- **Linux (systemd)**: `systemd-run --no-block --collect` places the uninstaller in a transient cgroup, preventing systemd from killing it when the agent's cgroup is torn down
+- **Linux (non-systemd)**: `setsid` fallback
+- **macOS**: `setsid`-style process detach
+- **Windows**: `CREATE_NEW_PROCESS_GROUP`
+
+### Manual uninstall
 
 1. Stop the agent process (or `systemctl stop infrawatch-agent`)
 2. The host transitions to **Offline** in the UI automatically

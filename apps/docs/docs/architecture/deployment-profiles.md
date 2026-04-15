@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # Deployment Profiles
 
 Infrawatch ships with three deployment profiles, each targeting a different scale. All profiles use the same codebase — only the infrastructure backing them changes.

@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # Monitoring
 
 Infrawatch collects system metrics from every agent and lets you define health checks that run on a schedule. Metrics are stored in TimescaleDB and visualised as time-series charts.

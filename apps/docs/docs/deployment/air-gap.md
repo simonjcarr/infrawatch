@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Air-Gap Deployment
 
 Infrawatch is designed to work in fully air-gapped environments — no internet access is required for any core feature, including agent registration, metrics collection, alerting, and agent binary distribution.

@@ -1,4 +1,5 @@
-# Docusaurus build output and cache
-build/
-.docusaurus/
+# VuePress build output and cache
+docs/.vuepress/dist/
+docs/.vuepress/.temp/
+docs/.vuepress/.cache/
 node_modules/

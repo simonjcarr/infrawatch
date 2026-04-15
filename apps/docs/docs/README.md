@@ -1,8 +1,3 @@
----
-slug: /
-sidebar_position: 1
----
-
 # Introduction
 
 Infrawatch is an open-source infrastructure monitoring and tooling platform built for corporate engineering teams and individual operators who need full control over their observability stack.

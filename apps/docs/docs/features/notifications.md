@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # Notifications
 
 Infrawatch supports multiple notification channels. Each alert rule specifies which channels its notifications are routed to.

@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Host Groups
 
 Host Groups let you organise hosts into logical collections — by environment (production / staging), team ownership, geography, or any other dimension that makes sense for your organisation.

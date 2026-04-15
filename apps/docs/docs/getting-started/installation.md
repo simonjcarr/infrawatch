@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Installation
 
 This guide walks you through getting Infrawatch running — from zero to a real agent showing up as online in the host inventory.

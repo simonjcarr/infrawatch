@@ -1,7 +1,3 @@
----
-sidebar_position: 8
----
-
 # Terminal
 
 Infrawatch provides a persistent, browser-based terminal that gives you shell access to any host that has an active agent — without needing SSH configured or a VPN connection.

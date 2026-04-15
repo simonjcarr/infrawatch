@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Configuration
 
 All Infrawatch configuration is via environment variables. There are no config files for the web app or ingest service in production — just set env vars in your `.env` file or compose config.

@@ -1,7 +1,3 @@
----
-sidebar_position: 10
----
-
 # Tasks & Runbooks
 
 The Tasks feature lets you run scripts on hosts directly from the Infrawatch UI, and Runbooks provide a way to define reusable, multi-step operational procedures.

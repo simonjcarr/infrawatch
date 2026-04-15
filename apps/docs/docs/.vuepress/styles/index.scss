@@ -1,0 +1,67 @@
+// Dark mode overrides — slate palette to match Infrawatch UI
+html.dark {
+  --c-brand: #818cf8;
+  --c-brand-light: #a5b4fc;
+  --c-bg: #0f172a;
+  --c-bg-light: #1e293b;
+  --c-bg-lighter: #334155;
+  --c-border: #334155;
+  --c-border-dark: #475569;
+  --c-text: #e2e8f0;
+  --c-text-lighter: #94a3b8;
+  --c-text-lightest: #64748b;
+  --c-code-bg: #1e293b;
+}
+
+// Monospace font for code
+:root {
+  --font-family-code: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+}
+
+// Code blocks
+html.dark div[class*='language-'] {
+  background-color: #1e293b;
+}
+
+html.dark div[class*='language-'] pre {
+  border: 1px solid #334155;
+}
+
+// Inline code
+html.dark code {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+// Tables
+html.dark table {
+  border-color: #334155;
+}
+
+html.dark th {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+html.dark td {
+  border-color: #334155;
+}
+
+// Scrollbar
+html.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

@@ -1,7 +1,3 @@
----
-sidebar_position: 9
----
-
 # Service Accounts & Identity
 
 Infrawatch tracks the users and service accounts present on your hosts — including domain accounts synced from LDAP/Active Directory. This gives you a fleet-wide view of who has access to what.

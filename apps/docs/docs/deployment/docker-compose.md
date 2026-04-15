@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Docker Compose Deployment
 
 The recommended way to run Infrawatch in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database) on a single host using pre-built images from GHCR.

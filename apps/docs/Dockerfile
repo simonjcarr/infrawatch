@@ -15,7 +15,7 @@ COPY apps/docs/package.json ./apps/docs/package.json
 RUN pnpm install --filter @infrawatch/docs --frozen-lockfile
 
 # ------------------------------------------------------------------
-# Build stage: run Docusaurus build
+# Build stage: run VuePress build
 # ------------------------------------------------------------------
 FROM base AS builder
 WORKDIR /app
@@ -28,7 +28,7 @@ RUN pnpm --filter @infrawatch/docs build
 # Runtime stage: nginx serving the static output
 # ------------------------------------------------------------------
 FROM nginx:alpine AS runner
-COPY --from=builder /app/apps/docs/build /usr/share/nginx/html
+COPY --from=builder /app/apps/docs/docs/.vuepress/dist /usr/share/nginx/html
 COPY apps/docs/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

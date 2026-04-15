@@ -14,6 +14,9 @@ import {
   TrendingUp,
   GitBranch,
   X,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,6 +78,9 @@ interface Props {
 
 type ActiveView = 'search' | 'new-packages' | 'drift'
 
+type SortKey = 'host' | 'os' | 'version' | 'source' | 'architecture' | 'lastSeen'
+type SortDir = 'asc' | 'desc'
+
 const VERSION_MODE_LABELS: Record<VersionMode, string> = {
   any: 'Any version',
   exact: 'Exact',
@@ -116,6 +122,20 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
   const [saveName, setSaveName] = useState('')
   const [savedReportsOpen, setSavedReportsOpen] = useState(false)
   const [newWindowDays, setNewWindowDays] = useState<7 | 30>(7)
+
+  // Sort state for the unified results table
+  const [sortKey, setSortKey] = useState<SortKey>('version')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      // Version and lastSeen feel more natural starting desc; others asc.
+      setSortDir(key === 'version' || key === 'lastSeen' ? 'desc' : 'asc')
+    }
+  }
 
   const filters: SoftwareReportFilters = {
     name: nameParam || undefined,
@@ -224,24 +244,70 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
     window.open(`/api/reports/software/export?${params.toString()}`, '_blank')
   }
 
-// Client-side version filtering of package detail groups
-  const displayedGroups = useMemo(() => {
+// Client-side version filtering + flattening + sorting of package detail rows
+  const displayedRows = useMemo(() => {
     const groups = packageDetails?.versionGroups ?? []
-    if (versionMode === 'exact' && versionExact) {
-      return groups.filter((g) => g.version === versionExact)
-    }
-    if (versionMode === 'prefix' && versionPrefix) {
-      return groups.filter((g) => g.version.startsWith(versionPrefix))
-    }
-    if (versionMode === 'between' && versionLow && versionHigh) {
-      return groups.filter(
-        (g) =>
-          compareVersions(g.version, versionLow) >= 0 &&
-          compareVersions(g.version, versionHigh) <= 0,
-      )
-    }
-    return groups
-  }, [packageDetails, versionMode, versionExact, versionPrefix, versionLow, versionHigh])
+
+    const filteredGroups = (() => {
+      if (versionMode === 'exact' && versionExact) {
+        return groups.filter((g) => g.version === versionExact)
+      }
+      if (versionMode === 'prefix' && versionPrefix) {
+        return groups.filter((g) => g.version.startsWith(versionPrefix))
+      }
+      if (versionMode === 'between' && versionLow && versionHigh) {
+        return groups.filter(
+          (g) =>
+            compareVersions(g.version, versionLow) >= 0 &&
+            compareVersions(g.version, versionHigh) <= 0,
+        )
+      }
+      return groups
+    })()
+
+    const rows = filteredGroups.flatMap((g) => g.hosts)
+
+    const dirMul = sortDir === 'asc' ? 1 : -1
+    const cmpStr = (a: string, b: string) =>
+      a < b ? -1 * dirMul : a > b ? 1 * dirMul : 0
+
+    return [...rows].sort((a, b) => {
+      switch (sortKey) {
+        case 'host':
+          return cmpStr(
+            (a.displayName ?? a.hostname).toLowerCase(),
+            (b.displayName ?? b.hostname).toLowerCase(),
+          )
+        case 'os':
+          return cmpStr(
+            (a.osVersion ?? a.os ?? '').toLowerCase(),
+            (b.osVersion ?? b.os ?? '').toLowerCase(),
+          )
+        case 'version':
+          return compareVersions(a.version, b.version) * dirMul
+        case 'source':
+          return cmpStr(a.source.toLowerCase(), b.source.toLowerCase())
+        case 'architecture':
+          return cmpStr(
+            (a.architecture ?? '').toLowerCase(),
+            (b.architecture ?? '').toLowerCase(),
+          )
+        case 'lastSeen':
+          return (
+            (new Date(a.lastSeenAt).getTime() - new Date(b.lastSeenAt).getTime()) * dirMul
+          )
+      }
+    })
+  }, [
+    packageDetails,
+    versionMode,
+    versionExact,
+    versionPrefix,
+    versionLow,
+    versionHigh,
+    sortKey,
+    sortDir,
+  ])
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -484,18 +550,22 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
             <>
               {/* Action bar */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                {packageDetails && (
-                  <>
-                    <span>
-                      <span className="font-medium text-foreground">{packageDetails.totalHosts.toLocaleString()}</span>{' '}
-                      host{packageDetails.totalHosts === 1 ? '' : 's'} with this package
-                    </span>
-                    <span>
-                      <span className="font-medium text-foreground">{packageDetails.versionGroups.length}</span>{' '}
-                      version{packageDetails.versionGroups.length === 1 ? '' : 's'}
-                    </span>
-                  </>
-                )}
+                {packageDetails && (() => {
+                  const uniqueHosts = new Set(displayedRows.map((r) => r.hostId)).size
+                  const uniqueVersions = new Set(displayedRows.map((r) => r.version)).size
+                  return (
+                    <>
+                      <span>
+                        <span className="font-medium text-foreground">{uniqueHosts.toLocaleString()}</span>{' '}
+                        host{uniqueHosts === 1 ? '' : 's'} with this package
+                      </span>
+                      <span>
+                        <span className="font-medium text-foreground">{uniqueVersions}</span>{' '}
+                        version{uniqueVersions === 1 ? '' : 's'}
+                      </span>
+                    </>
+                  )
+                })()}
                 <div className="ml-auto flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -522,57 +592,46 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                   <Loader2 className="size-4 animate-spin" />
                   <span className="text-sm">Loading…</span>
                 </div>
-              ) : displayedGroups.length > 0 ? (
-                <div className="space-y-4">
-                  {displayedGroups.map((group) => (
-                    <div key={group.version} className="rounded-md border overflow-hidden">
-                      <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/40 border-b">
-                        <span className="font-mono text-sm font-semibold text-foreground">
-                          {nameParam}
-                        </span>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {group.version}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          {group.hosts.length} host{group.hosts.length === 1 ? '' : 's'}
-                        </Badge>
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Host</TableHead>
-                            <TableHead>OS</TableHead>
-                            <TableHead>Source</TableHead>
-                            <TableHead>Architecture</TableHead>
-                            <TableHead>Last seen</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.hosts.map((host) => (
-                            <TableRow key={host.hostId}>
-                              <TableCell className="font-medium text-sm">
-                                {host.displayName ?? host.hostname}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {host.osVersion ?? host.os ?? '—'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {host.source}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
-                                {host.architecture ?? '—'}
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(host.lastSeenAt), { addSuffix: true })}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ))}
+              ) : displayedRows.length > 0 ? (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <SortableTh label="Host" sortKey="host" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                        <SortableTh label="OS" sortKey="os" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                        <SortableTh label="Version" sortKey="version" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                        <SortableTh label="Source" sortKey="source" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                        <SortableTh label="Architecture" sortKey="architecture" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                        <SortableTh label="Last seen" sortKey="lastSeen" currentKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {displayedRows.map((row) => (
+                        <TableRow key={`${row.hostId}:${row.version}:${row.architecture ?? ''}`}>
+                          <TableCell className="font-medium text-sm">
+                            {row.displayName ?? row.hostname}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.osVersion ?? row.os ?? '—'}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {row.version}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {row.source}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {row.architecture ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(row.lastSeenAt), { addSuffix: true })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : packageDetails ? (
                 <div className="text-center py-16 text-sm text-muted-foreground">
@@ -783,5 +842,36 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function SortableTh({
+  label,
+  sortKey: key,
+  currentKey,
+  dir,
+  onClick,
+}: {
+  label: string
+  sortKey: SortKey
+  currentKey: SortKey
+  dir: SortDir
+  onClick: (key: SortKey) => void
+}) {
+  const active = currentKey === key
+  const Icon = !active ? ChevronsUpDown : dir === 'asc' ? ChevronUp : ChevronDown
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => onClick(key)}
+        className={`inline-flex items-center gap-1 -mx-2 px-2 py-1 rounded hover:bg-muted/60 ${
+          active ? 'text-foreground' : 'text-muted-foreground'
+        }`}
+      >
+        {label}
+        <Icon className="size-3" />
+      </button>
+    </TableHead>
   )
 }

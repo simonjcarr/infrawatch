@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.5](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.4...web/v0.34.5) (2026-04-15)
+
+
+### Bug Fixes
+
+* **agents:** complete deleteHost FK cascade for all referencing tables ([7faea5a](https://github.com/simonjcarr/infrawatch/commit/7faea5a71509351e142463221cb95af46020f7fb))
+* **agents:** complete deleteHost FK cascade for all referencing tables ([c6dcb2a](https://github.com/simonjcarr/infrawatch/commit/c6dcb2a39524d96ecee0819b42909daf4af0297b))
+
 ## [0.34.4](https://github.com/simonjcarr/infrawatch/compare/web/v0.34.3...web/v0.34.4) (2026-04-15)
 
 

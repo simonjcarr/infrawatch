@@ -1,0 +1,104 @@
+/**
+ * Infrawatch documentation custom theme
+ * Primary: indigo — professional, modern, infra-tool aesthetic
+ */
+
+:root {
+  --ifm-color-primary: #4f46e5;
+  --ifm-color-primary-dark: #4338ca;
+  --ifm-color-primary-darker: #3730a3;
+  --ifm-color-primary-darkest: #312e81;
+  --ifm-color-primary-light: #6366f1;
+  --ifm-color-primary-lighter: #818cf8;
+  --ifm-color-primary-lightest: #a5b4fc;
+  --ifm-code-font-size: 93%;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --docusaurus-highlighted-code-line-bg: rgba(79, 70, 229, 0.12);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6366f1;
+  --ifm-color-primary-darker: #4f46e5;
+  --ifm-color-primary-darkest: #4338ca;
+  --ifm-color-primary-light: #a5b4fc;
+  --ifm-color-primary-lighter: #c7d2fe;
+  --ifm-color-primary-lightest: #e0e7ff;
+  --ifm-background-color: #0f172a;
+  --ifm-background-surface-color: #1e293b;
+  --ifm-navbar-background-color: #0f172a;
+  --ifm-footer-background-color: #0f172a;
+  --ifm-toc-border-color: #334155;
+  --ifm-hr-border-color: #334155;
+  --docusaurus-highlighted-code-line-bg: rgba(129, 140, 248, 0.15);
+}
+
+/* Code blocks */
+[data-theme='dark'] .prism-code {
+  background-color: #1e293b !important;
+}
+
+[data-theme='dark'] pre.prism-code {
+  border: 1px solid #334155;
+}
+
+/* Inline code */
+[data-theme='dark'] code:not([class*='codeBlock']) {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
+
+/* Navbar */
+[data-theme='dark'] .navbar {
+  border-bottom: 1px solid #1e293b;
+}
+
+/* Sidebar */
+[data-theme='dark'] .menu {
+  background-color: #0f172a;
+}
+
+/* Tables */
+[data-theme='dark'] table {
+  --ifm-table-stripe-background: #1e293b;
+}
+
+[data-theme='dark'] th {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] td {
+  border-color: #334155;
+}
+
+/* Admonitions */
+[data-theme='dark'] .alert {
+  border-left-width: 3px;
+}
+
+/* Scrollbar */
+[data-theme='dark'] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Search */
+[data-theme='dark'] .aa-DetachedSearchButton {
+  background-color: #1e293b;
+  border-color: #334155;
+}

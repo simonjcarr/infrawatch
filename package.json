@@ -17,5 +17,10 @@
   },
   "devDependencies": {
     "turbo": "^2.8.21"
+  },
+  "pnpm": {
+    "overrides": {
+      "webpack": "5.99.0"
+    }
   }
 }

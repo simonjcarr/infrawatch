@@ -357,6 +357,23 @@ pnpm run db:migrate    # applies it to the local/dev database
 
 ---
 
+## Documentation Rules
+
+The public documentation site lives in `apps/docs/docs/`. It is hosted on GitHub Pages and auto-deployed on push to `main`.
+
+**Rule: update the docs in the same branch/PR as any feature change.**
+
+- Adding a new feature → create or update the relevant page in `apps/docs/docs/features/`
+- Changing how an existing feature works → update the affected page
+- Adding a new deployment option or config variable → update the relevant page in `apps/docs/docs/deployment/` or `apps/docs/docs/getting-started/`
+- Architecture changes → update `apps/docs/docs/architecture/`
+
+Do not wait until "later" to update the docs. If you implement a feature without updating the docs, the docs are wrong.
+
+The `apps/docs/docs/` directory structure mirrors the sidebar in `apps/docs/sidebars.ts`. If you add a new page, also add it to `sidebars.ts`.
+
+---
+
 ## Code Quality Rules
 
 - TypeScript strict mode — no `any`, no `@ts-ignore` without explanation

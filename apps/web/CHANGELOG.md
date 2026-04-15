@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.36.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.36.1...web/v0.36.2) (2026-04-15)
+
+
+### Bug Fixes
+
+* **reports:** sliding window rate limit (3/10s), errors in modal ([54001af](https://github.com/simonjcarr/infrawatch/commit/54001af9fe08ebbffe913c5872c687084a8d5de4))
+* **reports:** sliding window rate limit (3/10s), fix error message, show errors in modal ([52d2c1d](https://github.com/simonjcarr/infrawatch/commit/52d2c1d7cd25c88ec0f2ca0851a8a608d1c85589))
+
 ## [0.36.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.36.0...web/v0.36.1) (2026-04-15)
 
 

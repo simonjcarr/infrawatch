@@ -47,7 +47,7 @@ func main() {
 	slog.Info("database connected")
 
 	// Set up JWT issuer
-	issuer, err := auth.NewJWTIssuer(cfg.JWT.KeyFile, cfg.JWT.Issuer, cfg.JWT.TokenTTL)
+	issuer, err := auth.NewJWTIssuer(pool, cfg.JWT.KeyFile, cfg.JWT.Issuer, cfg.JWT.TokenTTL)
 	if err != nil {
 		slog.Error("initialising JWT issuer", "err", err)
 		os.Exit(1)

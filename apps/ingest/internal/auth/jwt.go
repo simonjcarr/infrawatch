@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -13,7 +14,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/infrawatch/ingest/internal/db/queries"
 )
+
+const jwtKeyConfigKey = "jwt_private_key"
 
 // JWTIssuer handles JWT creation and the JWKS endpoint for agent authentication.
 type JWTIssuer struct {
@@ -23,8 +29,11 @@ type JWTIssuer struct {
 }
 
 // NewJWTIssuer loads or generates an RSA key pair and creates a JWTIssuer.
-func NewJWTIssuer(keyFile, issuer string, ttl time.Duration) (*JWTIssuer, error) {
-	key, err := loadOrGenerateKey(keyFile)
+// The key is persisted to keyFile as a fallback, but the database (pool) is
+// the primary store so the key survives volume resets between container restarts.
+// If pool is nil the file-only path is used (for tests / dev without a DB).
+func NewJWTIssuer(pool *pgxpool.Pool, keyFile, issuer string, ttl time.Duration) (*JWTIssuer, error) {
+	key, err := loadOrGenerateKeyWithDB(context.Background(), pool, keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("loading JWT key: %w", err)
 	}
@@ -33,6 +42,59 @@ func NewJWTIssuer(keyFile, issuer string, ttl time.Duration) (*JWTIssuer, error)
 		issuer:     issuer,
 		tokenTTL:   ttl,
 	}, nil
+}
+
+// loadOrGenerateKeyWithDB tries to load the RSA key from the database first,
+// then from the key file, and generates a new one if neither exists.
+// Whenever a key is loaded from the file or generated fresh it is written back
+// to the database so future restarts survive volume loss.
+func loadOrGenerateKeyWithDB(ctx context.Context, pool *pgxpool.Pool, keyFile string) (*rsa.PrivateKey, error) {
+	// 1. Try database.
+	if pool != nil {
+		if pem, err := queries.GetSystemConfig(ctx, pool, jwtKeyConfigKey); err == nil {
+			key, err := parsePEMKey([]byte(pem))
+			if err == nil {
+				return key, nil
+			}
+			// Corrupted DB value — fall through to file/generate.
+		}
+	}
+
+	// 2. Try key file.
+	if _, err := os.Stat(keyFile); err == nil {
+		key, err := loadKey(keyFile)
+		if err == nil {
+			// Migrate the file key into the database.
+			if pool != nil {
+				_ = queries.UpsertSystemConfig(ctx, pool, jwtKeyConfigKey, marshalKeyToPEM(key))
+			}
+			return key, nil
+		}
+	}
+
+	// 3. Generate a new key.
+	key, err := generateKey(keyFile)
+	if err != nil {
+		return nil, err
+	}
+	if pool != nil {
+		_ = queries.UpsertSystemConfig(ctx, pool, jwtKeyConfigKey, marshalKeyToPEM(key))
+	}
+	return key, nil
+}
+
+func parsePEMKey(data []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found")
+	}
+	return x509.ParsePKCS1PrivateKey(block.Bytes)
+}
+
+func marshalKeyToPEM(key *rsa.PrivateKey) string {
+	keyBytes := x509.MarshalPKCS1PrivateKey(key)
+	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes}
+	return string(pem.EncodeToMemory(block))
 }
 
 // IssueAgentToken creates a signed JWT for an active agent.

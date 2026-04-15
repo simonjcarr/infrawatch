@@ -211,6 +211,13 @@
       "when": 1776171978830,
       "tag": "0029_heavy_pepper_potts",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776245447976,
+      "tag": "0030_white_green_goblin",
+      "breakpoints": true
     }
   ]
 }

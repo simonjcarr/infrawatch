@@ -175,3 +175,12 @@
   fill: var(--muted);
   stroke: var(--border);
 }
+
+/* ── React Flow animated edge — flowing dash keyframe ────────────────────────── */
+/* Drives the stroke-dashoffset animation on the dashed bezier edges.
+   dasharray: 6 4 → total pattern = 10 → animate from 10 → 0 for
+   source-to-target flow. Duration is set per-element (default 10s). */
+@keyframes rf-dash-flow {
+  from { stroke-dashoffset: 10; }
+  to   { stroke-dashoffset: 0; }
+}

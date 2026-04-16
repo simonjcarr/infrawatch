@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.37.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.36.2...web/v0.37.0) (2026-04-16)
+
+
+### Features
+
+* add network management with CIDR-based auto-assignment ([2be6169](https://github.com/simonjcarr/infrawatch/commit/2be6169160455ebdc122fb72b87c59e1e2a288f4))
+* add network management with CIDR-based auto-assignment ([0550654](https://github.com/simonjcarr/infrawatch/commit/05506543b9195f176d4634661545893410d003fa))
+
 ## [0.36.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.36.1...web/v0.36.2) (2026-04-15)
 
 

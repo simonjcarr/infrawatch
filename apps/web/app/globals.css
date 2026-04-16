@@ -176,6 +176,15 @@
   stroke: var(--border);
 }
 
+/* ── React Flow host node pointer-events fix ─────────────────────────────────── */
+/* xyflow sets pointer-events:none on all nodes when nodesDraggable, nodesConnectable,
+   and elementsSelectable are all false. This overrides that for host nodes so
+   right-click (onNodeContextMenu) and cursor work correctly. */
+.react-flow__node-hostNode {
+  pointer-events: all !important;
+  cursor: default !important;
+}
+
 /* ── React Flow animated edge — flowing dash keyframe ────────────────────────── */
 /* Drives the stroke-dashoffset animation on the dashed bezier edges.
    dasharray: 6 4 → total pattern = 10 → animate from 10 → 0 for

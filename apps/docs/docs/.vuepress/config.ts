@@ -90,6 +90,13 @@ export default defineUserConfig({
           placeholder: 'Search documentation...',
         },
       },
+      getExtraFields: (page) => {
+        const content = page.contentRendered
+          .replace(/<[^>]+>/g, ' ')  // strip HTML tags
+          .replace(/\s+/g, ' ')       // collapse whitespace
+          .trim()
+        return content ? [content] : []
+      },
     }),
   ],
 })

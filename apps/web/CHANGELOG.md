@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.41.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.40.0...web/v0.41.0) (2026-04-16)
+
+
+### Features
+
+* add right-click context menu to network graph host nodes ([eb8dfdf](https://github.com/simonjcarr/infrawatch/commit/eb8dfdfe01fdc80bd8b63016f05fdb6ebb87c5f7))
+* add right-click context menu to network graph host nodes ([d7a2fa8](https://github.com/simonjcarr/infrawatch/commit/d7a2fa883a38cfe7e4996c0430402371d4ad124d))
+
 ## [0.40.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.39.0...web/v0.40.0) (2026-04-16)
 
 

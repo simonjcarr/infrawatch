@@ -7,7 +7,11 @@ Infrawatch is a monorepo composed of several independently deployable services. 
 ## System Diagram
 
 
-<img alt="image" src="https://github.com/user-attachments/assets/c242cb2d-acf6-491e-9ef0-eaafe839a3d3" />
+<img
+  style="max-width: 100%; height: auto; display: block;"
+  alt="System Diagram"
+  src="https://github.com/user-attachments/assets/c242cb2d-acf6-491e-9ef0-eaafe839a3d3"
+/>
 
 
 ---

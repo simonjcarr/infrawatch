@@ -1,14 +1,14 @@
 'use client'
 
 import { memo } from 'react'
-import { getSmoothStepPath, type EdgeProps } from '@xyflow/react'
+import { getBezierPath, type EdgeProps } from '@xyflow/react'
 
-function dotColor(status: string | undefined): string {
-  if (status === 'online') return '#22c55e'   // green-500
-  if (status === 'offline') return '#ef4444'  // red-500
-  return '#94a3b8'                             // slate-400
-}
-
+/**
+ * Dashed bezier edge with a slow flowing stroke-dashoffset animation —
+ * matching the React Flow homepage aesthetic.
+ *
+ * The keyframe `rf-dash-flow` is defined in globals.css.
+ */
 export const AnimatedFlowEdge = memo(function AnimatedFlowEdge({
   sourceX,
   sourceY,
@@ -16,11 +16,8 @@ export const AnimatedFlowEdge = memo(function AnimatedFlowEdge({
   targetY,
   sourcePosition,
   targetPosition,
-  data,
 }: EdgeProps) {
-  const status = (data as { hostStatus?: string } | undefined)?.hostStatus
-
-  const [edgePath] = getSmoothStepPath({
+  const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -29,26 +26,30 @@ export const AnimatedFlowEdge = memo(function AnimatedFlowEdge({
     targetPosition,
   })
 
-  const color = dotColor(status)
-
   return (
     <>
-      {/* Edge line — use muted-foreground which is visible in both light and dark mode */}
+      {/* Very subtle base line so the edge is visible even when zoomed out */}
       <path
         d={edgePath}
         fill="none"
-        stroke="hsl(var(--muted-foreground))"
+        stroke="var(--muted-foreground)"
         strokeWidth={1.5}
-        opacity={0.35}
+        opacity={0.15}
       />
-      {/* Leading dot */}
-      <circle r="4" fill={color}>
-        <animateMotion dur="2s" repeatCount="indefinite" begin="0s" path={edgePath} />
-      </circle>
-      {/* Trailing dot */}
-      <circle r="2.5" fill={color} opacity={0.5}>
-        <animateMotion dur="2s" repeatCount="indefinite" begin="0.7s" path={edgePath} />
-      </circle>
+
+      {/* Slowly flowing dashes — the main visual */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="var(--muted-foreground)"
+        strokeWidth={1.5}
+        strokeDasharray="6 4"
+        style={{ animation: 'rf-dash-flow 10s linear infinite', opacity: 0.55 }}
+      />
+
+      {/* Small dots at handle endpoints, like the React Flow homepage */}
+      <circle cx={sourceX} cy={sourceY} r={3} fill="var(--muted-foreground)" opacity={0.45} />
+      <circle cx={targetX} cy={targetY} r={3} fill="var(--muted-foreground)" opacity={0.45} />
     </>
   )
 })

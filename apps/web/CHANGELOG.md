@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.41.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.2...web/v0.41.3) (2026-04-16)
+
+
+### Bug Fixes
+
+* avoid setState-in-effect lint error in HostNodeTerminalDialog ([9e9f374](https://github.com/simonjcarr/infrawatch/commit/9e9f374725dc5fd4bb072e88a9b0368fb420e929))
+* move terminal dialog to parent to survive context menu unmount ([6696382](https://github.com/simonjcarr/infrawatch/commit/66963827013f517bba74d39ef8cf8f8c85fb1839))
+* Open Terminal from network graph context menu now works ([667f100](https://github.com/simonjcarr/infrawatch/commit/667f1002832bcacfea42cfbe9a95a4e11db2eddc))
+
 ## [0.41.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.1...web/v0.41.2) (2026-04-16)
 
 

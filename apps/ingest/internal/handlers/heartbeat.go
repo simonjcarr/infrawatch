@@ -326,6 +326,13 @@ func (h *HeartbeatHandler) processHeartbeat(
 		slog.Warn("updating host vitals", "err", err)
 	}
 
+	// Sync host↔network memberships based on current IP addresses.
+	if hostID != "" && len(ipAddresses) > 0 {
+		if err := queries.SyncHostNetworks(ctx, h.pool, orgID, hostID, ipAddresses); err != nil {
+			slog.Warn("syncing host network memberships", "host_id", hostID, "err", err)
+		}
+	}
+
 	// Persist metric history row
 	if err := queries.InsertHostMetricByAgentID(ctx, h.pool, orgID, agentID, now,
 		req.CpuPercent, req.MemoryPercent, req.DiskPercent, req.UptimeSeconds,

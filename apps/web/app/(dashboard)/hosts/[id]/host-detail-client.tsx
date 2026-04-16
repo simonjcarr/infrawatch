@@ -17,6 +17,8 @@ import {
   Trash2,
   Loader2,
   Layers,
+  Zap,
+  User,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -67,11 +69,13 @@ import { getAlertInstances } from '@/lib/actions/alerts'
 import { getHostCollectionSettings } from '@/lib/actions/host-settings'
 import { getServiceAccounts } from '@/lib/actions/service-accounts'
 import { listGroupsForHost, listGroups, addHostToGroup, removeHostFromGroup } from '@/lib/actions/host-groups'
+import { listNetworksForHost, listNetworks, addHostToNetwork, removeHostFromNetwork } from '@/lib/actions/networks'
 import type { HostGroup } from '@/lib/db/schema'
 import type { HostGroupWithCount } from '@/lib/actions/host-groups'
+import type { NetworkWithMembership, NetworkWithCount } from '@/lib/actions/networks'
 
 type ParentTabId = 'overview' | 'monitoring' | 'infrastructure' | 'inventory' | 'management' | 'tools'
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'tasks' | 'terminal' | 'packages'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'host-networks' | 'tasks' | 'terminal' | 'packages'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -83,6 +87,7 @@ const TAB_LABELS: Record<Tab, string> = {
   users: 'Users',
   settings: 'Settings',
   groups: 'Groups',
+  'host-networks': 'Networks',
   tasks: 'Tasks',
   terminal: 'Terminal',
   packages: 'Packages',
@@ -98,7 +103,7 @@ const PARENT_TABS: Array<{
   { id: 'monitoring', label: 'Monitoring', defaultTab: 'metrics', children: ['metrics', 'checks', 'alerts'] },
   { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network'] },
   { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages'] },
-  { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'settings'] },
+  { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'host-networks', 'settings'] },
   { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'terminal'] },
 ]
 
@@ -231,6 +236,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
   const [uninstallAgent, setUninstallAgent] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [addGroupOpen, setAddGroupOpen] = useState(false)
+  const [addNetworkOpen, setAddNetworkOpen] = useState(false)
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -370,6 +376,35 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', orgId, initialHost.id] })
       queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+    },
+  })
+
+  const { data: hostNetworksList = [] } = useQuery<NetworkWithMembership[]>({
+    queryKey: ['networks-for-host', orgId, initialHost.id],
+    queryFn: () => listNetworksForHost(orgId, initialHost.id),
+    enabled: activeTab === 'host-networks',
+  })
+
+  const { data: allNetworks = [] } = useQuery<NetworkWithCount[]>({
+    queryKey: ['networks', orgId],
+    queryFn: () => listNetworks(orgId),
+    enabled: activeTab === 'host-networks',
+  })
+
+  const { mutate: doAddToNetwork, isPending: isAddingToNetwork } = useMutation({
+    mutationFn: (networkId: string) => addHostToNetwork(orgId, networkId, initialHost.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['networks-for-host', orgId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+      setAddNetworkOpen(false)
+    },
+  })
+
+  const { mutate: doRemoveFromNetwork, isPending: isRemovingFromNetwork } = useMutation({
+    mutationFn: (networkId: string) => removeHostFromNetwork(orgId, networkId, initialHost.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['networks-for-host', orgId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
     },
   })
 
@@ -897,6 +932,114 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
                           onClick={() => doAddToGroup(group.id)}
                         >
                           {isAddingToGroup ? <Loader2 className="size-3.5 animate-spin" /> : 'Add'}
+                        </Button>
+                      </div>
+                    ))
+                )}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Close</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
+
+      {/* Host Networks Tab */}
+      {activeTab === 'host-networks' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Networks this host belongs to.
+            </p>
+            <Button size="sm" onClick={() => setAddNetworkOpen(true)} disabled={allNetworks.length === hostNetworksList.length}>
+              <Network className="size-4 mr-1" />
+              Add to Network
+            </Button>
+          </div>
+          {hostNetworksList.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-12 text-center">
+              <Network className="size-8 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm font-medium text-foreground">Not in any networks</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                This host will be automatically added to a network when its IP matches a defined CIDR.
+              </p>
+              <Button className="mt-4" size="sm" onClick={() => setAddNetworkOpen(true)}>
+                <Network className="size-4 mr-1" />
+                Add to Network
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-lg border divide-y">
+              {hostNetworksList.map((network) => (
+                <div key={network.id} className="flex items-center gap-3 px-4 py-3">
+                  <Network className="size-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/hosts/networks/${network.id}`}
+                      className="font-medium text-foreground hover:underline"
+                    >
+                      {network.name}
+                    </Link>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <code className="text-xs font-mono text-muted-foreground">{network.cidr}</code>
+                      {network.autoAssigned ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Zap className="size-3" />
+                          Auto
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <User className="size-3" />
+                          Manual
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-destructive hover:text-destructive shrink-0"
+                    disabled={isRemovingFromNetwork}
+                    onClick={() => doRemoveFromNetwork(network.id)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add to Network Dialog */}
+          <AlertDialog open={addNetworkOpen} onOpenChange={setAddNetworkOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Add to Network</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Select a network to add this host to.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="divide-y rounded-lg border max-h-64 overflow-y-auto">
+                {allNetworks.filter((n) => !hostNetworksList.some((hn) => hn.id === n.id)).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    This host is already in all available networks.
+                  </p>
+                ) : (
+                  allNetworks
+                    .filter((n) => !hostNetworksList.some((hn) => hn.id === n.id))
+                    .map((network) => (
+                      <div key={network.id} className="flex items-center justify-between px-3 py-2.5">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{network.name}</p>
+                          <code className="text-xs font-mono text-muted-foreground">{network.cidr}</code>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isAddingToNetwork}
+                          onClick={() => doAddToNetwork(network.id)}
+                        >
+                          {isAddingToNetwork ? <Loader2 className="size-3.5 animate-spin" /> : 'Add'}
                         </Button>
                       </div>
                     ))

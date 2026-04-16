@@ -62,6 +62,7 @@ export default defineUserConfig({
         children: [
           '/features/hosts.md',
           '/features/host-groups.md',
+          '/features/networks.md',
           '/features/monitoring.md',
           '/features/certificates.md',
           '/features/alerts.md',

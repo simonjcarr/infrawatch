@@ -19,6 +19,7 @@ import {
   Layers,
   Terminal,
   FileBarChart,
+  Network,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -66,6 +67,7 @@ const primaryNav: NavItem[] = [
     children: [
       { title: 'All Hosts', href: '/hosts', icon: Server },
       { title: 'Groups', href: '/hosts/groups', icon: Layers },
+      { title: 'Networks', href: '/hosts/networks', icon: Network },
     ],
   },
   { title: 'Checks & Alerts', href: '/alerts', icon: Bell },

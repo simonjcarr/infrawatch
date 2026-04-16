@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.40.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.39.0...web/v0.40.0) (2026-04-16)
+
+
+### Features
+
+* replace moving circles with subtle dashed bezier edge animation ([e219ea7](https://github.com/simonjcarr/infrawatch/commit/e219ea752f07aeed0ea21cbc479b62660e14958a))
+* subtle dashed bezier edges on network graphs ([ee56359](https://github.com/simonjcarr/infrawatch/commit/ee563595ef1c4f098577953dd72ffbc6297f7992))
+
 ## [0.39.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.38.0...web/v0.39.0) (2026-04-16)
 
 

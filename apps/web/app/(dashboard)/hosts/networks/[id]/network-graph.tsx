@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import {
   ReactFlow,
   Background,
@@ -9,13 +9,16 @@ import {
   MiniMap,
   type Node,
   type Edge,
+  type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
   NetworkNodeComponent,
   HostNodeComponent,
+  type HostNodeData,
 } from '../components/network-flow-nodes'
 import { AnimatedFlowEdge } from '../components/animated-flow-edge'
+import { HostNodeContextMenu } from '../components/host-node-context-menu'
 import type { Network as NetworkType, Host } from '@/lib/db/schema'
 
 const nodeTypes = {
@@ -75,6 +78,7 @@ function computeLayout(
     nodes.push({
       id: `host-${host.id}`,
       type: 'hostNode',
+      className: 'cursor-default',
       position: {
         x: rowStartX + col * (HOST_W + HOST_COL_GAP),
         y: NETWORK_H + NETWORK_HOST_GAP + row * (HOST_H + HOST_ROW_GAP),
@@ -100,16 +104,32 @@ function computeLayout(
   return { nodes, edges }
 }
 
+interface ContextMenuState {
+  x: number
+  y: number
+  data: HostNodeData
+}
+
 export function NetworkGraph({ network, hosts }: Props) {
   const { nodes, edges } = useMemo(
     () => computeLayout(network, hosts),
     [network, hosts],
   )
 
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
   const graphKey = `${network.id}-${hosts
     .map((h) => h.id)
     .sort()
     .join(',')}`
+
+  const handleNodeContextMenu: NodeMouseHandler = useCallback((e, node) => {
+    if (node.type !== 'hostNode') return
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, data: node.data as HostNodeData })
+  }, [])
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
   return (
     <div className="w-full h-[520px] rounded-lg border overflow-hidden">
@@ -122,6 +142,9 @@ export function NetworkGraph({ network, hosts }: Props) {
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
+        onNodeContextMenu={handleNodeContextMenu}
+        onPaneClick={closeContextMenu}
+        onMoveStart={closeContextMenu}
         fitView
         fitViewOptions={{ padding: 0.15 }}
       >
@@ -134,6 +157,15 @@ export function NetworkGraph({ network, hosts }: Props) {
         <Controls />
         <MiniMap nodeStrokeWidth={3} />
       </ReactFlow>
+
+      {contextMenu && (
+        <HostNodeContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          data={contextMenu.data}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   )
 }

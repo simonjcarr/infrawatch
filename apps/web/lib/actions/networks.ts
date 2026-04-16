@@ -281,6 +281,44 @@ export async function listMembershipsForNetwork(
   return rows
 }
 
+export type NetworkWithHosts = Network & { hosts: Host[] }
+
+export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithHosts[]> {
+  const networkRows = await db.query.networks.findMany({
+    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
+    orderBy: (n, { asc }) => [asc(n.name)],
+  })
+
+  if (networkRows.length === 0) return []
+
+  const memberships = await db
+    .select({
+      networkId: hostNetworkMemberships.networkId,
+      host: hosts,
+    })
+    .from(hostNetworkMemberships)
+    .innerJoin(hosts, eq(hostNetworkMemberships.hostId, hosts.id))
+    .where(
+      and(
+        eq(hostNetworkMemberships.organisationId, orgId),
+        isNull(hostNetworkMemberships.deletedAt),
+        isNull(hosts.deletedAt),
+      ),
+    )
+
+  const hostsByNetwork = new Map<string, Host[]>()
+  memberships.forEach(({ networkId, host }) => {
+    const arr = hostsByNetwork.get(networkId) ?? []
+    arr.push(host)
+    hostsByNetwork.set(networkId, arr)
+  })
+
+  return networkRows.map((network) => ({
+    ...network,
+    hosts: hostsByNetwork.get(network.id) ?? [],
+  }))
+}
+
 export async function listNetworksForHost(orgId: string, hostId: string): Promise<NetworkWithMembership[]> {
   const members = await db.query.hostNetworkMemberships.findMany({
     where: and(

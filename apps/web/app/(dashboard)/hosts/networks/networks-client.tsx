@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { formatDistanceToNow } from 'date-fns'
-import { Plus, Pencil, Trash2, Loader2, Network, Server } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Network, Server, LayoutGrid, GitBranch } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +41,9 @@ import {
   createNetwork,
   updateNetwork,
   deleteNetwork,
+  listNetworksWithHosts,
 } from '@/lib/actions/networks'
+import { AllNetworksGraph } from './all-networks-graph'
 import type { NetworkWithCount } from '@/lib/actions/networks'
 
 const networkSchema = z.object({
@@ -130,6 +132,7 @@ function NetworkForm({
 
 export function NetworksClient({ orgId, initialNetworks }: Props) {
   const queryClient = useQueryClient()
+  const [viewMode, setViewMode] = useState<'table' | 'graph'>('table')
   const [createOpen, setCreateOpen] = useState(false)
   const [editNetwork, setEditNetwork] = useState<NetworkWithCount | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<NetworkWithCount | null>(null)
@@ -138,6 +141,12 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
     queryKey: ['networks', orgId],
     queryFn: () => listNetworks(orgId),
     initialData: initialNetworks,
+  })
+
+  const { data: networksWithHosts = [] } = useQuery({
+    queryKey: ['networks-with-hosts', orgId],
+    queryFn: () => listNetworksWithHosts(orgId),
+    enabled: viewMode === 'graph',
   })
 
   const { mutate: doCreate, isPending: isCreating } = useMutation({
@@ -189,14 +198,42 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
             </p>
           </div>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="size-4 mr-1" />
-          New Network
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex gap-0.5 rounded-md border p-0.5">
+            <Button
+              size="sm"
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              className="h-7 px-2 text-xs"
+              onClick={() => setViewMode('table')}
+            >
+              <LayoutGrid className="size-3.5 mr-1" />
+              Table
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'graph' ? 'secondary' : 'ghost'}
+              className="h-7 px-2 text-xs"
+              onClick={() => setViewMode('graph')}
+            >
+              <GitBranch className="size-3.5 mr-1" />
+              Graph
+            </Button>
+          </div>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="size-4 mr-1" />
+            New Network
+          </Button>
+        </div>
       </div>
 
+      {/* Graph view */}
+      {viewMode === 'graph' && (
+        <AllNetworksGraph networksWithHosts={networksWithHosts} />
+      )}
+
       {/* Table */}
-      {networkList.length === 0 ? (
+      {viewMode === 'table' && (networkList.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <Network className="size-8 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-medium text-foreground">No networks yet</p>
@@ -274,7 +311,7 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
             </TableBody>
           </Table>
         </div>
-      )}
+      ))}
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

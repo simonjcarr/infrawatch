@@ -16,6 +16,8 @@ import {
   Network,
   Zap,
   User,
+  LayoutGrid,
+  GitBranch,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -58,6 +60,7 @@ import {
   listMembershipsForNetwork,
 } from '@/lib/actions/networks'
 import { listHosts } from '@/lib/actions/agents'
+import { NetworkGraph } from './network-graph'
 import type { HostWithAgent } from '@/lib/actions/agents'
 import type { Network as NetworkType, Host } from '@/lib/db/schema'
 
@@ -77,6 +80,7 @@ function HostStatusIcon({ status }: { status: string }) {
 
 export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: Props) {
   const queryClient = useQueryClient()
+  const [viewMode, setViewMode] = useState<'table' | 'graph'>('table')
   const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Host | null>(null)
@@ -157,105 +161,135 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
               </div>
             </div>
           </div>
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="size-4 mr-1" />
-            Add Host
-          </Button>
-        </div>
-
-        {/* Members table */}
-        {network.members.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <Server className="size-8 mx-auto text-muted-foreground mb-3" />
-            <p className="text-sm font-medium text-foreground">No hosts in this network</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Hosts are added automatically when their IP falls within{' '}
-              <code className="font-mono">{network.cidr}</code>, or you can add them manually.
-            </p>
-            <Button className="mt-4" onClick={() => setAddOpen(true)}>
+          <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex gap-0.5 rounded-md border p-0.5">
+              <Button
+                size="sm"
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                className="h-7 px-2 text-xs"
+                onClick={() => setViewMode('table')}
+              >
+                <LayoutGrid className="size-3.5 mr-1" />
+                Table
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'graph' ? 'secondary' : 'ghost'}
+                className="h-7 px-2 text-xs"
+                onClick={() => setViewMode('graph')}
+              >
+                <GitBranch className="size-3.5 mr-1" />
+                Graph
+              </Button>
+            </div>
+            <Button onClick={() => setAddOpen(true)}>
               <Plus className="size-4 mr-1" />
               Add Host
             </Button>
           </div>
-        ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Host</TableHead>
-                  <TableHead>IP Addresses</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assignment</TableHead>
-                  <TableHead>Added</TableHead>
-                  <TableHead className="w-16" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {network.members.map((host) => {
-                  const isAuto = autoAssignedMap.get(host.id) ?? false
-                  return (
-                    <TableRow key={host.id}>
-                      <TableCell>
-                        <Link
-                          href={`/hosts/${host.id}`}
-                          className="font-medium text-foreground hover:underline"
-                        >
-                          {host.displayName ?? host.hostname ?? host.id}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {(host.ipAddresses as string[] | null)?.join(', ') ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-1.5 text-sm">
-                          <HostStatusIcon status={host.status ?? 'unknown'} />
-                          <span className="capitalize text-muted-foreground">
-                            {host.status ?? 'unknown'}
+        </div>
+
+        {/* Graph view */}
+        {viewMode === 'graph' && (
+          <NetworkGraph network={network} hosts={network.members} />
+        )}
+
+        {/* Table view */}
+        {viewMode === 'table' && (
+          network.members.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-12 text-center">
+              <Server className="size-8 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm font-medium text-foreground">No hosts in this network</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Hosts are added automatically when their IP falls within{' '}
+                <code className="font-mono">{network.cidr}</code>, or you can add them manually.
+              </p>
+              <Button className="mt-4" onClick={() => setAddOpen(true)}>
+                <Plus className="size-4 mr-1" />
+                Add Host
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Host</TableHead>
+                    <TableHead>IP Addresses</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Assignment</TableHead>
+                    <TableHead>Added</TableHead>
+                    <TableHead className="w-16" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {network.members.map((host) => {
+                    const isAuto = autoAssignedMap.get(host.id) ?? false
+                    return (
+                      <TableRow key={host.id}>
+                        <TableCell>
+                          <Link
+                            href={`/hosts/${host.id}`}
+                            className="font-medium text-foreground hover:underline"
+                          >
+                            {host.displayName ?? host.hostname ?? host.id}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {(host.ipAddresses as string[] | null)?.join(', ') ?? '—'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5 text-sm">
+                            <HostStatusIcon status={host.status ?? 'unknown'} />
+                            <span className="capitalize text-muted-foreground">
+                              {host.status ?? 'unknown'}
+                            </span>
                           </span>
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {isAuto ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="secondary" className="gap-1 text-xs cursor-default">
-                                <Zap className="size-3" />
-                                Auto
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs text-xs">
-                                Auto-assigned based on IP match. Will be re-added on the next
-                                heartbeat if the IP still falls within the CIDR.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <Badge variant="outline" className="gap-1 text-xs">
-                            <User className="size-3" />
-                            Manual
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(host.createdAt), { addSuffix: true })}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-destructive hover:text-destructive"
-                          onClick={() => setRemoveTarget(host)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                        </TableCell>
+                        <TableCell>
+                          {isAuto ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="secondary" className="gap-1 text-xs cursor-default">
+                                  <Zap className="size-3" />
+                                  Auto
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs text-xs">
+                                  Auto-assigned based on IP match. Will be re-added on the next
+                                  heartbeat if the IP still falls within the CIDR.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <User className="size-3" />
+                              Manual
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(host.createdAt), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-destructive hover:text-destructive"
+                            onClick={() => setRemoveTarget(host)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )
         )}
 
         {/* Add Host Dialog */}

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.38.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.37.0...web/v0.38.0) (2026-04-16)
+
+
+### Features
+
+* add network topology graph visualizations ([9543b4b](https://github.com/simonjcarr/infrawatch/commit/9543b4b9bd8aadf69c57e05b1fb0fbe2a29590c9))
+* add network topology graph visualizations ([e42213e](https://github.com/simonjcarr/infrawatch/commit/e42213e3e5d5efcbaf8d50238dcc52764ecb7880))
+
 ## [0.37.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.36.2...web/v0.37.0) (2026-04-16)
 
 

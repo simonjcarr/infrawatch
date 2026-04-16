@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.41.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.1...web/v0.41.2) (2026-04-16)
+
+
+### Bug Fixes
+
+* restore pointer-events on host nodes for context menu to work ([a16c20a](https://github.com/simonjcarr/infrawatch/commit/a16c20ab10d03fd6a8ed0b86a3b6968e04b507e2))
+* restore pointer-events on host nodes so right-click context menu works ([ac14b8e](https://github.com/simonjcarr/infrawatch/commit/ac14b8ea42a3545f064cd110293587c57aca4188))
+
 ## [0.41.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.0...web/v0.41.1) (2026-04-16)
 
 

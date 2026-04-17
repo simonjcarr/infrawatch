@@ -301,11 +301,16 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
   const [state, setState] = useState<TerminalPanelState>(DEFAULT_STATE)
   const [hasHydrated, setHasHydrated] = useState(false)
 
+  // Hydrating from sessionStorage after mount is the canonical pattern for
+  // avoiding SSR/CSR mismatch; hasHydrated flips once to gate the persistence
+  // effect below.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const persisted = loadPersistedState()
     if (persisted) setState(persisted)
     setHasHydrated(true)
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!hasHydrated) return

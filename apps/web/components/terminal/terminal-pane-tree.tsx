@@ -15,6 +15,7 @@ interface PaneTreeProps {
   binding: TerminalSessionBinding
   isVisible: boolean
   activePaneId: string
+  fontSize: number
   onSessionStatusChange: (paneId: string, status: TerminalSessionStatus) => void
   onFocusPane: (paneId: string) => void
   onSplitPane: (paneId: string, direction: 'row' | 'column') => void
@@ -39,6 +40,7 @@ function PaneLeaf({
   binding,
   isVisible,
   activePaneId,
+  fontSize,
   onSessionStatusChange,
   onFocusPane,
   onSplitPane,
@@ -57,6 +59,7 @@ function PaneLeaf({
         binding={binding}
         isVisible={isVisible}
         isFocused={isActive}
+        fontSize={fontSize}
         onStatusChange={onSessionStatusChange}
         onFocus={() => onFocusPane(node.id)}
       />

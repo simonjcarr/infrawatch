@@ -11,6 +11,7 @@ interface Props {
   binding: TerminalSessionBinding
   isVisible: boolean
   isFocused: boolean
+  fontSize: number
   onStatusChange?: (paneId: string, status: TerminalSessionStatus) => void
   onFocus?: () => void
 }
@@ -20,6 +21,7 @@ export function TerminalSession({
   binding,
   isVisible,
   isFocused,
+  fontSize,
   onStatusChange,
   onFocus,
 }: Props) {
@@ -30,6 +32,9 @@ export function TerminalSession({
   const connectionCleanupRef = useRef<(() => void) | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const hasInitializedRef = useRef(false)
+  // Hold the latest font size so the init effect doesn't need it in its deps.
+  const fontSizeRef = useRef(fontSize)
+  fontSizeRef.current = fontSize
 
   const updateStatus = useCallback(
     (s: TerminalSessionStatus) => {
@@ -64,6 +69,26 @@ export function TerminalSession({
     }
   }, [isFocused, isVisible])
 
+  // Apply font-size changes to a live terminal instance and re-fit.
+  useEffect(() => {
+    if (!termRef.current) return
+    const term = termRef.current as { options: { fontSize?: number } }
+    if (term.options.fontSize === fontSize) return
+    try {
+      term.options.fontSize = fontSize
+      const fit = fitRef.current as { fit: () => void } | null
+      requestAnimationFrame(() => {
+        try {
+          fit?.fit()
+        } catch {
+          // ignore
+        }
+      })
+    } catch {
+      // ignore
+    }
+  }, [fontSize])
+
   // Initialize terminal and start first connection
   useEffect(() => {
     if (hasInitializedRef.current) return
@@ -86,7 +111,7 @@ export function TerminalSession({
       const term = new Terminal({
         cursorBlink: true,
         fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-        fontSize: 13,
+        fontSize: fontSizeRef.current,
         theme: {
           background: '#09090b',
           foreground: '#e4e4e7',

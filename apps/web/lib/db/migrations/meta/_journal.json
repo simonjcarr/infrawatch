@@ -225,6 +225,13 @@
       "when": 1776353140773,
       "tag": "0031_salty_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1776416112233,
+      "tag": "0032_tranquil_rattler",
+      "breakpoints": true
     }
   ]
 }

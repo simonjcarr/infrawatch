@@ -1,9 +1,7 @@
-import { pgTable, text, timestamp, jsonb, boolean, uniqueIndex, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
-import { ldapConfigurations } from './ldap-configurations'
 
-export type DomainAccountSource = 'ldap' | 'active_directory' | 'manual'
 export type DomainAccountStatus = 'active' | 'disabled' | 'locked' | 'expired'
 
 export const domainAccounts = pgTable('domain_accounts', {
@@ -14,25 +12,14 @@ export const domainAccounts = pgTable('domain_accounts', {
   username: text('username').notNull(),
   displayName: text('display_name'),
   email: text('email'),
-  source: text('source').notNull().$type<DomainAccountSource>().default('manual'),
-  ldapConfigurationId: text('ldap_configuration_id')
-    .references(() => ldapConfigurations.id),
-  distinguishedName: text('distinguished_name'),
-  samAccountName: text('sam_account_name'),
-  userPrincipalName: text('user_principal_name'),
-  groups: jsonb('groups').$type<string[]>(),
   status: text('status').notNull().$type<DomainAccountStatus>().default('active'),
-  accountLocked: boolean('account_locked').notNull().default(false),
   passwordExpiresAt: timestamp('password_expires_at', { withTimezone: true }),
-  passwordLastChangedAt: timestamp('password_last_changed_at', { withTimezone: true }),
-  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   metadata: jsonb('metadata'),
 }, (t) => [
-  uniqueIndex('domain_accounts_org_source_username_idx').on(t.organisationId, t.source, t.username),
+  uniqueIndex('domain_accounts_org_username_idx').on(t.organisationId, t.username),
   index('domain_accounts_org_status_idx').on(t.organisationId, t.status),
-  index('domain_accounts_org_source_idx').on(t.organisationId, t.source),
 ])
 
 export type DomainAccount = typeof domainAccounts.$inferSelect

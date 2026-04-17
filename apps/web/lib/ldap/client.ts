@@ -205,6 +205,93 @@ function parsePasswordLastChanged(entry: Record<string, unknown>): { passwordLas
   return { passwordLastChangedAt: null }
 }
 
+// Attributes we already surface in typed fields — excluded from the rawAttributes
+// map so the "all attributes" table isn't duplicated
+const SUMMARY_ATTRIBUTES = new Set([
+  'memberof',
+  'userpassword',
+  'unicodepwd',
+  'dbcspwd',
+  'lmpwdhistory',
+  'ntpwdhistory',
+  'supplementalcredentials',
+])
+
+function normaliseAttributeValue(value: unknown): string | string[] | null {
+  if (value == null) return null
+  if (Buffer.isBuffer(value)) {
+    // Binary values — represent as base64 so the UI can still display them
+    return `[binary ${value.length}B]`
+  }
+  if (Array.isArray(value)) {
+    const mapped = value
+      .map((v) => {
+        if (v == null) return null
+        if (Buffer.isBuffer(v)) return `[binary ${v.length}B]`
+        return String(v)
+      })
+      .filter((v): v is string => v !== null)
+    return mapped.length === 0 ? null : mapped
+  }
+  return String(value)
+}
+
+export interface LdapUserDetail extends LdapUser {
+  rawAttributes: Record<string, string | string[]>
+}
+
+export async function lookupUserByDn(
+  config: LdapConfiguration,
+  dn: string,
+): Promise<LdapUserDetail | null> {
+  let client: Client | undefined
+  try {
+    client = await connectAndBind(config, config.bindDn, getBindPassword(config))
+
+    const { searchEntries } = await client.search(dn, {
+      filter: '(objectClass=*)',
+      scope: 'base',
+      // '*' returns all user attributes, '+' returns operational attributes
+      attributes: ['*', '+'],
+      sizeLimit: 1,
+    })
+
+    await client.unbind()
+
+    const entry = searchEntries[0]
+    if (!entry) return null
+
+    const raw: Record<string, string | string[]> = {}
+    for (const [key, value] of Object.entries(entry)) {
+      if (key === 'dn') continue
+      if (SUMMARY_ATTRIBUTES.has(key.toLowerCase())) continue
+      const normalised = normaliseAttributeValue(value)
+      if (normalised !== null) raw[key] = normalised
+    }
+
+    return {
+      dn: entry.dn,
+      username: String(entry[config.usernameAttribute] ?? ''),
+      email: entry[config.emailAttribute] ? String(entry[config.emailAttribute]) || null : null,
+      displayName: entry[config.displayNameAttribute] ? String(entry[config.displayNameAttribute]) || null : null,
+      groups: Array.isArray(entry.memberOf)
+        ? entry.memberOf.map(String)
+        : entry.memberOf
+          ? [String(entry.memberOf)]
+          : [],
+      samAccountName: entry.sAMAccountName ? String(entry.sAMAccountName) : undefined,
+      userPrincipalName: entry.userPrincipalName ? String(entry.userPrincipalName) : undefined,
+      ...parseAccountLockStatus(entry),
+      ...parsePasswordExpiry(entry),
+      ...parsePasswordLastChanged(entry),
+      rawAttributes: raw,
+    }
+  } catch (err) {
+    await client?.unbind().catch(() => {})
+    throw err
+  }
+}
+
 export async function authenticateUser(
   config: LdapConfiguration,
   username: string,

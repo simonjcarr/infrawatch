@@ -244,7 +244,7 @@ export function LdapSettingsClient({
         <div>
           <h1 className="text-2xl font-semibold text-foreground">LDAP / Directory</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure LDAP or Active Directory connections for domain login.
+            Configure LDAP or Active Directory connections for directory lookup and optional domain login.
           </p>
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

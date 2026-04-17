@@ -2,8 +2,6 @@ import { pgTable, text, timestamp, jsonb, integer, boolean } from 'drizzle-orm/p
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
 
-export type LdapSyncStatus = 'success' | 'error' | 'running'
-
 export const ldapConfigurations = pgTable('ldap_configurations', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   organisationId: text('organisation_id')
@@ -27,10 +25,6 @@ export const ldapConfigurations = pgTable('ldap_configurations', {
   displayNameAttribute: text('display_name_attribute').notNull().default('cn'),
   enabled: boolean('enabled').notNull().default(true),
   allowLogin: boolean('allow_login').notNull().default(false),
-  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
-  lastSyncStatus: text('last_sync_status').$type<LdapSyncStatus>(),
-  lastSyncError: text('last_sync_error'),
-  syncIntervalMinutes: integer('sync_interval_minutes').default(60),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

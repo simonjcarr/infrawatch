@@ -8,15 +8,11 @@ import {
   ArrowLeft,
   User,
   Mail,
-  FolderTree,
   Shield,
   Pencil,
   Trash2,
-  Lock,
   Clock,
   KeyRound,
-  CheckCircle,
-  XCircle,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -41,7 +37,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { updateDomainAccount, deleteDomainAccount } from '@/lib/actions/domain-accounts'
-import type { LdapConfigOption } from '@/lib/actions/domain-accounts'
 import type { DomainAccount, DomainAccountStatus } from '@/lib/db/schema'
 
 function StatusBadge({ status }: { status: DomainAccountStatus }) {
@@ -97,11 +92,9 @@ function InfoCard({
 export function ServiceAccountDetailClient({
   orgId,
   account,
-  ldapConfigs,
 }: {
   orgId: string
   account: DomainAccount
-  ldapConfigs: LdapConfigOption[]
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -111,24 +104,18 @@ export function ServiceAccountDetailClient({
     displayName: account.displayName ?? '',
     email: account.email ?? '',
     status: account.status as DomainAccountStatus,
-    ldapConfigurationId: account.ldapConfigurationId ?? null as string | null,
     passwordExpiresAt: account.passwordExpiresAt
       ? new Date(account.passwordExpiresAt).toISOString().split('T')[0]
       : '',
   })
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
-  const ldapConfigName = account.ldapConfigurationId
-    ? (ldapConfigs.find((c) => c.id === account.ldapConfigurationId)?.name ?? 'LDAP')
-    : null
-
   const updateMutation = useMutation({
     mutationFn: () => updateDomainAccount(orgId, account.id, {
       displayName: editForm.displayName,
       email: editForm.email,
       status: editForm.status,
-      ldapConfigurationId: editForm.ldapConfigurationId,
-      passwordExpiresAt: editForm.ldapConfigurationId ? null : (editForm.passwordExpiresAt || null),
+      passwordExpiresAt: editForm.passwordExpiresAt || null,
     }),
     onSuccess: (result) => {
       if ('error' in result) return
@@ -245,37 +232,16 @@ export function ServiceAccountDetailClient({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Directory Server</Label>
-              <Select
-                value={editForm.ldapConfigurationId ?? 'none'}
-                onValueChange={(v) => setEditForm({ ...editForm, ldapConfigurationId: v === 'none' ? null : v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (not on a directory)</SelectItem>
-                  {ldapConfigs.map((config) => (
-                    <SelectItem key={config.id} value={config.id}>
-                      {config.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Password Expiry Date</Label>
+              <Input
+                type="date"
+                value={editForm.passwordExpiresAt}
+                onChange={(e) => setEditForm({ ...editForm, passwordExpiresAt: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank if the password doesn&apos;t expire.
+              </p>
             </div>
-            {!editForm.ldapConfigurationId && (
-              <div className="space-y-1.5">
-                <Label>Password Expiry Date</Label>
-                <Input
-                  type="date"
-                  value={editForm.passwordExpiresAt}
-                  onChange={(e) => setEditForm({ ...editForm, passwordExpiresAt: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Leave blank if the password doesn&apos;t expire.
-                </p>
-              </div>
-            )}
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -293,98 +259,43 @@ export function ServiceAccountDetailClient({
       )}
 
       {/* Info cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <InfoCard label="Username" value={account.username} icon={User} />
         <InfoCard label="Email" value={account.email ?? '—'} icon={Mail} />
-        <InfoCard
-          label="Directory"
-          value={ldapConfigName ?? 'None'}
-          icon={FolderTree}
-        />
         <InfoCard label="Status" value={<StatusBadge status={account.status as DomainAccountStatus} />} icon={Shield} />
       </div>
 
-      {/* Security & Password */}
+      {/* Password expiry */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <KeyRound className="size-4" />
-            Security
+            Password
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <Lock className="size-3.5" />
-                Account Locked
-              </span>
-              <div className="flex items-center gap-1.5 mt-1 font-medium">
-                {account.accountLocked ? (
-                  <span className="text-red-600 flex items-center gap-1.5">
-                    <XCircle className="size-4" />
-                    Locked
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle className="size-4 text-green-600" />
-                    No
-                  </span>
-                )}
-              </div>
-            </div>
-            <div>
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <Clock className="size-3.5" />
-                Password Expires
-              </span>
-              <div className="mt-1 font-medium">
-                {account.passwordExpiresAt ? (
-                  (() => {
-                    const expiry = new Date(account.passwordExpiresAt)
-                    const isExpired = expiry < new Date()
-                    return (
-                      <span className={isExpired ? 'text-red-600' : ''}>
-                        {isExpired ? 'Expired ' : ''}
-                        {formatDistanceToNow(expiry, { addSuffix: true })}
-                      </span>
-                    )
-                  })()
-                ) : (
-                  <span className="text-muted-foreground">Never</span>
-                )}
-              </div>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Password Last Changed</span>
-              <div className="mt-1 font-medium">
-                {account.passwordLastChangedAt
-                  ? formatDistanceToNow(new Date(account.passwordLastChangedAt), { addSuffix: true })
-                  : <span className="text-muted-foreground">Unknown</span>
-                }
-              </div>
+          <div>
+            <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+              <Clock className="size-3.5" />
+              Password Expires
+            </span>
+            <div className="mt-1 font-medium">
+              {account.passwordExpiresAt ? (
+                (() => {
+                  const expiry = new Date(account.passwordExpiresAt)
+                  const isExpired = expiry < new Date()
+                  return (
+                    <span className={isExpired ? 'text-red-600' : ''}>
+                      {isExpired ? 'Expired ' : ''}
+                      {formatDistanceToNow(expiry, { addSuffix: true })}
+                    </span>
+                  )
+                })()
+              ) : (
+                <span className="text-muted-foreground">Never</span>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Groups */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Groups</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(account.groups ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No groups assigned.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {(account.groups ?? []).map((group) => (
-                <Badge key={group} variant="outline" className="font-mono text-xs">
-                  {group}
-                </Badge>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 

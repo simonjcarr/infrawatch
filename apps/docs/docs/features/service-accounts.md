@@ -1,64 +1,62 @@
 # Service Accounts & Identity
 
-Infrawatch tracks the users and service accounts present on your hosts — including domain accounts synced from LDAP/Active Directory. This gives you a fleet-wide view of who has access to what.
+Infrawatch tracks two distinct but related things:
+
+- **Service Accounts** — a manually-maintained register of service/domain accounts you want to track, with status and password-expiry tracking
+- **Host user inventory** — local system accounts and SSH keys discovered by the agent on each host
+
+For live on-demand lookup against your LDAP or Active Directory (no syncing), see **[Directory User Lookup](./directory-lookup.md)**.
 
 ---
 
-## LDAP / Active Directory Integration
+## Tracked Service Accounts
 
-Infrawatch can sync domain accounts from your LDAP directory or Active Directory. This enriches host user inventory with domain context — showing you which AD accounts are present on which hosts.
+The **Service Accounts** page holds a manually-curated list of the service or domain accounts your team wants to track — for example, deploy bots, CI tokens, shared mailbox accounts, or domain service accounts tied to specific infrastructure.
 
-### Setup
-
-1. Navigate to **Settings → LDAP**
-2. Fill in your LDAP server details:
+### Fields
 
 | Field | Description |
 |---|---|
-| **Server URL** | e.g. `ldap://ad.corp.example.com:389` or `ldaps://...` |
-| **Bind DN** | Service account DN used to query the directory |
-| **Bind Password** | Password for the bind account |
-| **Base DN** | Root DN for user searches (e.g. `dc=corp,dc=example,dc=com`) |
-| **User filter** | LDAP filter for user objects (e.g. `(objectClass=user)`) |
-| **Username attribute** | Attribute to use as the username (e.g. `sAMAccountName`) |
+| **Username** | Unique within the organisation |
+| **Display Name** | Friendly label |
+| **Email** | Optional contact address |
+| **Status** | `active`, `disabled`, `locked`, or `expired` |
+| **Password Expiry Date** | Optional — used to surface upcoming rotations |
 
-3. Click **Test Connection** to verify connectivity
-4. Click **Save** to enable the integration
+### Adding an account
 
-### Sync
+Click **Add Account** and enter the username (plus any optional details). You can edit or delete accounts later from the detail page.
 
-Infrawatch syncs domain accounts on a configurable schedule (default: every 15 minutes). You can trigger a manual sync from the LDAP settings page by clicking **Sync Now**.
+Accounts are independent of LDAP — even if you have an LDAP configuration set up, Infrawatch does not sync accounts from the directory. Use the **[Directory User Lookup](./directory-lookup.md)** tool when you need live directory information.
 
 ---
 
 ## Per-Host User Inventory
 
 The **Users** tab on each host detail page shows:
-- Local system accounts
-- Domain accounts present on this host (from LDAP sync cross-referenced with agent-collected user data)
-- Last login timestamp (where available)
-- Account type (local / domain)
+- Local system accounts discovered by the agent
+- Account type (human / service / system)
+- Login capability, running-process hints, password expiry (where exposed by the OS)
+- Authorised SSH keys per account
 
-Navigate to **Service Accounts** for the fleet-wide view showing which accounts are present across all hosts.
-
----
-
-## Account Detail
-
-Clicking a user account opens the detail view:
-
-- Account metadata (DN, username, email, department from LDAP)
-- **Hosts** — all hosts where this account is present
-- **Groups** — AD group memberships
-- Event history for this account
+This is independent of the Service Accounts register above — it's a live picture of what the agent sees on that host.
 
 ---
 
 ## SSH Keys
 
-The agent collects SSH authorised keys from `~/.ssh/authorized_keys` on each host. These are displayed in the **Users** tab alongside the account information.
+The agent collects SSH authorised keys from `~/.ssh/authorized_keys` on each host. These are displayed in the **Users** tab alongside the account information, and surfaced fleet-wide from the host user inventory.
 
-A fleet-wide SSH key inventory is available from the **Service Accounts** page — useful for identifying stale or unexpected authorised keys.
+---
+
+## LDAP / Directory Integration
+
+Infrawatch can connect to an LDAP or Active Directory server for two purposes:
+
+1. **[Directory User Lookup](./directory-lookup.md)** — search and inspect users on demand
+2. **Domain login** — optionally allow users to sign in to Infrawatch with their directory credentials
+
+Configure connections at **Settings → LDAP / Directory**. Nothing is ever synced from the directory into Infrawatch.
 
 ---
 
@@ -66,4 +64,4 @@ A fleet-wide SSH key inventory is available from the **Service Accounts** page �
 
 - CSR workflows for certificate requests tied to service accounts
 - SSH key rotation reminders
-- Automated detection of accounts not in Active Directory (local orphan accounts)
+- Automated detection of accounts not in the directory (local orphan accounts)

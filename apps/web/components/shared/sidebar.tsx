@@ -20,6 +20,7 @@ import {
   Terminal,
   FileBarChart,
   Network,
+  FolderSearch,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -88,6 +89,7 @@ const reportingNav: NavItem[] = [
 ]
 
 const toolingNav: NavItem[] = [
+  { title: 'Directory User Lookup', href: '/directory-lookup', icon: FolderSearch },
   { title: 'Air-gap Bundlers', href: '/bundlers', icon: Package },
   { title: 'Runbooks', href: '/runbooks', icon: BookOpen },
   { title: 'Scheduled Tasks', href: '/tasks', icon: Activity },

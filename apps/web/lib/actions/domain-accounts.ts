@@ -2,8 +2,8 @@
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { domainAccounts, ldapConfigurations } from '@/lib/db/schema'
-import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
+import { domainAccounts } from '@/lib/db/schema'
+import { eq, and, asc, desc, sql } from 'drizzle-orm'
 import type { DomainAccount, DomainAccountStatus } from '@/lib/db/schema'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,33 +25,19 @@ export type DomainAccountCounts = {
   expired: number
 }
 
-export type LdapConfigOption = {
-  id: string
-  name: string
-}
-
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const createDomainAccountSchema = z.object({
   username: z.string().min(1, 'Username is required').max(255),
   displayName: z.string().max(255).optional(),
   email: z.string().email().optional().or(z.literal('')),
-  ldapConfigurationId: z.string().nullable().optional(),
   passwordExpiresAt: z.string().nullable().optional(),
-  distinguishedName: z.string().max(1000).optional(),
-  samAccountName: z.string().max(255).optional(),
-  userPrincipalName: z.string().max(255).optional(),
-  groups: z.array(z.string()).optional(),
-  accountLocked: z.boolean().optional(),
-  passwordLastChangedAt: z.string().nullable().optional(),
 })
 
 const updateDomainAccountSchema = z.object({
   displayName: z.string().max(255).optional(),
   email: z.string().email().optional().or(z.literal('')),
   status: z.enum(['active', 'disabled', 'locked', 'expired']).optional(),
-  groups: z.array(z.string()).optional(),
-  ldapConfigurationId: z.string().nullable().optional(),
   passwordExpiresAt: z.string().nullable().optional(),
 })
 
@@ -139,21 +125,6 @@ export async function getDomainAccountCounts(
   return counts
 }
 
-export async function getLdapConfigOptions(
-  orgId: string,
-): Promise<LdapConfigOption[]> {
-  const rows = await db.query.ldapConfigurations.findMany({
-    where: and(
-      eq(ldapConfigurations.organisationId, orgId),
-      eq(ldapConfigurations.enabled, true),
-      isNull(ldapConfigurations.deletedAt),
-    ),
-    columns: { id: true, name: true },
-    orderBy: ldapConfigurations.name,
-  })
-  return rows
-}
-
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function createDomainAccount(
@@ -173,18 +144,8 @@ export async function createDomainAccount(
         username: parsed.data.username,
         displayName: parsed.data.displayName || null,
         email: parsed.data.email || null,
-        source: 'manual',
-        ldapConfigurationId: parsed.data.ldapConfigurationId || null,
-        distinguishedName: parsed.data.distinguishedName || null,
-        samAccountName: parsed.data.samAccountName || null,
-        userPrincipalName: parsed.data.userPrincipalName || null,
-        groups: parsed.data.groups ?? null,
-        accountLocked: parsed.data.accountLocked ?? false,
         passwordExpiresAt: parsed.data.passwordExpiresAt
           ? new Date(parsed.data.passwordExpiresAt)
-          : null,
-        passwordLastChangedAt: parsed.data.passwordLastChangedAt
-          ? new Date(parsed.data.passwordLastChangedAt)
           : null,
       })
       .returning({ id: domainAccounts.id })
@@ -193,7 +154,7 @@ export async function createDomainAccount(
     return { success: true, id: row.id }
   } catch (err) {
     const message = err instanceof Error ? err.message : ''
-    if (message.includes('domain_accounts_org_source_username_idx')) {
+    if (message.includes('domain_accounts_org_username_idx')) {
       return { error: 'An account with this username already exists' }
     }
     console.error('Failed to create service account:', err)
@@ -225,8 +186,6 @@ export async function updateDomainAccount(
       ...(parsed.data.displayName !== undefined && { displayName: parsed.data.displayName || null }),
       ...(parsed.data.email !== undefined && { email: parsed.data.email || null }),
       ...(parsed.data.status !== undefined && { status: parsed.data.status }),
-      ...(parsed.data.groups !== undefined && { groups: parsed.data.groups }),
-      ...(parsed.data.ldapConfigurationId !== undefined && { ldapConfigurationId: parsed.data.ldapConfigurationId || null }),
       ...(parsed.data.passwordExpiresAt !== undefined && {
         passwordExpiresAt: parsed.data.passwordExpiresAt
           ? new Date(parsed.data.passwordExpiresAt)

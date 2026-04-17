@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import {
-  Users, Search, Key, Plus, CheckCircle, XCircle, Lock, Clock, Loader2,
+  Users, Search, Key, Plus, CheckCircle, XCircle, Lock, Clock,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -40,9 +40,7 @@ import {
   getDomainAccountCounts,
   createDomainAccount,
 } from '@/lib/actions/domain-accounts'
-import { searchLdapDirectory } from '@/lib/actions/ldap'
-import type { LdapUserResult } from '@/lib/actions/ldap'
-import type { DomainAccountCounts, DomainAccountListFilters, LdapConfigOption } from '@/lib/actions/domain-accounts'
+import type { DomainAccountCounts, DomainAccountListFilters } from '@/lib/actions/domain-accounts'
 import type { DomainAccount, DomainAccountStatus } from '@/lib/db/schema'
 
 function StatusBadge({ status }: { status: DomainAccountStatus }) {
@@ -113,7 +111,6 @@ const INITIAL_ADD_FORM = {
   username: '',
   displayName: '',
   email: '',
-  ldapConfigurationId: null as string | null,
   passwordExpiresAt: '',
 }
 
@@ -121,12 +118,10 @@ export function ServiceAccountsClient({
   orgId,
   initialAccounts,
   initialCounts,
-  ldapConfigs,
 }: {
   orgId: string
   initialAccounts: DomainAccount[]
   initialCounts: DomainAccountCounts
-  ldapConfigs: LdapConfigOption[]
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -136,14 +131,6 @@ export function ServiceAccountsClient({
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addForm, setAddForm] = useState({ ...INITIAL_ADD_FORM })
   const [addError, setAddError] = useState<string | null>(null)
-
-  // Typeahead state
-  const [selectedUser, setSelectedUser] = useState<LdapUserResult | null>(null)
-  const [suggestions, setSuggestions] = useState<LdapUserResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const filters: DomainAccountListFilters = {
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
@@ -167,34 +154,16 @@ export function ServiceAccountsClient({
     staleTime: 30_000,
   })
 
-  const isDirectoryMode = addForm.ldapConfigurationId !== null
-  const canAdd = isDirectoryMode ? selectedUser !== null : addForm.username.trim().length > 0
+  const canAdd = addForm.username.trim().length > 0
 
   const addMutation = useMutation({
-    mutationFn: () => {
-      if (isDirectoryMode && selectedUser) {
-        return createDomainAccount(orgId, {
-          username: selectedUser.username,
-          displayName: selectedUser.displayName ?? '',
-          email: selectedUser.email ?? '',
-          ldapConfigurationId: addForm.ldapConfigurationId,
-          distinguishedName: selectedUser.dn,
-          samAccountName: selectedUser.samAccountName,
-          userPrincipalName: selectedUser.userPrincipalName,
-          groups: selectedUser.groups,
-          accountLocked: selectedUser.accountLocked,
-          passwordExpiresAt: selectedUser.passwordExpiresAt,
-          passwordLastChangedAt: selectedUser.passwordLastChangedAt,
-        })
-      }
-      return createDomainAccount(orgId, {
+    mutationFn: () =>
+      createDomainAccount(orgId, {
         username: addForm.username,
         displayName: addForm.displayName,
         email: addForm.email,
-        ldapConfigurationId: null,
         passwordExpiresAt: addForm.passwordExpiresAt || null,
-      })
-    },
+      }),
     onSuccess: (result) => {
       if ('error' in result) {
         setAddError(result.error)
@@ -210,84 +179,6 @@ export function ServiceAccountsClient({
     setShowAddDialog(false)
     setAddForm({ ...INITIAL_ADD_FORM })
     setAddError(null)
-    setSelectedUser(null)
-    setSuggestions([])
-    setShowSuggestions(false)
-    setSearching(false)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-  }
-
-  const handleDirectoryServerChange = useCallback((value: string) => {
-    setAddForm((prev) => ({
-      ...prev,
-      ldapConfigurationId: value === 'none' ? null : value,
-      username: '',
-    }))
-    setSelectedUser(null)
-    setSuggestions([])
-    setShowSuggestions(false)
-    setAddError(null)
-  }, [])
-
-  // Use a ref for the config ID so the debounced callback always has the latest value.
-  const configIdRef = useRef(addForm.ldapConfigurationId)
-  useEffect(() => { configIdRef.current = addForm.ldapConfigurationId }, [addForm.ldapConfigurationId])
-
-  // Debounced LDAP search as the user types
-  const handleUsernameInput = useCallback((value: string) => {
-    setAddForm((prev) => ({ ...prev, username: value }))
-    setSelectedUser(null)
-
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-
-    if (!value.trim()) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      const configId = configIdRef.current
-      if (!configId) return
-      setSearching(true)
-      const result = await searchLdapDirectory(orgId, configId, value.trim())
-      setSearching(false)
-      if ('error' in result) {
-        setSuggestions([])
-        setShowSuggestions(false)
-      } else {
-        setSuggestions(result.users)
-        setShowSuggestions(result.users.length > 0)
-      }
-    }, 300)
-  }, [orgId])
-
-  function selectUser(user: LdapUserResult) {
-    setSelectedUser(user)
-    setAddForm((prev) => ({
-      ...prev,
-      username: user.username,
-      displayName: user.displayName ?? '',
-      email: user.email ?? '',
-    }))
-    setShowSuggestions(false)
-    setSuggestions([])
-  }
-
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  function getLdapConfigName(configId: string | null): string | null {
-    if (!configId) return null
-    return ldapConfigs.find((c) => c.id === configId)?.name ?? null
   }
 
   return (
@@ -310,188 +201,50 @@ export function ServiceAccountsClient({
             <DialogHeader>
               <DialogTitle>Add Service Account</DialogTitle>
               <DialogDescription>
-                Add a service account to track. If on a directory server, the account will be verified and details pulled automatically.
+                Track a service account by username. Details can be edited later.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <Label>Directory Server</Label>
-                <Select
-                  value={addForm.ldapConfigurationId ?? 'none'}
-                  onValueChange={handleDirectoryServerChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a directory server..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None (not on a directory)</SelectItem>
-                    {ldapConfigs.map((config) => (
-                      <SelectItem key={config.id} value={config.id}>
-                        {config.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="add-username">Username</Label>
+                <Input
+                  id="add-username"
+                  value={addForm.username}
+                  onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
+                  placeholder="e.g. svc-deploy"
+                />
               </div>
-
-              {/* Username with typeahead (directory mode) */}
-              {isDirectoryMode && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="add-username">Username</Label>
-                  <div className="relative" ref={suggestionsRef}>
-                    <div className="relative">
-                      <Input
-                        id="add-username"
-                        value={addForm.username}
-                        onChange={(e) => handleUsernameInput(e.target.value)}
-                        onFocus={() => { if (suggestions.length > 0 && !selectedUser) setShowSuggestions(true) }}
-                        placeholder="Start typing to search the directory..."
-                        disabled={selectedUser !== null}
-                        autoComplete="off"
-                      />
-                      {searching && (
-                        <Loader2 className="absolute right-2.5 top-2.5 size-4 animate-spin text-muted-foreground" />
-                      )}
-                    </div>
-                    {selectedUser && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-0.5 h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          setSelectedUser(null)
-                          setAddForm((prev) => ({ ...prev, username: '', displayName: '', email: '' }))
-                        }}
-                      >
-                        Clear
-                      </Button>
-                    )}
-
-                    {/* Suggestions dropdown */}
-                    {showSuggestions && !selectedUser && (
-                      <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-                        {suggestions.map((user) => (
-                          <button
-                            key={user.dn}
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
-                            onClick={() => selectUser(user)}
-                          >
-                            <p className="font-medium font-mono text-sm">{user.username}</p>
-                            {user.displayName && (
-                              <p className="text-xs text-muted-foreground">{user.displayName}</p>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedUser && (
-                    <p className="text-sm text-green-700 flex items-center gap-1.5">
-                      <CheckCircle className="size-3.5 shrink-0" />
-                      Account found in directory
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Username (manual mode) */}
-              {!isDirectoryMode && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="add-username-manual">Username</Label>
-                  <Input
-                    id="add-username-manual"
-                    value={addForm.username}
-                    onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
-                    placeholder="e.g. svc-deploy"
-                  />
-                </div>
-              )}
-
-              {/* Directory user details (verified) */}
-              {isDirectoryMode && selectedUser && (
-                <div className="rounded-md border bg-muted/30 p-3 space-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground text-xs">Display Name</span>
-                    <p className="font-medium break-words">{selectedUser.displayName ?? '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground text-xs">Email</span>
-                    <p className="font-medium break-all">{selectedUser.email ?? '—'}</p>
-                  </div>
-                  {selectedUser.groups.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Groups</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedUser.groups.map((g) => (
-                          <Badge key={g} variant="outline" className="text-xs font-mono break-all">
-                            {g}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="text-muted-foreground text-xs">Account Locked</span>
-                      <p className="font-medium flex items-center gap-1.5">
-                        {selectedUser.accountLocked ? (
-                          <><XCircle className="size-3.5 text-red-600 shrink-0" /> Yes</>
-                        ) : (
-                          <><CheckCircle className="size-3.5 text-green-600 shrink-0" /> No</>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs">Password Expires</span>
-                      <p className="font-medium">
-                        {selectedUser.passwordExpiresAt
-                          ? new Date(selectedUser.passwordExpiresAt).toLocaleDateString()
-                          : 'Never'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual entry fields */}
-              {!isDirectoryMode && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="add-displayname">Display Name</Label>
-                    <Input
-                      id="add-displayname"
-                      value={addForm.displayName}
-                      onChange={(e) => setAddForm({ ...addForm, displayName: e.target.value })}
-                      placeholder="e.g. Deploy Service Account"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="add-email">Email</Label>
-                    <Input
-                      id="add-email"
-                      type="email"
-                      value={addForm.email}
-                      onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                      placeholder="e.g. svc-deploy@example.com"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="add-password-expires">Password Expiry Date</Label>
-                    <Input
-                      id="add-password-expires"
-                      type="date"
-                      value={addForm.passwordExpiresAt}
-                      onChange={(e) => setAddForm({ ...addForm, passwordExpiresAt: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      When does this account&apos;s password expire? Leave blank if it doesn&apos;t expire.
-                    </p>
-                  </div>
-                </>
-              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="add-displayname">Display Name</Label>
+                <Input
+                  id="add-displayname"
+                  value={addForm.displayName}
+                  onChange={(e) => setAddForm({ ...addForm, displayName: e.target.value })}
+                  placeholder="e.g. Deploy Service Account"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add-email">Email</Label>
+                <Input
+                  id="add-email"
+                  type="email"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                  placeholder="e.g. svc-deploy@example.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add-password-expires">Password Expiry Date</Label>
+                <Input
+                  id="add-password-expires"
+                  type="date"
+                  value={addForm.passwordExpiresAt}
+                  onChange={(e) => setAddForm({ ...addForm, passwordExpiresAt: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  When does this account&apos;s password expire? Leave blank if it doesn&apos;t expire.
+                </p>
+              </div>
 
               {addError && (
                 <p className="text-sm text-destructive">{addError}</p>
@@ -601,7 +354,7 @@ export function ServiceAccountsClient({
                 <TableHead>Username</TableHead>
                 <TableHead>Display Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Directory</TableHead>
+                <TableHead>Password Expires</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -620,9 +373,9 @@ export function ServiceAccountsClient({
                     {acct.email ?? '—'}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {acct.ldapConfigurationId
-                      ? (getLdapConfigName(acct.ldapConfigurationId) ?? 'LDAP')
-                      : <span className="text-muted-foreground/60">None</span>}
+                    {acct.passwordExpiresAt
+                      ? new Date(acct.passwordExpiresAt).toLocaleDateString()
+                      : <span className="text-muted-foreground/60">Never</span>}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={acct.status as DomainAccountStatus} />

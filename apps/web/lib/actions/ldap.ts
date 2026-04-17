@@ -6,8 +6,8 @@ import { ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import type { LdapConfiguration } from '@/lib/db/schema'
 import { encrypt } from '@/lib/crypto/encrypt'
-import { testConnection as ldapTestConnection, searchUsers } from '@/lib/ldap/client'
-import type { LdapUser } from '@/lib/ldap/client'
+import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn } from '@/lib/ldap/client'
+import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
 const createLdapConfigSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
@@ -27,7 +27,6 @@ const createLdapConfigSchema = z.object({
   emailAttribute: z.string().default('mail'),
   displayNameAttribute: z.string().default('cn'),
   allowLogin: z.boolean().default(false),
-  syncIntervalMinutes: z.number().int().min(5).max(1440).default(60),
 })
 
 const updateLdapConfigSchema = z.object({
@@ -49,7 +48,6 @@ const updateLdapConfigSchema = z.object({
   displayNameAttribute: z.string().optional(),
   enabled: z.boolean().optional(),
   allowLogin: z.boolean().optional(),
-  syncIntervalMinutes: z.number().int().min(5).max(1440).optional(),
 })
 
 export async function getLdapConfigurations(
@@ -111,7 +109,6 @@ export async function createLdapConfiguration(
         emailAttribute: parsed.data.emailAttribute,
         displayNameAttribute: parsed.data.displayNameAttribute,
         allowLogin: parsed.data.allowLogin,
-        syncIntervalMinutes: parsed.data.syncIntervalMinutes,
       })
       .returning({ id: ldapConfigurations.id })
 
@@ -163,7 +160,6 @@ export async function updateLdapConfiguration(
   if (data.displayNameAttribute !== undefined) updates.displayNameAttribute = data.displayNameAttribute
   if (data.enabled !== undefined) updates.enabled = data.enabled
   if (data.allowLogin !== undefined) updates.allowLogin = data.allowLogin
-  if (data.syncIntervalMinutes !== undefined) updates.syncIntervalMinutes = data.syncIntervalMinutes
 
   await db
     .update(ldapConfigurations)
@@ -261,6 +257,60 @@ export async function searchLdapDirectory(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return { error: `Directory search failed: ${message}` }
+  }
+}
+
+export type LookupConfigOption = {
+  id: string
+  name: string
+}
+
+export async function getLookupConfigOptions(
+  orgId: string,
+): Promise<LookupConfigOption[]> {
+  const rows = await db.query.ldapConfigurations.findMany({
+    where: and(
+      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.enabled, true),
+      isNull(ldapConfigurations.deletedAt),
+    ),
+    columns: { id: true, name: true },
+    orderBy: ldapConfigurations.name,
+  })
+  return rows
+}
+
+export type LdapUserDetailResult = LdapUserResult & {
+  rawAttributes: Record<string, string | string[]>
+}
+
+export async function lookupDirectoryUser(
+  orgId: string,
+  configId: string,
+  dn: string,
+): Promise<{ success: true; user: LdapUserDetailResult } | { error: string }> {
+  const config = await db.query.ldapConfigurations.findFirst({
+    where: and(
+      eq(ldapConfigurations.id, configId),
+      eq(ldapConfigurations.organisationId, orgId),
+      isNull(ldapConfigurations.deletedAt),
+    ),
+  })
+  if (!config) return { error: 'Configuration not found' }
+
+  try {
+    const detail: LdapUserDetail | null = await lookupUserByDn(config, dn)
+    if (!detail) return { error: 'User not found' }
+    return {
+      success: true,
+      user: {
+        ...toLdapUserResult(detail),
+        rawAttributes: detail.rawAttributes,
+      },
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return { error: `Directory lookup failed: ${message}` }
   }
 }
 

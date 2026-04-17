@@ -70,6 +70,7 @@ export default defineUserConfig({
           '/features/reports.md',
           '/features/terminal.md',
           '/features/service-accounts.md',
+          '/features/directory-lookup.md',
           '/features/tasks.md',
         ],
       },

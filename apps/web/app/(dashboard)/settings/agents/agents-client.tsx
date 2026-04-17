@@ -56,6 +56,7 @@ interface AgentsSettingsClientProps {
   orgId: string
   currentUserId: string
   initialTokens: AgentEnrolmentToken[]
+  appUrl: string
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -78,12 +79,9 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-function getAppOrigin(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? window.location.origin
-}
-
-function buildInstallCommand(token: string, skipVerify: boolean): string {
-  const installUrl = new URL(`${getAppOrigin()}/api/agent/install`)
+function buildInstallCommand(token: string, skipVerify: boolean, appUrl: string): string {
+  const origin = appUrl.replace(/\/$/, '') || window.location.origin
+  const installUrl = new URL(`${origin}/api/agent/install`)
   installUrl.searchParams.set('token', token)
   if (skipVerify) {
     installUrl.searchParams.set('skip_verify', 'true')
@@ -108,6 +106,7 @@ export function AgentsSettingsClient({
   orgId,
   currentUserId,
   initialTokens,
+  appUrl,
 }: AgentsSettingsClientProps) {
   const queryClient = useQueryClient()
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -151,12 +150,7 @@ export function AgentsSettingsClient({
       if ('error' in result) return
       queryClient.invalidateQueries({ queryKey: ['enrolment-tokens', orgId] })
       setNewTokenValue(result.token)
-      const installUrl = new URL(`${getAppOrigin()}/api/agent/install`)
-      installUrl.searchParams.set('token', result.token)
-      if (variables.skipVerify) {
-        installUrl.searchParams.set('skip_verify', 'true')
-      }
-      setNewInstallCommand(`curl -fsSL "${installUrl.toString()}" | sudo bash`)
+      setNewInstallCommand(buildInstallCommand(result.token, variables.skipVerify, appUrl))
       reset()
     },
   })
@@ -304,9 +298,9 @@ export function AgentsSettingsClient({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Install command</p>
                 <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
                   <code className="text-xs font-mono flex-1 break-all leading-relaxed">
-                    {buildInstallCommand(viewToken.token, viewToken.skipVerify)}
+                    {buildInstallCommand(viewToken.token, viewToken.skipVerify, appUrl)}
                   </code>
-                  <CopyButton text={buildInstallCommand(viewToken.token, viewToken.skipVerify)} />
+                  <CopyButton text={buildInstallCommand(viewToken.token, viewToken.skipVerify, appUrl)} />
                 </div>
               </div>
               <div className="space-y-1.5">

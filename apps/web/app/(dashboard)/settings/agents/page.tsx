@@ -18,11 +18,14 @@ export default async function AgentsSettingsPage() {
   const orgId = session.user.organisationId!
   const tokens = await listEnrolmentTokens(orgId)
 
+  const appUrl = process.env.AGENT_DOWNLOAD_BASE_URL ?? ''
+
   return (
     <AgentsSettingsClient
       orgId={orgId}
       currentUserId={session.user.id}
       initialTokens={tokens}
+      appUrl={appUrl}
     />
   )
 }

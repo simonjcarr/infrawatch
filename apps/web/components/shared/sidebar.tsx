@@ -21,6 +21,7 @@ import {
   FileBarChart,
   Network,
   FolderSearch,
+  ScanSearch,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -89,6 +90,7 @@ const reportingNav: NavItem[] = [
 ]
 
 const toolingNav: NavItem[] = [
+  { title: 'SSL Certificate Checker', href: '/certificate-checker', icon: ScanSearch },
   { title: 'Directory User Lookup', href: '/directory-lookup', icon: FolderSearch },
   { title: 'Air-gap Bundlers', href: '/bundlers', icon: Package },
   { title: 'Runbooks', href: '/runbooks', icon: BookOpen },

@@ -66,6 +66,7 @@ export default defineUserConfig({
           '/features/networks.md',
           '/features/monitoring.md',
           '/features/certificates.md',
+          '/features/certificate-checker.md',
           '/features/alerts.md',
           '/features/notifications.md',
           '/features/reports.md',

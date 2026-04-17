@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.42.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.3...web/v0.42.0) (2026-04-17)
+
+
+### Features
+
+* add tab colours, reorder, rename, and split panes to terminal ([f5f7df9](https://github.com/simonjcarr/infrawatch/commit/f5f7df9e35dff10d9d7e670e75cd37ffe6bc1438))
+* tab colours, reorder, rename, and split panes for terminal ([9c464d9](https://github.com/simonjcarr/infrawatch/commit/9c464d979143aa54d41ebf5a8a66fb91fe1f2741))
+
 ## [0.41.3](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.2...web/v0.41.3) (2026-04-16)
 
 

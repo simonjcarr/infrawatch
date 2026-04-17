@@ -9,11 +9,114 @@
 **Phase 5 — Tooling (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — Full software inventory and reporting shipped; Docusaurus documentation site live on GitHub Pages; remote agent uninstall from host delete dialog.
+🟢 Phase 5 progressing — VuePress docs site live; networks (CIDR auto-assignment) and interactive network topology graphs shipped; terminal panel evolved into a full tabbed/split VS Code-style workspace with per-tab colours, reorder, splits, and adjustable text size.
 
 ---
 
 ## What Has Been Built
+
+### Session 47 — Terminal text size settings
+
+**Terminal preferences** (`apps/web/components/terminal/`)
+- New `terminal-preferences.ts` stores a global default text size in `localStorage` with a live change-event bus so every open pane reacts without a reload
+- Settings gear in the terminal panel toolbar opens a popover with a default text-size slider and presets
+- Right-click a terminal tab to pick a per-tab text-size override or revert to the default
+- `terminal-session.tsx` subscribes to preference changes and resizes xterm live
+- Docs updated at `apps/docs/docs/features/terminal.md`
+- Branch: `feat/terminal-font-size` (commit `11635d4`)
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 46 — Terminal tabs, colours, reorder, and split panes
+
+**Terminal panel overhaul** (`apps/web/components/terminal/`)
+- Right-click a tab for rename, colour presets, split right / split down, or close
+- Tabs are draggable for reorder
+- New `terminal-pane-tree.tsx` — each tab holds a recursive pane tree so a single host session can be split into multiple independent shells with draggable dividers
+- `terminal-panel-context.tsx` extended with tab colours, rename, reorder, and split operations
+- `terminal-session.tsx` updated for multi-pane rendering per tab
+- Docs updated at `apps/docs/docs/features/terminal.md`
+- PR: simonjcarr/infrawatch#234
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 45 — Network topology graph visualizations
+
+**Network graphs** (`apps/web/app/(dashboard)/hosts/networks/`)
+- Table/Graph toggle on both individual network page and all-networks page
+- Individual network: network node with hosts in a grid below, smoothstep edges
+- All-networks: networks in a row, hosts below in columns, cross-network hosts shown once with multiple edges
+- New `listNetworksWithHosts` server action for efficient single-query join, lazy-loaded only when graph view is active
+- `NetworkNodeComponent` and `HostNodeComponent` (memo-wrapped) with status dots and CIDR badges
+- Uses `@xyflow/react` (MIT) for pan/zoom/minimap/controls
+- PR: simonjcarr/infrawatch#220
+
+**Edge animation & dark-mode polish** (`apps/web/app/(dashboard)/hosts/networks/components/`)
+- Custom `AnimatedFlowEdge`: `getBezierPath` curves with slow `stroke-dashoffset` CSS animation (10s cycle) — subtle, React-Flow-homepage style
+- Endpoint dots at source/target handles; strokes use `var(--muted-foreground)` for light/dark
+- React Flow Controls and MiniMap restyled via `globals.css` to use `--card`, `--border`, `--muted`, `--background` theme variables
+- Earlier iteration with SVG `animateMotion` moving dots replaced for being too busy
+- PRs: simonjcarr/infrawatch#221 (animated), #224 (dashed bezier)
+
+**Host-node context menu** (`apps/web/app/(dashboard)/hosts/networks/components/`)
+- Right-click a host node to open in-app terminal session (with username prompt) or navigate to host detail
+- `HostNodeContextMenu` — custom fixed-position overlay fired from React Flow's `onNodeContextMenu` (shadcn ContextMenu didn't work because React Flow intercepts contextmenu at the pane level)
+- `HostNodeTerminalDialog` lifted to parent graph level so the terminal dialog survives context-menu unmount
+- CSS override restoring `pointer-events:all` on `.react-flow__node-hostNode` (xyflow sets `pointer-events:none` when nodes are non-draggable/non-connectable)
+- PRs: simonjcarr/infrawatch#226, #228, #230, #232
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
+
+### Session 44 — Networks (CIDR-based auto-assignment)
+
+**Schema & migrations** (`apps/web/lib/db/schema/networks.ts`, migration 0031)
+- New `networks` table — named IP subnets with CIDR range, multi-tenant
+- New `host_network_memberships` join table with `is_auto_assigned` flag
+
+**Server actions & UI** (`apps/web/lib/actions/networks.ts`, `apps/web/app/(dashboard)/hosts/networks/`)
+- Full CRUD and membership management with RBAC (admin/engineer gating)
+- Networks list page, network detail page, Networks tab in host detail under Management
+- "Networks" nav item added to sidebar under Hosts
+
+**Ingest auto-assignment** (`apps/ingest/internal/`)
+- `SyncHostNetworks` matches heartbeat IPs against org network ranges and syncs auto-assignments; stale assignments removed when IPs change
+- Called from heartbeat handler on every tick
+
+**Docs**
+- New `apps/docs/docs/features/networks.md`
+- PR: simonjcarr/infrawatch#218
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+- `go build ./...` — zero errors ✅
+
+---
+
+### Session 43 — VuePress documentation site (replacing Docusaurus)
+
+**Migration to VuePress 2** (`apps/docs/`)
+- Full migration from Docusaurus v3 to VuePress 2 — smaller, faster, simpler config
+- New `apps/docs/docs/.vuepress/config.ts`, custom palette and index SCSS
+- Full-text body search enabled (air-gap compatible)
+- Dockerfile updated for VuePress build → nginx serve
+- GitHub Actions workflow updated; Pages deployment source switched to GitHub Actions workflow
+- pnpm version pinned in deploy-docs workflow to match `packageManager` field
+- System architecture diagram reworked (image replacing hand-drawn diagram), fixed aspect ratio
+- PRs: simonjcarr/infrawatch#213 (pnpm pin), #217 (VuePress migration), #216 (diagram fix)
+
+**Build state**
+- `pnpm run build` — zero TypeScript errors ✅
+
+---
 
 ### Session 42 — Docusaurus documentation site
 

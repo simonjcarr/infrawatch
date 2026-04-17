@@ -77,6 +77,20 @@ The agent uses exponential backoff on disconnect:
 
 ---
 
+## Installation
+
+There are three supported ways to install the agent on a host:
+
+| Method | When to use | Guide |
+| --- | --- | --- |
+| One-command curl install | Target host can reach the Infrawatch server during install | [Installation guide](../getting-started/installation.md) |
+| Offline install bundle (zip) | Air-gapped, change-controlled, or jump-host-only environments | [Offline Agent Install Bundle](../getting-started/agent-install-bundle.md) |
+| Manual build + config | Development, or when you need a custom build | [Installation guide](../getting-started/installation.md#build-and-run-the-agent) |
+
+Regardless of install method, the agent's registration flow and configuration format (below) are identical — the bundle just packages the binary, script, and config template together.
+
+---
+
 ## Configuration
 
 ```toml

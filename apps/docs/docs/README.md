@@ -38,7 +38,9 @@ Enterprise licence validation uses a signed JWT verified against a bundled publi
 | | |
 |---|---|
 | [Installation](./getting-started/installation) | Get Infrawatch running in under 5 minutes |
+| [Offline Agent Install Bundle](./getting-started/agent-install-bundle) | Download a portable zip to install agents on air-gapped hosts |
 | [Architecture Overview](./architecture/overview) | Understand how the components fit together |
 | [Agent Architecture](./architecture/agent) | Registration flow, identity model, self-update |
 | [Ingest Service](./architecture/ingest) | gRPC gateway, JWT issuance, queue |
 | [Deployment Profiles](./architecture/deployment-profiles) | single / standard / HA configurations |
+| [Air-Gap Deployment](./deployment/air-gap) | Run Infrawatch with zero external dependencies |

@@ -115,6 +115,8 @@ An enrolment token is what the agent uses to register itself with your organisat
 5. Click **Create Token**
 6. **Copy the token now** — it won't be shown in full again
 
+> Installing on an air-gapped host? See [Offline Agent Install Bundle](./agent-install-bundle.md) to download a portable zip with the binary, install script, and config.
+
 ---
 
 ## Build and run the agent

@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { formatDistanceToNow, format } from 'date-fns'
-import { Plus, Trash2, Copy, Check, Key, RefreshCw, Eye } from 'lucide-react'
+import { Plus, Trash2, Copy, Check, Key, RefreshCw, Eye, Package, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -28,6 +28,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   listEnrolmentTokens,
   createEnrolmentToken,
@@ -103,6 +110,7 @@ export function AgentsSettingsClient({
   const [newTokenValue, setNewTokenValue] = useState<string | null>(null)
   const [newInstallCommand, setNewInstallCommand] = useState<string | null>(null)
   const [viewToken, setViewToken] = useState<AgentEnrolmentToken | null>(null)
+  const [showBundleDialog, setShowBundleDialog] = useState(false)
 
   const { data: tokens } = useQuery({
     queryKey: ['enrolment-tokens', orgId],
@@ -179,10 +187,16 @@ export function AgentsSettingsClient({
               agents.
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-            <Plus className="size-4 mr-1" />
-            New Token
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowBundleDialog(true)}>
+              <Package className="size-4 mr-1" />
+              Download Install Bundle
+            </Button>
+            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+              <Plus className="size-4 mr-1" />
+              New Token
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {tokens.length === 0 ? (
@@ -462,6 +476,340 @@ export function AgentsSettingsClient({
           )}
         </DialogContent>
       </Dialog>
+
+      <BundleDialog
+        open={showBundleDialog}
+        onOpenChange={setShowBundleDialog}
+        activeTokens={(tokens ?? []).filter((t) => tokenStatus(t).label === 'Active')}
+      />
     </div>
+  )
+}
+
+// ── Install bundle dialog ─────────────────────────────────────────────────────
+
+type BundleOS = 'linux' | 'darwin' | 'windows'
+type BundleArch = 'amd64' | 'arm64'
+type TokenMode = 'create' | 'existing' | 'none'
+
+interface BundleDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  activeTokens: AgentEnrolmentToken[]
+}
+
+function BundleDialog({ open, onOpenChange, activeTokens }: BundleDialogProps) {
+  const [os, setOs] = useState<BundleOS>('linux')
+  const [arch, setArch] = useState<BundleArch>('amd64')
+  const [tokenMode, setTokenMode] = useState<TokenMode>('create')
+  const [tokenLabel, setTokenLabel] = useState('Install bundle')
+  const [expiresInDays, setExpiresInDays] = useState('7')
+  const [autoApprove, setAutoApprove] = useState(false)
+  const [skipVerify, setSkipVerify] = useState(true)
+  const [ingestAddress, setIngestAddress] = useState('')
+  const [existingTokenId, setExistingTokenId] = useState<string>(activeTokens[0]?.id ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // Reset server-side errors when the dialog is reopened.
+  function reset() {
+    setError(null)
+    setIsGenerating(false)
+  }
+
+  async function handleDownload() {
+    reset()
+    setIsGenerating(true)
+
+    const body: Record<string, unknown> = { os, arch }
+    if (ingestAddress.trim()) body.ingestAddress = ingestAddress.trim()
+
+    if (tokenMode === 'create') {
+      const days = Number(expiresInDays)
+      if (!Number.isFinite(days) || days < 1) {
+        setError('Expiry must be a positive number of days.')
+        setIsGenerating(false)
+        return
+      }
+      body.createToken = {
+        label: tokenLabel.trim() || 'Install bundle',
+        autoApprove,
+        skipVerify,
+        expiresInDays: days,
+      }
+    } else if (tokenMode === 'existing') {
+      if (!existingTokenId) {
+        setError('Select a token to embed in the bundle.')
+        setIsGenerating(false)
+        return
+      }
+      body.tokenId = existingTokenId
+    } else {
+      // No token — operator supplies it at install time.
+      body.skipVerify = skipVerify
+    }
+
+    try {
+      const res = await fetch('/api/agent/bundle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const contentType = res.headers.get('content-type') ?? ''
+        const message = contentType.includes('application/json')
+          ? (await res.json().catch(() => ({}))).error ?? `Request failed (${res.status})`
+          : `Request failed (${res.status})`
+        setError(String(message))
+        setIsGenerating(false)
+        return
+      }
+      const disposition = res.headers.get('content-disposition') ?? ''
+      const filenameMatch = /filename="?([^";]+)"?/.exec(disposition)
+      const filename = filenameMatch?.[1] ?? `infrawatch-agent-${os}-${arch}.zip`
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+
+      setIsGenerating(false)
+      onOpenChange(false)
+    } catch (err) {
+      console.error(err)
+      setError('Network error while generating bundle.')
+      setIsGenerating(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset()
+        onOpenChange(next)
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Download Install Bundle</DialogTitle>
+          <DialogDescription>
+            Generate a zip containing the agent binary, install script, config template, and
+            checksum — ready to transfer to an air-gapped host.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bundle-os">Operating system</Label>
+              <Select value={os} onValueChange={(v) => setOs(v as BundleOS)}>
+                <SelectTrigger id="bundle-os">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="linux">Linux</SelectItem>
+                  <SelectItem value="darwin">macOS</SelectItem>
+                  <SelectItem value="windows">Windows</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bundle-arch">Architecture</Label>
+              <Select value={arch} onValueChange={(v) => setArch(v as BundleArch)}>
+                <SelectTrigger id="bundle-arch">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="amd64">amd64 (x86_64)</SelectItem>
+                  <SelectItem value="arm64">arm64 (aarch64)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bundle-ingest">Ingest address (optional)</Label>
+            <Input
+              id="bundle-ingest"
+              placeholder="Defaults to this server's hostname:9443"
+              value={ingestAddress}
+              onChange={(e) => setIngestAddress(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              The gRPC ingest host:port the agent will connect to. Leave blank to use this
+              server&apos;s hostname.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Enrolment token</Label>
+            <div className="space-y-2 rounded-md border p-3">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="tokenMode"
+                  value="create"
+                  checked={tokenMode === 'create'}
+                  onChange={() => setTokenMode('create')}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium">Create a new single-use token</span>
+                  <p className="text-xs text-muted-foreground">
+                    A fresh token is generated, limited to one use and expiring after the chosen
+                    number of days.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="tokenMode"
+                  value="existing"
+                  checked={tokenMode === 'existing'}
+                  onChange={() => setTokenMode('existing')}
+                  disabled={activeTokens.length === 0}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium">Embed an existing token</span>
+                  <p className="text-xs text-muted-foreground">
+                    {activeTokens.length === 0
+                      ? 'No active tokens available.'
+                      : 'Use one of your currently active enrolment tokens.'}
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="tokenMode"
+                  value="none"
+                  checked={tokenMode === 'none'}
+                  onChange={() => setTokenMode('none')}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium">No token (operator supplies it)</span>
+                  <p className="text-xs text-muted-foreground">
+                    Installer reads the token from <code>INFRAWATCH_ORG_TOKEN</code> at install
+                    time — safest for wide distribution.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {tokenMode === 'create' && (
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="space-y-2">
+                <Label htmlFor="bundle-label">Token label</Label>
+                <Input
+                  id="bundle-label"
+                  value={tokenLabel}
+                  onChange={(e) => setTokenLabel(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bundle-expires">Expires in days</Label>
+                <Input
+                  id="bundle-expires"
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={expiresInDays}
+                  onChange={(e) => setExpiresInDays(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="bundle-autoapprove"
+                  className="h-4 w-4 rounded border-border"
+                  checked={autoApprove}
+                  onChange={(e) => setAutoApprove(e.target.checked)}
+                />
+                <Label htmlFor="bundle-autoapprove" className="font-normal cursor-pointer">
+                  Auto-approve the agent on registration
+                </Label>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="bundle-skipverify"
+                  className="h-4 w-4 rounded border-border"
+                  checked={skipVerify}
+                  onChange={(e) => setSkipVerify(e.target.checked)}
+                />
+                <Label htmlFor="bundle-skipverify" className="font-normal cursor-pointer">
+                  Accept self-signed TLS certificates
+                </Label>
+              </div>
+            </div>
+          )}
+
+          {tokenMode === 'existing' && activeTokens.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="bundle-existing-token">Active token</Label>
+              <Select value={existingTokenId} onValueChange={setExistingTokenId}>
+                <SelectTrigger id="bundle-existing-token">
+                  <SelectValue placeholder="Select a token" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeTokens.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {tokenMode === 'none' && (
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="bundle-skipverify-none"
+                className="h-4 w-4 rounded border-border"
+                checked={skipVerify}
+                onChange={(e) => setSkipVerify(e.target.checked)}
+              />
+              <Label htmlFor="bundle-skipverify-none" className="font-normal cursor-pointer">
+                Write <code>tls_skip_verify = true</code> in the config
+              </Label>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleDownload} disabled={isGenerating}>
+            {isGenerating ? (
+              <>
+                <RefreshCw className="size-3.5 mr-1 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Download className="size-3.5 mr-1" />
+                Download
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

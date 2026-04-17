@@ -44,6 +44,7 @@ export default defineUserConfig({
         children: [
           '/getting-started/installation.md',
           '/getting-started/configuration.md',
+          '/getting-started/agent-install-bundle.md',
         ],
       },
       {

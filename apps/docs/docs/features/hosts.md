@@ -40,6 +40,26 @@ To reject a pending agent, click **Revoke**.
 
 ---
 
+## Duplicate-Host Protection
+
+Two live hosts in the same organisation cannot share a hostname or IP address — on a real network that would be a configuration error. Infrawatch enforces this at two points:
+
+- **At registration time** — when an agent calls `Register`, the ingest service checks for an existing non-deleted host in the same organisation whose hostname matches or whose reported IP addresses overlap any of the new agent's IPs.
+- **At approval time** — the same check runs when an admin approves a pending agent, in case a collision emerged while the agent was queued.
+
+What happens on a match depends on the state of the existing host:
+
+| Existing host state | Result |
+|---|---|
+| **Online** (heartbeating) or agent **revoked** | Registration is rejected with `ALREADY_EXISTS` — delete the existing host record first |
+| **Offline** or **unknown** | The existing row is **adopted**: the new public key is rotated onto the existing `agents` row, the host record is kept, and approval state is preserved |
+
+Adoption covers the common re-registration path: an agent is reinstalled on the same physical machine with its data directory wiped, so it generates a fresh keypair. Without adoption this would leave a stale "Offline" duplicate that the admin has to clean up manually; with adoption the host silently resumes using its existing record.
+
+The key rotation is recorded in the agent's status history (`reason: "adopted re-registration (keypair rotated; matched by hostname or IP)"`) so the event is auditable.
+
+---
+
 ## Host Detail Page
 
 The host detail page (`/hosts/[id]`) provides a full view of a single host:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"runtime"
 	"time"
@@ -47,8 +48,9 @@ func (r *Registrar) Register(ctx context.Context, existingAgentID string) (*iden
 		OrgToken:  r.orgToken,
 		PublicKey: r.keypair.PublicKeyPEM,
 		PlatformInfo: &agentv1.PlatformInfo{
-			Os:   runtime.GOOS,
-			Arch: runtime.GOARCH,
+			Os:          runtime.GOOS,
+			Arch:        runtime.GOARCH,
+			IpAddresses: localIPs(),
 		},
 		AgentInfo: &agentv1.AgentInfo{
 			AgentId:  existingAgentID,
@@ -90,4 +92,35 @@ func (r *Registrar) Register(ctx context.Context, existingAgentID string) (*iden
 			return nil, fmt.Errorf("unexpected registration status %q: %s", resp.Status, resp.Message)
 		}
 	}
+}
+
+// localIPs returns the non-loopback IP addresses currently bound on this host,
+// so the server can detect duplicate-host registrations by IP overlap.
+// Mirrors the filtering used by the heartbeat's network interface reporter.
+func localIPs() []string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var ips []string
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				continue
+			}
+			ips = append(ips, ip.String())
+		}
+	}
+	return ips
 }

@@ -91,16 +91,27 @@ export function DirectoryLookupClient({
     debounceRef.current = setTimeout(async () => {
       const cid = configIdRef.current
       setSearching(true)
-      const result = await searchLdapDirectory(orgId, cid, value.trim())
-      setSearching(false)
-      if ('error' in result) {
-        setError(result.error)
+      try {
+        const result = await searchLdapDirectory(orgId, cid, value.trim())
+        if ('error' in result) {
+          setError(result.error)
+          setSuggestions([])
+          setShowSuggestions(false)
+        } else {
+          setError(null)
+          setSuggestions(result.users)
+          setShowSuggestions(result.users.length > 0)
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error && err.message.includes('Server Action')
+            ? 'This page is out of date. Please reload (Cmd+Shift+R / Ctrl+Shift+R).'
+            : err instanceof Error ? err.message : 'Directory search failed.'
+        )
         setSuggestions([])
         setShowSuggestions(false)
-      } else {
-        setError(null)
-        setSuggestions(result.users)
-        setShowSuggestions(result.users.length > 0)
+      } finally {
+        setSearching(false)
       }
     }, 300)
   }, [orgId])
@@ -115,13 +126,22 @@ export function DirectoryLookupClient({
     setGroupFilter('')
     setAttrFilter('')
 
-    const result = await lookupDirectoryUser(orgId, configId, user.dn)
-    setLoadingDetail(false)
-    if ('error' in result) {
-      setError(result.error)
-      return
+    try {
+      const result = await lookupDirectoryUser(orgId, configId, user.dn)
+      if ('error' in result) {
+        setError(result.error)
+        return
+      }
+      setSelectedUser(result.user)
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message.includes('Server Action')
+          ? 'This page is out of date. Please reload (Cmd+Shift+R / Ctrl+Shift+R).'
+          : err instanceof Error ? err.message : 'Directory lookup failed.'
+      )
+    } finally {
+      setLoadingDetail(false)
     }
-    setSelectedUser(result.user)
   }
 
   useEffect(() => {

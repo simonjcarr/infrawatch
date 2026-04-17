@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.45.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.44.2...web/v0.45.0) (2026-04-17)
+
+
+### Features
+
+* group filter always visible and humanise LDAP timestamps ([75e53fe](https://github.com/simonjcarr/infrawatch/commit/75e53fea94c68c87f6141155c9fb0253b9ec3e4c))
+* group filter always visible and humanise LDAP timestamps ([07235c2](https://github.com/simonjcarr/infrawatch/commit/07235c25b4f66c479bd91128267b05f103f4df12))
+
+
+### Bug Fixes
+
+* portal directory-lookup suggestions out of card overflow ([b5b874e](https://github.com/simonjcarr/infrawatch/commit/b5b874e08473ef0ad68535ee340350248eca0cc1))
+* portal directory-lookup suggestions out of card overflow ([38d8063](https://github.com/simonjcarr/infrawatch/commit/38d8063005bacbd702d0a95d45bb61151bf217b8))
+
 ## [0.44.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.44.1...web/v0.44.2) (2026-04-17)
 
 

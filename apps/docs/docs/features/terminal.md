@@ -35,9 +35,33 @@ Each host session opens in its own tab. You can have multiple simultaneous sessi
 - Click a tab to switch between sessions
 - Close a tab to end the session
 
+### Reordering tabs
+
+Drag a tab left or right along the tab bar to reorder it. The new order is persisted with the rest of the terminal state.
+
+### Renaming tabs
+
+Double-click a tab (or right-click → **Rename**) to give it a custom label. Press **Enter** to commit or **Escape** to cancel. Clearing the label reverts to the host's name. The username, when shown, is hidden once a custom label is set.
+
+### Tab colours
+
+Right-click a tab and choose **Tab colour** to assign one of the preset colours (slate, red, amber, emerald, sky, violet, pink). The chosen colour is shown as a thin accent bar on the left edge of the tab and a subtle tint on the active tab — useful for distinguishing production hosts from staging, or grouping related sessions visually. Select **No colour** to clear the assignment.
+
+### Split panes
+
+Each tab can host multiple terminal panes connected to the same host. Splits are useful for running `tail -f` in one pane while you work in another, or watching a process while reading its logs.
+
+- **Right-click a tab → Split right / Split down** — splits the currently focused pane in the chosen direction and opens a new session on the same host.
+- **Hover over a pane** — action buttons appear in the top-right for Split right, Split down, and Close pane.
+- **Drag the divider** between two panes to resize them.
+- **Click inside a pane** to make it active; split actions operate on the active pane.
+- Closing the last pane in a tab also closes the tab.
+
+All panes in a tab share the same host/user binding — they are independent shell sessions, not a shared shell.
+
 ### Tab persistence
 
-Open tabs (and which host they're connected to) are persisted across browser refreshes via `localStorage`. Your session layout is restored when you reopen the browser.
+Open tabs, their order, colours, labels, and pane layout are persisted across navigation and browser refreshes via `sessionStorage`. The live shell sessions themselves are not restored on refresh — each pane reconnects and starts a new shell when the page loads.
 
 ---
 

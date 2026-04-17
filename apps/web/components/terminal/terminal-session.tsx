@@ -2,17 +2,27 @@
 
 import { useRef, useEffect, useCallback } from 'react'
 import { createTerminalSession } from '@/lib/actions/terminal'
-import type { TerminalTabInfo } from './terminal-panel-context'
+import type { TerminalSessionBinding } from './terminal-panel-context'
 
-type Status = 'connecting' | 'connected' | 'error' | 'closed'
+export type TerminalSessionStatus = 'connecting' | 'connected' | 'error' | 'closed'
 
 interface Props {
-  tab: TerminalTabInfo
+  paneId: string
+  binding: TerminalSessionBinding
   isVisible: boolean
-  onStatusChange?: (tabId: string, status: Status) => void
+  isFocused: boolean
+  onStatusChange?: (paneId: string, status: TerminalSessionStatus) => void
+  onFocus?: () => void
 }
 
-export function TerminalSession({ tab, isVisible, onStatusChange }: Props) {
+export function TerminalSession({
+  paneId,
+  binding,
+  isVisible,
+  isFocused,
+  onStatusChange,
+  onFocus,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<unknown>(null)
   const fitRef = useRef<unknown>(null)
@@ -22,10 +32,10 @@ export function TerminalSession({ tab, isVisible, onStatusChange }: Props) {
   const hasInitializedRef = useRef(false)
 
   const updateStatus = useCallback(
-    (s: Status) => {
-      onStatusChange?.(tab.id, s)
+    (s: TerminalSessionStatus) => {
+      onStatusChange?.(paneId, s)
     },
-    [tab.id, onStatusChange],
+    [paneId, onStatusChange],
   )
 
   // Refit when visibility changes
@@ -41,6 +51,18 @@ export function TerminalSession({ tab, isVisible, onStatusChange }: Props) {
       })
     }
   }, [isVisible])
+
+  // Focus the xterm when this pane becomes the active one.
+  useEffect(() => {
+    if (isFocused && isVisible && termRef.current) {
+      const term = termRef.current as { focus: () => void }
+      try {
+        term.focus()
+      } catch {
+        // ignore
+      }
+    }
+  }, [isFocused, isVisible])
 
   // Initialize terminal and start first connection
   useEffect(() => {
@@ -101,22 +123,21 @@ export function TerminalSession({ tab, isVisible, onStatusChange }: Props) {
       const connectSession = async () => {
         if (cancelled) return
 
-        // Tear down previous WebSocket connection if any
         connectionCleanupRef.current?.()
         connectionCleanupRef.current = null
 
         updateStatus('connecting')
         term.clear()
 
-        const connectMsg = tab.directAccess
-          ? `Connecting to ${tab.hostname}...`
-          : `Connecting to ${tab.hostname} as ${tab.username}...`
+        const connectMsg = binding.directAccess
+          ? `Connecting to ${binding.hostname}...`
+          : `Connecting to ${binding.hostname} as ${binding.username}...`
         term.writeln(`\x1b[90m${connectMsg}\x1b[0m`)
 
         const result = await createTerminalSession(
-          tab.orgId,
-          tab.hostId,
-          tab.directAccess ? undefined : (tab.username ?? undefined),
+          binding.orgId,
+          binding.hostId,
+          binding.directAccess ? undefined : (binding.username ?? undefined),
         )
 
         if (cancelled) return
@@ -227,7 +248,7 @@ export function TerminalSession({ tab, isVisible, onStatusChange }: Props) {
             } catch {
               // ignore send errors on closing socket
             }
-            ws.close(1000, 'tab closed')
+            ws.close(1000, 'pane closed')
           }
           wsRef.current = null
         }
@@ -250,16 +271,18 @@ export function TerminalSession({ tab, isVisible, onStatusChange }: Props) {
       fitRef.current = null
       wsRef.current = null
     }
-  }, [tab, updateStatus])
+  }, [binding, updateStatus])
 
   return (
     <div
-      ref={containerRef}
+      onMouseDown={onFocus}
       className="h-full w-full bg-zinc-950"
       style={{
         display: isVisible ? 'block' : 'none',
         padding: '4px',
       }}
-    />
+    >
+      <div ref={containerRef} className="h-full w-full" />
+    </div>
   )
 }

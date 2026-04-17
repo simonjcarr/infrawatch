@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.44.2](https://github.com/simonjcarr/infrawatch/compare/web/v0.44.1...web/v0.44.2) (2026-04-17)
+
+
+### Bug Fixes
+
+* disable set-state-in-effect rule for one-shot hydration effect ([9630a11](https://github.com/simonjcarr/infrawatch/commit/9630a113b1bd2fb4fdd9b11d39f9fd0131533e8a))
+* hydrate terminal panel state after mount to avoid SSR mismatch ([48f9ed2](https://github.com/simonjcarr/infrawatch/commit/48f9ed257a6da35759a166798414f6a6c332952f))
+* terminal panel hydration mismatch breaking dashboard interactivity ([e255a9a](https://github.com/simonjcarr/infrawatch/commit/e255a9a114d527f6f49e2b2ea6a5d750dd07cf5c))
+
 ## [0.44.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.44.0...web/v0.44.1) (2026-04-17)
 
 

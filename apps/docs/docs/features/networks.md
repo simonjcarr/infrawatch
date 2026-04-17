@@ -50,6 +50,32 @@ A host can belong to multiple networks. Membership is managed from:
 
 ---
 
+## Graph View
+
+Both the all-networks page (**Hosts → Networks**) and each individual network detail page include a **Table / Graph** toggle in the top-right. Switching to **Graph** renders an interactive topology diagram:
+
+- **All-networks graph** — every network is shown as a node across the top row, with its member hosts as child nodes below. Hosts that belong to more than one network appear only once and are connected to each network they belong to.
+- **Network detail graph** — the selected network node sits above a grid of its member hosts.
+
+Each host node shows a coloured status dot (green online, red offline, slate unknown) and each network node shows its CIDR badge. The graph supports pan, zoom, minimap, and controls. All panels (controls, minimap, edges) respect the active light/dark theme.
+
+The graph data is fetched lazily — it is only loaded when you switch to the graph view, so the table view stays fast for large fleets.
+
+### Animated edges
+
+Edges between networks and hosts use a subtle dashed bezier path with a slow flowing animation. The animation is intentionally understated so the graph stays readable when zoomed out across many hosts. Edge colour uses the current theme's muted foreground, so it adapts to both light and dark mode.
+
+### Right-click host actions
+
+Right-clicking a host node in either graph opens a context menu with:
+
+- **Open terminal** — prompts for a username, then launches an in-app terminal session to that host (see the [Terminal feature](./terminal.md)).
+- **Open host detail** — navigates to the host's detail page.
+
+The context menu uses React Flow's `onNodeContextMenu` so the browser's native right-click menu is suppressed inside the graph pane.
+
+---
+
 ## Required Roles
 
 | Action | Required Role |

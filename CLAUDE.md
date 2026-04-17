@@ -370,7 +370,7 @@ The public documentation site lives in `apps/docs/docs/`. It is hosted on GitHub
 
 Do not wait until "later" to update the docs. If you implement a feature without updating the docs, the docs are wrong.
 
-The `apps/docs/docs/` directory structure mirrors the sidebar in `apps/docs/sidebars.ts`. If you add a new page, also add it to `sidebars.ts`.
+The docs site is built with **VuePress 2** (`@vuepress/theme-default`). The `apps/docs/docs/` directory structure mirrors the `sidebar` array in `apps/docs/docs/.vuepress/config.ts`. If you add a new page, also add it to that config file.
 
 ---
 

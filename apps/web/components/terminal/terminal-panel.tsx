@@ -1,6 +1,20 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   X,
   Plus,
@@ -8,18 +22,38 @@ import {
   ChevronUp,
   Terminal,
   Circle,
+  Check,
+  SplitSquareHorizontal,
+  SplitSquareVertical,
+  Pencil,
+  Palette,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
-import { useTerminalPanel } from './terminal-panel-context'
-import { TerminalSession } from './terminal-session'
+import {
+  useTerminalPanel,
+  TERMINAL_TAB_COLOR_PRESETS,
+  getTabColorPreset,
+  type TerminalTabInfo,
+  type TerminalTabColor,
+} from './terminal-panel-context'
+import { TerminalPaneTree } from './terminal-pane-tree'
 import { HostSelectorDialog } from './host-selector-dialog'
+import type { TerminalSessionStatus } from './terminal-session'
 
 interface Props {
   orgId: string
 }
-
-type TabStatus = 'connecting' | 'connected' | 'error' | 'closed'
 
 export function TerminalPanel({ orgId }: Props) {
   const {
@@ -31,18 +65,30 @@ export function TerminalPanel({ orgId }: Props) {
     setActiveTab,
     togglePanel,
     setPanelHeight,
+    reorderTabs,
+    setTabColor,
+    renameTab,
+    splitPane,
+    closePane,
+    setActivePane,
+    setSplitRatio,
   } = useTerminalPanel()
 
   const [hostSelectorOpen, setHostSelectorOpen] = useState(false)
-  const [tabStatuses, setTabStatuses] = useState<Record<string, TabStatus>>({})
+  // Status is now tracked per-pane, keyed by paneId
+  const [paneStatuses, setPaneStatuses] = useState<Record<string, TerminalSessionStatus>>({})
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const isResizing = useRef(false)
   const startY = useRef(0)
   const startHeight = useRef(0)
 
-  const handleStatusChange = useCallback((tabId: string, status: TabStatus) => {
-    setTabStatuses((prev) => ({ ...prev, [tabId]: status }))
-  }, [])
+  const handleSessionStatusChange = useCallback(
+    (paneId: string, status: TerminalSessionStatus) => {
+      setPaneStatuses((prev) => ({ ...prev, [paneId]: status }))
+    },
+    [],
+  )
 
   // Resize drag handlers
   const handleMouseDown = useCallback(
@@ -74,6 +120,21 @@ export function TerminalPanel({ orgId }: Props) {
     [panelHeight, setPanelHeight],
   )
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  )
+
+  const handleDragEnd = useCallback(
+    (e: DragEndEvent) => {
+      const { active, over } = e
+      if (!over || active.id === over.id) return
+      reorderTabs(String(active.id), String(over.id))
+    },
+    [reorderTabs],
+  )
+
   if (tabs.length === 0) {
     return (
       <HostSelectorDialog
@@ -84,13 +145,33 @@ export function TerminalPanel({ orgId }: Props) {
     )
   }
 
-  const statusColor = (tabId: string) => {
-    const s = tabStatuses[tabId]
+  // Aggregate status across all panes in a tab (worst state wins for the dot).
+  const tabAggregateStatus = (tab: TerminalTabInfo): TerminalSessionStatus | undefined => {
+    const paneIds = collectLeafIds(tab.paneTree)
+    let result: TerminalSessionStatus | undefined
+    const priority: Record<TerminalSessionStatus, number> = {
+      error: 4,
+      connecting: 3,
+      closed: 2,
+      connected: 1,
+    }
+    for (const id of paneIds) {
+      const s = paneStatuses[id]
+      if (!s) continue
+      if (!result || priority[s] > priority[result]) result = s
+    }
+    return result
+  }
+
+  const statusColor = (tab: TerminalTabInfo) => {
+    const s = tabAggregateStatus(tab)
     if (s === 'connected') return 'text-green-500'
     if (s === 'connecting') return 'text-amber-500 animate-pulse'
     if (s === 'error') return 'text-red-500'
     return 'text-zinc-500'
   }
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
 
   return (
     <>
@@ -110,38 +191,44 @@ export function TerminalPanel({ orgId }: Props) {
         {/* Tab bar */}
         <div className="flex items-center border-b border-border bg-muted/30 shrink-0">
           <div className="flex-1 flex items-center overflow-x-auto min-w-0">
-            {tabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={cn(
-                  'group flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer select-none shrink-0 max-w-48',
-                  tab.id === activeTabId
-                    ? 'bg-background text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                )}
-                onClick={() => {
-                  setActiveTab(tab.id)
-                  if (!isOpen) togglePanel()
-                }}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={tabs.map((t) => t.id)}
+                strategy={horizontalListSortingStrategy}
               >
-                <Circle className={cn('size-2 shrink-0 fill-current', statusColor(tab.id))} />
-                <span className="truncate">
-                  {tab.hostname}
-                  {tab.username && (
-                    <span className="text-muted-foreground ml-1">({tab.username})</span>
-                  )}
-                </span>
-                <button
-                  className="ml-1 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    closeTab(tab.id)
-                  }}
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
+                <div className="flex items-center min-w-0">
+                  {tabs.map((tab) => (
+                    <SortableTab
+                      key={tab.id}
+                      tab={tab}
+                      isActive={tab.id === activeTabId}
+                      statusColorClass={statusColor(tab)}
+                      isRenaming={renamingTabId === tab.id}
+                      onActivate={() => {
+                        setActiveTab(tab.id)
+                        if (!isOpen) togglePanel()
+                      }}
+                      onClose={() => closeTab(tab.id)}
+                      onStartRename={() => setRenamingTabId(tab.id)}
+                      onFinishRename={(label) => {
+                        renameTab(tab.id, label)
+                        setRenamingTabId(null)
+                      }}
+                      onCancelRename={() => setRenamingTabId(null)}
+                      onSetColor={(c) => setTabColor(tab.id, c)}
+                      onSplitActive={(dir) => {
+                        const active = tabs.find((t) => t.id === tab.id)
+                        if (active) splitPane(tab.id, active.activePaneId, dir)
+                      }}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
 
           <div className="flex items-center gap-0.5 px-2 shrink-0">
@@ -167,15 +254,29 @@ export function TerminalPanel({ orgId }: Props) {
         </div>
 
         {/* Terminal content */}
-        {isOpen && (
+        {isOpen && activeTab && (
           <div className="flex-1 min-h-0 relative">
             {tabs.map((tab) => (
-              <TerminalSession
+              <div
                 key={tab.id}
-                tab={tab}
-                isVisible={tab.id === activeTabId}
-                onStatusChange={handleStatusChange}
-              />
+                className="absolute inset-0"
+                style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}
+              >
+                <TerminalPaneTree
+                  tabId={tab.id}
+                  node={tab.paneTree}
+                  binding={tab.binding}
+                  isVisible={tab.id === activeTab.id}
+                  activePaneId={tab.activePaneId}
+                  onSessionStatusChange={handleSessionStatusChange}
+                  onFocusPane={(paneId) => setActivePane(tab.id, paneId)}
+                  onSplitPane={(paneId, dir) => splitPane(tab.id, paneId, dir)}
+                  onClosePane={(paneId) => closePane(tab.id, paneId)}
+                  onSplitRatioChange={(splitId, ratio) =>
+                    setSplitRatio(tab.id, splitId, ratio)
+                  }
+                />
+              </div>
             ))}
           </div>
         )}
@@ -187,6 +288,203 @@ export function TerminalPanel({ orgId }: Props) {
         orgId={orgId}
       />
     </>
+  )
+}
+
+/**
+ * Collect all leaf paneIds from a pane tree so we can aggregate status.
+ */
+function collectLeafIds(node: TerminalTabInfo['paneTree']): string[] {
+  if (node.type === 'leaf') return [node.id]
+  return [...collectLeafIds(node.children[0]), ...collectLeafIds(node.children[1])]
+}
+
+interface SortableTabProps {
+  tab: TerminalTabInfo
+  isActive: boolean
+  statusColorClass: string
+  isRenaming: boolean
+  onActivate: () => void
+  onClose: () => void
+  onStartRename: () => void
+  onFinishRename: (label: string) => void
+  onCancelRename: () => void
+  onSetColor: (color: TerminalTabColor | null) => void
+  onSplitActive: (direction: 'row' | 'column') => void
+}
+
+function SortableTab({
+  tab,
+  isActive,
+  statusColorClass,
+  isRenaming,
+  onActivate,
+  onClose,
+  onStartRename,
+  onFinishRename,
+  onCancelRename,
+  onSetColor,
+  onSplitActive,
+}: SortableTabProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: tab.id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const preset = getTabColorPreset(tab.color)
+  const displayLabel = tab.label ?? tab.binding.hostname
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={style}
+          className={cn(
+            'group relative flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer select-none shrink-0 max-w-48',
+            isActive
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+            preset && isActive && preset.tint,
+          )}
+          onClick={onActivate}
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            onStartRename()
+          }}
+          {...attributes}
+          {...listeners}
+        >
+          {/* Left colour accent bar */}
+          {preset && (
+            <span
+              aria-hidden
+              className={cn('absolute left-0 top-0 bottom-0 w-0.5', preset.accent)}
+            />
+          )}
+          <Circle className={cn('size-2 shrink-0 fill-current', statusColorClass)} />
+          {isRenaming ? (
+            <RenameInput
+              initial={tab.label ?? ''}
+              placeholder={tab.binding.hostname}
+              onCommit={onFinishRename}
+              onCancel={onCancelRename}
+            />
+          ) : (
+            <span className="truncate">
+              {displayLabel}
+              {tab.binding.username && !tab.label && (
+                <span className="text-muted-foreground ml-1">
+                  ({tab.binding.username})
+                </span>
+              )}
+            </span>
+          )}
+          <button
+            className="ml-1 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity shrink-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={onStartRename}>
+          <Pencil className="size-3.5" />
+          Rename
+        </ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Palette className="size-3.5" />
+            Tab colour
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-40">
+            <ContextMenuItem onClick={() => onSetColor(null)}>
+              <span className="size-3 rounded-full border border-border" />
+              No colour
+              {!tab.color && <Check className="ml-auto size-3.5" />}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            {TERMINAL_TAB_COLOR_PRESETS.map((c) => (
+              <ContextMenuItem key={c.value} onClick={() => onSetColor(c.value)}>
+                <span className={cn('size-3 rounded-full', c.swatch)} />
+                {c.label}
+                {tab.color === c.value && <Check className="ml-auto size-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => onSplitActive('row')}>
+          <SplitSquareVertical className="size-3.5" />
+          Split right
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onSplitActive('column')}>
+          <SplitSquareHorizontal className="size-3.5" />
+          Split down
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onClick={onClose}
+          variant="destructive"
+        >
+          <X className="size-3.5" />
+          Close tab
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+function RenameInput({
+  initial,
+  placeholder,
+  onCommit,
+  onCancel,
+}: {
+  initial: string
+  placeholder: string
+  onCommit: (value: string) => void
+  onCancel: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [value, setValue] = useState(initial)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          onCommit(value)
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          onCancel()
+        }
+        e.stopPropagation()
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={() => onCommit(value)}
+      className="h-5 px-1 w-28 rounded-sm border border-border bg-background text-foreground text-xs outline-none focus:ring-1 focus:ring-primary"
+    />
   )
 }
 

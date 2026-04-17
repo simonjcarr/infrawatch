@@ -43,6 +43,63 @@ function copyToClipboard(text: string) {
   void navigator.clipboard.writeText(text)
 }
 
+// Attributes that store a Windows file time (100-nanosecond intervals since 1601-01-01 UTC).
+const AD_FILETIME_ATTRS = new Set([
+  'accountexpires',
+  'badpasswordtime',
+  'pwdlastset',
+  'lastlogon',
+  'lastlogontimestamp',
+  'lastlogoff',
+  'lockouttime',
+  'msds-userpasswordexpirytimecomputed',
+  'msds-lastsuccessfulinteractivelogontime',
+  'msds-lastfailedinteractivelogontime',
+])
+
+// Attributes stored as LDAP Generalized Time (YYYYMMDDHHMMSS[.f]Z).
+const GENERALIZED_TIME_ATTRS = new Set([
+  'whencreated',
+  'whenchanged',
+  'pwdchangedtime',
+  'createtimestamp',
+  'modifytimestamp',
+])
+
+const AD_EPOCH_DIFF_MS = BigInt('11644473600000')
+const AD_NEVER_MAX = BigInt('9223372036854775807')
+
+function formatAdFileTime(raw: string): string | null {
+  let n: bigint
+  try {
+    n = BigInt(raw.trim())
+  } catch {
+    return null
+  }
+  if (n <= BigInt(0) || n === AD_NEVER_MAX) return 'Never'
+  const ms = Number(n / BigInt(10000) - AD_EPOCH_DIFF_MS)
+  if (!Number.isFinite(ms)) return null
+  const d = new Date(ms)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleString()
+}
+
+function formatGeneralizedTime(raw: string): string | null {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(raw.trim())
+  if (!m) return null
+  const [, y, mo, day, h, mi, s] = m
+  const d = new Date(`${y}-${mo}-${day}T${h}:${mi}:${s}Z`)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleString()
+}
+
+function humaniseTimestamp(key: string, value: string): string | null {
+  const k = key.toLowerCase()
+  if (AD_FILETIME_ATTRS.has(k)) return formatAdFileTime(value)
+  if (GENERALIZED_TIME_ATTRS.has(k)) return formatGeneralizedTime(value)
+  return null
+}
+
 export function DirectoryLookupClient({
   orgId,
   configs,
@@ -420,7 +477,7 @@ export function DirectoryLookupClient({
                   Groups
                   <Badge variant="outline">{selectedUser.groups.length}</Badge>
                 </CardTitle>
-                {selectedUser.groups.length > 5 && (
+                {selectedUser.groups.length > 0 && (
                   <div className="relative w-64">
                     <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
                     <Input
@@ -492,20 +549,28 @@ export function DirectoryLookupClient({
                   <p className="text-sm text-muted-foreground py-2">No attributes match &ldquo;{attrFilter}&rdquo;.</p>
                 ) : (
                   <div className="border rounded-md divide-y max-h-[30rem] overflow-y-auto">
-                    {filteredAttrs.map(([key, value]) => (
-                      <div key={key} className="grid grid-cols-[minmax(0,12rem)_1fr] gap-4 px-3 py-2 text-sm">
-                        <div className="font-mono text-xs font-medium text-foreground break-all">{key}</div>
-                        <div className="font-mono text-xs text-muted-foreground break-all whitespace-pre-wrap">
-                          {Array.isArray(value) ? (
-                            <ul className="space-y-1">
-                              {value.map((v, i) => <li key={i}>{v}</li>)}
-                            </ul>
-                          ) : (
-                            value
-                          )}
+                    {filteredAttrs.map(([key, value]) => {
+                      const humanised = !Array.isArray(value) ? humaniseTimestamp(key, value) : null
+                      return (
+                        <div key={key} className="grid grid-cols-[minmax(0,12rem)_1fr] gap-4 px-3 py-2 text-sm">
+                          <div className="font-mono text-xs font-medium text-foreground break-all">{key}</div>
+                          <div className="font-mono text-xs text-muted-foreground break-all whitespace-pre-wrap">
+                            {humanised ? (
+                              <div>
+                                <div className="font-sans text-xs text-foreground">{humanised}</div>
+                                <div className="text-[10px] opacity-60 mt-0.5">raw: {value}</div>
+                              </div>
+                            ) : Array.isArray(value) ? (
+                              <ul className="space-y-1">
+                                {value.map((v, i) => <li key={i}>{v}</li>)}
+                              </ul>
+                            ) : (
+                              value
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

@@ -65,6 +65,22 @@ Open tabs, their order, colours, labels, and pane layout are persisted across na
 
 ---
 
+## Terminal Settings
+
+### Default text size
+
+Click the **settings** (gear) icon in the terminal panel toolbar to open terminal preferences. The default text size slider controls the font used by every terminal tab. Changes apply immediately to all open terminals and are remembered across browser sessions (per user, per browser — stored in `localStorage`).
+
+Preset sizes are available for quick selection, with a reset button to return to the built-in default (13px).
+
+### Per-tab text size override
+
+To change the text size for a single tab without affecting the others, right-click the tab and choose **Text size**. Pick a preset size, or select **Use default** to clear the override and follow the global setting again. Per-tab overrides are remembered with the tab and persist until the tab is closed.
+
+This is useful for giving more pixels to a log-tail pane, or boosting a shared screen so attendees can read the commands being typed.
+
+---
+
 ## Shell Detection
 
 The agent automatically selects the appropriate shell for the host:

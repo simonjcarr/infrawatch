@@ -27,6 +27,8 @@ import {
   SplitSquareVertical,
   Pencil,
   Palette,
+  Settings2,
+  Type,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,6 +41,11 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import {
   useTerminalPanel,
@@ -47,6 +54,13 @@ import {
   type TerminalTabInfo,
   type TerminalTabColor,
 } from './terminal-panel-context'
+import {
+  useTerminalPreferences,
+  FONT_SIZE_PRESETS,
+  MIN_FONT_SIZE,
+  MAX_FONT_SIZE,
+  DEFAULT_FONT_SIZE,
+} from './terminal-preferences'
 import { TerminalPaneTree } from './terminal-pane-tree'
 import { HostSelectorDialog } from './host-selector-dialog'
 import type { TerminalSessionStatus } from './terminal-session'
@@ -72,7 +86,9 @@ export function TerminalPanel({ orgId }: Props) {
     closePane,
     setActivePane,
     setSplitRatio,
+    setTabFontSize,
   } = useTerminalPanel()
+  const { preferences, setFontSize: setGlobalFontSize } = useTerminalPreferences()
 
   const [hostSelectorOpen, setHostSelectorOpen] = useState(false)
   // Status is now tracked per-pane, keyed by paneId
@@ -224,6 +240,8 @@ export function TerminalPanel({ orgId }: Props) {
                         const active = tabs.find((t) => t.id === tab.id)
                         if (active) splitPane(tab.id, active.activePaneId, dir)
                       }}
+                      onSetFontSize={(size) => setTabFontSize(tab.id, size)}
+                      globalFontSize={preferences.fontSize}
                     />
                   ))}
                 </div>
@@ -241,6 +259,10 @@ export function TerminalPanel({ orgId }: Props) {
             >
               <Plus className="size-3.5" />
             </Button>
+            <TerminalSettingsPopover
+              fontSize={preferences.fontSize}
+              onFontSizeChange={setGlobalFontSize}
+            />
             <Button
               variant="ghost"
               size="icon"
@@ -268,6 +290,7 @@ export function TerminalPanel({ orgId }: Props) {
                   binding={tab.binding}
                   isVisible={tab.id === activeTab.id}
                   activePaneId={tab.activePaneId}
+                  fontSize={tab.fontSize ?? preferences.fontSize}
                   onSessionStatusChange={handleSessionStatusChange}
                   onFocusPane={(paneId) => setActivePane(tab.id, paneId)}
                   onSplitPane={(paneId, dir) => splitPane(tab.id, paneId, dir)}
@@ -304,6 +327,7 @@ interface SortableTabProps {
   isActive: boolean
   statusColorClass: string
   isRenaming: boolean
+  globalFontSize: number
   onActivate: () => void
   onClose: () => void
   onStartRename: () => void
@@ -311,6 +335,7 @@ interface SortableTabProps {
   onCancelRename: () => void
   onSetColor: (color: TerminalTabColor | null) => void
   onSplitActive: (direction: 'row' | 'column') => void
+  onSetFontSize: (size: number | null) => void
 }
 
 function SortableTab({
@@ -318,6 +343,7 @@ function SortableTab({
   isActive,
   statusColorClass,
   isRenaming,
+  globalFontSize,
   onActivate,
   onClose,
   onStartRename,
@@ -325,6 +351,7 @@ function SortableTab({
   onCancelRename,
   onSetColor,
   onSplitActive,
+  onSetFontSize,
 }: SortableTabProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: tab.id })
@@ -422,6 +449,31 @@ function SortableTab({
             ))}
           </ContextMenuSubContent>
         </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Type className="size-3.5" />
+            Text size
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            <ContextMenuItem onClick={() => onSetFontSize(null)}>
+              <span className="text-muted-foreground w-3 text-center text-[10px]">
+                ·
+              </span>
+              Use default ({globalFontSize}px)
+              {tab.fontSize === null && <Check className="ml-auto size-3.5" />}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            {FONT_SIZE_PRESETS.map((p) => (
+              <ContextMenuItem key={p.value} onClick={() => onSetFontSize(p.value)}>
+                <span className="text-muted-foreground w-3 text-center text-[10px]">
+                  {p.value}
+                </span>
+                {p.label}
+                {tab.fontSize === p.value && <Check className="ml-auto size-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => onSplitActive('row')}>
           <SplitSquareVertical className="size-3.5" />
@@ -485,6 +537,81 @@ function RenameInput({
       onBlur={() => onCommit(value)}
       className="h-5 px-1 w-28 rounded-sm border border-border bg-background text-foreground text-xs outline-none focus:ring-1 focus:ring-primary"
     />
+  )
+}
+
+/**
+ * Global terminal settings. Currently exposes only the default font size, but
+ * intentionally structured as a popover so more preferences can be added here
+ * (theme, cursor style, scrollback, etc.) without redesigning the toolbar.
+ */
+function TerminalSettingsPopover({
+  fontSize,
+  onFontSizeChange,
+}: {
+  fontSize: number
+  onFontSizeChange: (size: number) => void
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          title="Terminal settings"
+        >
+          <Settings2 className="size-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-3 space-y-3">
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-foreground">Terminal settings</div>
+          <div className="text-xs text-muted-foreground">
+            Applies to every terminal tab. Individual tabs can override these
+            defaults from their right-click menu.
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground flex items-center justify-between">
+            <span>Default text size</span>
+            <span className="tabular-nums text-foreground">{fontSize}px</span>
+          </label>
+          <input
+            type="range"
+            min={MIN_FONT_SIZE}
+            max={MAX_FONT_SIZE}
+            step={1}
+            value={fontSize}
+            onChange={(e) => onFontSizeChange(Number(e.target.value))}
+            className="w-full accent-primary"
+          />
+          <div className="flex flex-wrap gap-1 pt-1">
+            {FONT_SIZE_PRESETS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => onFontSizeChange(p.value)}
+                className={cn(
+                  'px-2 py-0.5 text-[11px] rounded border border-border transition-colors',
+                  fontSize === p.value
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
+                )}
+              >
+                {p.value}
+              </button>
+            ))}
+            <button
+              onClick={() => onFontSizeChange(DEFAULT_FONT_SIZE)}
+              className="px-2 py-0.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-auto"
+              title="Reset to factory default"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

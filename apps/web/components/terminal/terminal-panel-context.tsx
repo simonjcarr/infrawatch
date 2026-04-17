@@ -41,6 +41,8 @@ export interface TerminalTabInfo {
   label: string | null
   paneTree: TerminalPaneNode
   activePaneId: string
+  /** Optional per-tab font-size override. When null, the global preference is used. */
+  fontSize: number | null
 }
 
 interface TerminalPanelState {
@@ -71,6 +73,7 @@ interface TerminalPanelActions {
   closePane: (tabId: string, paneId: string) => void
   setActivePane: (tabId: string, paneId: string) => void
   setSplitRatio: (tabId: string, splitId: string, ratio: number) => void
+  setTabFontSize: (tabId: string, fontSize: number | null) => void
 }
 
 type TerminalPanelContextValue = TerminalPanelState & TerminalPanelActions
@@ -160,6 +163,7 @@ interface PersistedTab {
   color: TerminalTabColor | null
   label: string | null
   paneTree: TerminalPaneNode
+  fontSize: number | null
 }
 
 interface PersistedTerminalState {
@@ -198,6 +202,14 @@ function isValidPersistedTab(value: unknown): value is PersistedTab {
   if (t.color !== null && !COLOR_VALUES.has(t.color as TerminalTabColor)) return false
   if (t.label !== null && typeof t.label !== 'string') return false
   if (!isValidPaneTree(t.paneTree)) return false
+  // fontSize may be absent on state from older builds — accept null/missing/number.
+  if (
+    t.fontSize !== undefined &&
+    t.fontSize !== null &&
+    (typeof t.fontSize !== 'number' || !Number.isFinite(t.fontSize))
+  ) {
+    return false
+  }
   return true
 }
 
@@ -228,6 +240,7 @@ function loadPersistedState(): TerminalPanelState | null {
       label: t.label,
       paneTree: t.paneTree,
       activePaneId: findFirstLeafId(t.paneTree),
+      fontSize: typeof t.fontSize === 'number' ? t.fontSize : null,
     }))
 
     const restoredTab =
@@ -257,6 +270,7 @@ function persistState(state: TerminalPanelState): void {
         color: t.color,
         label: t.label,
         paneTree: t.paneTree,
+        fontSize: t.fontSize,
       })),
       activeTabIndex: state.activeTabId
         ? state.tabs.findIndex((t) => t.id === state.activeTabId)
@@ -305,6 +319,7 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
         label: null,
         paneTree: { type: 'leaf', id: paneId },
         activePaneId: paneId,
+        fontSize: null,
       }
 
       setState((prev) => ({
@@ -460,6 +475,13 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
     }))
   }, [])
 
+  const setTabFontSize = useCallback((tabId: string, fontSize: number | null) => {
+    setState((prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, fontSize } : t)),
+    }))
+  }, [])
+
   return (
     <TerminalPanelContext.Provider
       value={{
@@ -478,6 +500,7 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
         closePane,
         setActivePane,
         setSplitRatio,
+        setTabFontSize,
       }}
     >
       {children}

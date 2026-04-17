@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.46.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.45.0...web/v0.46.0) (2026-04-17)
+
+
+### Features
+
+* download agents as zip for offline/manual install ([ae060f9](https://github.com/simonjcarr/infrawatch/commit/ae060f9fdab891e2f4fc1693fbcadf646d8c5a73))
+* download agents as zip for offline/manual install ([7df1f04](https://github.com/simonjcarr/infrawatch/commit/7df1f04bfd16be0a1adb953e43bbaa99dd61945e)), closes [#244](https://github.com/simonjcarr/infrawatch/issues/244)
+
 ## [0.45.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.44.2...web/v0.45.0) (2026-04-17)
 
 

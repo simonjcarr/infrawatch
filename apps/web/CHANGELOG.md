@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.43.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.42.0...web/v0.43.0) (2026-04-17)
+
+
+### Features
+
+* terminal text size settings (global + per-tab) ([4332aab](https://github.com/simonjcarr/infrawatch/commit/4332aab64e855638ef027c8891f68a0a13f04e08))
+* terminal text size settings (global default + per-tab override) ([11635d4](https://github.com/simonjcarr/infrawatch/commit/11635d4b60f07b25f93264c4697ab061954489c1))
+
 ## [0.42.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.41.3...web/v0.42.0) (2026-04-17)
 
 

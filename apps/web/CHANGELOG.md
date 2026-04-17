@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.44.1](https://github.com/simonjcarr/infrawatch/compare/web/v0.44.0...web/v0.44.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* surface server-action errors in directory lookup ([1698e91](https://github.com/simonjcarr/infrawatch/commit/1698e917ac90e4755ec1ac935c032df687456649))
+* surface server-action errors in directory lookup typeahead ([5fe5ea0](https://github.com/simonjcarr/infrawatch/commit/5fe5ea0413fe9232cca5b97a0748dfb6e803a24c))
+
 ## [0.44.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.43.0...web/v0.44.0) (2026-04-17)
 
 

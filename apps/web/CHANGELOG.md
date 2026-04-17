@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.44.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.43.0...web/v0.44.0) (2026-04-17)
+
+
+### Features
+
+* directory user lookup (live LDAP query, no sync) ([b96037d](https://github.com/simonjcarr/infrawatch/commit/b96037dcd3d59b1426d99a86d9fba5e4944a7247))
+* directory user lookup (live LDAP query, no sync) ([dd954ca](https://github.com/simonjcarr/infrawatch/commit/dd954ca62dcb34d766343bf6008fc5634eafbd91))
+
 ## [0.43.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.42.0...web/v0.43.0) (2026-04-17)
 
 

@@ -1,6 +1,6 @@
 # Hosts & Inventory
 
-The Hosts page is the primary inventory view in Infrawatch. It shows every server that has registered an agent, along with real-time status, recent vitals, and quick access to all host-level tooling.
+The Hosts page is the primary inventory view in CT-Ops. It shows every server that has registered an agent, along with real-time status, recent vitals, and quick access to all host-level tooling.
 
 ---
 
@@ -74,7 +74,7 @@ To reject a pending agent, click **Revoke**.
 
 ## Duplicate-Host Protection
 
-Two live hosts in the same organisation cannot share a hostname or IP address — on a real network that would be a configuration error. Infrawatch enforces this at two points:
+Two live hosts in the same organisation cannot share a hostname or IP address — on a real network that would be a configuration error. CT-Ops enforces this at two points:
 
 - **At registration time** — when an agent calls `Register`, the ingest service checks for an existing non-deleted host in the same organisation whose hostname matches or whose reported IP addresses overlap any of the new agent's IPs.
 - **At approval time** — the same check runs when an admin approves a pending agent, in case a collision emerged while the agent was queued.
@@ -146,7 +146,7 @@ Hosts can be organised into **Host Groups** for bulk operations, scoped alert ru
 
 Hosts are soft-deleted — the record is retained for audit purposes but the host is hidden from the inventory. To permanently remove a host, revoke its agent and delete the host record from the detail page.
 
-If the agent is currently **online**, the delete dialog offers an **"Also uninstall agent from the remote host"** checkbox. When checked, Infrawatch dispatches an `agent_uninstall` task before removing the host record. The agent runs the uninstaller as a detached child process so it can complete even after the service manager terminates the agent process:
+If the agent is currently **online**, the delete dialog offers an **"Also uninstall agent from the remote host"** checkbox. When checked, CT-Ops dispatches an `agent_uninstall` task before removing the host record. The agent runs the uninstaller as a detached child process so it can complete even after the service manager terminates the agent process:
 
 - **Linux (systemd)**: uninstaller runs in a transient systemd unit (`systemd-run --no-block`) so it is not killed when the agent's cgroup is torn down
 - **Linux (non-systemd)**: falls back to a new session (`setsid`)

@@ -1,6 +1,6 @@
 # Docker Compose Deployment
 
-The recommended way to run Infrawatch in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database) on a single host using pre-built images from GHCR.
+The recommended way to run CT-Ops in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database) on a single host using pre-built images from GHCR.
 
 ---
 
@@ -17,7 +17,7 @@ The recommended way to run Infrawatch in production is via `docker-compose.singl
 ```bash
 # Download the deployment bundle
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
-cd infrawatch
+cd ct-ops
 
 # First run: creates .env with defaults, then exits
 ./start.sh
@@ -40,7 +40,7 @@ If you prefer to manage the deployment yourself:
 ### 1. Create a directory and download the compose file
 
 ```bash
-mkdir infrawatch && cd infrawatch
+mkdir ct-ops && cd ct-ops
 curl -fsSL https://github.com/carrtech-dev/ct-ops/releases/latest/download/docker-compose.single.yml \
   -o docker-compose.single.yml
 ```
@@ -50,9 +50,9 @@ curl -fsSL https://github.com/carrtech-dev/ct-ops/releases/latest/download/docke
 ```bash
 # Minimum required variables
 cat > .env <<'EOF'
-POSTGRES_USER=infrawatch
+POSTGRES_USER=ct-ops
 POSTGRES_PASSWORD=change-me
-POSTGRES_DB=infrawatch
+POSTGRES_DB=ct-ops
 BETTER_AUTH_SECRET=change-me-to-a-long-random-string
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
@@ -69,7 +69,7 @@ Change `BETTER_AUTH_SECRET` before going to production. Use at least 32 random c
 mkdir -p deploy/dev-tls
 openssl req -x509 -newkey rsa:4096 -keyout deploy/dev-tls/server.key \
   -out deploy/dev-tls/server.crt -days 365 -nodes \
-  -subj "/CN=infrawatch-ingest"
+  -subj "/CN=ct-ops-ingest"
 ```
 
 For production, use a certificate from your corporate CA or Let's Encrypt.
@@ -95,8 +95,8 @@ The web container runs database migrations automatically on first start. Once yo
 | Service | Image | Port(s) | Description |
 |---|---|---|---|
 | `db` | `timescale/timescaledb:latest-pg16` | 5432 | PostgreSQL + TimescaleDB |
-| `web` | `ghcr.io/carrtech-dev/infrawatch/web:latest` | 3000 | Next.js web app |
-| `ingest` | `ghcr.io/carrtech-dev/infrawatch/ingest:latest` | 9443, 8080 | gRPC ingest + JWKS |
+| `web` | `ghcr.io/carrtech-dev/ct-ops/web:latest` | 3000 | Next.js web app |
+| `ingest` | `ghcr.io/carrtech-dev/ct-ops/ingest:latest` | 9443, 8080 | gRPC ingest + JWKS |
 
 ---
 
@@ -120,11 +120,11 @@ Back up the PostgreSQL database and the ingest JWT key:
 ```bash
 # Database backup
 docker compose -f docker-compose.single.yml exec db \
-  pg_dump -U infrawatch infrawatch > backup-$(date +%Y%m%d).sql
+  pg_dump -U ct-ops ct-ops > backup-$(date +%Y%m%d).sql
 
 # JWT key backup (losing this forces all agents to re-register)
 docker compose -f docker-compose.single.yml cp \
-  ingest:/var/lib/infrawatch/jwt_key.pem ./jwt_key.pem.bak
+  ingest:/var/lib/ct-ops/jwt_key.pem ./jwt_key.pem.bak
 ```
 
 ---
@@ -148,10 +148,10 @@ To expose the web UI on port 443 with TLS termination, add nginx or Caddy in fro
 ```nginx title="nginx.conf (example)"
 server {
     listen 443 ssl;
-    server_name infrawatch.corp.example.com;
+    server_name ct-ops.corp.example.com;
 
-    ssl_certificate     /etc/ssl/infrawatch.crt;
-    ssl_certificate_key /etc/ssl/infrawatch.key;
+    ssl_certificate     /etc/ssl/ct-ops.crt;
+    ssl_certificate_key /etc/ssl/ct-ops.key;
 
     location / {
         proxy_pass http://localhost:3000;

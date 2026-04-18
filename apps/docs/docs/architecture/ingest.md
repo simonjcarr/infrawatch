@@ -31,7 +31,7 @@ All configuration is via environment variables:
 | `DATABASE_URL` | ✓ | — | PostgreSQL connection string |
 | `INGEST_TLS_CERT` | ✓ | — | Path to TLS certificate (PEM) |
 | `INGEST_TLS_KEY` | ✓ | — | Path to TLS private key (PEM) |
-| `INGEST_JWT_KEY_FILE` | — | `/var/lib/infrawatch/jwt_key.pem` | RSA private key for JWT signing. Auto-generated on first start if missing. |
+| `INGEST_JWT_KEY_FILE` | — | `/var/lib/ct-ops/jwt_key.pem` | RSA private key for JWT signing. Auto-generated on first start if missing. |
 | `INGEST_GRPC_PORT` | — | `9443` | gRPC listener port |
 | `INGEST_HTTP_PORT` | — | `8080` | HTTP port for JWKS and health check |
 | `INGEST_AGENT_DOWNLOAD_BASE_URL` | — | `http://localhost:3000` | Public URL of the web app — agents construct their binary download URL from this. Must be reachable from agent hosts. |
@@ -105,7 +105,7 @@ The RSA key is loaded from `INGEST_JWT_KEY_FILE` at startup. If the file does no
 
 JWTs are signed with RS256 and include:
 - `sub` — agent ID
-- `iss` — `infrawatch-ingest`
+- `iss` — `ct-ops-ingest`
 - `exp` — 24 h from issuance
 
 ---

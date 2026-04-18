@@ -1,8 +1,8 @@
 # Installation
 
-This guide walks you through getting Infrawatch running — from zero to a real agent showing up as online in the host inventory.
+This guide walks you through getting CT-Ops running — from zero to a real agent showing up as online in the host inventory.
 
-There are two ways to run Infrawatch:
+There are two ways to run CT-Ops:
 
 - **[Option A — Pre-built images from GHCR](#option-a--pre-built-images-from-ghcr)** — Fastest. No clone required, just a `docker-compose.yml` and an env file.
 - **[Option B — Build from source](#option-b--build-from-source)** — For development or if you want to modify the code.
@@ -21,11 +21,11 @@ That's it. No local Go, Node.js, or pnpm required.
 
 ## Option A — Pre-built images from GHCR
 
-The fastest way to get Infrawatch running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release:
+The fastest way to get CT-Ops running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
-cd infrawatch
+cd ct-ops
 ./start.sh        # first run: creates .env from the example, then exits
 $EDITOR .env      # set BETTER_AUTH_URL, AGENT_DOWNLOAD_BASE_URL, etc.
 ./start.sh        # second run: generates secret, certs, pulls images, boots
@@ -34,7 +34,7 @@ $EDITOR .env      # set BETTER_AUTH_URL, AGENT_DOWNLOAD_BASE_URL, etc.
 To pin a specific version:
 
 ```bash
-INFRAWATCH_VERSION=v0.3.0 curl -fsSL ... | bash
+CT_OPS_VERSION=v0.3.0 curl -fsSL ... | bash
 ```
 
 `start.sh` generates dev TLS certs, generates `BETTER_AUTH_SECRET` if blank, pulls images from GHCR, and starts the stack. Database migrations run inside the web container automatically on startup.
@@ -48,8 +48,8 @@ When all three containers show `healthy` in `docker compose ps`, continue to [Cr
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/carrtech-dev/ct-ops infrawatch
-cd infrawatch
+git clone https://github.com/carrtech-dev/ct-ops ct-ops
+cd ct-ops
 ```
 
 ### 2. Generate dev TLS certificates
@@ -69,7 +69,7 @@ cp apps/web/.env.example apps/web/.env.local
 Edit `apps/web/.env.local` and set at minimum:
 
 ```env
-DATABASE_URL=postgresql://infrawatch:infrawatch@localhost:5432/infrawatch
+DATABASE_URL=postgresql://ct-ops:ct-ops@localhost:5432/ct-ops
 BETTER_AUTH_SECRET=a-long-random-string-change-this
 BETTER_AUTH_URL=http://localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -140,7 +140,7 @@ ca_cert_file = "deploy/dev-tls/server.crt"
 
 [agent]
 org_token = "YOUR_ENROLMENT_TOKEN"
-data_dir = "/tmp/infrawatch-agent"
+data_dir = "/tmp/ct-ops-agent"
 version = "0.1.0"
 heartbeat_interval_secs = 30
 ```
@@ -154,7 +154,7 @@ Run it:
 Expected output:
 
 ```
-level=INFO msg="agent identity ready" data_dir=/tmp/infrawatch-agent
+level=INFO msg="agent identity ready" data_dir=/tmp/ct-ops-agent
 level=INFO msg="registering agent" address=localhost:9443
 level=INFO msg="registration response" status=active agent_id=abc123...
 level=INFO msg="starting heartbeat" interval_secs=30

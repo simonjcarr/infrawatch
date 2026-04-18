@@ -1,6 +1,6 @@
 # Configuration
 
-All Infrawatch configuration is via environment variables. There are no config files for the web app or ingest service in production — just set env vars in your `.env` file or compose config.
+All CT-Ops configuration is via environment variables. There are no config files for the web app or ingest service in production — just set env vars in your `.env` file or compose config.
 
 ---
 
@@ -10,17 +10,17 @@ All Infrawatch configuration is via environment variables. There are no config f
 |---|---|---|---|
 | `DATABASE_URL` | ✓ | — | PostgreSQL connection string |
 | `BETTER_AUTH_SECRET` | ✓ | — | Secret key for signing sessions (min 32 chars, keep private) |
-| `BETTER_AUTH_URL` | ✓ | — | Public URL of the web app (e.g. `https://infrawatch.corp.example.com`) |
+| `BETTER_AUTH_URL` | ✓ | — | Public URL of the web app (e.g. `https://ct-ops.corp.example.com`) |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | — | Same as `BETTER_AUTH_URL` | Comma-separated list of allowed origins for CORS |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |
-| `AGENT_DIST_DIR` | — | `/var/lib/infrawatch/agent-dist` | Directory where compiled agent binaries are stored for download |
+| `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download |
 | `INGEST_WS_URL` | — | `ws://localhost:8080` | WebSocket URL of the ingest service (for real-time agent status) |
 
 ### Example `.env.local` (development)
 
 ```env
-DATABASE_URL=postgresql://infrawatch:infrawatch@localhost:5432/infrawatch
+DATABASE_URL=postgresql://ct-ops:ct-ops@localhost:5432/ct-ops
 BETTER_AUTH_SECRET=change-me-to-something-long-and-random-in-production
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
@@ -37,7 +37,7 @@ INGEST_WS_URL=ws://localhost:8080
 | `DATABASE_URL` | ✓ | — | PostgreSQL connection string |
 | `INGEST_TLS_CERT` | ✓ | — | Path to TLS certificate file (PEM) |
 | `INGEST_TLS_KEY` | ✓ | — | Path to TLS private key file (PEM) |
-| `INGEST_JWT_KEY_FILE` | — | `/var/lib/infrawatch/jwt_key.pem` | Path to RSA private key for JWT signing (auto-generated if missing) |
+| `INGEST_JWT_KEY_FILE` | — | `/var/lib/ct-ops/jwt_key.pem` | Path to RSA private key for JWT signing (auto-generated if missing) |
 | `INGEST_GRPC_PORT` | — | `9443` | gRPC listener port |
 | `INGEST_HTTP_PORT` | — | `8080` | HTTP port for JWKS endpoint and health check |
 | `INGEST_AGENT_DOWNLOAD_BASE_URL` | — | `http://localhost:3000` | Public URL of the web app — agents construct their binary download URL from this |
@@ -59,15 +59,15 @@ address = "ingest.corp.example.com:9443"
 
 # Optional: path to CA cert for self-signed/corporate TLS
 # Leave empty if ingest uses a publicly trusted certificate
-ca_cert_file = "/etc/infrawatch/ca.crt"
+ca_cert_file = "/etc/ct-ops/ca.crt"
 
 [agent]
 # Enrolment token from Settings → Agent Enrolment
-# Can also be set via INFRAWATCH_ORG_TOKEN env var
+# Can also be set via CT_OPS_ORG_TOKEN env var
 org_token = "tok_..."
 
 # Directory where agent stores its identity (keypair + JWT)
-data_dir = "/var/lib/infrawatch/agent"
+data_dir = "/var/lib/ct-ops/agent"
 
 # Agent version string (set by build system)
 version = "0.1.0"
@@ -82,10 +82,10 @@ All TOML values can be overridden via environment variables:
 
 | Environment variable | TOML path |
 |---|---|
-| `INFRAWATCH_INGEST_ADDRESS` | `ingest.address` |
-| `INFRAWATCH_INGEST_CA_CERT` | `ingest.ca_cert_file` |
-| `INFRAWATCH_ORG_TOKEN` | `agent.org_token` |
-| `INFRAWATCH_DATA_DIR` | `agent.data_dir` |
+| `CT_OPS_INGEST_ADDRESS` | `ingest.address` |
+| `CT_OPS_INGEST_CA_CERT` | `ingest.ca_cert_file` |
+| `CT_OPS_ORG_TOKEN` | `agent.org_token` |
+| `CT_OPS_DATA_DIR` | `agent.data_dir` |
 
 ---
 

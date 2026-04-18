@@ -1,6 +1,6 @@
 # Alerts
 
-Alert rules define the conditions under which Infrawatch generates a notification. Rules are evaluated by the alerts consumer as metrics and check results arrive from the queue.
+Alert rules define the conditions under which CT-Ops generates a notification. Rules are evaluated by the alerts consumer as metrics and check results arrive from the queue.
 
 ---
 

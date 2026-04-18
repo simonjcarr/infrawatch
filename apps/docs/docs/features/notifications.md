@@ -1,6 +1,6 @@
 # Notifications
 
-Infrawatch supports multiple notification channels. Each alert rule specifies which channels its notifications are routed to.
+CT-Ops supports multiple notification channels. Each alert rule specifies which channels its notifications are routed to.
 
 ---
 

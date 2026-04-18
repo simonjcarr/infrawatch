@@ -14,7 +14,7 @@ There are four places tags can originate, merged in weakest-to-strongest order:
 2. **Enrolment token** — chosen when creating an install token. Baked into the
    install bundle so every machine installed with that bundle registers with
    those tags.
-3. **Agent CLI** — repeatable `--tag key=value` flag on `infrawatch-agent`.
+3. **Agent CLI** — repeatable `--tag key=value` flag on `ct-ops-agent`.
    Overrides conflicting keys from the bundle config.
 4. **Saved tag rules** — dynamic filters that apply tags on host approval and
    on demand. Run last and only fill in keys not already set, so they never
@@ -47,7 +47,7 @@ demand from the admin page. Disable a rule to pause it without deleting.
 ## CLI reference
 
 ```
-infrawatch-agent --tag env=prod --tag team=platform
+ct-ops-agent --tag env=prod --tag team=platform
 ```
 
 The flag is repeatable. `key=value` and `key:value` are both accepted. CLI
@@ -56,7 +56,7 @@ tags override config-file tags on conflicting keys.
 Install-time:
 
 ```
-infrawatch-agent --install --token <token> --tag datacenter=eu-west-1
+ct-ops-agent --install --token <token> --tag datacenter=eu-west-1
 ```
 
 Tags passed at install time are written into the persisted config so the

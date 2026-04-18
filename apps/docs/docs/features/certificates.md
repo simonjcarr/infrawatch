@@ -1,6 +1,6 @@
 # Certificate Management
 
-Infrawatch discovers TLS certificates on your hosts automatically and tracks their expiry dates — so you know about certificate expirations before they cause outages.
+CT-Ops discovers TLS certificates on your hosts automatically and tracks their expiry dates — so you know about certificate expirations before they cause outages.
 
 ---
 

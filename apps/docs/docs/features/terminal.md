@@ -1,6 +1,6 @@
 # Terminal
 
-Infrawatch provides a persistent, browser-based terminal that gives you shell access to any host that has an active agent — without needing SSH configured or a VPN connection.
+CT-Ops provides a persistent, browser-based terminal that gives you shell access to any host that has an active agent — without needing SSH configured or a VPN connection.
 
 ---
 
@@ -88,7 +88,7 @@ The agent automatically selects the appropriate shell for the host:
 - **Linux** — detects `bash` first, falls back to `sh`
 - **macOS** — `zsh` first, then `bash`, then `sh`
 
-The shell is launched as the `infrawatch` service user on the host. The user must have the appropriate permissions for the commands you need to run.
+The shell is launched as the `ct-ops` service user on the host. The user must have the appropriate permissions for the commands you need to run.
 
 ---
 

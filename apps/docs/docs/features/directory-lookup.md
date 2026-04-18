@@ -1,8 +1,8 @@
 # Directory User Lookup
 
-Live on-demand lookup of users in your LDAP or Active Directory server. Results are queried at the moment you search — nothing is ever synced or stored in Infrawatch.
+Live on-demand lookup of users in your LDAP or Active Directory server. Results are queried at the moment you search — nothing is ever synced or stored in CT-Ops.
 
-This tool is intended for environments where syncing thousands of directory users into Infrawatch would be wasteful or unwanted, but engineers still need to quickly check a user's directory details: DN, password expiry, group memberships, and other LDAP attributes.
+This tool is intended for environments where syncing thousands of directory users into CT-Ops would be wasteful or unwanted, but engineers still need to quickly check a user's directory details: DN, password expiry, group memberships, and other LDAP attributes.
 
 ---
 
@@ -28,7 +28,7 @@ The username search uses your configuration's `userSearchFilter` with the typed 
 
 ## What you see
 
-Once a user is selected, Infrawatch queries the directory for all attributes on that DN (both user and operational attributes) and displays:
+Once a user is selected, CT-Ops queries the directory for all attributes on that DN (both user and operational attributes) and displays:
 
 - **Summary** — display name, username, status badge (locked/active), email, sAMAccountName, UPN, distinguished name (copyable)
 - **Password** — expires, last changed, account locked status
@@ -41,9 +41,9 @@ Once a user is selected, Infrawatch queries the directory for all attributes on 
 
 ## No sync, no storage
 
-Directory Lookup never writes results to the Infrawatch database. Every search produces a fresh query against the directory — you always see the current state.
+Directory Lookup never writes results to the CT-Ops database. Every search produces a fresh query against the directory — you always see the current state.
 
-This is intentional for environments where the directory contains tens of thousands of users and groups. If you want to track a handful of directory accounts inside Infrawatch (for status or password-expiry monitoring), add them manually on the **[Service Accounts](./service-accounts.md)** page.
+This is intentional for environments where the directory contains tens of thousands of users and groups. If you want to track a handful of directory accounts inside CT-Ops (for status or password-expiry monitoring), add them manually on the **[Service Accounts](./service-accounts.md)** page.
 
 ---
 

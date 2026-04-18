@@ -1,6 +1,6 @@
 # Licensing & Tiers
 
-Infrawatch is available in three tiers:
+CT-Ops is available in three tiers:
 
 - **Community** — free, open source (Apache 2.0). Everything an engineer or small team needs day-to-day.
 - **Pro** — the bulk of paid value: expiry tracking, reports, governance basics, and common corporate IdP integration.
@@ -58,11 +58,11 @@ Everything in Pro, plus:
 
 ## How licensing works
 
-Infrawatch uses an **offline-capable** licence model. There is no phone-home, no activation server, and no network dependency for validation. This is essential for air-gapped deployments.
+CT-Ops uses an **offline-capable** licence model. There is no phone-home, no activation server, and no network dependency for validation. This is essential for air-gapped deployments.
 
 ### Key format
 
-A licence key is a signed JSON Web Token (JWT, RS256). The public key is bundled into every Infrawatch build. The private signing key is held only by the licence issuance service.
+A licence key is a signed JSON Web Token (JWT, RS256). The public key is bundled into every CT-Ops build. The private signing key is held only by the licence issuance service.
 
 Every key encodes:
 
@@ -81,11 +81,11 @@ Every key encodes:
 3. Paste the key into **Settings → Licence → Licence key**.
 4. The server validates the signature, issuer, audience, and expiry locally. No outbound request is made.
 
-For air-gapped installs: download the key on a connected machine, transfer to the target network, and paste into the Infrawatch UI.
+For air-gapped installs: download the key on a connected machine, transfer to the target network, and paste into the CT-Ops UI.
 
 ### Renewal & expiry
 
-Licences are time-limited via the `exp` claim. When a licence expires, Infrawatch silently falls back to the **Community** tier — no hard shutdown. Paid features become unavailable until a new key is pasted in. Renew at least a few days before expiry to avoid interruption.
+Licences are time-limited via the `exp` claim. When a licence expires, CT-Ops silently falls back to the **Community** tier — no hard shutdown. Paid features become unavailable until a new key is pasted in. Renew at least a few days before expiry to avoid interruption.
 
 ### Revocation
 
@@ -109,7 +109,7 @@ Community installs see a **"Pro"** badge on each locked entry in the sidebar and
 
 ## Circumvention and support
 
-Infrawatch is source-available. A determined engineer with build access can, technically, patch out licence checks. We rely on:
+CT-Ops is source-available. A determined engineer with build access can, technically, patch out licence checks. We rely on:
 
 - **Legal** — the commercial licence agreement forbids removal or modification of licence checks.
 - **Detection** — tampered builds log telltale signals that are visible to our support team.

@@ -12,7 +12,7 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/docs/package.json ./apps/docs/package.json
-RUN pnpm install --filter @infrawatch/docs --frozen-lockfile
+RUN pnpm install --filter @ct-ops/docs --frozen-lockfile
 
 # ------------------------------------------------------------------
 # Build stage: run VuePress build
@@ -22,7 +22,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/docs/node_modules ./apps/docs/node_modules
 COPY apps/docs ./apps/docs
-RUN pnpm --filter @infrawatch/docs build
+RUN pnpm --filter @ct-ops/docs build
 
 # ------------------------------------------------------------------
 # Runtime stage: nginx serving the static output

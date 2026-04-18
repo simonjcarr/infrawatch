@@ -123,6 +123,14 @@ export async function deleteCertificate(
   orgId: string,
   certId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  if (session.user.organisationId !== orgId) {
+    return { error: 'Organisation mismatch' }
+  }
+  if (session.user.role === 'read_only') {
+    return { error: 'Insufficient permissions to delete certificates' }
+  }
+
   await requireFeature(orgId, 'certExpiryTracker')
   const existing = await db.query.certificates.findFirst({
     where: and(

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.53.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.52.0...web/v0.53.0) (2026-04-18)
+
+
+### Features
+
+* split host Tools tabs so Tasks shows only user-triggered runs ([d8335e7](https://github.com/carrtech-dev/ct-ops/commit/d8335e7083192091c3909aea2fe924ecb7e91fd5))
+
 ## [0.52.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.51.0...web/v0.52.0) (2026-04-18)
 
 

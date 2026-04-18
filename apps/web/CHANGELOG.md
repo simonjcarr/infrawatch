@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.54.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.54.0...web/v0.54.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* correct docs base path and rename simonjcarr/infrawatch to carrtech-dev/ct-ops ([1a5dc35](https://github.com/carrtech-dev/ct-ops/commit/1a5dc35ab6941759e0c495d12678021ffb381ae9))
+* correct docs base path and replace simonjcarr/infrawatch references ([349eacd](https://github.com/carrtech-dev/ct-ops/commit/349eacde1db368f02234726bb6a075f2082c1d75))
+
 ## [0.54.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.53.0...web/v0.54.0) (2026-04-18)
 
 

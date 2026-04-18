@@ -34,6 +34,7 @@ services:
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
       NODE_ENV: production
       AGENT_DIST_DIR: /var/lib/infrawatch/agent-dist
+      AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
       INGEST_WS_URL: ${INGEST_WS_URL:-ws://localhost:8080}
     volumes:
       - agent_dist:/var/lib/infrawatch/agent-dist

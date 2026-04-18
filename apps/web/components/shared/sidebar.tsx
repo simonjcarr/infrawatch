@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { TerminalPanelTrigger } from '@/components/terminal'
+import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
 import pkg from '../../package.json'
 
 const WEB_VERSION = `v${pkg.version}`
@@ -50,6 +51,7 @@ interface NavChild {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
+  feature?: Feature
 }
 
 interface NavItem {
@@ -57,6 +59,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
+  feature?: Feature
   children?: NavChild[]
 }
 
@@ -74,8 +77,8 @@ const primaryNav: NavItem[] = [
   },
   { title: 'Checks & Alerts', href: '/alerts', icon: Bell },
   { title: 'Notifications', href: '/notifications', icon: BellPlus },
-  { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
-  { title: 'Service Accounts', href: '/service-accounts', icon: Key },
+  { title: 'Certificates', href: '/certificates', icon: ShieldCheck, feature: 'certExpiryTracker' },
+  { title: 'Service Accounts', href: '/service-accounts', icon: Key, feature: 'serviceAccountTracker' },
 ]
 
 const reportingNav: NavItem[] = [
@@ -83,8 +86,9 @@ const reportingNav: NavItem[] = [
     title: 'Reports',
     href: '/reports',
     icon: FileBarChart,
+    feature: 'reportsExport',
     children: [
-      { title: 'Installed Software', href: '/reports/software', icon: Package },
+      { title: 'Installed Software', href: '/reports/software', icon: Package, feature: 'reportsExport' },
     ],
   },
 ]
@@ -113,7 +117,21 @@ const adminNav: NavItem[] = [
   },
 ]
 
-function CollapsibleNavItem({ item }: { item: NavItem & { children: NavChild[] } }) {
+function ProBadge() {
+  return (
+    <span className="ml-auto rounded-sm border border-sidebar-border/70 px-1 py-0 text-[9px] font-semibold uppercase tracking-wide text-sidebar-foreground/60">
+      Pro
+    </span>
+  )
+}
+
+function CollapsibleNavItem({
+  item,
+  tier,
+}: {
+  item: NavItem & { children: NavChild[] }
+  tier: LicenceTier
+}) {
   const pathname = usePathname()
 
   // Auto-open if any child (or the parent itself) is active
@@ -127,6 +145,7 @@ function CollapsibleNavItem({ item }: { item: NavItem & { children: NavChild[] }
   // For /hosts specifically: active when on /hosts exactly or /hosts/groups/* but NOT /hosts/[id]
   // The parent highlight just needs to know if we're somewhere in the subtree
   const defaultOpen = isParentActive || isAnyChildActive
+  const parentLocked = item.feature ? !hasFeature(tier, item.feature) : false
 
   return (
     <CollapsiblePrimitive.Root defaultOpen={defaultOpen}>
@@ -145,9 +164,11 @@ function CollapsibleNavItem({ item }: { item: NavItem & { children: NavChild[] }
               )}
             />
             <span>{item.title}</span>
+            {parentLocked ? <ProBadge /> : null}
             <ChevronRight
               className={cn(
-                'ml-auto size-3 text-sidebar-foreground/50 transition-transform duration-200',
+                'size-3 text-sidebar-foreground/50 transition-transform duration-200',
+                parentLocked ? 'ml-1' : 'ml-auto',
                 defaultOpen && 'rotate-90'
               )}
             />
@@ -162,6 +183,7 @@ function CollapsibleNavItem({ item }: { item: NavItem & { children: NavChild[] }
                 child.href === '/hosts' || child.href === '/settings'
                   ? pathname === child.href
                   : pathname.startsWith(child.href)
+              const childLocked = child.feature ? !hasFeature(tier, child.feature) : false
               return (
                 <SidebarMenuSubItem key={child.href}>
                   <SidebarMenuSubButton asChild isActive={isActive}>
@@ -173,6 +195,7 @@ function CollapsibleNavItem({ item }: { item: NavItem & { children: NavChild[] }
                         )}
                       />
                       <span>{child.title}</span>
+                      {childLocked ? <ProBadge /> : null}
                     </Link>
                   </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
@@ -185,25 +208,33 @@ function CollapsibleNavItem({ item }: { item: NavItem & { children: NavChild[] }
   )
 }
 
-function NavGroupItems({ items }: { items: NavItem[] }) {
+function NavGroupItems({ items, tier }: { items: NavItem[]; tier: LicenceTier }) {
   const pathname = usePathname()
   return (
     <>
       {items.map((item) => {
         if (item.children && item.children.length > 0) {
-          return <CollapsibleNavItem key={item.href} item={item as NavItem & { children: NavChild[] }} />
+          return (
+            <CollapsibleNavItem
+              key={item.href}
+              item={item as NavItem & { children: NavChild[] }}
+              tier={tier}
+            />
+          )
         }
 
         const isActive =
           item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href)
+        const locked = item.feature ? !hasFeature(tier, item.feature) : false
         return (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton asChild isActive={isActive}>
               <Link href={item.href}>
                 <item.icon className={cn('size-4', isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/70')} />
                 <span>{item.title}</span>
+                {locked ? <ProBadge /> : null}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -213,20 +244,34 @@ function NavGroupItems({ items }: { items: NavItem[] }) {
   )
 }
 
-function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+function NavGroup({
+  label,
+  items,
+  tier,
+}: {
+  label: string
+  items: NavItem[]
+  tier: LicenceTier
+}) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          <NavGroupItems items={items} />
+          <NavGroupItems items={items} tier={tier} />
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
   )
 }
 
-export function AppSidebar({ orgId }: { orgId: string }) {
+const TIER_LABEL: Record<LicenceTier, string> = {
+  community: 'Community Edition',
+  pro: 'Pro Edition',
+  enterprise: 'Enterprise Edition',
+}
+
+export function AppSidebar({ orgId, tier }: { orgId: string; tier: LicenceTier }) {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
@@ -238,24 +283,24 @@ export function AppSidebar({ orgId }: { orgId: string }) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavGroup label="Monitoring" items={primaryNav} />
-        <NavGroup label="Reporting" items={reportingNav} />
+        <NavGroup label="Monitoring" items={primaryNav} tier={tier} />
+        <NavGroup label="Reporting" items={reportingNav} tier={tier} />
         <SidebarGroup>
           <SidebarGroupLabel>Tooling</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <NavGroupItems items={toolingNav} />
+              <NavGroupItems items={toolingNav} tier={tier} />
               <SidebarMenuItem>
                 <TerminalPanelTrigger orgId={orgId} />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <NavGroup label="Administration" items={adminNav} />
+        <NavGroup label="Administration" items={adminNav} tier={tier} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-2">
         <p className="text-xs text-muted-foreground px-2 py-1">
-          Community Edition <span className="font-mono">{WEB_VERSION}</span>
+          {TIER_LABEL[tier]} <span className="font-mono">{WEB_VERSION}</span>
         </p>
       </SidebarFooter>
     </Sidebar>

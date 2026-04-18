@@ -6,6 +6,7 @@ import { certificates, certificateEvents } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
 import type { Certificate, CertificateEvent, CertificateStatus, CertificateDetails } from '@/lib/db/schema'
 import { getRequiredSession } from '@/lib/auth/session'
+import { requireFeature } from '@/lib/actions/licence-guard'
 import { computeExpiryStatus } from '@/lib/certificates/expiry'
 import {
   fetchCertificateFromUrl,
@@ -37,6 +38,7 @@ export async function getCertificates(
   orgId: string,
   filters: CertificateListFilters = {},
 ): Promise<Certificate[]> {
+  await requireFeature(orgId, 'certExpiryTracker')
   const {
     status,
     host,
@@ -74,6 +76,7 @@ export async function getCertificate(
   orgId: string,
   certId: string,
 ): Promise<{ certificate: Certificate; events: CertificateEvent[] } | null> {
+  await requireFeature(orgId, 'certExpiryTracker')
   const certificate = await db.query.certificates.findFirst({
     where: and(
       eq(certificates.id, certId),
@@ -95,6 +98,7 @@ export async function getCertificate(
 }
 
 export async function getCertificateCounts(orgId: string): Promise<CertificateCounts> {
+  await requireFeature(orgId, 'certExpiryTracker')
   const rows = await db
     .select({
       status: certificates.status,
@@ -119,6 +123,7 @@ export async function deleteCertificate(
   orgId: string,
   certId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireFeature(orgId, 'certExpiryTracker')
   const existing = await db.query.certificates.findFirst({
     where: and(
       eq(certificates.id, certId),
@@ -205,6 +210,7 @@ export async function trackCertificateFromUrl(
   orgId: string,
   input: unknown,
 ): Promise<TrackCertificateResult> {
+  await requireFeature(orgId, 'certExpiryTracker')
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) {
     return { error: 'Organisation mismatch' }
@@ -288,6 +294,7 @@ export async function trackCertificateFromUpload(
   orgId: string,
   input: unknown,
 ): Promise<TrackCertificateResult> {
+  await requireFeature(orgId, 'certExpiryTracker')
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) {
     return { error: 'Organisation mismatch' }

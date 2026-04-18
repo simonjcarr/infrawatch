@@ -11,6 +11,7 @@ import type {
   ServiceAccountType,
 } from '@/lib/db/schema'
 import type { Host } from '@/lib/db/schema'
+import { requireFeature } from '@/lib/actions/licence-guard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export async function getServiceAccounts(
   orgId: string,
   filters: ServiceAccountListFilters = {},
 ): Promise<ServiceAccountWithHost[]> {
+  await requireFeature(orgId, 'serviceAccountTracker')
   const {
     accountType,
     status,
@@ -132,6 +134,7 @@ export async function getServiceAccount(
   events: IdentityEvent[]
   host: Host | null
 } | null> {
+  await requireFeature(orgId, 'serviceAccountTracker')
   const account = await db.query.serviceAccounts.findFirst({
     where: and(
       eq(serviceAccounts.id, accountId),
@@ -171,6 +174,7 @@ export async function getServiceAccount(
 export async function getServiceAccountCounts(
   orgId: string,
 ): Promise<ServiceAccountCounts> {
+  await requireFeature(orgId, 'serviceAccountTracker')
   const [typeRows, statusRows] = await Promise.all([
     db
       .select({
@@ -218,6 +222,7 @@ export async function getSshKeysByFingerprint(
   orgId: string,
   fingerprint: string,
 ): Promise<(SshKey & { hostHostname?: string })[]> {
+  await requireFeature(orgId, 'sshKeyInventory')
   const keys = await db.query.sshKeys.findMany({
     where: and(
       eq(sshKeys.organisationId, orgId),

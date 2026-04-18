@@ -3,6 +3,7 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/shared/sidebar'
 import { Topbar } from '@/components/shared/topbar'
 import { getRequiredSession } from '@/lib/auth/session'
+import { getEffectiveLicence } from '@/lib/actions/licence-guard'
 import { TerminalProviderWrapper, TerminalContentWrapper } from '@/components/terminal/terminal-layout-wrapper'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -21,11 +22,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const orgId = session.user.organisationId
+  const licence = await getEffectiveLicence(orgId)
 
   return (
     <TerminalProviderWrapper>
       <SidebarProvider className="h-svh overflow-hidden">
-        <AppSidebar orgId={orgId} />
+        <AppSidebar orgId={orgId} tier={licence.tier} />
         <TerminalContentWrapper orgId={orgId}>
           <Topbar orgId={orgId} />
           <main className="flex-1 p-6 overflow-auto min-h-0">{children}</main>

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
 import { getCertificates, getCertificateCounts } from '@/lib/actions/certificates'
+import { getEffectiveLicence } from '@/lib/actions/licence-guard'
+import { hasFeature } from '@/lib/features'
+import { LockedFeature } from '@/components/shared/locked-feature'
 import { CertificatesClient } from './certificates-client'
 
 export const metadata: Metadata = {
@@ -10,6 +13,11 @@ export const metadata: Metadata = {
 export default async function CertificatesPage() {
   const session = await getRequiredSession()
   const orgId = session.user.organisationId!
+
+  const licence = await getEffectiveLicence(orgId)
+  if (!hasFeature(licence.tier, 'certExpiryTracker')) {
+    return <LockedFeature feature="certExpiryTracker" tier={licence.tier} />
+  }
 
   const [initialCertificates, initialCounts] = await Promise.all([
     getCertificates(orgId, { sortBy: 'not_after', sortDir: 'asc', limit: 100 }),

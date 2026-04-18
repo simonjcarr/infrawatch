@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getDomainAccountCounts } from '@/lib/actions/domain-accounts'
+import { LicenceRequiredError } from '@/lib/actions/licence-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,13 @@ export async function GET() {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const counts = await getDomainAccountCounts(user.organisationId)
-  return Response.json(counts)
+  try {
+    const counts = await getDomainAccountCounts(user.organisationId)
+    return Response.json(counts)
+  } catch (err) {
+    if (err instanceof LicenceRequiredError) {
+      return Response.json({ error: err.message }, { status: 402 })
+    }
+    throw err
+  }
 }

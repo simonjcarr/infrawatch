@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm'
 import { getDomainAccounts } from '@/lib/actions/domain-accounts'
 import type { DomainAccountListFilters } from '@/lib/actions/domain-accounts'
 import type { DomainAccountStatus } from '@/lib/db/schema'
+import { LicenceRequiredError } from '@/lib/actions/licence-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,13 @@ export async function GET(request: NextRequest) {
     offset: searchParams.has('offset') ? Number(searchParams.get('offset')) : undefined,
   }
 
-  const accounts = await getDomainAccounts(user.organisationId, filters)
-  return Response.json(accounts)
+  try {
+    const accounts = await getDomainAccounts(user.organisationId, filters)
+    return Response.json(accounts)
+  } catch (err) {
+    if (err instanceof LicenceRequiredError) {
+      return Response.json({ error: err.message }, { status: 402 })
+    }
+    throw err
+  }
 }

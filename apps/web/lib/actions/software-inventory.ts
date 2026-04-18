@@ -21,6 +21,7 @@ import type {
   SoftwareInventorySettings,
 } from '@/lib/db/schema'
 import { getRequiredSession } from '@/lib/auth/session'
+import { requireFeature } from '@/lib/actions/licence-guard'
 import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
 
@@ -54,6 +55,7 @@ export async function updateSoftwareInventorySettings(
   orgId: string,
   settings: SoftwareInventorySettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireFeature(orgId, 'reportsScheduled')
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -235,6 +237,7 @@ export async function searchPackageNames(
   orgId: string,
   q: string,
 ): Promise<PackageNameSuggestion[]> {
+  await requireFeature(orgId, 'reportsExport')
   if (!q || q.length < 2 || q.length > 100) return []
 
   const escaped = `%${escapeLikePattern(q)}%`
@@ -297,6 +300,7 @@ export async function getSoftwareReport(
   orgId: string,
   filters: SoftwareReportFilters = {},
 ): Promise<SoftwareReportResult> {
+  await requireFeature(orgId, 'reportsExport')
   const page = filters.page ?? 1
   const pageSize = Math.min(filters.pageSize ?? 50, 200)
   const offset = (page - 1) * pageSize
@@ -430,6 +434,7 @@ export async function getNewPackages(
   orgId: string,
   windowDays: 7 | 30 = 7,
 ): Promise<NewPackageRow[]> {
+  await requireFeature(orgId, 'reportsExport')
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - windowDays)
 
@@ -481,6 +486,7 @@ export interface DriftRow {
 }
 
 export async function getPackageDrift(orgId: string): Promise<DriftRow[]> {
+  await requireFeature(orgId, 'reportsExport')
   const rows = await db
     .select({
       groupId: hostGroupMembers.groupId,
@@ -570,6 +576,7 @@ export async function getPackageDetails(
   packageName: string,
   osFamily?: string,
 ): Promise<PackageDetailsResult> {
+  await requireFeature(orgId, 'reportsExport')
   const packages = await db
     .select({
       hostId: softwarePackages.hostId,
@@ -642,6 +649,7 @@ export async function getPackageVersions(
   orgId: string,
   packageName: string,
 ): Promise<string[]> {
+  await requireFeature(orgId, 'reportsExport')
   const rows = await db
     .select({ version: softwarePackages.version })
     .from(softwarePackages)
@@ -734,6 +742,7 @@ const saveReportSchema = z.object({
 })
 
 export async function listSavedReports(orgId: string): Promise<SavedSoftwareReport[]> {
+  await requireFeature(orgId, 'reportsExport')
   const session = await getRequiredSession()
   return db.query.savedSoftwareReports.findMany({
     where: and(
@@ -750,6 +759,7 @@ export async function saveSoftwareReport(
   name: string,
   filters: SoftwareReportFilters,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireFeature(orgId, 'reportsExport')
   const session = await getRequiredSession()
   const parsed = saveReportSchema.safeParse({ name, filters })
   if (!parsed.success) {
@@ -777,6 +787,7 @@ export async function deleteSavedReport(
   orgId: string,
   reportId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireFeature(orgId, 'reportsExport')
   const session = await getRequiredSession()
   try {
     await db

@@ -23,9 +23,7 @@ LDAP / AD login is included in **Community** — it is expected in any serious o
 - Notification channels: in-app, webhook, SMTP, Slack, Telegram
 - Interactive terminal (multi-tab, split-pane)
 - Custom script runner, service management
-- Certificate **discovery** and inventory
-- Service account **inventory**
-- SSL Certificate Checker tool
+- SSL Certificate Checker tool (one-off URL lookup)
 - Metric graphs + retention up to **180 days**
 - Air-gap deployment
 
@@ -100,6 +98,14 @@ If a licence includes a `maxHosts` cap, agent approval is blocked once that coun
 ## Enforcement
 
 The authoritative licence check happens server-side on every gated action. UI controls for paid features are disabled on Community and hidden or badged appropriately, but the server never trusts the client — attempting to invoke a gated action without a valid licence returns an error.
+
+Currently enforced on Community tier:
+
+- Certificate tracker (`/certificates`) — requires `certExpiryTracker`
+- Service account tracker (`/service-accounts`) — requires `serviceAccountTracker`
+- Reports (`/reports/*`) — requires `reportsExport`; scheduled software scans require `reportsScheduled`
+
+Community installs see a **"Pro"** badge on each locked entry in the sidebar and an "Upgrade required" screen when the page is visited.
 
 ## Circumvention and support
 

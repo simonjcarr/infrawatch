@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm'
 import { getCertificates } from '@/lib/actions/certificates'
 import type { CertificateListFilters } from '@/lib/actions/certificates'
 import type { CertificateStatus } from '@/lib/db/schema'
+import { LicenceRequiredError } from '@/lib/actions/licence-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,13 @@ export async function GET(request: NextRequest) {
     offset: searchParams.has('offset') ? Number(searchParams.get('offset')) : undefined,
   }
 
-  const certificates = await getCertificates(user.organisationId, filters)
-  return Response.json(certificates)
+  try {
+    const certificates = await getCertificates(user.organisationId, filters)
+    return Response.json(certificates)
+  } catch (err) {
+    if (err instanceof LicenceRequiredError) {
+      return Response.json({ error: err.message }, { status: 402 })
+    }
+    throw err
+  }
 }

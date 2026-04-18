@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.25.0...agent/v0.26.0) (2026-04-18)
+
+
+### Features
+
+* infrawatch-loadtest tool for capacity planning ([fef4da8](https://github.com/carrtech-dev/ct-ops/commit/fef4da8d4316096e279063973671010f9a4ad9cb))
+* infrawatch-loadtest tool for capacity planning ([993d2c8](https://github.com/carrtech-dev/ct-ops/commit/993d2c808bbfdc969059e2ffe2bc961672f1ade1))
+
 ## [0.25.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.24.1...agent/v0.25.0) (2026-04-18)
 
 

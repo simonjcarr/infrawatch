@@ -422,12 +422,28 @@ function buildChain(forgeCerts: forge.pki.Certificate[]): ChainEntry[] {
   })
 }
 
+// ─── Key match helper ─────────────────────────────────────────────────────────
+
+function checkKeyMatch(keyPem: string, certPem: string): boolean {
+  try {
+    const privKey = crypto.createPrivateKey(keyPem)
+    const x509 = new crypto.X509Certificate(certPem)
+    return x509.checkPrivateKey(privKey)
+  } catch {
+    return false
+  }
+}
+
 // ─── Request schemas ───────────────────────────────────────────────────────────
 
 const ParseBodySchema = z.object({
   action: z.literal('parse'),
-  data: z.string().min(1),     // base64-encoded file bytes
+  data: z.string().optional(),       // base64-encoded binary file
+  pemText: z.string().optional(),    // direct PEM/text paste
   password: z.string().optional(),
+  keyPem: z.string().optional(),
+}).refine((v) => v.data != null || v.pemText != null, {
+  message: 'Either data or pemText is required',
 })
 
 const FetchUrlBodySchema = z.object({
@@ -435,6 +451,7 @@ const FetchUrlBodySchema = z.object({
   url: z.string().min(1),
   port: z.number().int().min(1).max(65535).optional(),
   servername: z.string().optional(),
+  keyPem: z.string().optional(),
 })
 
 const ValidateKeyBodySchema = z.object({
@@ -474,15 +491,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const data = parsed.data
 
   try {
-    // ── Parse uploaded file ──────────────────────────────────────────────────
+    // ── Parse uploaded file or pasted PEM ───────────────────────────────────
     if (data.action === 'parse') {
-      const buf = Buffer.from(data.data, 'base64')
+      const buf = data.pemText
+        ? Buffer.from(data.pemText, 'utf8')
+        : Buffer.from(data.data!, 'base64')
       const pems = toPemArray(buf, data.password)
       const forgeCerts = pems.map(pemToForgeCert)
       const chain = forgeCerts.length > 1 ? buildChain(forgeCerts) : []
       const cert = parseForgeCert(forgeCerts[0]!, pems[0]!)
       cert.chain = chain
-      return NextResponse.json({ ok: true, certificate: cert } satisfies CertCheckerResponse)
+      const keyMatch = data.keyPem ? checkKeyMatch(data.keyPem, pems[0]!) : undefined
+      return NextResponse.json({ ok: true, certificate: cert, keyMatch } satisfies CertCheckerResponse)
     }
 
     // ── Fetch from URL ───────────────────────────────────────────────────────
@@ -496,7 +516,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const chain = forgeCerts.length > 1 ? buildChain(forgeCerts) : []
       const cert = parseForgeCert(forgeCerts[0]!, pems[0]!)
       cert.chain = chain
-      return NextResponse.json({ ok: true, certificate: cert } satisfies CertCheckerResponse)
+      const keyMatch = data.keyPem ? checkKeyMatch(data.keyPem, pems[0]!) : undefined
+      return NextResponse.json({ ok: true, certificate: cert, keyMatch } satisfies CertCheckerResponse)
     }
 
     // ── Validate key matches cert ────────────────────────────────────────────

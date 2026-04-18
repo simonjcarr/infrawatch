@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { format, formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import {
   Upload,
   Globe,
@@ -104,6 +104,122 @@ function Section({ title, children, defaultOpen = true }: {
   )
 }
 
+// ─── File + Paste input ───────────────────────────────────────────────────────
+
+interface FileOrPasteInputProps {
+  id: string
+  label: string
+  sublabel?: string
+  accept: string
+  placeholder: string
+  file: File | null
+  text: string
+  onFile: (f: File | null) => void
+  onText: (t: string) => void
+}
+
+function FileOrPasteInput({ id, label, sublabel, accept, placeholder, file, text, onFile, onText }: FileOrPasteInputProps) {
+  const [dragging, setDragging] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const f = files[0]!
+    // If it looks like a text/PEM file, read it and populate the textarea
+    if (f.name.match(/\.(pem|crt|cer|key)$/i) || f.type === 'text/plain') {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        if (result.includes('-----BEGIN')) {
+          onFile(null)
+          onText(result.trim())
+          return
+        }
+        onText('')
+        onFile(f)
+      }
+      reader.readAsText(f)
+    } else {
+      onText('')
+      onFile(f)
+    }
+  }
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    handleFiles(e.dataTransfer.files)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const hasContent = file !== null || text.trim() !== ''
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
+        {sublabel && <span className="text-xs text-muted-foreground">{sublabel}</span>}
+      </div>
+
+      {/* Drop zone */}
+      <div
+        className={`relative rounded-lg border-2 border-dashed transition-colors cursor-pointer
+          ${dragging ? 'border-primary bg-primary/5' : hasContent ? 'border-muted-foreground/40 bg-muted/30' : 'border-muted-foreground/25 hover:border-muted-foreground/50'}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => fileRef.current?.click()}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          accept={accept}
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        {file ? (
+          <div className="flex items-center gap-2 px-4 py-3">
+            <FileText className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-sm truncate flex-1">{file.name}</span>
+            <button
+              className="text-muted-foreground hover:text-foreground shrink-0"
+              onClick={(e) => { e.stopPropagation(); onFile(null); if (fileRef.current) fileRef.current.value = '' }}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-3 px-4 text-center">
+            <Upload className="size-4 text-muted-foreground/60 shrink-0" />
+            <span className="text-xs text-muted-foreground">Drop file here or click to browse</span>
+          </div>
+        )}
+      </div>
+
+      {/* Paste area — always shown; cleared when file is set */}
+      <Textarea
+        id={id}
+        placeholder={placeholder}
+        className="font-mono text-xs h-28 resize-none"
+        value={file ? '' : text}
+        disabled={file !== null}
+        onChange={(e) => { onFile(null); onText(e.target.value) }}
+        onPaste={(e) => {
+          // Accept drops on the textarea too
+          e.stopPropagation()
+        }}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          handleFiles(e.dataTransfer.files)
+        }}
+      />
+    </div>
+  )
+}
+
 // ─── Certificate results display ─────────────────────────────────────────────
 
 function CertificateResults({ cert, keyMatch, onDownload }: {
@@ -124,12 +240,8 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-xl font-semibold">{cert.commonName || cert.subject}</h2>
             <StatusBadge cert={cert} />
-            {cert.isSelfSigned && (
-              <Badge variant="outline" className="text-xs">Self-Signed</Badge>
-            )}
-            {cert.isCA && (
-              <Badge variant="outline" className="text-xs">CA Certificate</Badge>
-            )}
+            {cert.isSelfSigned && <Badge variant="outline" className="text-xs">Self-Signed</Badge>}
+            {cert.isCA && <Badge variant="outline" className="text-xs">CA Certificate</Badge>}
           </div>
           <p className="text-sm text-muted-foreground mt-1 font-mono">{cert.subject}</p>
         </div>
@@ -195,7 +307,7 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
         </div>
       )}
 
-      {/* Subject details */}
+      {/* Subject */}
       <Section title="Subject">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
           <InfoRow label="Common Name" value={cert.commonName} copyable />
@@ -208,7 +320,7 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
         </dl>
       </Section>
 
-      {/* Issuer details */}
+      {/* Issuer */}
       <Section title="Issuer">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
           <InfoRow label="Common Name" value={cert.issuerCommonName} />
@@ -245,41 +357,30 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
       <Section title="Extensions">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
           <InfoRow label="Is CA" value={cert.isCA ? 'Yes' : 'No'} />
-          {cert.pathLength !== null && (
-            <InfoRow label="Path Length" value={String(cert.pathLength)} />
-          )}
+          {cert.pathLength !== null && <InfoRow label="Path Length" value={String(cert.pathLength)} />}
           <InfoRow label="Self-Signed" value={cert.isSelfSigned ? 'Yes' : 'No'} />
         </dl>
-
         {cert.keyUsage.length > 0 && (
           <div className="mt-4">
             <p className="text-sm text-muted-foreground font-medium mb-1.5">Key Usage</p>
             <div className="flex flex-wrap gap-1.5">
-              {cert.keyUsage.map((u) => (
-                <Badge key={u} variant="secondary" className="text-xs">{u}</Badge>
-              ))}
+              {cert.keyUsage.map((u) => <Badge key={u} variant="secondary" className="text-xs">{u}</Badge>)}
             </div>
           </div>
         )}
-
         {cert.extendedKeyUsage.length > 0 && (
           <div className="mt-4">
             <p className="text-sm text-muted-foreground font-medium mb-1.5">Extended Key Usage</p>
             <div className="flex flex-wrap gap-1.5">
-              {cert.extendedKeyUsage.map((u) => (
-                <Badge key={u} variant="secondary" className="text-xs">{u}</Badge>
-              ))}
+              {cert.extendedKeyUsage.map((u) => <Badge key={u} variant="secondary" className="text-xs">{u}</Badge>)}
             </div>
           </div>
         )}
-
         {cert.certificatePolicies.length > 0 && (
           <div className="mt-4">
             <p className="text-sm text-muted-foreground font-medium mb-1.5">Certificate Policies</p>
             <div className="flex flex-wrap gap-1.5">
-              {cert.certificatePolicies.map((p) => (
-                <Badge key={p} variant="outline" className="text-xs font-mono">{p}</Badge>
-              ))}
+              {cert.certificatePolicies.map((p) => <Badge key={p} variant="outline" className="text-xs font-mono">{p}</Badge>)}
             </div>
           </div>
         )}
@@ -299,7 +400,7 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
         </Section>
       )}
 
-      {/* Authority info / OCSP / CRL */}
+      {/* Revocation info */}
       {(cert.ocspUrls.length > 0 || cert.caIssuers.length > 0 || cert.crlUrls.length > 0) && (
         <Section title="Revocation & Authority Info">
           <dl className="space-y-2">
@@ -377,30 +478,72 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
   )
 }
 
+// ─── Shared key input (used in both tabs) ────────────────────────────────────
+
+function KeyInput({ keyFile, keyText, onKeyFile, onKeyText }: {
+  keyFile: File | null
+  keyText: string
+  onKeyFile: (f: File | null) => void
+  onKeyText: (t: string) => void
+}) {
+  return (
+    <div className="border-t pt-4 mt-2">
+      <FileOrPasteInput
+        id="key-input"
+        label="Private Key"
+        sublabel="optional — validates key matches certificate"
+        accept=".pem,.key,.txt"
+        placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+        file={keyFile}
+        text={keyText}
+        onFile={onKeyFile}
+        onText={onKeyText}
+      />
+    </div>
+  )
+}
+
 // ─── Upload tab ───────────────────────────────────────────────────────────────
 
-function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }) {
+function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?: boolean) => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [dragging, setDragging] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
+  const [certFile, setCertFile] = useState<File | null>(null)
+  const [certText, setCertText] = useState('')
+  const [keyFile, setKeyFile] = useState<File | null>(null)
+  const [keyText, setKeyText] = useState('')
   const [password, setPassword] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
 
-  async function submit(f: File) {
+  const isPfx = certFile?.name.match(/\.(pfx|p12)$/i)
+  const hasCert = certFile !== null || certText.trim() !== ''
+
+  async function submit() {
+    if (!hasCert) return
     setLoading(true)
     setError(null)
     try {
-      const buf = await f.arrayBuffer()
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+      let body: Record<string, unknown>
+
+      if (certText.trim()) {
+        body = { action: 'parse', pemText: certText.trim(), password: password || undefined }
+      } else {
+        const buf = await certFile!.arrayBuffer()
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+        body = { action: 'parse', data: b64, password: password || undefined }
+      }
+
+      // Attach key if provided
+      const resolvedKey = keyText.trim() || (keyFile ? await readFileAsText(keyFile) : undefined)
+      if (resolvedKey) body.keyPem = resolvedKey
+
       const res = await fetch('/api/tools/certificate-checker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'parse', data: b64, password: password || undefined }),
+        body: JSON.stringify(body),
       })
       const json: CertCheckerResponse = await res.json()
       if (!json.ok) { setError(json.error); return }
-      onResult(json.certificate)
+      onResult(json.certificate, json.keyMatch)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unexpected error')
     } finally {
@@ -408,58 +551,19 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }
     }
   }
 
-  function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return
-    setFile(files[0] ?? null)
-    setError(null)
-  }
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setDragging(false)
-    handleFiles(e.dataTransfer.files)
-  }, [])
-
-  const isPfx = file?.name.match(/\.(pfx|p12)$/i)
-
   return (
     <div className="space-y-4">
-      {/* Drop zone */}
-      <div
-        className={`relative rounded-lg border-2 border-dashed transition-colors cursor-pointer
-          ${dragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'}`}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        onClick={() => fileRef.current?.click()}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          className="hidden"
-          accept=".pem,.crt,.cer,.der,.p7b,.p7c,.pfx,.p12"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-          <Upload className="size-10 text-muted-foreground/50 mb-3" />
-          <p className="font-medium text-sm">Drop certificate file here or click to browse</p>
-          <p className="text-xs text-muted-foreground mt-1">PEM, DER, PKCS#7 (.p7b), PKCS#12 (.pfx/.p12)</p>
-        </div>
-        {file && (
-          <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-muted/80 rounded-b-lg px-4 py-2">
-            <FileText className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-sm truncate flex-1">{file.name}</span>
-            <button
-              className="text-muted-foreground hover:text-foreground shrink-0"
-              onClick={(e) => { e.stopPropagation(); setFile(null); if (fileRef.current) fileRef.current.value = '' }}
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        )}
-      </div>
+      <FileOrPasteInput
+        id="cert-input"
+        label="Certificate"
+        accept=".pem,.crt,.cer,.der,.p7b,.p7c,.pfx,.p12"
+        placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+        file={certFile}
+        text={certText}
+        onFile={setCertFile}
+        onText={setCertText}
+      />
 
-      {/* Password for PKCS#12 */}
       {(isPfx || password) && (
         <div className="space-y-1.5">
           <Label htmlFor="cert-password">Password {isPfx ? '(required for .pfx/.p12)' : '(optional)'}</Label>
@@ -473,6 +577,13 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }
         </div>
       )}
 
+      <KeyInput
+        keyFile={keyFile}
+        keyText={keyText}
+        onKeyFile={setKeyFile}
+        onKeyText={setKeyText}
+      />
+
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -480,11 +591,7 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }
         </div>
       )}
 
-      <Button
-        className="w-full"
-        disabled={!file || loading}
-        onClick={() => file && submit(file)}
-      >
+      <Button className="w-full" disabled={!hasCert || loading} onClick={submit}>
         {loading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Upload className="size-4 mr-2" />}
         {loading ? 'Parsing...' : 'Analyse Certificate'}
       </Button>
@@ -494,10 +601,12 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }
 
 // ─── URL tab ──────────────────────────────────────────────────────────────────
 
-function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }) {
+function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?: boolean) => void }) {
   const [url, setUrl] = useState('')
   const [port, setPort] = useState('443')
   const [servername, setServername] = useState('')
+  const [keyFile, setKeyFile] = useState<File | null>(null)
+  const [keyText, setKeyText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -506,6 +615,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }) {
     setLoading(true)
     setError(null)
     try {
+      const resolvedKey = keyText.trim() || (keyFile ? await readFileAsText(keyFile) : undefined)
       const res = await fetch('/api/tools/certificate-checker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -514,11 +624,12 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }) {
           url: url.trim(),
           port: port ? parseInt(port, 10) : 443,
           servername: servername.trim() || undefined,
+          keyPem: resolvedKey || undefined,
         }),
       })
       const json: CertCheckerResponse = await res.json()
       if (!json.ok) { setError(json.error); return }
-      onResult(json.certificate)
+      onResult(json.certificate, json.keyMatch)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unexpected error')
     } finally {
@@ -563,6 +674,13 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }) {
         </div>
       </div>
 
+      <KeyInput
+        keyFile={keyFile}
+        keyText={keyText}
+        onKeyFile={setKeyFile}
+        onKeyText={setKeyText}
+      />
+
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -578,64 +696,15 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate) => void }) {
   )
 }
 
-// ─── Key validation panel ─────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function KeyValidationPanel({ certPem, onResult }: {
-  certPem: string
-  onResult: (match: boolean) => void
-}) {
-  const [keyPem, setKeyPem] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function validate() {
-    if (!keyPem.trim()) return
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/tools/certificate-checker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'validate-key', certPem, keyPem: keyPem.trim() }),
-      })
-      const json = await res.json() as { ok: boolean; error?: string; keyMatch?: boolean }
-      if (!json.ok) { setError(json.error ?? 'Failed'); return }
-      onResult(json.keyMatch ?? false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unexpected error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Key className="size-4" />
-          Validate Private Key
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Textarea
-          placeholder="Paste your private key (PEM format)..."
-          className="font-mono text-xs h-32 resize-none"
-          value={keyPem}
-          onChange={(e) => setKeyPem(e.target.value)}
-        />
-        {error && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-            <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-        <Button size="sm" disabled={!keyPem.trim() || loading} onClick={validate}>
-          {loading ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Key className="size-3.5 mr-1.5" />}
-          {loading ? 'Validating...' : 'Validate Key'}
-        </Button>
-      </CardContent>
-    </Card>
-  )
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve((e.target?.result as string) ?? '')
+    reader.onerror = reject
+    reader.readAsText(file)
+  })
 }
 
 // ─── Main page component ──────────────────────────────────────────────────────
@@ -644,9 +713,9 @@ export function CertificateCheckerClient() {
   const [cert, setCert] = useState<ParsedCertificate | null>(null)
   const [keyMatch, setKeyMatch] = useState<boolean | undefined>(undefined)
 
-  function handleNewCert(c: ParsedCertificate) {
+  function handleResult(c: ParsedCertificate, km?: boolean) {
     setCert(c)
-    setKeyMatch(undefined)
+    setKeyMatch(km)
   }
 
   async function handleDownload(fmt: 'pem' | 'der' | 'pkcs7') {
@@ -689,14 +758,14 @@ export function CertificateCheckerClient() {
         )}
       </div>
 
-      {/* Input panel — always visible */}
+      {/* Input panel */}
       <Card>
         <CardContent className="pt-5">
           <Tabs defaultValue="upload">
             <TabsList className="mb-4">
               <TabsTrigger value="upload">
                 <Upload className="size-4 mr-2" />
-                Upload File
+                Upload / Paste
               </TabsTrigger>
               <TabsTrigger value="url">
                 <Globe className="size-4 mr-2" />
@@ -704,28 +773,22 @@ export function CertificateCheckerClient() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="upload">
-              <UploadTab onResult={handleNewCert} />
+              <UploadTab onResult={handleResult} />
             </TabsContent>
             <TabsContent value="url">
-              <UrlTab onResult={handleNewCert} />
+              <UrlTab onResult={handleResult} />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      {/* Results */}
-      {cert && (
-        <>
-          <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} />
-          <KeyValidationPanel certPem={cert.pem} onResult={setKeyMatch} />
-        </>
-      )}
-
-      {!cert && (
+      {cert ? (
+        <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} />
+      ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <ShieldCheck className="size-16 mb-4 opacity-20" />
           <p className="font-medium">No certificate loaded</p>
-          <p className="text-sm mt-1">Upload a certificate file or enter a URL above to begin.</p>
+          <p className="text-sm mt-1">Upload a certificate file, paste PEM text, or enter a URL above to begin.</p>
         </div>
       )}
     </div>

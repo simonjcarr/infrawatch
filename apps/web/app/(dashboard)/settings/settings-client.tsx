@@ -23,6 +23,7 @@ import type { OrgTerminalSettings } from '@/lib/actions/terminal'
 import type { OrgNotificationSettingsFull } from '@/lib/actions/notification-settings'
 import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
+import { COMMUNITY_MAX_RETENTION_DAYS, hasFeature, type LicenceTier } from '@/lib/features'
 
 const ALL_ROLES = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -68,6 +69,8 @@ const RETENTION_OPTIONS = [
 
 export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
   const queryClient = useQueryClient()
+  const tier = org.licenceTier as LicenceTier
+  const canExtendRetention = hasFeature(tier, 'metricRetentionExtended')
   const [orgSaveSuccess, setOrgSaveSuccess] = useState(false)
   const [licenceResult, setLicenceResult] = useState<{
     success?: boolean
@@ -298,13 +301,22 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {RETENTION_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
+                    {RETENTION_OPTIONS.map((opt) => {
+                      const locked = !canExtendRetention && Number(opt.value) > COMMUNITY_MAX_RETENTION_DAYS
+                      return (
+                        <SelectItem key={opt.value} value={opt.value} disabled={locked}>
+                          {opt.label}
+                          {locked ? ' (Pro)' : ''}
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
+                {!canExtendRetention && (
+                  <p className="text-xs text-muted-foreground">
+                    Retention above {COMMUNITY_MAX_RETENTION_DAYS} days requires a Pro or Enterprise licence.
+                  </p>
+                )}
               </div>
               {retentionError && (
                 <p className="text-sm text-destructive">{retentionError}</p>

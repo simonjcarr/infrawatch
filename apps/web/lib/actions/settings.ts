@@ -6,6 +6,8 @@ import { organisations } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
 import { getRequiredSession } from '@/lib/auth/session'
+import { hasLicenceFeature } from '@/lib/actions/licence-guard'
+import { COMMUNITY_MAX_RETENTION_DAYS } from '@/lib/features'
 
 const ADMIN_ROLES = ['org_admin', 'super_admin']
 
@@ -56,6 +58,13 @@ export async function updateMetricRetention(
   const parsed = metricRetentionSchema.safeParse({ days })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid value' }
+  }
+
+  const canExtend = await hasLicenceFeature(orgId, 'metricRetentionExtended')
+  if (!canExtend && parsed.data.days > COMMUNITY_MAX_RETENTION_DAYS) {
+    return {
+      error: `Retention above ${COMMUNITY_MAX_RETENTION_DAYS} days requires a Pro or Enterprise licence`,
+    }
   }
 
   try {
@@ -113,6 +122,10 @@ export async function saveLicenceKey(
   const result = await validateLicenceKey(key.trim())
   if (!result.valid) {
     return { error: result.error }
+  }
+
+  if (result.payload.sub !== orgId) {
+    return { error: 'Licence key was issued to a different organisation' }
   }
 
   try {

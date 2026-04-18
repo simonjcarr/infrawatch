@@ -85,6 +85,10 @@ export default defineUserConfig({
           '/deployment/load-testing.md',
         ],
       },
+      {
+        text: 'Licensing',
+        link: '/licensing.md',
+      },
     ],
   }),
 

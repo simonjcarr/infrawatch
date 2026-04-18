@@ -253,6 +253,13 @@
       "when": 1776524241006,
       "tag": "0035_happy_whistler",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1776550850127,
+      "tag": "0036_wise_ink",
+      "breakpoints": true
     }
   ]
 }

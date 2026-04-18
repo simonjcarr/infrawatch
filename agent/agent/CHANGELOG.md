@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.26.0...agent/v0.26.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* normalize negative agent indexes in ConnPool.Get ([c094110](https://github.com/carrtech-dev/ct-ops/commit/c094110667dbfb854da5776807687bff3c4caee0))
+* normalize negative agent indexes in ConnPool.Get ([92cd151](https://github.com/carrtech-dev/ct-ops/commit/92cd15192241dbafe8e1016f9599a356998258a2))
+
 ## [0.26.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.25.0...agent/v0.26.0) (2026-04-18)
 
 

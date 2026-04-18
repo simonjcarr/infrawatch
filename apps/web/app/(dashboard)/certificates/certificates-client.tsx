@@ -1,13 +1,22 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
-import { ShieldCheck, ShieldAlert, ShieldX, Shield, Search, Trash2 } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, ShieldX, Shield, Search, Trash2, BookmarkPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -88,6 +97,7 @@ export function CertificatesClient({
   const [statusFilter, setStatusFilter] = useState<CertificateStatus | 'all'>('all')
   const [hostFilter, setHostFilter] = useState('')
   const [sortBy, setSortBy] = useState<CertificateListFilters['sortBy']>('not_after')
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
 
   const filters: CertificateListFilters = {
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
@@ -138,12 +148,35 @@ export function CertificatesClient({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Certificates</h1>
-        <p className="text-muted-foreground mt-1">
-          {totalCerts} certificate{totalCerts !== 1 ? 's' : ''} tracked across your infrastructure
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Certificates</h1>
+          <p className="text-muted-foreground mt-1">
+            {totalCerts} certificate{totalCerts !== 1 ? 's' : ''} tracked across your infrastructure
+          </p>
+        </div>
+        <Button onClick={() => setAddDialogOpen(true)}>
+          <BookmarkPlus className="size-4 mr-2" />
+          Add tracked certificate
+        </Button>
       </div>
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a tracked certificate</DialogTitle>
+            <DialogDescription>
+              Tracked certificates are added from the Certificate Checker. Fetch a URL or upload a certificate, then click &quot;Track this certificate&quot; on the results panel.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button asChild>
+              <Link href="/certificate-checker">Open Certificate Checker</Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

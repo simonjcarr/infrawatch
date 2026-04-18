@@ -1,9 +1,17 @@
 'use server'
 
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { certificates, certificateEvents } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
-import type { Certificate, CertificateEvent, CertificateStatus } from '@/lib/db/schema'
+import type { Certificate, CertificateEvent, CertificateStatus, CertificateDetails } from '@/lib/db/schema'
+import { getRequiredSession } from '@/lib/auth/session'
+import { computeExpiryStatus } from '@/lib/certificates/expiry'
+import {
+  fetchCertificateFromUrl,
+  parseCertificateBuffer,
+  type ParsedCertificate,
+} from '@/lib/certificates/fetch'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,4 +134,224 @@ export async function deleteCertificate(
     .where(and(eq(certificates.id, certId), eq(certificates.organisationId, orgId)))
 
   return { success: true }
+}
+
+// ─── Track a certificate from the Certificate Checker ─────────────────────────
+
+const REFRESH_INTERVAL_OPTIONS = [900, 3600, 21600, 86400] as const
+
+const trackFromUrlSchema = z.object({
+  url: z.string().min(1).max(512),
+  refreshIntervalSeconds: z.number().int().refine(
+    (v) => (REFRESH_INTERVAL_OPTIONS as readonly number[]).includes(v),
+    { message: 'Refresh interval must be 15m, 1h, 6h, or 24h' },
+  ).optional(),
+})
+
+const trackFromUploadSchema = z.object({
+  pem: z.string().min(1),
+  host: z.string().max(255).optional(),
+  port: z.number().int().min(0).max(65535).optional(),
+  serverName: z.string().max(255).optional(),
+})
+
+export type TrackCertificateResult =
+  | { success: true; certificateId: string }
+  | { success: false; alreadyTracked: true; certificateId: string }
+  | { error: string }
+
+function buildDetailsFromParsed(parsed: ParsedCertificate): CertificateDetails {
+  return {
+    subject: parsed.subject,
+    issuer: parsed.issuer,
+    serialNumber: parsed.serialNumber,
+    signatureAlgorithm: parsed.signatureAlgorithm,
+    keyAlgorithm: parsed.keySize ? `${parsed.keyAlgorithm}-${parsed.keySize}` : parsed.keyAlgorithm,
+    isSelfSigned: parsed.isSelfSigned,
+    chain: parsed.chain.map((c) => ({
+      subject: c.subject,
+      issuer: c.issuer,
+      not_before: c.notBefore,
+      not_after: c.notAfter,
+      fingerprint_sha256: c.fingerprintSha256,
+    })),
+  }
+}
+
+function sanValues(parsed: ParsedCertificate): string[] {
+  return parsed.sans.map((s) => s.value).filter((v) => v.length > 0)
+}
+
+async function findExistingCertByIdentity(
+  orgId: string,
+  host: string,
+  port: number,
+  serverName: string,
+  fingerprintSha256: string,
+): Promise<Certificate | undefined> {
+  return db.query.certificates.findFirst({
+    where: and(
+      eq(certificates.organisationId, orgId),
+      eq(certificates.host, host),
+      eq(certificates.port, port),
+      eq(certificates.serverName, serverName),
+      eq(certificates.fingerprintSha256, fingerprintSha256),
+      isNull(certificates.deletedAt),
+    ),
+  })
+}
+
+export async function trackCertificateFromUrl(
+  orgId: string,
+  input: unknown,
+): Promise<TrackCertificateResult> {
+  const session = await getRequiredSession()
+  if (session.user.organisationId !== orgId) {
+    return { error: 'Organisation mismatch' }
+  }
+
+  const parsed = trackFromUrlSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
+  const { url, refreshIntervalSeconds = 3600 } = parsed.data
+
+  let result
+  try {
+    result = await fetchCertificateFromUrl(url)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch certificate'
+    return { error: message }
+  }
+
+  const { certificate, host, port, serverName } = result
+  const notAfter = new Date(certificate.notAfter)
+  const notBefore = new Date(certificate.notBefore)
+  const status = computeExpiryStatus(notAfter)
+
+  const existing = await findExistingCertByIdentity(
+    orgId, host, port, serverName, certificate.fingerprintSha256,
+  )
+  if (existing) {
+    if (existing.trackedUrl !== url || existing.refreshIntervalSeconds !== refreshIntervalSeconds) {
+      await db
+        .update(certificates)
+        .set({
+          trackedUrl: url,
+          refreshIntervalSeconds,
+          lastRefreshedAt: new Date(),
+          lastRefreshError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(certificates.id, existing.id))
+    }
+    return { success: false, alreadyTracked: true, certificateId: existing.id }
+  }
+
+  const [inserted] = await db
+    .insert(certificates)
+    .values({
+      organisationId: orgId,
+      source: 'imported',
+      host,
+      port,
+      serverName,
+      commonName: certificate.commonName || host,
+      issuer: certificate.issuerCommonName || certificate.issuer,
+      sans: sanValues(certificate),
+      notBefore,
+      notAfter,
+      fingerprintSha256: certificate.fingerprintSha256,
+      status,
+      details: buildDetailsFromParsed(certificate),
+      trackedUrl: url,
+      refreshIntervalSeconds,
+      lastRefreshedAt: new Date(),
+    })
+    .returning({ id: certificates.id })
+
+  if (!inserted) return { error: 'Failed to insert certificate' }
+
+  await db.insert(certificateEvents).values({
+    organisationId: orgId,
+    certificateId: inserted.id,
+    eventType: 'discovered',
+    newStatus: status,
+    message: `Certificate tracked from URL ${url} (CN: ${certificate.commonName || host})`,
+  })
+
+  return { success: true, certificateId: inserted.id }
+}
+
+export async function trackCertificateFromUpload(
+  orgId: string,
+  input: unknown,
+): Promise<TrackCertificateResult> {
+  const session = await getRequiredSession()
+  if (session.user.organisationId !== orgId) {
+    return { error: 'Organisation mismatch' }
+  }
+
+  const parsed = trackFromUploadSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
+  const { pem, host: hostOverride, port: portOverride, serverName: serverNameOverride } = parsed.data
+
+  let certificate: ParsedCertificate
+  try {
+    certificate = parseCertificateBuffer(Buffer.from(pem, 'utf8'))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to parse certificate'
+    return { error: message }
+  }
+
+  const fallback = certificate.commonName || certificate.fingerprintSha256
+  const host = (hostOverride && hostOverride.trim()) || fallback
+  const port = portOverride ?? 0
+  const serverName = (serverNameOverride && serverNameOverride.trim()) || fallback
+
+  const notAfter = new Date(certificate.notAfter)
+  const notBefore = new Date(certificate.notBefore)
+  const status = computeExpiryStatus(notAfter)
+
+  const existing = await findExistingCertByIdentity(
+    orgId, host, port, serverName, certificate.fingerprintSha256,
+  )
+  if (existing) {
+    return { success: false, alreadyTracked: true, certificateId: existing.id }
+  }
+
+  const [inserted] = await db
+    .insert(certificates)
+    .values({
+      organisationId: orgId,
+      source: 'imported',
+      host,
+      port,
+      serverName,
+      commonName: certificate.commonName || fallback,
+      issuer: certificate.issuerCommonName || certificate.issuer,
+      sans: sanValues(certificate),
+      notBefore,
+      notAfter,
+      fingerprintSha256: certificate.fingerprintSha256,
+      status,
+      details: buildDetailsFromParsed(certificate),
+    })
+    .returning({ id: certificates.id })
+
+  if (!inserted) return { error: 'Failed to insert certificate' }
+
+  await db.insert(certificateEvents).values({
+    organisationId: orgId,
+    certificateId: inserted.id,
+    eventType: 'discovered',
+    newStatus: status,
+    message: `Certificate imported from upload (CN: ${certificate.commonName || fallback})`,
+  })
+
+  return { success: true, certificateId: inserted.id }
 }

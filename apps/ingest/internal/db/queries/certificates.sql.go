@@ -286,6 +286,175 @@ func GetAllOrgsWithCertExpiryRules(ctx context.Context, pool *pgxpool.Pool) ([]s
 	return result, rows.Err()
 }
 
+// TrackedCertRow represents a row needed by the URL refresh sweeper.
+type TrackedCertRow struct {
+	ID                     string
+	OrgID                  string
+	Host                   string
+	Port                   int
+	ServerName             string
+	TrackedURL             string
+	RefreshIntervalSeconds int
+	FingerprintSHA256      string
+	NotAfter               time.Time
+	Status                 string
+}
+
+// ListCertsDueForUrlRefresh returns tracked certs whose next refresh is due.
+// A cert is due when last_refreshed_at is NULL or older than refresh_interval_seconds.
+func ListCertsDueForUrlRefresh(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	limit int,
+) ([]TrackedCertRow, error) {
+	const q = `
+		SELECT id, organisation_id, host, port, server_name,
+		       tracked_url, COALESCE(refresh_interval_seconds, 3600),
+		       fingerprint_sha256, not_after, status
+		FROM certificates
+		WHERE tracked_url IS NOT NULL
+		  AND deleted_at IS NULL
+		  AND (
+		    last_refreshed_at IS NULL
+		    OR last_refreshed_at + (COALESCE(refresh_interval_seconds, 3600) * interval '1 second') < NOW()
+		  )
+		ORDER BY last_refreshed_at NULLS FIRST
+		LIMIT $1
+	`
+	rows, err := pool.Query(ctx, q, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []TrackedCertRow
+	for rows.Next() {
+		var r TrackedCertRow
+		if err := rows.Scan(
+			&r.ID, &r.OrgID, &r.Host, &r.Port, &r.ServerName,
+			&r.TrackedURL, &r.RefreshIntervalSeconds,
+			&r.FingerprintSHA256, &r.NotAfter, &r.Status,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// MarkCertRefreshed updates status + metadata after a successful fetch where
+// the fingerprint is unchanged (same cert, just re-verified).
+func MarkCertRefreshed(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	certID, status string,
+) error {
+	const q = `
+		UPDATE certificates
+		SET status            = $2,
+		    last_refreshed_at = NOW(),
+		    last_refresh_error = NULL,
+		    last_seen_at      = NOW(),
+		    updated_at        = NOW()
+		WHERE id = $1
+	`
+	_, err := pool.Exec(ctx, q, certID, status)
+	return err
+}
+
+// MarkCertRefreshFailed records a failed fetch attempt without overwriting cert data.
+func MarkCertRefreshFailed(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	certID, errMessage string,
+) error {
+	const q = `
+		UPDATE certificates
+		SET last_refreshed_at = NOW(),
+		    last_refresh_error = $2,
+		    updated_at         = NOW()
+		WHERE id = $1
+	`
+	_, err := pool.Exec(ctx, q, certID, errMessage)
+	return err
+}
+
+// InsertRenewedTrackedCert inserts a new certificate row for a renewal detected
+// during URL refresh. It carries over the tracked_url + refresh_interval_seconds
+// from the predecessor and also clears those fields from the old row so the
+// sweeper stops polling the retired fingerprint.
+func InsertRenewedTrackedCert(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	previousCertID, orgID string,
+	host string, port int, serverName string,
+	commonName, issuer string,
+	sans []string,
+	notBefore, notAfter time.Time,
+	fingerprint, status, trackedURL string,
+	refreshIntervalSeconds int,
+	detailsJSON []byte,
+) (newCertID string, err error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	sansJSON, _ := json.Marshal(sans)
+
+	const insertQ = `
+		INSERT INTO certificates (
+			id, organisation_id,
+			source, host, port, server_name,
+			common_name, issuer, sans,
+			not_before, not_after, fingerprint_sha256, status,
+			details,
+			tracked_url, refresh_interval_seconds, last_refreshed_at,
+			last_seen_at, created_at, updated_at
+		) VALUES (
+			$1, $2,
+			'imported', $3, $4, $5,
+			$6, $7, $8,
+			$9, $10, $11, $12,
+			$13,
+			$14, $15, NOW(),
+			NOW(), NOW(), NOW()
+		)
+		RETURNING id
+	`
+	id := newCUID()
+	err = tx.QueryRow(ctx, insertQ,
+		id, orgID,
+		host, port, serverName,
+		commonName, issuer, sansJSON,
+		notBefore, notAfter, fingerprint, status,
+		detailsJSON,
+		trackedURL, refreshIntervalSeconds,
+	).Scan(&newCertID)
+	if err != nil {
+		return "", err
+	}
+
+	const clearOldQ = `
+		UPDATE certificates
+		SET tracked_url = NULL,
+		    refresh_interval_seconds = NULL,
+		    last_refreshed_at = NOW(),
+		    last_refresh_error = NULL,
+		    updated_at = NOW()
+		WHERE id = $1
+	`
+	if _, err = tx.Exec(ctx, clearOldQ, previousCertID); err != nil {
+		return "", err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return newCertID, nil
+}
+
 // ListCertificatesExpiringWithin returns certs whose notAfter is within the given
 // number of days and that are not deleted.
 func ListCertificatesExpiringWithin(

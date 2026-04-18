@@ -49,6 +49,10 @@ export const certificates = pgTable('certificates', {
   fingerprintSha256: text('fingerprint_sha256').notNull(),
   status: text('status').notNull().$type<CertificateStatus>().default('valid'),
   details: jsonb('details').notNull().$type<CertificateDetails>(),
+  trackedUrl: text('tracked_url'),
+  refreshIntervalSeconds: integer('refresh_interval_seconds'),
+  lastRefreshedAt: timestamp('last_refreshed_at', { withTimezone: true }),
+  lastRefreshError: text('last_refresh_error'),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -61,6 +65,7 @@ export const certificates = pgTable('certificates', {
   index('certificates_org_expiry_idx').on(t.organisationId, t.notAfter),
   index('certificates_org_status_idx').on(t.organisationId, t.status),
   index('certificates_org_host_idx').on(t.organisationId, t.discoveredByHostId),
+  index('certificates_refresh_due_idx').on(t.trackedUrl, t.lastRefreshedAt),
 ])
 
 export const certificateEvents = pgTable('certificate_events', {

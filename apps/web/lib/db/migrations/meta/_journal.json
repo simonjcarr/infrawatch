@@ -232,6 +232,13 @@
       "when": 1776416112233,
       "tag": "0032_tranquil_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1776505241190,
+      "tag": "0033_rich_tombstone",
+      "breakpoints": true
     }
   ]
 }

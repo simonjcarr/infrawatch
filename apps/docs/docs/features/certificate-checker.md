@@ -83,3 +83,29 @@ Use the **Download** button in the results header to export the leaf certificate
 | **Expired** (red) | Certificate has passed its `Not After` date |
 | **Self-Signed** badge | Subject and issuer are identical |
 | **CA Certificate** badge | Basic Constraints `cA=TRUE` is set |
+
+## Promoting a Certificate into the Tracker
+
+Once a certificate is loaded in the Checker (from either tab), a **Track this certificate** button appears on the results panel. Clicking it adds the certificate to the [Certificate Tracker](./certificates) so expiry is monitored on an ongoing basis.
+
+Two tracking modes are available, selected automatically based on the source tab:
+
+### URL-tracked (Check URL tab)
+
+The server periodically re-opens a TLS connection to the URL you checked and refreshes the certificate data. This keeps the tracker automatically in sync across renewals.
+
+- You pick a refresh interval when you click **Track this certificate** — 15 minutes, 1 hour (default), 6 hours, or 24 hours.
+- On every refresh the server re-reads `notAfter` and recomputes status.
+- If the fingerprint changes, the tracker detects a renewal automatically: the old row is retained for history and a new row takes over as the current tracked certificate.
+- If the endpoint is temporarily unreachable (DNS failure, TCP timeout, TLS handshake error), the last known certificate data is preserved and the failure is recorded so the expiry reminder still works.
+
+### Upload-tracked (Upload File tab)
+
+Used when the certificate was uploaded or pasted — typically an air-gapped host or an out-of-band copy the server cannot reach over TLS.
+
+- The certificate is tracked as a **static expiry reminder** based on the `notAfter` baked into the certificate.
+- There is no periodic re-check. When the certificate is renewed, re-upload the new one via the Checker and click **Track this certificate** again.
+
+::: tip
+If a certificate is already tracked, the Checker will tell you and link directly to the existing row rather than creating a duplicate.
+:::

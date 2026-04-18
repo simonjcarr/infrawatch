@@ -96,6 +96,9 @@ func main() {
 	// Start software inventory sweeper goroutine
 	go handlers.RunSoftwareSweeper(ctx, pool)
 
+	// Start cert URL refresh sweeper goroutine
+	go handlers.RunCertRefreshSweeper(ctx, pool, 60*time.Second)
+
 	// Start gRPC server in goroutine
 	grpcErr := make(chan error, 1)
 	go func() {

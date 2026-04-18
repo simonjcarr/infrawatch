@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { format } from 'date-fns'
 import {
   Upload,
   Globe,
-  Key,
   Download,
   Copy,
   Check,
@@ -18,6 +18,7 @@ import {
   Loader2,
   FileText,
   AlertCircle,
+  BookmarkPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -41,6 +57,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ParsedCertificate, CertCheckerResponse } from '@/app/api/tools/certificate-checker/route'
+import { trackCertificateFromUrl, trackCertificateFromUpload } from '@/lib/actions/certificates'
 
 // ─── Utility helpers ─────────────────────────────────────────────────────────
 
@@ -220,12 +237,162 @@ function FileOrPasteInput({ id, label, sublabel, accept, placeholder, file, text
   )
 }
 
+// ─── Track controls ──────────────────────────────────────────────────────────
+
+type TrackSource =
+  | { kind: 'url'; url: string }
+  | { kind: 'upload'; pem: string }
+
+type TrackState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'tracked'; certificateId: string; wasAlready: boolean }
+  | { status: 'error'; message: string }
+
+const REFRESH_OPTIONS = [
+  { value: '900', label: 'Every 15 minutes' },
+  { value: '3600', label: 'Every hour' },
+  { value: '21600', label: 'Every 6 hours' },
+  { value: '86400', label: 'Every 24 hours' },
+] as const
+
+function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }) {
+  const [state, setState] = useState<TrackState>({ status: 'idle' })
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [refreshInterval, setRefreshInterval] = useState('3600')
+
+  async function submitUpload() {
+    if (source.kind !== 'upload') return
+    setState({ status: 'loading' })
+    const result = await trackCertificateFromUpload(orgId, { pem: source.pem })
+    applyResult(result)
+  }
+
+  async function submitUrl() {
+    if (source.kind !== 'url') return
+    setState({ status: 'loading' })
+    setDialogOpen(false)
+    const result = await trackCertificateFromUrl(orgId, {
+      url: source.url,
+      refreshIntervalSeconds: parseInt(refreshInterval, 10),
+    })
+    applyResult(result)
+  }
+
+  function applyResult(result: Awaited<ReturnType<typeof trackCertificateFromUrl>>) {
+    if ('error' in result) {
+      setState({ status: 'error', message: result.error })
+    } else if (result.success) {
+      setState({ status: 'tracked', certificateId: result.certificateId, wasAlready: false })
+    } else {
+      setState({ status: 'tracked', certificateId: result.certificateId, wasAlready: true })
+    }
+  }
+
+  if (state.status === 'tracked') {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900">
+        <ShieldCheck className="size-4" />
+        <span className="font-medium">
+          {state.wasAlready ? 'Already tracked' : 'Added to tracker'}
+        </span>
+        <Link
+          href={`/certificates/${state.certificateId}`}
+          className="underline underline-offset-2 hover:text-green-950"
+        >
+          View in Certificate Tracker
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        {source.kind === 'url' ? (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setDialogOpen(true)}
+            disabled={state.status === 'loading'}
+          >
+            {state.status === 'loading'
+              ? <Loader2 className="size-4 mr-2 animate-spin" />
+              : <BookmarkPlus className="size-4 mr-2" />}
+            Track this certificate
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={submitUpload}
+            disabled={state.status === 'loading'}
+            title="This certificate will be tracked as a static expiry reminder. Re-upload after renewal."
+          >
+            {state.status === 'loading'
+              ? <Loader2 className="size-4 mr-2 animate-spin" />
+              : <BookmarkPlus className="size-4 mr-2" />}
+            Track this certificate
+          </Button>
+        )}
+        {state.status === 'error' && (
+          <span className="text-sm text-red-700">{state.message}</span>
+        )}
+      </div>
+
+      {source.kind === 'upload' && state.status !== 'error' && (
+        <p className="text-xs text-muted-foreground">
+          Uploaded certificates are tracked as static expiry reminders. We cannot re-verify them automatically — re-upload after renewal.
+        </p>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Track certificate from URL</DialogTitle>
+            <DialogDescription>
+              The server will periodically re-fetch this URL and update the tracked certificate&apos;s expiry status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">URL</Label>
+              <p className="text-sm font-mono break-all">{source.kind === 'url' ? source.url : ''}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="refresh-interval">Re-check frequency</Label>
+              <Select value={refreshInterval} onValueChange={setRefreshInterval}>
+                <SelectTrigger id="refresh-interval">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REFRESH_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={submitUrl}>Start tracking</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 // ─── Certificate results display ─────────────────────────────────────────────
 
-function CertificateResults({ cert, keyMatch, onDownload }: {
+function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
   cert: ParsedCertificate
   keyMatch?: boolean
   onDownload: (format: 'pem' | 'der' | 'pkcs7') => void
+  orgId: string
+  source: TrackSource | null
 }) {
   const daysAbs = Math.abs(cert.daysRemaining)
   const expiryLabel = cert.isExpired
@@ -245,26 +412,29 @@ function CertificateResults({ cert, keyMatch, onDownload }: {
           </div>
           <p className="text-sm text-muted-foreground mt-1 font-mono">{cert.subject}</p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Download className="size-4 mr-2" />
-              Download
-              <ChevronDown className="size-3 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onDownload('pem')}>
-              <FileText className="size-4 mr-2" />PEM (.pem / .crt)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDownload('der')}>
-              <FileText className="size-4 mr-2" />DER (.der)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDownload('pkcs7')}>
-              <FileText className="size-4 mr-2" />PKCS#7 (.p7b)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2 flex-wrap">
+          {source && <TrackControls orgId={orgId} source={source} />}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="size-4 mr-2" />
+                Download
+                <ChevronDown className="size-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onDownload('pem')}>
+                <FileText className="size-4 mr-2" />PEM (.pem / .crt)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload('der')}>
+                <FileText className="size-4 mr-2" />DER (.der)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload('pkcs7')}>
+                <FileText className="size-4 mr-2" />PKCS#7 (.p7b)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -505,7 +675,7 @@ function KeyInput({ keyFile, keyText, onKeyFile, onKeyText }: {
 
 // ─── Upload tab ───────────────────────────────────────────────────────────────
 
-function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?: boolean) => void }) {
+function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, source: TrackSource, keyMatch?: boolean) => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [certFile, setCertFile] = useState<File | null>(null)
@@ -543,7 +713,7 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?
       })
       const json: CertCheckerResponse = await res.json()
       if (!json.ok) { setError(json.error); return }
-      onResult(json.certificate, json.keyMatch)
+      onResult(json.certificate, { kind: 'upload', pem: json.certificate.pem }, json.keyMatch)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unexpected error')
     } finally {
@@ -601,7 +771,7 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?
 
 // ─── URL tab ──────────────────────────────────────────────────────────────────
 
-function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?: boolean) => void }) {
+function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: TrackSource, keyMatch?: boolean) => void }) {
   const [url, setUrl] = useState('')
   const [port, setPort] = useState('443')
   const [servername, setServername] = useState('')
@@ -629,7 +799,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, keyMatch?: b
       })
       const json: CertCheckerResponse = await res.json()
       if (!json.ok) { setError(json.error); return }
-      onResult(json.certificate, json.keyMatch)
+      onResult(json.certificate, { kind: 'url', url: url.trim() }, json.keyMatch)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unexpected error')
     } finally {
@@ -709,13 +879,15 @@ function readFileAsText(file: File): Promise<string> {
 
 // ─── Main page component ──────────────────────────────────────────────────────
 
-export function CertificateCheckerClient() {
+export function CertificateCheckerClient({ orgId }: { orgId: string }) {
   const [cert, setCert] = useState<ParsedCertificate | null>(null)
   const [keyMatch, setKeyMatch] = useState<boolean | undefined>(undefined)
+  const [source, setSource] = useState<TrackSource | null>(null)
 
-  function handleResult(c: ParsedCertificate, km?: boolean) {
+  function handleResult(c: ParsedCertificate, s: TrackSource, km?: boolean) {
     setCert(c)
     setKeyMatch(km)
+    setSource(s)
   }
 
   async function handleDownload(fmt: 'pem' | 'der' | 'pkcs7') {
@@ -739,6 +911,7 @@ export function CertificateCheckerClient() {
   function reset() {
     setCert(null)
     setKeyMatch(undefined)
+    setSource(null)
   }
 
   return (
@@ -783,7 +956,7 @@ export function CertificateCheckerClient() {
       </Card>
 
       {cert ? (
-        <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} />
+        <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} orgId={orgId} source={source} />
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <ShieldCheck className="size-16 mb-4 opacity-20" />

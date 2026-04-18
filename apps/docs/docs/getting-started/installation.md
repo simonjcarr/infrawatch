@@ -24,7 +24,7 @@ That's it. No local Go, Node.js, or pnpm required.
 The fastest way to get Infrawatch running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/simonjcarr/infrawatch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
 cd infrawatch
 ./start.sh        # first run: creates .env from the example, then exits
 $EDITOR .env      # set BETTER_AUTH_URL, AGENT_DOWNLOAD_BASE_URL, etc.
@@ -48,7 +48,7 @@ When all three containers show `healthy` in `docker compose ps`, continue to [Cr
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/simonjcarr/infrawatch infrawatch
+git clone https://github.com/carrtech-dev/ct-ops infrawatch
 cd infrawatch
 ```
 

@@ -4,7 +4,7 @@ import { defaultTheme } from '@vuepress/theme-default'
 import { searchPlugin } from '@vuepress/plugin-search'
 
 export default defineUserConfig({
-  base: '/infrawatch/',
+  base: '/ct-ops/',
   bundler: viteBundler(),
   lang: 'en-US',
   title: 'Infrawatch',
@@ -12,7 +12,7 @@ export default defineUserConfig({
 
   theme: defaultTheme({
     logo: '/images/logo.svg',
-    repo: 'simonjcarr/infrawatch',
+    repo: 'carrtech-dev/ct-ops',
     docsDir: 'apps/docs/docs',
     editLink: true,
     editLinkText: 'Edit this page on GitHub',
@@ -29,7 +29,7 @@ export default defineUserConfig({
       { text: 'Deployment', link: '/deployment/docker-compose' },
       {
         text: 'GitHub',
-        link: 'https://github.com/simonjcarr/infrawatch',
+        link: 'https://github.com/carrtech-dev/ct-ops',
       },
     ],
 

@@ -16,7 +16,7 @@ The recommended way to run Infrawatch in production is via `docker-compose.singl
 
 ```bash
 # Download the deployment bundle
-curl -fsSL https://raw.githubusercontent.com/simonjcarr/infrawatch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
 cd infrawatch
 
 # First run: creates .env with defaults, then exits
@@ -41,7 +41,7 @@ If you prefer to manage the deployment yourself:
 
 ```bash
 mkdir infrawatch && cd infrawatch
-curl -fsSL https://github.com/simonjcarr/infrawatch/releases/latest/download/docker-compose.single.yml \
+curl -fsSL https://github.com/carrtech-dev/ct-ops/releases/latest/download/docker-compose.single.yml \
   -o docker-compose.single.yml
 ```
 

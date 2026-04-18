@@ -302,6 +302,6 @@ ${opts.os === 'windows' ? `& ${opts.binary.fileName} --uninstall` : `sudo ./${op
 
 ## Support
 
-See the docs at ${opts.serverUrl}/docs or https://github.com/simonjcarr/infrawatch for more.
+See the docs at ${opts.serverUrl}/docs or https://github.com/carrtech-dev/ct-ops for more.
 `
 }

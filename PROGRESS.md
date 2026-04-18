@@ -158,7 +158,7 @@
 - `terminal-panel-context.tsx` extended with tab colours, rename, reorder, and split operations
 - `terminal-session.tsx` updated for multi-pane rendering per tab
 - Docs updated at `apps/docs/docs/features/terminal.md`
-- PR: simonjcarr/infrawatch#234
+- PR: carrtech-dev/ct-ops#234
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -174,21 +174,21 @@
 - New `listNetworksWithHosts` server action for efficient single-query join, lazy-loaded only when graph view is active
 - `NetworkNodeComponent` and `HostNodeComponent` (memo-wrapped) with status dots and CIDR badges
 - Uses `@xyflow/react` (MIT) for pan/zoom/minimap/controls
-- PR: simonjcarr/infrawatch#220
+- PR: carrtech-dev/ct-ops#220
 
 **Edge animation & dark-mode polish** (`apps/web/app/(dashboard)/hosts/networks/components/`)
 - Custom `AnimatedFlowEdge`: `getBezierPath` curves with slow `stroke-dashoffset` CSS animation (10s cycle) — subtle, React-Flow-homepage style
 - Endpoint dots at source/target handles; strokes use `var(--muted-foreground)` for light/dark
 - React Flow Controls and MiniMap restyled via `globals.css` to use `--card`, `--border`, `--muted`, `--background` theme variables
 - Earlier iteration with SVG `animateMotion` moving dots replaced for being too busy
-- PRs: simonjcarr/infrawatch#221 (animated), #224 (dashed bezier)
+- PRs: carrtech-dev/ct-ops#221 (animated), #224 (dashed bezier)
 
 **Host-node context menu** (`apps/web/app/(dashboard)/hosts/networks/components/`)
 - Right-click a host node to open in-app terminal session (with username prompt) or navigate to host detail
 - `HostNodeContextMenu` — custom fixed-position overlay fired from React Flow's `onNodeContextMenu` (shadcn ContextMenu didn't work because React Flow intercepts contextmenu at the pane level)
 - `HostNodeTerminalDialog` lifted to parent graph level so the terminal dialog survives context-menu unmount
 - CSS override restoring `pointer-events:all` on `.react-flow__node-hostNode` (xyflow sets `pointer-events:none` when nodes are non-draggable/non-connectable)
-- PRs: simonjcarr/infrawatch#226, #228, #230, #232
+- PRs: carrtech-dev/ct-ops#226, #228, #230, #232
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -212,7 +212,7 @@
 
 **Docs**
 - New `apps/docs/docs/features/networks.md`
-- PR: simonjcarr/infrawatch#218
+- PR: carrtech-dev/ct-ops#218
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -230,7 +230,7 @@
 - GitHub Actions workflow updated; Pages deployment source switched to GitHub Actions workflow
 - pnpm version pinned in deploy-docs workflow to match `packageManager` field
 - System architecture diagram reworked (image replacing hand-drawn diagram), fixed aspect ratio
-- PRs: simonjcarr/infrawatch#213 (pnpm pin), #217 (VuePress migration), #216 (diagram fix)
+- PRs: carrtech-dev/ct-ops#213 (pnpm pin), #217 (VuePress migration), #216 (diagram fix)
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -251,21 +251,21 @@
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
-- PR: simonjcarr/infrawatch#212 (`feat/docusaurus-docs-site`)
+- PR: carrtech-dev/ct-ops#212 (`feat/docusaurus-docs-site`)
 
 ---
 
 ### Session 41 — Software report enhancements (unified table, charts, export)
 
 **Software report** (`apps/web/app/(dashboard)/reports/software/software-report-client.tsx`)
-- **Unified table**: all software search results combined into a single sortable table (was separate sections per version) — PR simonjcarr/infrawatch#202
-- **Clickable hostnames**: clicking a host in the results opens its detail page — PR simonjcarr/infrawatch#204
-- **First-seen column**: added to results table to show when a package was first observed — PR simonjcarr/infrawatch#206
-- **OS distribution chart**: pie/bar breakdown of hosts by OS type per package — PR simonjcarr/infrawatch#206
-- **Version breakdown chart**: for the selected package shows distribution of installed versions — PR simonjcarr/infrawatch#206
-- **Dark mode chart labels**: axis and legend labels now visible in dark mode — PR simonjcarr/infrawatch#208
-- **Export rate limiting**: sliding window 3-per-10-seconds limit; export errors now shown in a modal dialog — PR simonjcarr/infrawatch#210
-- **CSV/PDF export fixes**: correct parameter passing for filters; export respects OS family and version filters — PR simonjcarr/infrawatch#204
+- **Unified table**: all software search results combined into a single sortable table (was separate sections per version) — PR carrtech-dev/ct-ops#202
+- **Clickable hostnames**: clicking a host in the results opens its detail page — PR carrtech-dev/ct-ops#204
+- **First-seen column**: added to results table to show when a package was first observed — PR carrtech-dev/ct-ops#206
+- **OS distribution chart**: pie/bar breakdown of hosts by OS type per package — PR carrtech-dev/ct-ops#206
+- **Version breakdown chart**: for the selected package shows distribution of installed versions — PR carrtech-dev/ct-ops#206
+- **Dark mode chart labels**: axis and legend labels now visible in dark mode — PR carrtech-dev/ct-ops#208
+- **Export rate limiting**: sliding window 3-per-10-seconds limit; export errors now shown in a modal dialog — PR carrtech-dev/ct-ops#210
+- **CSV/PDF export fixes**: correct parameter passing for filters; export respects OS family and version filters — PR carrtech-dev/ct-ops#204
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -276,18 +276,18 @@
 
 **deleteHost cascade** (`apps/web/lib/actions/agents.ts`)
 - Full FK deletion order: notifications → alert_instances → software_scans → task_run_hosts → remaining FKs → host record
-- PRs: simonjcarr/infrawatch#196 (notifications), #198 (all FKs), #200 (software_scans)
+- PRs: carrtech-dev/ct-ops#196 (notifications), #198 (all FKs), #200 (software_scans)
 
 **JWT signing key persistence** (`apps/ingest/internal/`)
 - Ingest service now persists its JWT signing key in the database (org settings table) on first start
 - Survives Docker volume resets — agents no longer get 401s after a volume wipe
-- PR: simonjcarr/infrawatch#194
+- PR: carrtech-dev/ct-ops#194
 
 **Inventory scan reliability** (`apps/ingest/`, `apps/web/`)
-- Inventory tab polls for scan completion and shows live status while a scan is running — PR simonjcarr/infrawatch#187
-- Per-collector logging and ingest scan-start diagnostics added — PR simonjcarr/infrawatch#189
-- Failed scan errors surfaced in the host Inventory tab (was silently ignored) — PR simonjcarr/infrawatch#191
-- Ingest accepts expired agent JWTs in the inventory stream handler to prevent scan failures during token rotation — PR simonjcarr/infrawatch#193
+- Inventory tab polls for scan completion and shows live status while a scan is running — PR carrtech-dev/ct-ops#187
+- Per-collector logging and ingest scan-start diagnostics added — PR carrtech-dev/ct-ops#189
+- Failed scan errors surfaced in the host Inventory tab (was silently ignored) — PR carrtech-dev/ct-ops#191
+- Ingest accepts expired agent JWTs in the inventory stream handler to prevent scan failures during token rotation — PR carrtech-dev/ct-ops#193
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -304,13 +304,13 @@
 - `getPackageDetails` and `getPackageVersions` server actions added
 - Export route updated to pass `osFamily` filter
 - **Inventory wipe bug fixed** — if `collectPackages` returns an error, the task now fails immediately rather than streaming 0 packages; streaming 0 packages caused `MarkRemovedPackages` to wipe the host's entire inventory
-- PR: simonjcarr/infrawatch#185
+- PR: carrtech-dev/ct-ops#185
 
 **Monitoring reliability** (`agent/internal/heartbeat/heartbeat.go`, `apps/ingest/internal/db/queries/alerts.sql.go`, `apps/web/app/(dashboard)/hosts/[id]/alerts-tab.tsx`)
 - **CPU spike elimination**: `resultsReady` heartbeats now send a cached `hostMetricsSnapshot` collected on the regular 30s tick rather than re-sampling CPU — prevents near-zero delta windows inflating readings to 100%
 - **Alert double-evaluation fix**: `GetAlertRulesForHost` now filters `is_global_default = false` — global defaults (templates) were being evaluated alongside their host-specific clones
 - **Global defaults visible**: Alerts tab on host detail shows a read-only "Organisation-wide Default Rules" section linking to Settings → Alerts
-- PR: simonjcarr/infrawatch#183
+- PR: carrtech-dev/ct-ops#183
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -353,7 +353,7 @@
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
 - `go build ./...` — zero errors ✅
-- PRs: simonjcarr/infrawatch#175 (`feature/software-inventory`), #177, #179, #181
+- PRs: carrtech-dev/ct-ops#175 (`feature/software-inventory`), #177, #179, #181
 
 ---
 
@@ -374,7 +374,7 @@
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
 - `go build ./agent/...` — zero errors ✅
-- PRs: simonjcarr/infrawatch#171 (`feature/host-delete-uninstall-agent`), #173
+- PRs: carrtech-dev/ct-ops#171 (`feature/host-delete-uninstall-agent`), #173
 
 ---
 
@@ -383,7 +383,7 @@
 **Dashboard layout** (`apps/web/app/(dashboard)/layout.tsx`)
 - `SidebarProvider` container changed from `min-h-svh` to `h-svh overflow-hidden` — bounds the entire dashboard to the viewport height
 - The main content area already uses `overflow-auto` so page content still scrolls internally; the terminal panel stays pinned at the bottom on all pages regardless of content length
-- PR: simonjcarr/infrawatch#165 (`feature/terminal-fixed-bottom`)
+- PR: carrtech-dev/ct-ops#165 (`feature/terminal-fixed-bottom`)
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -421,7 +421,7 @@
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
-- PRs: simonjcarr/infrawatch#159, #161, #163, #165
+- PRs: carrtech-dev/ct-ops#159, #161, #163, #165
 
 ---
 
@@ -476,7 +476,7 @@
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
 - `go build ./...` — zero errors ✅
-- PR: simonjcarr/infrawatch#155
+- PR: carrtech-dev/ct-ops#155
 
 ---
 

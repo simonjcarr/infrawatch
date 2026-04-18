@@ -20,7 +20,7 @@ On a machine with internet access, run the bundle script to pull all images and 
 
 ```bash
 # Clone the repo (or download just the scripts)
-git clone https://github.com/simonjcarr/infrawatch
+git clone https://github.com/carrtech-dev/ct-ops
 cd infrawatch
 
 # Bundle all images into a single tarball

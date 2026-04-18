@@ -2,17 +2,17 @@
 #
 # Infrawatch one-line installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/simonjcarr/infrawatch/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
 #
 # Optional: pin a specific version.
 #
-#   curl -fsSL https://raw.githubusercontent.com/simonjcarr/infrawatch/main/install.sh \
+#   curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh \
 #     | INFRAWATCH_VERSION=v0.3.0 bash
 #
 set -euo pipefail
 
-REPO_OWNER="simonjcarr"
-REPO_NAME="infrawatch"
+REPO_OWNER="carrtech-dev"
+REPO_NAME="ct-ops"
 
 if [ "$(id -u)" = "0" ]; then
   echo "ERROR: do not run this installer as root." >&2

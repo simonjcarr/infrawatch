@@ -42,8 +42,12 @@ func NewConnPool(address, caCertFile string, tlsSkipVerify bool, size int) *Conn
 
 // Get returns the connection for the given agent index, dialling or re-dialling
 // if the slot is unset or in a non-recoverable state. Safe for concurrent use.
+// Negative indexes (used by the preflight sentinel) are mapped to slot 0.
 func (p *ConnPool) Get(agentIndex int) (*grpc.ClientConn, error) {
 	slot := agentIndex % p.size
+	if slot < 0 {
+		slot += p.size
+	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()

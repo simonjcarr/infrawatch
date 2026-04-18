@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.26.1...agent/v0.26.2) (2026-04-18)
+
+
+### Bug Fixes
+
+* release registration semaphore before heartbeat loop ([4ebd195](https://github.com/carrtech-dev/ct-ops/commit/4ebd19560bbbab9627038b582eb250adf494bd05))
+* release registration semaphore before heartbeat loop ([f4eb44b](https://github.com/carrtech-dev/ct-ops/commit/f4eb44ba7b9ac187db4b66c817e744ce72c1ed9e))
+
 ## [0.26.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.26.0...agent/v0.26.1) (2026-04-18)
 
 

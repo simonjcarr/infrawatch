@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.26.2...agent/v0.27.0) (2026-04-18)
+
+
+### Features
+
+* tag assignment for hosts (settings, enrolment, CLI, bulk rules) ([ddf5b16](https://github.com/carrtech-dev/ct-ops/commit/ddf5b168df16741b8a545f8f367882c28089b46a))
+* tag assignment for hosts across settings, enrolment, CLI, and bulk rules ([58cf0cd](https://github.com/carrtech-dev/ct-ops/commit/58cf0cdc66a8a87311f870f0ef58136bfcb98b6d))
+
 ## [0.26.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.26.1...agent/v0.26.2) (2026-04-18)
 
 

@@ -128,7 +128,19 @@ Virtual hosts are real rows in `hosts` and related tables; leaving them around w
 
 The load tester ships with a `cleanup` subcommand that calls a narrow admin endpoint on the web app. Because the endpoint wraps the same `deleteHost()` action used everywhere else in the product, any foreign-key added in future is handled automatically.
 
-1. On the web server, set `INFRAWATCH_LOADTEST_ADMIN_KEY` to a secret of your choice.
+1. On the web server, set `INFRAWATCH_LOADTEST_ADMIN_KEY` in the `.env` file sitting next to `docker-compose.single.yml`, then recreate the web container so the new env is injected:
+
+   ```bash
+   # on the server under test
+   echo "INFRAWATCH_LOADTEST_ADMIN_KEY=$(openssl rand -hex 32)" >> .env
+   docker compose -f docker-compose.single.yml up -d --force-recreate web
+   ```
+
+   The key is read by the web container at startup only — editing `.env` without restarting the container leaves the endpoint returning `503`. Verify with:
+
+   ```bash
+   docker compose -f docker-compose.single.yml exec web env | grep INFRAWATCH_LOADTEST_ADMIN_KEY
+   ```
 2. From the load-tester VM:
 
    ```bash

@@ -13,11 +13,9 @@ There are two ways to run Infrawatch:
 
 | Tool | Version | Notes |
 |---|---|---|
-| Docker + Docker Compose **or** Podman + `podman compose` / `podman-compose` | Docker v2.x / Podman 4.x+ | Runs the full stack and all build steps |
+| Docker + Docker Compose | v2.x | Runs the full stack and all build steps |
 
 That's it. No local Go, Node.js, or pnpm required.
-
-**Running on Podman:** Infrawatch also works on hosts that use Podman instead of Docker (common on RHEL, Rocky, Alma, Fedora). `install.sh`, `start.sh`, and the `Makefile` auto-detect which runtime is available. Wherever this guide shows a `docker compose …` command, substitute `podman compose …` (Podman 4.x+) or `podman-compose …` (the standalone provider).
 
 ---
 

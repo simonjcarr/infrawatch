@@ -55,7 +55,7 @@ Or use a USB drive, secure FTP, or any other approved transfer mechanism.
 ```bash
 cd /opt/infrawatch
 tar -xzf infrawatch-bundle-*.tar.gz
-docker load < images.tar   # Podman: podman load -i images.tar
+docker load < images.tar
 ```
 
 ---
@@ -125,8 +125,7 @@ INFRAWATCH_VERSION=v0.4.0 bash deploy/scripts/airgap-bundle.sh
 # Transfer the new tarball
 scp infrawatch-bundle-v0.4.0.tar.gz ops@server:/opt/infrawatch/
 
-# On the target server (substitute `podman load -i images.tar` and
-# `podman compose` / `podman-compose` on Podman hosts)
+# On the target server
 docker load < images.tar
 docker compose -f docker-compose.single.yml pull   # no-op: images already loaded
 docker compose -f docker-compose.single.yml up -d  # restarts with new images

@@ -16,7 +16,7 @@ REPO_NAME="infrawatch"
 
 if [ "$(id -u)" = "0" ]; then
   echo "ERROR: do not run this installer as root." >&2
-  echo "Run it as the user that will operate Infrawatch (must be able to run containers — in the 'docker' group for Docker, or a user with rootless Podman configured)." >&2
+  echo "Run it as the user that will operate Infrawatch (must be in the docker group)." >&2
   exit 1
 fi
 
@@ -26,11 +26,7 @@ need() {
     exit 1
   fi
 }
-if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then
-  echo "ERROR: neither 'docker' nor 'podman' found in PATH" >&2
-  echo "Install Docker (with the compose plugin) or Podman 4.x+ and re-run." >&2
-  exit 1
-fi
+need docker
 need curl
 need unzip
 need openssl

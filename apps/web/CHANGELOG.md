@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.54.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.53.0...web/v0.54.0) (2026-04-18)
+
+
+### Features
+
+* paginate, filter, sort hosts page and add fleet overview ([6a4d604](https://github.com/carrtech-dev/ct-ops/commit/6a4d604a61d53a6bfbc253f05e30c6cae44f5ffe))
+* paginate, filter, sort hosts page and add fleet overview ([1390de4](https://github.com/carrtech-dev/ct-ops/commit/1390de47a7034fb63ced3b10aff03c8d2c9873fe))
+
+
+### Bug Fixes
+
+* move filter-reset setState out of useEffect ([d6b7ddb](https://github.com/carrtech-dev/ct-ops/commit/d6b7ddb89992bdeafd6f98d613ddd82928d45b53))
+
 ## [0.53.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.52.0...web/v0.53.0) (2026-04-18)
 
 

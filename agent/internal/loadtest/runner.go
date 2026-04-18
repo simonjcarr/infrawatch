@@ -106,9 +106,16 @@ func (r *Runner) Run(ctx context.Context) error {
 		r.stats.RegistrationsStarted.Add(1)
 		go func(a *VirtualAgent) {
 			defer runWG.Done()
-			defer func() { <-sem }()
 
+			// The semaphore bounds *Register* concurrency only — it must be
+			// released as soon as Register returns, otherwise the long-lived
+			// heartbeat loop inside a.Run() pins sem slots and the ramp loop
+			// stalls once --registration-concurrency agents are alive. The
+			// symptom is the stats line showing exactly that many streams
+			// forever and no further registrations starting.
 			status, err := a.Register(rampCtx)
+			<-sem
+
 			if err != nil {
 				r.stats.RegistrationsFailed.Add(1)
 				r.stats.RecordError(truncate("register: "+err.Error(), 200))

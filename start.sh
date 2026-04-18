@@ -163,7 +163,7 @@ if ! $LOCAL; then
   # command manually.
   "${COMPOSE[@]}" -f docker-compose.single.yml pull db web ingest
   "${COMPOSE[@]}" -f docker-compose.single.yml down
-  "${COMPOSE[@]}" -f docker-compose.single.yml up -d --pull always
+  "${COMPOSE[@]}" -f docker-compose.single.yml up -d
 
   # Database migrations are applied automatically by the web container on
   # startup (its CMD runs `node migrate.js && node server.js`), and the

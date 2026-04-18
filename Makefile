@@ -1,4 +1,4 @@
-.PHONY: proto go-build go-test agent ingest clean
+.PHONY: proto go-build go-test agent ingest loadtest clean
 
 AGENT_DIST_DIR := apps/web/data/agent-dist
 
@@ -70,6 +70,24 @@ ingest:
 		golang:1.25 \
 		go build -o dist/ingest ./apps/ingest/cmd/ingest
 	@echo "Ingest binary: dist/ingest ($(HOST_OS)/$(HOST_ARCH))"
+
+# Build the infrawatch-loadtest binary for the host platform only. This is a
+# dev/ops tool for measuring sustainable fleet capacity of a given server
+# profile; it is not shipped as a release artefact.
+loadtest:
+	@echo "Building infrawatch-loadtest for $(HOST_OS)/$(HOST_ARCH)..."
+	@mkdir -p dist $(GO_CACHE_DIR) $(GO_MOD_DIR)
+	docker run --rm \
+		-v "$(CURDIR):/src" \
+		-w /src \
+		--user "$(shell id -u):$(shell id -g)" \
+		-e GOOS=$(HOST_OS) \
+		-e GOARCH=$(HOST_ARCH) \
+		-e CGO_ENABLED=0 \
+		$(GO_CACHE_ARGS) \
+		golang:1.25 \
+		go build -trimpath -ldflags="-s -w" -o dist/infrawatch-loadtest ./agent/cmd/loadtest
+	@echo "Load-test binary: dist/infrawatch-loadtest ($(HOST_OS)/$(HOST_ARCH))"
 
 go-test:
 	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_DIR)

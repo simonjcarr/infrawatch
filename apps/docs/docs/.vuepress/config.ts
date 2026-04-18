@@ -82,6 +82,7 @@ export default defineUserConfig({
         children: [
           '/deployment/docker-compose.md',
           '/deployment/air-gap.md',
+          '/deployment/load-testing.md',
         ],
       },
     ],

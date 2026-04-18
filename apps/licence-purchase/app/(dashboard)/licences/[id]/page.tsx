@@ -8,12 +8,16 @@ import { getLicenceById } from '@/lib/actions/licences'
 
 export const metadata = { title: 'Licence detail' }
 
+function daysUntil(target: Date): number {
+  return Math.ceil((target.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+}
+
 export default async function LicencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const licence = await getLicenceById(id)
   if (!licence) notFound()
 
-  const daysLeft = Math.ceil((licence.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const daysLeft = daysUntil(licence.expiresAt)
 
   return (
     <>

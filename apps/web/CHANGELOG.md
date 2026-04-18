@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.47.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.46.0...web/v0.47.0) (2026-04-18)
+
+
+### Features
+
+* add SSL certificate checker tool ([082d372](https://github.com/carrtech-dev/ct-ops/commit/082d3724feb2649db40577ce98d52aef427ba7a7))
+* **ingest:** dedupe host registrations by hostname / IP overlap ([8e34db9](https://github.com/carrtech-dev/ct-ops/commit/8e34db919dadf05a29d7b2701a7df73cca7a9f3d))
+* SSL certificate checker tool ([8853991](https://github.com/carrtech-dev/ct-ops/commit/88539910c436631596a4048e8411aad3298608df))
+
+
+### Bug Fixes
+
+* read enrolment URL from AGENT_DOWNLOAD_BASE_URL env var ([b3fed72](https://github.com/carrtech-dev/ct-ops/commit/b3fed72ddd6da6b50791148b17ce199fe6675f70))
+* use NEXT_PUBLIC_APP_URL for agent enrolment install URL ([295e27c](https://github.com/carrtech-dev/ct-ops/commit/295e27cc66ff4f52e817ec90b6130d5cd242d7d3))
+* use NEXT_PUBLIC_APP_URL for agent enrolment install URL ([66de4a8](https://github.com/carrtech-dev/ct-ops/commit/66de4a810b493fa61c3ad37ca7d49d975a79dd39))
+
 ## [0.46.0](https://github.com/simonjcarr/infrawatch/compare/web/v0.45.0...web/v0.46.0) (2026-04-17)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.24.1...agent/v0.25.0) (2026-04-18)
+
+
+### Features
+
+* **ingest:** dedupe host registrations by hostname / IP overlap ([8e34db9](https://github.com/carrtech-dev/ct-ops/commit/8e34db919dadf05a29d7b2701a7df73cca7a9f3d))
+
 ## [0.24.1](https://github.com/simonjcarr/infrawatch/compare/agent/v0.24.0...agent/v0.24.1) (2026-04-15)
 
 

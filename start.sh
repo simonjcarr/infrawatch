@@ -21,6 +21,25 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ---- Detect container runtime (Docker or Podman) ----
+# Resolves a COMPOSE array used for every compose invocation below.
+# Preference order: docker compose > podman compose > podman-compose.
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  COMPOSE=(docker compose)
+elif command -v podman >/dev/null 2>&1 && podman compose version >/dev/null 2>&1; then
+  COMPOSE=(podman compose)
+elif command -v podman-compose >/dev/null 2>&1; then
+  COMPOSE=(podman-compose)
+else
+  echo "ERROR: no supported container runtime found." >&2
+  echo "Install one of the following and re-run:" >&2
+  echo "  - Docker with the compose plugin ('docker compose')" >&2
+  echo "  - Podman 4.x+ ('podman compose')" >&2
+  echo "  - podman-compose (standalone)" >&2
+  exit 1
+fi
+echo "Using container runtime: ${COMPOSE[*]}"
+
 LOCAL=false
 DB_ONLY=false
 DOWN=false
@@ -39,10 +58,10 @@ done
 # ---- Handle --down ----
 if $DOWN; then
   if $LOCAL; then
-    docker compose -f docker-compose.dev.yml down
+    "${COMPOSE[@]}" -f docker-compose.dev.yml down
     echo "Dev database stopped."
   else
-    docker compose -f docker-compose.single.yml down
+    "${COMPOSE[@]}" -f docker-compose.single.yml down
     echo "Production stack stopped."
   fi
   exit 0
@@ -67,8 +86,8 @@ if [ ! -f ".env" ]; then
 fi
 
 # Load .env so values like AGENT_DOWNLOAD_BASE_URL are available both to
-# this script and (via export) to the docker compose variable substitution
-# that follows.
+# this script and (via export) to the compose variable substitution that
+# follows.
 set -a
 # shellcheck disable=SC1091
 source .env
@@ -131,13 +150,14 @@ if ! $LOCAL; then
   echo "Agent download base URL: ${AGENT_DOWNLOAD_BASE_URL}"
 
   # Always pull the latest published images from GHCR. This is the production
-  # install path — users running Infrawatch from Docker do not have a source
+  # install path — users running Infrawatch from containers do not have a source
   # checkout to build from. To run a locally-built image instead, set
   # WEB_IMAGE / INGEST_IMAGE in your environment (or .env) before invoking this
-  # script, or run `docker compose -f docker-compose.single.yml build` manually.
-  docker compose -f docker-compose.single.yml pull db web ingest
-  docker compose -f docker-compose.single.yml down
-  docker compose -f docker-compose.single.yml up -d --pull always
+  # script, or run the equivalent `compose -f docker-compose.single.yml build`
+  # command manually.
+  "${COMPOSE[@]}" -f docker-compose.single.yml pull db web ingest
+  "${COMPOSE[@]}" -f docker-compose.single.yml down
+  "${COMPOSE[@]}" -f docker-compose.single.yml up -d --pull always
 
   # Database migrations are applied automatically by the web container on
   # startup (its CMD runs `node migrate.js && node server.js`), and the
@@ -185,10 +205,10 @@ make ingest
 
 # ---- Start database ----
 echo "Starting dev database..."
-docker compose -f docker-compose.dev.yml up -d
+"${COMPOSE[@]}" -f docker-compose.dev.yml up -d
 
 echo "Waiting for database to be healthy..."
-until docker compose -f docker-compose.dev.yml exec -T db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; do
+until "${COMPOSE[@]}" -f docker-compose.dev.yml exec -T db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; do
   sleep 1
 done
 echo "Database ready."

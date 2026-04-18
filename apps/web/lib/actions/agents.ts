@@ -67,6 +67,27 @@ export async function approveAgent(
     if (!agent) return { error: 'Agent not found' }
     if (agent.status !== 'pending') return { error: 'Agent is not in pending state' }
 
+    // Guard against duplicate hosts: a pending agent that shares a hostname or
+    // any IP with a currently-online host in the same org must not be approved,
+    // because activating it would leave two live rows for the same physical
+    // machine. The ingest register handler enforces the same rule at first
+    // contact, but a collision can emerge later (e.g. another host with the
+    // same hostname came online after this agent was queued for approval).
+    const pendingHost = await db.query.hosts.findFirst({
+      where: and(
+        eq(hosts.agentId, agentId),
+        eq(hosts.organisationId, orgId),
+        isNull(hosts.deletedAt),
+      ),
+    })
+    const pendingIps = (pendingHost?.ipAddresses ?? []) as string[]
+    const collision = await findOnlineHostCollision(orgId, agentId, pendingHost?.hostname ?? agent.hostname, pendingIps)
+    if (collision) {
+      return {
+        error: `Cannot approve: another host (${collision.hostname}) matching this hostname or IP is already online in this organisation. Delete the existing host first.`,
+      }
+    }
+
     await db.transaction(async (tx) => {
       await tx
         .update(agents)
@@ -111,6 +132,35 @@ export async function approveAgent(
     console.error('Failed to approve agent:', err)
     return { error: 'An unexpected error occurred' }
   }
+}
+
+// findOnlineHostCollision returns the first online host in the org (excluding
+// the one linked to excludeAgentId) whose hostname matches or whose
+// ip_addresses jsonb array overlaps any of the provided ips. Used by
+// approveAgent to block activation when doing so would produce a duplicate.
+async function findOnlineHostCollision(
+  orgId: string,
+  excludeAgentId: string,
+  hostname: string,
+  ips: string[],
+): Promise<{ id: string; hostname: string } | null> {
+  const ipOverlap = ips.length > 0
+    ? sql`ip_addresses ?| ${ips}::text[]`
+    : sql`false`
+  const rows = await db
+    .select({ id: hosts.id, hostname: hosts.hostname })
+    .from(hosts)
+    .where(
+      and(
+        eq(hosts.organisationId, orgId),
+        isNull(hosts.deletedAt),
+        eq(hosts.status, 'online'),
+        sql`(${hosts.agentId} IS NULL OR ${hosts.agentId} <> ${excludeAgentId})`,
+        sql`(${hosts.hostname} = ${hostname} OR ${ipOverlap})`,
+      ),
+    )
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function rejectAgent(

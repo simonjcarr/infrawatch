@@ -18,6 +18,7 @@ The ingest service is a stateless gRPC server that sits between the agents and t
 - Write agent status and host vitals to PostgreSQL
 - Publish metrics to the internal queue (for consumer processing)
 - Expose a JWKS endpoint for JWT public key distribution
+- Deduplicate host records on registration (see [Duplicate-Host Protection](../features/hosts#duplicate-host-protection))
 
 ---
 

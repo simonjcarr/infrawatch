@@ -4,10 +4,84 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// HostCollision describes an existing host whose identity (hostname or IP) overlaps
+// with a newly registering agent. Used to reject online duplicates and adopt offline
+// ones rather than creating a second row for the same physical machine.
+type HostCollision struct {
+	HostID      string
+	AgentID     string
+	Hostname    string
+	HostStatus  string // hosts.status: online | offline | unknown
+	AgentStatus string // agents.status: pending | active | offline | revoked
+}
+
+// FindHostCollision looks for a non-deleted host in the given org whose hostname
+// matches or whose ip_addresses jsonb array overlaps any of the provided ips.
+// Returns nil, nil when no collision exists.
+//
+// An "online" match means the physical machine is still heartbeating under a
+// different keypair — the new registration must be rejected. An "offline" or
+// "unknown" match is treated as a re-registration of the same machine and the
+// caller will rotate the keypair onto the existing row.
+func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname string, ips []string) (*HostCollision, error) {
+	const q = `
+		SELECT h.id, COALESCE(h.agent_id, ''), h.hostname, h.status, COALESCE(a.status, '')
+		FROM hosts h
+		LEFT JOIN agents a ON a.id = h.agent_id
+		WHERE h.organisation_id = $1
+		  AND h.deleted_at IS NULL
+		  AND (
+		    h.hostname = $2
+		    OR (cardinality($3::text[]) > 0 AND h.ip_addresses ?| $3::text[])
+		  )
+		ORDER BY
+		  CASE WHEN h.status = 'online' THEN 0 ELSE 1 END,
+		  h.last_seen_at DESC NULLS LAST
+		LIMIT 1
+	`
+	if ips == nil {
+		ips = []string{}
+	}
+	row := pool.QueryRow(ctx, q, orgID, hostname, ips)
+	var c HostCollision
+	if err := row.Scan(&c.HostID, &c.AgentID, &c.Hostname, &c.HostStatus, &c.AgentStatus); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &c, nil
+}
+
+// RotateAgentPublicKey replaces the public key on an existing agent row. Used
+// during re-registration adoption: the physical machine is the same (hostname
+// or IP match) but the agent has generated a fresh keypair (e.g. data dir wiped).
+func RotateAgentPublicKey(ctx context.Context, pool *pgxpool.Pool, agentID, publicKey string) error {
+	const q = `UPDATE agents SET public_key = $1, updated_at = NOW() WHERE id = $2`
+	_, err := pool.Exec(ctx, q, publicKey, agentID)
+	return err
+}
+
+// ReattachHostToAgent ensures a host row is linked to the given agent id. Used
+// when adopting an existing host during re-registration.
+func ReattachHostToAgent(ctx context.Context, pool *pgxpool.Pool, hostID, agentID, hostname string) error {
+	const q = `
+		UPDATE hosts
+		SET agent_id   = $2,
+		    hostname   = $3,
+		    updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := pool.Exec(ctx, q, hostID, agentID, hostname)
+	return err
+}
 
 // InsertHost inserts a new host row linked to an agent and returns the host ID.
 // Caller should verify no host exists for this agentID before calling.

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.51.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.50.0...web/v0.51.0) (2026-04-18)
+
+
+### Features
+
+* expand licence tier model with feature flags, guard, and docs ([3ff4665](https://github.com/carrtech-dev/ct-ops/commit/3ff4665d59bbe12823f7923759cba5f876da6da1))
+* expand licence tier model with feature flags, guard, and docs ([a38810c](https://github.com/carrtech-dev/ct-ops/commit/a38810ce3f053278a24986f9fefc09e7029363eb))
+* tag assignment for hosts (settings, enrolment, CLI, bulk rules) ([ddf5b16](https://github.com/carrtech-dev/ct-ops/commit/ddf5b168df16741b8a545f8f367882c28089b46a))
+* tag assignment for hosts across settings, enrolment, CLI, and bulk rules ([58cf0cd](https://github.com/carrtech-dev/ct-ops/commit/58cf0cdc66a8a87311f870f0ef58136bfcb98b6d))
+
+
+### Bug Fixes
+
+* use next/link for Bulk Tag cross-reference on Tag Rules page ([f4865f3](https://github.com/carrtech-dev/ct-ops/commit/f4865f325526033ecd9705b95c90a0ca6fed381c))
+
 ## [0.50.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.49.0...web/v0.50.0) (2026-04-18)
 
 

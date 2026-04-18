@@ -1,6 +1,6 @@
 # Agent Architecture
 
-The Infrawatch agent is a statically compiled Go binary. It has no runtime dependencies — just copy the binary to a host and run it. It is designed to work in fully air-gapped environments.
+The CT-Ops agent is a statically compiled Go binary. It has no runtime dependencies — just copy the binary to a host and run it. It is designed to work in fully air-gapped environments.
 
 ---
 
@@ -83,7 +83,7 @@ There are three supported ways to install the agent on a host:
 
 | Method | When to use | Guide |
 | --- | --- | --- |
-| One-command curl install | Target host can reach the Infrawatch server during install | [Installation guide](../getting-started/installation.md) |
+| One-command curl install | Target host can reach the CT-Ops server during install | [Installation guide](../getting-started/installation.md) |
 | Offline install bundle (zip) | Air-gapped, change-controlled, or jump-host-only environments | [Offline Agent Install Bundle](../getting-started/agent-install-bundle.md) |
 | Manual build + config | Development, or when you need a custom build | [Installation guide](../getting-started/installation.md#build-and-run-the-agent) |
 
@@ -100,11 +100,11 @@ address = "ingest.corp.example.com:9443"
 
 # Optional: path to CA cert for self-signed or corporate TLS
 # Leave empty if using a publicly trusted certificate
-ca_cert_file = "/etc/infrawatch/ca.crt"
+ca_cert_file = "/etc/ct-ops/ca.crt"
 
 [agent]
-org_token = "tok_..."          # or INFRAWATCH_ORG_TOKEN env var
-data_dir  = "/var/lib/infrawatch/agent"
+org_token = "tok_..."          # or CT_OPS_ORG_TOKEN env var
+data_dir  = "/var/lib/ct-ops/agent"
 version   = "0.1.0"
 heartbeat_interval_secs = 30
 ```
@@ -113,28 +113,28 @@ heartbeat_interval_secs = 30
 
 | Variable | Overrides |
 |---|---|
-| `INFRAWATCH_INGEST_ADDRESS` | `ingest.address` |
-| `INFRAWATCH_INGEST_CA_CERT` | `ingest.ca_cert_file` |
-| `INFRAWATCH_ORG_TOKEN` | `agent.org_token` |
-| `INFRAWATCH_DATA_DIR` | `agent.data_dir` |
+| `CT_OPS_INGEST_ADDRESS` | `ingest.address` |
+| `CT_OPS_INGEST_CA_CERT` | `ingest.ca_cert_file` |
+| `CT_OPS_ORG_TOKEN` | `agent.org_token` |
+| `CT_OPS_DATA_DIR` | `agent.data_dir` |
 
 ---
 
 ## Running as a systemd Service
 
-```ini title="/etc/systemd/system/infrawatch-agent.service"
+```ini title="/etc/systemd/system/ct-ops-agent.service"
 [Unit]
-Description=Infrawatch Agent
+Description=CT-Ops Agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/infrawatch-agent -config /etc/infrawatch/agent.toml
+ExecStart=/usr/local/bin/ct-ops-agent -config /etc/ct-ops/agent.toml
 Restart=on-failure
 RestartSec=5
-User=infrawatch
-Group=infrawatch
+User=ct-ops
+Group=ct-ops
 
 [Install]
 WantedBy=multi-user.target
@@ -142,8 +142,8 @@ WantedBy=multi-user.target
 
 ```bash
 systemctl daemon-reload
-systemctl enable --now infrawatch-agent
-journalctl -u infrawatch-agent -f
+systemctl enable --now ct-ops-agent
+journalctl -u ct-ops-agent -f
 ```
 
 ---
@@ -153,7 +153,7 @@ journalctl -u infrawatch-agent -f
 The agent logs structured text to stdout:
 
 ```
-level=INFO msg="agent identity ready" data_dir=/var/lib/infrawatch/agent
+level=INFO msg="agent identity ready" data_dir=/var/lib/ct-ops/agent
 level=INFO msg="registering agent" address=ingest.corp.example.com:9443
 level=INFO msg="registration response" status=active agent_id=clxyz123...
 level=INFO msg="agent registered and active"
@@ -193,7 +193,7 @@ The ingest service's `SoftwareSweeper` runs every 60 seconds and dispatches a `s
 
 ### Remote uninstall (recommended when agent is online)
 
-When deleting a host from the UI while its agent is **online**, check **"Also uninstall agent from the remote host"**. Infrawatch dispatches an `agent_uninstall` task; the agent runs the uninstaller as a detached child process that survives the service manager terminating the agent:
+When deleting a host from the UI while its agent is **online**, check **"Also uninstall agent from the remote host"**. CT-Ops dispatches an `agent_uninstall` task; the agent runs the uninstaller as a detached child process that survives the service manager terminating the agent:
 
 - **Linux (systemd)**: `systemd-run --no-block --collect` places the uninstaller in a transient cgroup, preventing systemd from killing it when the agent's cgroup is torn down
 - **Linux (non-systemd)**: `setsid` fallback
@@ -202,12 +202,12 @@ When deleting a host from the UI while its agent is **online**, check **"Also un
 
 ### Manual uninstall
 
-1. Stop the agent process (or `systemctl stop infrawatch-agent`)
+1. Stop the agent process (or `systemctl stop ct-ops-agent`)
 2. The host transitions to **Offline** in the UI automatically
 3. Optionally revoke the enrolment token in **Settings → Agent Enrolment**
-4. Delete the data directory: `rm -rf /var/lib/infrawatch/agent`
+4. Delete the data directory: `rm -rf /var/lib/ct-ops/agent`
 
-The host record remains in Infrawatch's database (soft-deleted on revocation). You can remove it from the Hosts UI.
+The host record remains in CT-Ops's database (soft-deleted on revocation). You can remove it from the Hosts UI.
 
 ---
 
@@ -220,4 +220,4 @@ The agent polls the ingest service for the minimum required version. If the runn
 3. Hot-swaps the binary and restarts
 4. Rolls back automatically on failure
 
-All updates are served from your Infrawatch server — no internet access required.
+All updates are served from your CT-Ops server — no internet access required.

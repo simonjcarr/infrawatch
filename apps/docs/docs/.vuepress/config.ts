@@ -7,7 +7,7 @@ export default defineUserConfig({
   base: '/ct-ops/',
   bundler: viteBundler(),
   lang: 'en-US',
-  title: 'Infrawatch',
+  title: 'CT-Ops',
   description: 'Open-source infrastructure monitoring for engineering teams',
 
   theme: defaultTheme({

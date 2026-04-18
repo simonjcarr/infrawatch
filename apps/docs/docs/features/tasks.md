@@ -1,6 +1,6 @@
 # Tasks & Runbooks
 
-The Tasks feature lets you run scripts on hosts directly from the Infrawatch UI, and Runbooks provide a way to define reusable, multi-step operational procedures.
+The Tasks feature lets you run scripts on hosts directly from the CT-Ops UI, and Runbooks provide a way to define reusable, multi-step operational procedures.
 
 ---
 
@@ -42,7 +42,7 @@ Click a task run to see the full stdout/stderr output.
 On the host detail page, the **Tools** section splits task history into two tabs:
 
 - **Tasks** — runs you started yourself by clicking **Run Script**, **Run Patch** or **Service**. This is the place to find scripts you previously ran on a host.
-- **Logs** — runs started automatically by Infrawatch on a schedule, such as software inventory scans. These share the same underlying execution mechanism, but are separated out so the Tasks list stays focused on your own activity.
+- **Logs** — runs started automatically by CT-Ops on a schedule, such as software inventory scans. These share the same underlying execution mechanism, but are separated out so the Tasks list stays focused on your own activity.
 
 Both tabs link through to the same task monitor view, so the full raw output is available regardless of which tab the run was started from.
 
@@ -83,4 +83,4 @@ The task runner integrates with the host's package manager. From the **Tasks** t
 - Apply selected updates
 - View update history
 
-This is equivalent to running `apt upgrade` or `yum update` but tracked and audited through Infrawatch.
+This is equivalent to running `apt upgrade` or `yum update` but tracked and audited through CT-Ops.

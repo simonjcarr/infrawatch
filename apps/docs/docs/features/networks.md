@@ -16,7 +16,7 @@ Networks let you define IP subnets (CIDRs) and automatically group hosts by the 
 
 ## Auto-Assignment
 
-On every agent heartbeat, Infrawatch compares the host's reported IP addresses against all defined network CIDRs for the organisation. Membership is kept in sync automatically:
+On every agent heartbeat, CT-Ops compares the host's reported IP addresses against all defined network CIDRs for the organisation. Membership is kept in sync automatically:
 
 - If an IP falls within a network's CIDR, the host is added to that network (marked **Auto**).
 - If the host's IPs change so that none match a network's CIDR, the auto-assigned membership is removed.

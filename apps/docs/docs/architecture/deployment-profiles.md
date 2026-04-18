@@ -1,6 +1,6 @@
 # Deployment Profiles
 
-Infrawatch ships with three deployment profiles, each targeting a different scale. All profiles use the same codebase — only the infrastructure backing them changes.
+CT-Ops ships with three deployment profiles, each targeting a different scale. All profiles use the same codebase — only the infrastructure backing them changes.
 
 ---
 
@@ -26,7 +26,7 @@ services:
 ```
 
 **Use when:**
-- Evaluating Infrawatch
+- Evaluating CT-Ops
 - Small infrastructure (< 50 agents)
 - A single point of failure is acceptable
 
@@ -99,7 +99,7 @@ Regardless of which queue implementation is in use, the topics are:
 
 Profiles are not currently hot-swappable. To move from `single` to `standard`:
 
-1. Take a PostgreSQL backup: `pg_dump infrawatch > backup.sql`
+1. Take a PostgreSQL backup: `pg_dump ct-ops > backup.sql`
 2. `docker compose -f docker-compose.single.yml down`
 3. `docker compose -f docker-compose.standard.yml up -d`
 4. Restore the backup if needed

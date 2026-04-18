@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Infrawatch is a monorepo composed of several independently deployable services. This page describes the high-level architecture and how data flows through the system.
+CT-Ops is a monorepo composed of several independently deployable services. This page describes the high-level architecture and how data flows through the system.
 
 ---
 

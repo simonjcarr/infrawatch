@@ -1,6 +1,6 @@
 # Load Testing
 
-`infrawatch-loadtest` is an operator tool that simulates **N virtual agents** against a running Infrawatch server so you can measure the sustainable fleet capacity of a given hardware profile before recommending sizing to customers.
+`ct-ops-loadtest` is an operator tool that simulates **N virtual agents** against a running CT-Ops server so you can measure the sustainable fleet capacity of a given hardware profile before recommending sizing to customers.
 
 Virtual agents exercise the real wire protocol (gRPC `Register` + `Heartbeat` + `Terminal` + `SubmitSoftwareInventory`), so the numbers reflect the production code path — ingest, queue, consumers, and database — not a bypass.
 
@@ -22,7 +22,7 @@ The load tester is a dev/ops tool; it is **not shipped as a release artefact**. 
 
 ```bash
 make loadtest
-# produces: dist/infrawatch-loadtest (host platform)
+# produces: dist/ct-ops-loadtest (host platform)
 ```
 
 ---
@@ -32,7 +32,7 @@ make loadtest
 1. An enrolment token with `auto_approve=true` (virtual agents cannot wait for manual approval).
 2. The server is reachable from the load-tester VM on the ingest gRPC port (default `9443`).
 3. If the server uses a self-signed certificate, either pass `--ca-cert <path>` or `--tls-skip-verify` (dev only).
-4. For `cleanup` to work, set `INFRAWATCH_LOADTEST_ADMIN_KEY` on the **web** server and pass the same key with `--admin-key` below.
+4. For `cleanup` to work, set `CT_OPS_LOADTEST_ADMIN_KEY` on the **web** server and pass the same key with `--admin-key` below.
 
 Running the tool on a **separate VM** from the server under test is strongly recommended — otherwise your measurements include the load-generator's own CPU/network overhead.
 
@@ -41,7 +41,7 @@ Running the tool on a **separate VM** from the server under test is strongly rec
 ## Running a test
 
 ```bash
-dist/infrawatch-loadtest run \
+dist/ct-ops-loadtest run \
   --address ingest.example.com:9443 \
   --token <enrolment-token-with-auto-approve> \
   --agents 1000 \
@@ -78,7 +78,7 @@ The tool prints a live counter every `--stats-interval` and a final summary (inc
 | `--metrics-jitter` | `0.1` | Amplitude of per-tick metric drift (0–1). |
 | `--output-json` | *(unset)* | Write final summary as JSON (useful for CI). |
 
-Run `infrawatch-loadtest run --help` for the full list.
+Run `ct-ops-loadtest run --help` for the full list.
 
 ---
 
@@ -128,24 +128,24 @@ Virtual hosts are real rows in `hosts` and related tables; leaving them around w
 
 The load tester ships with a `cleanup` subcommand that calls a narrow admin endpoint on the web app. Because the endpoint wraps the same `deleteHost()` action used everywhere else in the product, any foreign-key added in future is handled automatically.
 
-1. On the web server, set `INFRAWATCH_LOADTEST_ADMIN_KEY` in the `.env` file sitting next to `docker-compose.single.yml`, then recreate the web container so the new env is injected:
+1. On the web server, set `CT_OPS_LOADTEST_ADMIN_KEY` in the `.env` file sitting next to `docker-compose.single.yml`, then recreate the web container so the new env is injected:
 
    ```bash
    # on the server under test
-   echo "INFRAWATCH_LOADTEST_ADMIN_KEY=$(openssl rand -hex 32)" >> .env
+   echo "CT_OPS_LOADTEST_ADMIN_KEY=$(openssl rand -hex 32)" >> .env
    docker compose -f docker-compose.single.yml up -d --force-recreate web
    ```
 
    The key is read by the web container at startup only — editing `.env` without restarting the container leaves the endpoint returning `503`. Verify with:
 
    ```bash
-   docker compose -f docker-compose.single.yml exec web env | grep INFRAWATCH_LOADTEST_ADMIN_KEY
+   docker compose -f docker-compose.single.yml exec web env | grep CT_OPS_LOADTEST_ADMIN_KEY
    ```
 2. From the load-tester VM:
 
    ```bash
-   dist/infrawatch-loadtest cleanup \
-     --web-url https://infrawatch.example.com \
+   dist/ct-ops-loadtest cleanup \
+     --web-url https://ct-ops.example.com \
      --admin-key <key> \
      --run-id <id-printed-at-end-of-run>
    ```

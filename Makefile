@@ -6,7 +6,7 @@ PROTO_OUT := proto/gen/go
 
 # Persistent host-directory caches for Go builds.
 # Using host dirs (owned by the current user) avoids permission errors when
-# Docker runs with --user $(id -u):$(id -g) and a root-owned named volume.
+# the container runs with --user $(id -u):$(id -g) and a root-owned named volume.
 GO_CACHE_DIR := $(HOME)/.cache/infrawatch/go-build
 GO_MOD_DIR   := $(HOME)/.cache/infrawatch/go-mod
 
@@ -14,6 +14,17 @@ GO_MOD_DIR   := $(HOME)/.cache/infrawatch/go-mod
 # running this Makefile (e.g. darwin/arm64 on Apple Silicon).
 HOST_OS   := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH := $(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+
+# Detect container runtime. Override with CONTAINER_RUNTIME=podman if both are
+# installed and you want the non-default.
+CONTAINER_RUNTIME ?= $(shell \
+	if command -v docker >/dev/null 2>&1; then echo docker; \
+	elif command -v podman >/dev/null 2>&1; then echo podman; \
+	else echo MISSING; fi)
+
+ifeq ($(CONTAINER_RUNTIME),MISSING)
+$(error No container runtime found. Install docker or podman and retry.)
+endif
 
 GO_CACHE_ARGS := \
 	-e GOCACHE=/go-cache \
@@ -41,7 +52,7 @@ go-build: agent ingest
 agent:
 	@echo "Building agent binaries for all platforms..."
 	@mkdir -p $(AGENT_DIST_DIR) $(GO_CACHE_DIR) $(GO_MOD_DIR)
-	docker run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 		-v "$(CURDIR):/src" \
 		-w /src \
 		--user "$(shell id -u):$(shell id -g)" \
@@ -60,7 +71,7 @@ agent:
 ingest:
 	@echo "Building ingest service..."
 	@mkdir -p dist $(GO_CACHE_DIR) $(GO_MOD_DIR)
-	docker run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 		-v "$(CURDIR):/src" \
 		-w /src \
 		--user "$(shell id -u):$(shell id -g)" \
@@ -77,7 +88,7 @@ ingest:
 loadtest:
 	@echo "Building infrawatch-loadtest for $(HOST_OS)/$(HOST_ARCH)..."
 	@mkdir -p dist $(GO_CACHE_DIR) $(GO_MOD_DIR)
-	docker run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 		-v "$(CURDIR):/src" \
 		-w /src \
 		--user "$(shell id -u):$(shell id -g)" \
@@ -91,7 +102,7 @@ loadtest:
 
 go-test:
 	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_DIR)
-	docker run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 		-v "$(CURDIR):/src" \
 		-w /src \
 		--user "$(shell id -u):$(shell id -g)" \
@@ -102,7 +113,7 @@ go-test:
 # Download all Go dependencies.
 go-deps:
 	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_DIR)
-	docker run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 		-v "$(CURDIR):/src" \
 		-w /src \
 		--user "$(shell id -u):$(shell id -g)" \
@@ -110,10 +121,10 @@ go-deps:
 		golang:1.25 \
 		sh -c "go work sync && cd proto/gen/go && go mod tidy && cd /src/agent && go mod tidy && cd /src/apps/ingest && go mod tidy"
 
-# Generate dev TLS certificates for local development (requires Docker).
+# Generate dev TLS certificates for local development (requires a container runtime).
 dev-tls:
 	@mkdir -p deploy/dev-tls
-	docker run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 		-v "$(CURDIR)/deploy/dev-tls:/out" \
 		alpine/openssl req -x509 \
 		-newkey rsa:4096 \

@@ -4,20 +4,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ContactForm } from '@/components/account/contact-form'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
-import { contacts, organisations } from '@/lib/db/schema'
+import { contacts, organisations, users } from '@/lib/db/schema'
 
 export const metadata = { title: 'Account' }
 
+// First-visit bootstrap: every authenticated user needs an organisation row
+// so contacts and purchases have something to belong to. Creates a placeholder
+// org named after the user; they can rename it before checkout (editor to be
+// added in Phase 3 per PROGRESS.md).
+async function ensureOrganisation(user: { id: string; name: string; organisationId: string | null }): Promise<string> {
+  if (user.organisationId) return user.organisationId
+  const [created] = await db
+    .insert(organisations)
+    .values({ name: `${user.name}'s organisation` })
+    .returning({ id: organisations.id })
+  if (!created) throw new Error('Failed to create organisation')
+  await db.update(users).set({ organisationId: created.id, updatedAt: new Date() }).where(eq(users.id, user.id))
+  return created.id
+}
+
 export default async function AccountPage() {
   const { user } = await getRequiredSession()
+  const organisationId = await ensureOrganisation(user)
 
-  const org = user.organisationId
-    ? await db.query.organisations.findFirst({ where: eq(organisations.id, user.organisationId) })
-    : null
-
-  const orgContacts = user.organisationId
-    ? await db.query.contacts.findMany({ where: eq(contacts.organisationId, user.organisationId) })
-    : []
+  const org = await db.query.organisations.findFirst({ where: eq(organisations.id, organisationId) })
+  const orgContacts = await db.query.contacts.findMany({ where: eq(contacts.organisationId, organisationId) })
 
   function findContact(role: 'technical' | 'billing' | 'procurement') {
     const c = orgContacts.find((c) => c.role === role)
@@ -37,8 +48,8 @@ export default async function AccountPage() {
             <CardTitle className="text-base">Company</CardTitle>
             <CardDescription>
               {org
-                ? `Registered as ${org.name}. Edit via Stripe Customer Portal once subscriptions are active.`
-                : 'Company details will be captured on your first checkout.'}
+                ? `Registered as ${org.name}. We'll confirm and enrich these details during Stripe Checkout.`
+                : ''}
             </CardDescription>
           </CardHeader>
           <CardContent>

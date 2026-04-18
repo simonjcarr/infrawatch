@@ -30,12 +30,18 @@ elif command -v podman >/dev/null 2>&1 && podman compose --help >/dev/null 2>&1;
   COMPOSE=(podman compose)
 elif command -v podman-compose >/dev/null 2>&1; then
   COMPOSE=(podman-compose)
+elif command -v podman >/dev/null 2>&1; then
+  echo "ERROR: Podman is installed but no compose provider was found." >&2
+  echo "Install podman-compose, then re-run:" >&2
+  echo "  sudo dnf install podman-compose   # RHEL / Rocky / Alma / Fedora" >&2
+  echo "  sudo apt install podman-compose   # Debian / Ubuntu" >&2
+  echo "  pip3 install podman-compose       # any distro (via pip)" >&2
+  exit 1
 else
   echo "ERROR: no supported container runtime found." >&2
   echo "Install one of the following and re-run:" >&2
   echo "  - Docker with the compose plugin ('docker compose')" >&2
-  echo "  - Podman 4.x+ ('podman compose')" >&2
-  echo "  - podman-compose (standalone)" >&2
+  echo "  - Podman + podman-compose" >&2
   exit 1
 fi
 echo "Using container runtime: ${COMPOSE[*]}"

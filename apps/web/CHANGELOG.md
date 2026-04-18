@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.55.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.54.1...web/v0.55.0) (2026-04-18)
+
+
+### Features
+
+* **notes:** data layer for shared engineer notes ([e3b12ed](https://github.com/carrtech-dev/ct-ops/commit/e3b12ed7c69978fcc25334f92f1315647e115d01))
+* **notes:** data layer for shared engineer notes (PR 2) ([5515967](https://github.com/carrtech-dev/ct-ops/commit/55159674adc07c049b7d7a5e6ce5a6e5d68b3d6b))
+
 ## [0.54.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.54.0...web/v0.54.1) (2026-04-18)
 
 

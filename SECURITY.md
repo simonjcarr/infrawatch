@@ -59,7 +59,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
   - Functions accept `orgId` as an argument and query the DB without verifying the caller is logged in, let alone a member of that org. Any unauthenticated request that can reach the Next.js action RPC endpoint can pull another org's data by guessing/enumerating org ids.
   - Fix direction: add `const session = await getRequiredSession(); if (session.user.organisationId !== orgId) throw ...` to every action. Consider removing `orgId` from public parameters and always deriving it from the session.
 
-- [ ] **[C-09] `deleteCertificate` (and other destructive actions) have no auth/org check**
+- [x] **[C-09] `deleteCertificate` (and other destructive actions) have no auth/org check**
   - Location: `apps/web/lib/actions/certificates.ts:~118-137`
   - Takes `orgId` + `certId` only. An attacker can delete any certificate in any organisation.
   - Fix direction: session check + confirm the cert belongs to the session's org before deleting; use soft-delete (`deletedAt`) per the universal table convention.

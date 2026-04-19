@@ -194,6 +194,17 @@ func installDarwin(orgToken, ingestAddress string, tlsSkipVerify bool, tags []st
 		return fmt.Errorf("writing launchd plist: %w", err)
 	}
 
+	// Pre-create the agent log file with 0640 (root:wheel by default on
+	// macOS) so launchd appends to an already-restricted file rather than
+	// creating it via the daemon's umask, which on macOS yields 0644 and
+	// makes the file world-readable. The agent runs as root and the log
+	// can contain hostnames, command output, and other fingerprinting
+	// material that there's no reason to expose to other local users.
+	if err := touchLogFile("/var/log/infrawatch-agent.log", 0o640); err != nil {
+		// Non-fatal — install can continue, but warn so an operator notices.
+		slog.Warn("pre-creating agent log file", "err", err)
+	}
+
 	if err := run("launchctl", "load", "-w", plistPath); err != nil {
 		return fmt.Errorf("loading launchd service: %w", err)
 	}
@@ -343,6 +354,21 @@ func writeFile(path, content string, mode os.FileMode) error {
 	}
 	slog.Info("file written", "path", path)
 	return nil
+}
+
+// touchLogFile creates path with the requested mode if it does not exist,
+// and applies the mode if it does. Used to lock down log files before a
+// daemon (launchd, systemd) appends to them, since those daemons honour
+// existing file permissions but create with the process umask otherwise.
+func touchLogFile(path string, mode os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, mode)
+	if err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(path, mode)
 }
 
 func run(name string, args ...string) error {

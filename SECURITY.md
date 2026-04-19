@@ -69,10 +69,9 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
   - Agent downloads and `exec`s a binary from a server URL without signature/hash verification. A compromised or MITM'd server pushes arbitrary code to every host as root.
   - Fix direction: sign release binaries; embed a pinned public key in the agent; verify signature + expected version before `exec`. Consider TUF or cosign for release flow.
 
-- [ ] **[C-11] Hardcoded development public key used to validate production licence JWTs**
-  - Location: `apps/web/lib/licence.ts:~5-13`
-  - The dev RSA public key is baked into source. Anyone with the matching dev private key (which very likely exists under `deploy/` or has been shared) can forge `tier=enterprise` JWTs for any org id.
-  - Fix direction: load the production public key from an env var (e.g., `LICENCE_PUBLIC_KEY`); fail to boot if missing or equal to the dev key.
+- [x] **[C-11] Hardcoded development public key used to validate production licence JWTs**
+  - Location: `apps/web/lib/licence.ts`
+  - Resolved: the production public key (`PROD_PUBLIC_KEY_PEM`) is now baked into the web image and used whenever `NODE_ENV=production`. The dev key is only used in non-production. Customers verify infrawatch.io-issued licences against the embedded prod key with no configuration.
 
 - [ ] **[C-12] Raw SQL interpolation in `updateMetricRetention`**
   - Location: `apps/web/lib/actions/settings.ts:~80, ~90`

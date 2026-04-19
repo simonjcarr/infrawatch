@@ -3,7 +3,7 @@
  *
  * Pre-warms the agent binary cache so every platform binary is available
  * immediately, even on a fresh server or after a new release ships.
- * Also performs fail-fast validation of required environment variables so
+ * Also performs fail-fast validation of required auth env vars so
  * misconfigurations surface at boot rather than at first use.
  */
 export async function register() {
@@ -13,11 +13,6 @@ export async function register() {
   // `next build` sets NODE_ENV=production but secrets are not available at
   // build time. Skip runtime-only checks during the build phase.
   if (process.env.NEXT_PHASE === 'phase-production-build') return
-
-  // Validate licence public key configuration — throws in production if missing
-  // or set to the development key, preventing forged licence acceptance.
-  const { resolveLicencePublicKeyPem } = await import('./lib/licence')
-  resolveLicencePublicKeyPem()
 
   // Validate critical auth env vars in production.
   // Better Auth accepts an empty secret and falls back silently, which would

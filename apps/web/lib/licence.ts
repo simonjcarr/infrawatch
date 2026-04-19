@@ -4,9 +4,7 @@ import type { Feature, LicenceTier } from './features'
 // Production public key (RS256) — used to verify licence JWTs issued by the
 // official infrawatch.io licence-purchase service. The matching private key
 // lives only on the licence-purchase server (deploy/scripts/licence-prod-private.pem
-// during MVP, KMS / Vault Transit before customer launch). Customers running
-// `./start.sh` need no licence configuration — this baked-in key Just Works
-// for any licence purchased from infrawatch.io.
+// during MVP, KMS / Vault Transit before customer launch).
 //
 // Rotating this key is a breaking change requiring every customer to upgrade
 // the binary. Treat it as a release-signing key — back up the private half in
@@ -35,38 +33,10 @@ YvAIzi0rDcPBMRFMGm6M7n6lwN/XCPgdXEAzI2z+/PiBAK3suh3jyaxtD0D4FHdt
 EQIDAQAB
 -----END PUBLIC KEY-----`
 
-/**
- * Returns the RSA public key PEM to use for licence JWT verification.
- *
- * Resolution order:
- *   1. LICENCE_PUBLIC_KEY env var (override — for enterprise customers who
- *      issue licences against their own PKI rather than infrawatch.io)
- *   2. PROD_PUBLIC_KEY_PEM (default in production — verifies licences
- *      purchased from infrawatch.io)
- *   3. DEV_PUBLIC_KEY_PEM (only when NODE_ENV !== 'production')
- *
- * Throws if the env var override equals the embedded dev key — a guardrail
- * against pasting the dev key into a production config and silently accepting
- * forged licences.
- */
 export function resolveLicencePublicKeyPem(): string {
-  const envKey = process.env.LICENCE_PUBLIC_KEY?.trim()
-
-  if (envKey) {
-    if (envKey === DEV_PUBLIC_KEY_PEM.trim()) {
-      throw new Error(
-        'LICENCE_PUBLIC_KEY is set to the development key. ' +
-          'Either unset it (to use the embedded production key) or set it to ' +
-          'your enterprise self-issued public key PEM.',
-      )
-    }
-    return envKey
-  }
-
   if (process.env.NODE_ENV === 'production') {
     return PROD_PUBLIC_KEY_PEM.trim()
   }
-
   return DEV_PUBLIC_KEY_PEM.trim()
 }
 

@@ -37,6 +37,10 @@ services:
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
       INGEST_WS_URL: ${INGEST_WS_URL:-ws://localhost:8080}
       INFRAWATCH_LOADTEST_ADMIN_KEY: ${INFRAWATCH_LOADTEST_ADMIN_KEY:-}
+      # Optional override for licence JWT verification. The web image already
+      # includes the official infrawatch.io public key baked in; only set this
+      # if you are an enterprise issuing licences against your own PKI.
+      LICENCE_PUBLIC_KEY: ${LICENCE_PUBLIC_KEY:-}
     volumes:
       - agent_dist:/var/lib/infrawatch/agent-dist
 

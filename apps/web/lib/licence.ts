@@ -1,9 +1,30 @@
 import { importSPKI, jwtVerify } from 'jose'
 import type { Feature, LicenceTier } from './features'
 
-// Dev-only public key (RS256) — used in development when LICENCE_PUBLIC_KEY is not set.
-// In production, set LICENCE_PUBLIC_KEY to your RSA public key PEM.
-// The matching private key lives in deploy/scripts/licence-dev-private.pem (never commit).
+// Production public key (RS256) — used to verify licence JWTs issued by the
+// official infrawatch.io licence-purchase service. The matching private key
+// lives only on the licence-purchase server (deploy/scripts/licence-prod-private.pem
+// during MVP, KMS / Vault Transit before customer launch). Customers running
+// `./start.sh` need no licence configuration — this baked-in key Just Works
+// for any licence purchased from infrawatch.io.
+//
+// Rotating this key is a breaking change requiring every customer to upgrade
+// the binary. Treat it as a release-signing key — back up the private half in
+// multiple secure locations and never amend it casually.
+const PROD_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs7wCpDYBtABdwlkDe5Vq
+ATSc3vjvPMvRZouJrvsg/DxWTUMYbvVvhaICXZjgDDl7ztrIS+jvM4SfGfrArQpu
+CxrmYRYITpZ8t71XDccmIKxBypxVupFtm1JiF6oLIWknKcLV4g2SLvep5YQLhSQq
+ebJdEjJtGbao9oWdLfDhnmKjSGTwGjX6jJysGhGWm0YpTNaGPZ81OcvlBHweTX34
+g/In9Js5u7oieD3+aY6JKMF65tnnswRS8Psj5UHtOeAc7GOR193EVEczgEQ95o37
+Uol9h/Lzyomiz808xOIWvemZLeT3DzeeNDcT4GOpKt8aIr+CQ8nsZk9wggd6aWnk
+XwIDAQAB
+-----END PUBLIC KEY-----`
+
+// Development public key — only used when NODE_ENV !== 'production'. The
+// matching private key lives at deploy/scripts/licence-dev-private.pem
+// (gitignored) and is used for local end-to-end iteration on the licence
+// issuance flow without exposing the production private key.
 const DEV_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz/pW3tGLo8e//f75eVk3
 pNM/S9CPBYozjgSRDxppJQIr2JPTI4tM9jd4Of1i0/MYfighpTSilDtUGgI6Q6Z9
@@ -18,31 +39,32 @@ EQIDAQAB
  * Returns the RSA public key PEM to use for licence JWT verification.
  *
  * Resolution order:
- *   1. LICENCE_PUBLIC_KEY env var (always preferred)
- *   2. Dev key — only allowed when NODE_ENV !== 'production'
+ *   1. LICENCE_PUBLIC_KEY env var (override — for enterprise customers who
+ *      issue licences against their own PKI rather than infrawatch.io)
+ *   2. PROD_PUBLIC_KEY_PEM (default in production — verifies licences
+ *      purchased from infrawatch.io)
+ *   3. DEV_PUBLIC_KEY_PEM (only when NODE_ENV !== 'production')
  *
- * Throws at startup in production if the env var is absent or still set to
- * the development key, so misconfigured deployments fail fast rather than
- * silently accepting forged licences.
+ * Throws if the env var override equals the embedded dev key — a guardrail
+ * against pasting the dev key into a production config and silently accepting
+ * forged licences.
  */
 export function resolveLicencePublicKeyPem(): string {
   const envKey = process.env.LICENCE_PUBLIC_KEY?.trim()
 
   if (envKey) {
-    if (process.env.NODE_ENV === 'production' && envKey === DEV_PUBLIC_KEY_PEM.trim()) {
+    if (envKey === DEV_PUBLIC_KEY_PEM.trim()) {
       throw new Error(
         'LICENCE_PUBLIC_KEY is set to the development key. ' +
-          'Set it to your production RSA public key PEM before deploying.',
+          'Either unset it (to use the embedded production key) or set it to ' +
+          'your enterprise self-issued public key PEM.',
       )
     }
     return envKey
   }
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'LICENCE_PUBLIC_KEY environment variable is required in production. ' +
-        'Set it to your RSA public key PEM (see docs/getting-started/configuration.md).',
-    )
+    return PROD_PUBLIC_KEY_PEM.trim()
   }
 
   return DEV_PUBLIC_KEY_PEM.trim()

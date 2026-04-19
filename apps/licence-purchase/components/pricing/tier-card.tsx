@@ -4,17 +4,39 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Check } from 'lucide-react'
 import type { BillingInterval, TierDefinition } from '@/lib/tiers'
+import type { StripePriceInfo } from '@/lib/stripe/prices'
 import { cn } from '@/lib/utils'
+
+function formatMoney(unitAmount: number, currency: string): string {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: unitAmount % 100 === 0 ? 0 : 2,
+  }).format(unitAmount / 100)
+}
 
 export function TierCard({
   tier,
   interval,
+  stripePrice,
 }: {
   tier: TierDefinition
   interval: BillingInterval
+  stripePrice?: StripePriceInfo | null
 }) {
-  const price = tier.displayPrice[interval]
-  const perMonth = price !== null && price > 0
+  const fallback = tier.displayPrice[interval]
+
+  let priceLabel: string | null = null
+  if (stripePrice) {
+    priceLabel = formatMoney(stripePrice.unitAmount, stripePrice.currency)
+  } else if (fallback === 0) {
+    priceLabel = 'Free'
+  } else if (fallback !== null) {
+    priceLabel = `£${fallback}`
+  }
+
+  const intervalSuffix = interval === 'year' ? '/ year' : '/ month'
+  const isPaid = priceLabel !== null && priceLabel !== 'Free'
 
   return (
     <Card
@@ -32,18 +54,13 @@ export function TierCard({
       </CardHeader>
       <CardContent className="flex h-full flex-col gap-6">
         <div>
-          {price === 0 ? (
+          {priceLabel === 'Free' ? (
             <div className="text-3xl font-semibold tracking-tight text-foreground">Free</div>
-          ) : price !== null ? (
-            <div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-semibold tracking-tight text-foreground">£{price}</span>
-                <span className="text-sm text-muted-foreground">
-                  {perMonth ? '/ month' : ''}
-                </span>
-              </div>
-              {interval === 'year' ? (
-                <p className="mt-1 text-xs text-muted-foreground">Billed annually</p>
+          ) : priceLabel !== null ? (
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-semibold tracking-tight text-foreground">{priceLabel}</span>
+              {isPaid ? (
+                <span className="text-sm text-muted-foreground">{intervalSuffix}</span>
               ) : null}
             </div>
           ) : (

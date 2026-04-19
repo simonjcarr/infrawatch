@@ -9,6 +9,7 @@ import { getTier } from '@/lib/tiers'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { contacts } from '@/lib/db/schema'
+import { getTierStripePrices } from '@/lib/stripe/prices'
 import { CheckoutPanels } from './checkout-form'
 import type { BillingInterval, PaidTierId } from '@/lib/tiers'
 
@@ -33,14 +34,17 @@ export default async function CheckoutPage({
   const initialInterval: BillingInterval = interval === 'year' ? 'year' : 'month'
   const tierDef = getTier(tier)
 
-  const technical = user.organisationId
-    ? await db.query.contacts.findFirst({
-        where: and(
-          eq(contacts.organisationId, user.organisationId),
-          eq(contacts.role, 'technical'),
-        ),
-      })
-    : null
+  const [technical, stripePrices] = await Promise.all([
+    user.organisationId
+      ? db.query.contacts.findFirst({
+          where: and(
+            eq(contacts.organisationId, user.organisationId),
+            eq(contacts.role, 'technical'),
+          ),
+        })
+      : Promise.resolve(null),
+    getTierStripePrices(tier),
+  ])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -67,7 +71,12 @@ export default async function CheckoutPage({
               </CardContent>
             </Card>
           ) : (
-            <CheckoutPanels tier={tier} tierDef={tierDef} initialInterval={initialInterval} />
+            <CheckoutPanels
+              tier={tier}
+              tierDef={tierDef}
+              initialInterval={initialInterval}
+              stripePrices={stripePrices}
+            />
           )}
         </div>
       </main>

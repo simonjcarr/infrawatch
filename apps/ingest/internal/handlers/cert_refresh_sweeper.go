@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -77,7 +78,11 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 	newFingerprint := fingerprintSha256Hex(leaf.Raw)
 	newStatus := computeCertStatus(leaf.NotAfter, 30)
 
-	if newFingerprint == row.FingerprintSHA256 {
+	// Defence in depth: even though both fingerprints are computed/loaded
+	// internally rather than supplied by an attacker, comparing certificate
+	// identity material in constant time keeps us in the habit and makes a
+	// future refactor that exposes one side to user input safer by default.
+	if subtle.ConstantTimeCompare([]byte(newFingerprint), []byte(row.FingerprintSHA256)) == 1 {
 		// Same cert — just refresh status + timestamps.
 		if err := queries.MarkCertRefreshed(ctx, pool, row.ID, newStatus); err != nil {
 			slog.Warn("cert refresh: mark refreshed", "cert_id", row.ID, "err", err)

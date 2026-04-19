@@ -24,8 +24,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { requireFeature } from '@/lib/actions/licence-guard'
 import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
-
-const ADMIN_ROLES = ['org_admin', 'super_admin']
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 

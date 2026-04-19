@@ -1,7 +1,6 @@
 import type { SessionUser } from '@/lib/auth/session'
 import type { Note } from '@/lib/db/schema'
-
-const ADMIN_ROLES = ['org_admin', 'super_admin']
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 // v1 reachability is "same org". Tag-based RBAC does not yet exist in this
 // codebase — once it does, notes should inherit the same host-reachability

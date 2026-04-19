@@ -3,12 +3,11 @@ import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { getLdapConfigurations } from '@/lib/actions/ldap'
 import { LdapSettingsClient } from './ldap-client'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 export const metadata: Metadata = {
   title: 'LDAP / Directory Settings',
 }
-
-const ADMIN_ROLES = ['org_admin', 'super_admin']
 
 export default async function LdapSettingsPage() {
   const session = await getRequiredSession()

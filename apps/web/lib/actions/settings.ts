@@ -8,8 +8,7 @@ import { validateLicenceKey } from '@/lib/licence'
 import { getRequiredSession } from '@/lib/auth/session'
 import { hasLicenceFeature } from '@/lib/actions/licence-guard'
 import { COMMUNITY_MAX_RETENTION_DAYS } from '@/lib/features'
-
-const ADMIN_ROLES = ['org_admin', 'super_admin']
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 const updateOrgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),

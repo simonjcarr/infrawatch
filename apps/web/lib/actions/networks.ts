@@ -6,12 +6,10 @@ import { eq, and, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getRequiredSession } from '@/lib/auth/session'
 import type { Network, Host } from '@/lib/db/schema'
+import { ADMIN_ROLES, MEMBERSHIP_ROLES } from '@/lib/auth/roles'
 
 export type NetworkWithCount = Network & { hostCount: number }
 export type NetworkWithMembership = Network & { autoAssigned: boolean }
-
-const ADMIN_ROLES = ['org_admin', 'super_admin']
-const MEMBERSHIP_ROLES = ['org_admin', 'super_admin', 'engineer']
 
 const networkSchema = z.object({
   name: z.string().min(1).max(100),

@@ -6,10 +6,7 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { OrgMetadata, OrgNotificationSettings } from '@/lib/db/schema/organisations'
 import { getRequiredSession } from '@/lib/auth/session'
-
-const ADMIN_ROLES = ['org_admin', 'super_admin'] as const
-
-const DEFAULT_ROLES = ['super_admin', 'org_admin', 'engineer']
+import { ADMIN_ROLES, DEFAULT_NOTIFICATION_ROLES } from '@/lib/auth/roles'
 
 const updateOrgNotificationSettingsSchema = z.object({
   inAppEnabled: z.boolean(),
@@ -36,7 +33,7 @@ export async function getOrgNotificationSettings(
   const ns = meta.notificationSettings ?? {}
   return {
     inAppEnabled: ns.inAppEnabled !== false,
-    inAppRoles: ns.inAppRoles ?? DEFAULT_ROLES,
+    inAppRoles: ns.inAppRoles ?? [...DEFAULT_NOTIFICATION_ROLES],
     allowUserOptOut: ns.allowUserOptOut !== false,
   }
 }

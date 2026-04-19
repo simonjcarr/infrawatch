@@ -6,8 +6,7 @@ import { eq, and, isNull } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { getRequiredSession } from '@/lib/auth/session'
 import type { OrgMetadata, HostMetadata } from '@/lib/db/schema'
-
-const ADMIN_ROLES = ['org_admin', 'super_admin']
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 export interface TerminalAccessResult {
   allowed: true

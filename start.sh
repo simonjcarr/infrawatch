@@ -110,13 +110,17 @@ if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
     SAN="${SAN},${LOCAL_IPS}"
   fi
 
+  # Dev certs deliberately expire in 365 days. They are NOT for production —
+  # production deployments must supply their own CA-issued certificates and
+  # rotate them per their own cert-management policy. A short-lived dev cert
+  # makes accidental production reuse fail loudly within a year.
   openssl req -x509 -newkey rsa:4096 \
     -keyout "$CERT_DIR/server.key" \
     -out "$CERT_DIR/server.crt" \
-    -sha256 -days 3650 -nodes \
+    -sha256 -days 365 -nodes \
     -subj "/CN=infrawatch-ingest" \
     -addext "subjectAltName=${SAN}" 2>/dev/null
-  echo "TLS certificates generated (SANs: ${SAN})."
+  echo "TLS certificates generated (SANs: ${SAN}, expiry: 365 days — dev only)."
 fi
 
 # =============================================================================

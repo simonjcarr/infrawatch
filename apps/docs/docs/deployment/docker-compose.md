@@ -72,7 +72,9 @@ openssl req -x509 -newkey rsa:4096 -keyout deploy/dev-tls/server.key \
   -subj "/CN=ct-ops-ingest"
 ```
 
-For production, use a certificate from your corporate CA or Let's Encrypt.
+The dev certificate above expires in 365 days — long enough for laptops to keep working between rebuilds, short enough that an accidental production deployment fails loudly within a year. **Do not extend the `-days` value** to avoid the renewal: the short lifetime is the safety net.
+
+For production, use a certificate from your corporate CA or Let's Encrypt and rotate it on the schedule your CA issues — typical lifetimes are 90 days (Let's Encrypt) to 1 year (corporate CAs). Re-running `start.sh` will not regenerate certificates that already exist on disk; production rotation is your operational responsibility.
 
 ### 4. Start the stack
 

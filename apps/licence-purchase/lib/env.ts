@@ -79,10 +79,10 @@ export const env = {
     return optional('LICENCE_SIGNING_PRIVATE_KEY_PATH')
   },
   get licenceIssuer() {
-    return optional('LICENCE_ISSUER') ?? 'infrawatch-licensing'
+    return optional('LICENCE_ISSUER') ?? 'licence.infrawatch.io'
   },
   get licenceAudience() {
-    return optional('LICENCE_AUDIENCE') ?? 'infrawatch'
+    return optional('LICENCE_AUDIENCE') ?? 'install.infrawatch.io'
   },
   get licenceMonthlyDays() {
     return optionalInt('LICENCE_MONTHLY_DAYS', 35)

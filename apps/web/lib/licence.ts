@@ -40,8 +40,8 @@ export function resolveLicencePublicKeyPem(): string {
   return DEV_PUBLIC_KEY_PEM.trim()
 }
 
-const LICENCE_ISSUER = 'infrawatch-licensing'
-const LICENCE_AUDIENCE = 'infrawatch'
+const LICENCE_ISSUER = 'licence.infrawatch.io'
+const LICENCE_AUDIENCE = 'install.infrawatch.io'
 
 export type PaidTier = Exclude<LicenceTier, 'community'>
 

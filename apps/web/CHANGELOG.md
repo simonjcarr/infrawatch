@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.57.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.56.0...web/v0.57.0) (2026-04-19)
+
+
+### Features
+
+* **licence:** bake production public key into the web image ([66703a9](https://github.com/carrtech-dev/ct-ops/commit/66703a9affec2030ec625eb161af1a89e3aa01a9))
+* **licence:** bake production public key into the web image ([f96a813](https://github.com/carrtech-dev/ct-ops/commit/f96a8130a6bd83b09b36b6a1d2751baa39dc1b92))
+
+
+### Bug Fixes
+
+* **db:** make 0037 migration idempotent for domain_accounts.deleted_at ([8dbfadf](https://github.com/carrtech-dev/ct-ops/commit/8dbfadfc97f087baaca4c99118a7c31d22ce2eaf))
+* **db:** make migration 0037 idempotent for domain_accounts.deleted_at ([b001797](https://github.com/carrtech-dev/ct-ops/commit/b0017973e2fac02695aadab3dd0b3bb7d597ec26))
+
 ## [0.56.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.55.1...web/v0.56.0) (2026-04-19)
 
 

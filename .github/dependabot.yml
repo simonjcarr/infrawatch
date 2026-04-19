@@ -34,6 +34,16 @@ updates:
       docker:
         patterns:
           - "*"
+    ignore:
+      # Base-image majors break the Dockerfile contract (e.g. node 25
+      # dropped corepack, alpine major bumps shuffle apk packages).
+      # Do these manually.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "golang"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "alpine"
+        update-types: ["version-update:semver-major"]
 
   # --- Node / pnpm workspaces ----------------------------------------------
   - package-ecosystem: "npm"
@@ -62,7 +72,8 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # Major framework bumps are never silent — do them by hand.
+      # Major framework / tooling bumps are never silent — do them by hand.
+      # Rationale for each entry is in the commit that added it.
       - dependency-name: "next"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react"
@@ -78,6 +89,23 @@ updates:
       - dependency-name: "drizzle-kit"
         update-types: ["version-update:semver-major"]
       - dependency-name: "better-auth"
+        update-types: ["version-update:semver-major"]
+      # ESLint 10 breaks eslint-plugin-react until the plugin ships an
+      # ESLint 10 compatible release; the bump currently fails the build.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      # @types/node majors track the Node runtime major — only bump in
+      # lockstep with the engines field.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      # Stripe majors include breaking API version bumps.
+      - dependency-name: "stripe"
         update-types: ["version-update:semver-major"]
 
   # --- Go modules -----------------------------------------------------------

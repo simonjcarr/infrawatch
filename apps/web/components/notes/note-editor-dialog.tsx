@@ -202,21 +202,36 @@ export function NoteEditorDialog(props: Props) {
 
             {(mode === 'create' || (mode === 'edit' && props.initial.isAuthor)) && (
               <div className="space-y-1.5">
-                <Label className="flex items-center gap-2">
-                  {isPrivate ? <Lock className="size-3.5" /> : <Eye className="size-3.5" />}
-                  Visibility
-                </Label>
-                <div className="flex items-center gap-3 h-9 px-3 rounded-md border border-input bg-transparent">
+                <Label className="flex items-center gap-2">Visibility</Label>
+                <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-transparent">
                   <Switch
                     id="note-private"
                     checked={isPrivate}
                     onCheckedChange={setIsPrivate}
                     disabled={isSaving}
                   />
-                  <Label htmlFor="note-private" className="text-sm cursor-pointer">
-                    {isPrivate ? 'Private — only you and super admins' : 'Shared with everyone in your org'}
+                  <Label
+                    htmlFor="note-private"
+                    className="text-sm cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    {isPrivate ? (
+                      <>
+                        <Lock className="size-3.5" />
+                        Private
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="size-3.5" />
+                        Shared
+                      </>
+                    )}
                   </Label>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {isPrivate
+                    ? 'Only you and super admins can read this note.'
+                    : 'Everyone in your org who can see this host.'}
+                </p>
               </div>
             )}
           </div>

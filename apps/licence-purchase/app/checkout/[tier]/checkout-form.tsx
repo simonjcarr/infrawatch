@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { startCheckout } from '@/lib/actions/checkout'
 import type { BillingInterval, PaidTierId, TierDefinition } from '@/lib/tiers'
+import type { TierStripePrices } from '@/lib/stripe/prices'
 
 type PaymentMethod = 'card' | 'bacs_debit' | 'invoice'
 
@@ -22,26 +23,37 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string; hint: string }[] = [
   },
 ]
 
-function formatGbp(amount: number): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(amount)
+function formatMoney(unitAmount: number, currency: string): string {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: unitAmount % 100 === 0 ? 0 : 2,
+  }).format(unitAmount / 100)
 }
 
 export function CheckoutPanels({
   tier,
   tierDef,
   initialInterval,
+  stripePrices,
 }: {
   tier: PaidTierId
   tierDef: TierDefinition
   initialInterval: BillingInterval
+  stripePrices: TierStripePrices
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [interval, setInterval] = useState<BillingInterval>(initialInterval)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card')
 
-  const perMonth = tierDef.displayPrice[interval] ?? 0
-  const annualisedTotal = interval === 'year' ? perMonth * 12 : perMonth
+  const activePrice = stripePrices[interval]
+  const displayPrice = activePrice
+    ? formatMoney(activePrice.unitAmount, activePrice.currency)
+    : tierDef.displayPrice[interval] !== null
+      ? `£${tierDef.displayPrice[interval]}`
+      : null
+  const intervalSuffix = interval === 'year' ? '/ year' : '/ month'
 
   function onSubmit() {
     setError(null)
@@ -149,15 +161,17 @@ export function CheckoutPanels({
           </div>
           <div className="flex items-baseline justify-between pt-2">
             <span className="text-muted-foreground">Price</span>
-            <span className="text-xl font-semibold">{formatGbp(perMonth)}<span className="text-sm font-normal text-muted-foreground"> / month</span></span>
+            {displayPrice ? (
+              <span className="text-xl font-semibold">
+                {displayPrice}
+                <span className="text-sm font-normal text-muted-foreground"> {intervalSuffix}</span>
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground">Price unavailable</span>
+            )}
           </div>
-          {interval === 'year' ? (
-            <p className="text-right text-xs text-muted-foreground">
-              Billed annually at {formatGbp(annualisedTotal)}
-            </p>
-          ) : null}
           <p className="mt-3 text-xs text-muted-foreground">
-            Final pricing and VAT will be confirmed on the Stripe checkout page.
+            VAT will be confirmed on the Stripe checkout page.
           </p>
         </CardContent>
       </Card>

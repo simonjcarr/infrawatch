@@ -3,11 +3,22 @@ import { Footer } from '@/components/shared/footer'
 import { PricingClient } from './pricing-client'
 import { TIERS } from '@/lib/tiers'
 import { getOptionalSession } from '@/lib/auth/session'
+import { getTierStripePrices, type TierStripePrices } from '@/lib/stripe/prices'
 
 export const metadata = { title: 'Pricing' }
 
 export default async function PricingPage() {
-  const session = await getOptionalSession()
+  const [session, proPrices, enterprisePrices] = await Promise.all([
+    getOptionalSession(),
+    getTierStripePrices('pro'),
+    getTierStripePrices('enterprise'),
+  ])
+
+  const stripePrices: Record<'pro' | 'enterprise', TierStripePrices> = {
+    pro: proPrices,
+    enterprise: enterprisePrices,
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Nav isAuthenticated={!!session} />
@@ -22,7 +33,7 @@ export default async function PricingPage() {
             </p>
           </div>
 
-          <PricingClient tiers={TIERS} />
+          <PricingClient tiers={TIERS} stripePrices={stripePrices} />
         </div>
       </main>
       <Footer />

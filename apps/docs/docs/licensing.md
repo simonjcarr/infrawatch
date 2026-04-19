@@ -66,7 +66,7 @@ A licence key is a signed JSON Web Token (JWT, RS256). The public key is bundled
 
 Every key encodes:
 
-- **Organisation** (`sub`) — the customer organisation the key was issued to
+- **Install organisation** (`sub`) — the id of the specific CT-Ops install the key was minted for. Verified on activation; a key issued for one install cannot be activated on a different install.
 - **Tier** — `pro` or `enterprise`
 - **Feature list** — the explicit features unlocked by this key (allows custom bundles and à-la-carte add-ons)
 - **Expiry** (`exp`) — licence term end date
@@ -76,12 +76,15 @@ Every key encodes:
 
 ### Activation
 
-1. Purchase or renew a licence.
-2. The issuance service emails the signed licence key to the customer.
-3. Paste the key into **Settings → Licence → Licence key**.
-4. The server validates the signature, issuer, audience, and expiry locally. No outbound request is made.
+Licences are bound to the specific install that purchases them via an **activation token** the customer copies from their install into the purchase flow. This prevents a single licence key being reused across unrelated installs.
 
-For air-gapped installs: download the key on a connected machine, transfer to the target network, and paste into the CT-Ops UI.
+1. In your CT-Ops install, go to **Settings → Licence** and click **Generate activation token**. Copy the token (starts with `infw-act_…`).
+2. Visit the licence purchase site and paste the activation token into the checkout. The site shows the install name decoded from the token so you can confirm you pasted the right one.
+3. Complete payment. The issuance service mints a licence key whose `sub` claim is your install's organisation id, and emails it to your technical contact.
+4. Paste the returned key into **Settings → Licence → Licence key**.
+5. The server validates the signature, issuer, audience, expiry, and that the `sub` matches this install. All checks are local — no outbound request is made.
+
+For air-gapped installs: generate the activation token inside the air-gapped network, transfer it out, complete purchase on a connected machine, and transfer the returned licence key back in. No network path between the install and the licence service is required.
 
 ### Renewal & expiry
 

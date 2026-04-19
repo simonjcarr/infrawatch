@@ -13,6 +13,11 @@ export type CreateCheckoutSessionInput = {
   organisationId: string
   customerEmail: string
   customerName?: string | null
+  install: {
+    organisationId: string
+    organisationName: string
+    nonce: string
+  }
   successUrl: string
   cancelUrl: string
 }
@@ -47,6 +52,9 @@ export async function createCheckoutSession(
     tier: input.tier,
     interval: input.interval,
     paymentMethod: input.paymentMethod,
+    installOrganisationId: input.install.organisationId,
+    installOrganisationName: input.install.organisationName,
+    activationNonce: input.install.nonce,
   }
 
   if (input.paymentMethod === 'invoice') {

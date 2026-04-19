@@ -61,6 +61,9 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
   const tier = meta['tier']
   const interval = meta['interval']
   const paymentMethod = meta['paymentMethod'] ?? 'card'
+  const installOrganisationId = meta['installOrganisationId'] || null
+  const installOrganisationName = meta['installOrganisationName'] || null
+  const activationNonce = meta['activationNonce'] || null
   if (!organisationId || !tier || !interval) return
 
   const customerId = typeof subscription.customer === 'string'
@@ -84,6 +87,13 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
         ...(currentPeriodStart ? { currentPeriodStart } : {}),
         ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
         cancelAt,
+        // Install-binding fields are only set on first insert; resist later
+        // overwrites so a renewal can't change which install the licence
+        // belongs to. Only fill them in if they're currently empty (e.g. a
+        // subscription created before the activation-token flow landed).
+        ...(!existing.installOrganisationId && installOrganisationId
+          ? { installOrganisationId, installOrganisationName, activationNonce }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(purchases.id, existing.id))
@@ -92,6 +102,9 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
 
   await db.insert(purchases).values({
     organisationId,
+    installOrganisationId,
+    installOrganisationName,
+    activationNonce,
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     tier,

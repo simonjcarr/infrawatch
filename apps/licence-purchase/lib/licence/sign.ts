@@ -4,7 +4,10 @@ import { env } from '@/lib/env'
 import type { PaidTierId } from '@/lib/tiers'
 
 export type SignLicenceInput = {
-  organisationId: string
+  // The install's organisation id, captured from the activation token. Used
+  // as the JWT `sub` claim so apps/web can verify the licence was minted for
+  // this specific install and reject it if pasted into a different install.
+  installOrganisationId: string
   customer: { name: string; email: string }
   tier: PaidTierId
   features: string[]
@@ -59,7 +62,7 @@ export async function signLicence(input: SignLicenceInput): Promise<SignedLicenc
     .setProtectedHeader({ alg: 'RS256' })
     .setIssuer(env.licenceIssuer)
     .setAudience(env.licenceAudience)
-    .setSubject(input.organisationId)
+    .setSubject(input.installOrganisationId)
     .setJti(input.jti)
     .setIssuedAt(iat)
     .setNotBefore(iat)

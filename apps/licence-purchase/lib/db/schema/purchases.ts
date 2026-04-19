@@ -8,6 +8,12 @@ export const purchases = pgTable('purchase', {
   organisationId: text('organisation_id')
     .notNull()
     .references(() => organisations.id),
+  // Identity of the customer's Infrawatch install, captured from the activation
+  // token the customer pastes into checkout. Used as the JWT `sub` so the
+  // minted licence can only be activated on that specific install.
+  installOrganisationId: text('install_organisation_id'),
+  installOrganisationName: text('install_organisation_name'),
+  activationNonce: text('activation_nonce'),
   stripeCustomerId: text('stripe_customer_id').notNull(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   tier: text('tier').notNull(), // 'pro' | 'enterprise'

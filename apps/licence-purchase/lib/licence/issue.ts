@@ -53,6 +53,12 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
     )
   }
 
+  if (!purchase.installOrganisationId) {
+    throw new Error(
+      `Purchase ${purchase.id} has no install organisation id — checkout must capture an activation token before a licence can be issued`,
+    )
+  }
+
   const issuedAt = input.issuedAt ?? new Date()
   const termDays = purchase.interval === 'year' ? env.licenceYearlyDays : env.licenceMonthlyDays
   const expiresAt = new Date(issuedAt.getTime() + termDays * DAY_MS)
@@ -61,8 +67,11 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
   const features = featureKeysForTier(purchase.tier)
 
   const signed = await signLicence({
-    organisationId: organisation.id,
-    customer: { name: organisation.name, email: technicalContact.email },
+    installOrganisationId: purchase.installOrganisationId,
+    customer: {
+      name: purchase.installOrganisationName ?? organisation.name,
+      email: technicalContact.email,
+    },
     tier: purchase.tier,
     features,
     jti,

@@ -10,11 +10,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert, Bell, ScanLine, Tag as TagIcon } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert, Bell, ScanLine, Tag as TagIcon, Copy, Check } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { updateOrgName, saveLicenceKey, updateMetricRetention } from '@/lib/actions/settings'
+import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivationToken } from '@/lib/actions/settings'
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
 import { getOrgNotificationSettings, updateOrgNotificationSettings } from '@/lib/actions/notification-settings'
@@ -117,6 +117,35 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       licenceForm.reset()
     },
   })
+
+  const [activationToken, setActivationToken] = useState<string | null>(null)
+  const [activationError, setActivationError] = useState<string | null>(null)
+  const [activationCopied, setActivationCopied] = useState(false)
+
+  const activationMutation = useMutation({
+    mutationFn: () => generateActivationToken(org.id),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setActivationError(result.error)
+        setActivationToken(null)
+        return
+      }
+      setActivationError(null)
+      setActivationToken(result.token)
+      setActivationCopied(false)
+    },
+  })
+
+  async function copyActivationToken() {
+    if (!activationToken) return
+    try {
+      await navigator.clipboard.writeText(activationToken)
+      setActivationCopied(true)
+      setTimeout(() => setActivationCopied(false), 2000)
+    } catch {
+      setActivationError('Unable to copy — select the token and copy manually')
+    }
+  }
 
   const retentionMutation = useMutation({
     mutationFn: (days: number) => updateMetricRetention(org.id, days),
@@ -856,6 +885,72 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           </div>
 
           {isAdmin && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Step 1 — Generate an activation token</p>
+                <p className="text-xs text-muted-foreground">
+                  Generate a token here and paste it into the checkout at{' '}
+                  <span className="font-mono">licence.infrawatch.io</span>. The resulting
+                  licence key is bound to this install and cannot be used on another.
+                </p>
+              </div>
+
+              {activationToken ? (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <code
+                      className="flex-1 rounded border bg-background px-2 py-1.5 text-xs break-all font-mono text-foreground"
+                      data-testid="activation-token"
+                    >
+                      {activationToken}
+                    </code>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={copyActivationToken}
+                      className="shrink-0"
+                    >
+                      {activationCopied ? (
+                        <>
+                          <Check className="size-4" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-4" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Valid for 30 days. Generate a new one at any time — previous tokens remain valid until they expire.
+                  </p>
+                </div>
+              ) : null}
+
+              {activationError ? (
+                <p className="text-xs text-destructive">{activationError}</p>
+              ) : null}
+
+              <Button
+                type="button"
+                size="sm"
+                variant={activationToken ? 'outline' : 'default'}
+                onClick={() => activationMutation.mutate()}
+                disabled={activationMutation.isPending}
+              >
+                {activationMutation.isPending
+                  ? 'Generating…'
+                  : activationToken
+                    ? 'Generate a new token'
+                    : 'Generate activation token'}
+              </Button>
+            </div>
+          )}
+
+          {isAdmin && (
             <form
               onSubmit={licenceForm.handleSubmit((v) => {
                 setLicenceResult(null)
@@ -863,6 +958,13 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
               })}
               className="space-y-3"
             >
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Step 2 — Paste the returned licence key</p>
+                <p className="text-xs text-muted-foreground">
+                  After completing checkout, the licence key is emailed to your technical contact
+                  and shown in the licence purchase dashboard. Paste it here to activate Pro or Enterprise features.
+                </p>
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="licence-key">Licence key</Label>
                 <Input

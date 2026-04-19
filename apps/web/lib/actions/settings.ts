@@ -1,10 +1,12 @@
 'use server'
 
 import { z } from 'zod'
+import { createId } from '@paralleldrive/cuid2'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
+import { encodeActivationToken } from '@/lib/licence-activation-token'
 import { getRequiredSession } from '@/lib/auth/session'
 import { hasLicenceFeature } from '@/lib/actions/licence-guard'
 import { COMMUNITY_MAX_RETENTION_DAYS } from '@/lib/features'
@@ -130,6 +132,38 @@ export async function saveLicenceKey(
     return { success: true, tier: result.payload.tier }
   } catch (err) {
     console.error('Failed to save licence key:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
+export async function generateActivationToken(
+  orgId: string,
+): Promise<{ success: true; token: string } | { error: string }> {
+  const session = await getRequiredSession()
+  if (!ADMIN_ROLES.includes(session.user.role)) {
+    return { error: 'You do not have permission to perform this action' }
+  }
+  if (session.user.organisationId !== orgId) {
+    return { error: 'You can only generate activation tokens for your own organisation' }
+  }
+
+  try {
+    const org = await db.query.organisations.findFirst({
+      where: eq(organisations.id, orgId),
+      columns: { id: true, name: true },
+    })
+    if (!org) {
+      return { error: 'Organisation not found' }
+    }
+
+    const token = encodeActivationToken({
+      installOrgId: org.id,
+      installOrgName: org.name,
+      nonce: createId(),
+    })
+    return { success: true, token }
+  } catch (err) {
+    console.error('Failed to generate activation token:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

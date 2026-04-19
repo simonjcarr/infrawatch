@@ -1,11 +1,29 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { startCheckout } from '@/lib/actions/checkout'
 import type { BillingInterval, PaidTierId, TierDefinition } from '@/lib/tiers'
 import type { TierStripePrices } from '@/lib/stripe/prices'
+
+const ACTIVATION_TOKEN_PREFIX = 'infw-act_'
+
+// Browser-safe preview decode — just shows the install name so the user can
+// sanity-check they pasted the right token. The server re-validates on submit.
+function previewInstallName(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith(ACTIVATION_TOKEN_PREFIX)) return null
+  try {
+    const body = trimmed.slice(ACTIVATION_TOKEN_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/')
+    const pad = body.length % 4 === 0 ? '' : '='.repeat(4 - (body.length % 4))
+    const json = JSON.parse(atob(body + pad)) as { installOrgName?: unknown }
+    return typeof json.installOrgName === 'string' ? json.installOrgName : null
+  } catch {
+    return null
+  }
+}
 
 type PaymentMethod = 'card' | 'bacs_debit' | 'invoice'
 
@@ -46,6 +64,7 @@ export function CheckoutPanels({
   const [error, setError] = useState<string | null>(null)
   const [interval, setInterval] = useState<BillingInterval>(initialInterval)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card')
+  const [activationToken, setActivationToken] = useState('')
 
   const activePrice = stripePrices[interval]
   const displayPrice = activePrice
@@ -55,11 +74,27 @@ export function CheckoutPanels({
       : null
   const intervalSuffix = interval === 'year' ? '/ year' : '/ month'
 
+  const installName = useMemo(() => previewInstallName(activationToken), [activationToken])
+  const tokenLooksValid = installName !== null
+  const tokenEntered = activationToken.trim().length > 0
+
   function onSubmit() {
     setError(null)
+    if (!tokenEntered) {
+      setError('Paste the activation token from your Infrawatch install before continuing.')
+      return
+    }
     start(async () => {
       try {
-        await startCheckout({ tier, interval, paymentMethod })
+        const result = await startCheckout({
+          tier,
+          interval,
+          paymentMethod,
+          activationToken: activationToken.trim(),
+        })
+        if (result && 'error' in result) {
+          setError(result.error)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to start checkout')
       }
@@ -74,6 +109,32 @@ export function CheckoutPanels({
         </CardHeader>
         <CardContent>
           <form action={onSubmit} className="grid gap-5">
+            <div className="grid gap-2">
+              <Label htmlFor="activation-token">Activation token</Label>
+              <textarea
+                id="activation-token"
+                value={activationToken}
+                onChange={(e) => setActivationToken(e.target.value)}
+                placeholder="Paste the infw-act_… token from your Infrawatch install (Settings → Licence)"
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              {tokenEntered && !tokenLooksValid ? (
+                <p className="text-xs text-destructive">
+                  That doesn&apos;t look like a valid activation token. Copy it from your install&apos;s Settings → Licence screen.
+                </p>
+              ) : null}
+              {tokenLooksValid ? (
+                <p className="text-xs text-muted-foreground">
+                  Binding licence to: <strong className="text-foreground">{installName}</strong>
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  The licence will be bound to the install that generated this token and can&apos;t be used elsewhere.
+                </p>
+              )}
+            </div>
+
             <fieldset className="grid gap-2">
               <legend className="mb-1 text-sm font-medium text-foreground">Billing interval</legend>
               <div className="grid grid-cols-2 gap-2">
@@ -134,7 +195,7 @@ export function CheckoutPanels({
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-            <Button type="submit" disabled={pending} size="lg">
+            <Button type="submit" disabled={pending || !tokenEntered} size="lg">
               {pending ? 'Redirecting to checkout…' : 'Continue to secure checkout'}
             </Button>
             <p className="text-xs text-muted-foreground">

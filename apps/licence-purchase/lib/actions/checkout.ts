@@ -8,7 +8,8 @@ import { decodeActivationToken } from '@/lib/licence/activation-token'
 import { env } from '@/lib/env'
 
 const schema = z.object({
-  tier: z.enum(['pro', 'enterprise']),
+  productSlug: z.string().min(1),
+  tierSlug: z.string().min(1),
   interval: z.enum(['month', 'year']),
   paymentMethod: z.enum(['card', 'bacs_debit', 'invoice']),
   activationToken: z.string().min(1, 'Activation token is required'),
@@ -33,21 +34,28 @@ export async function startCheckout(input: unknown): Promise<StartCheckoutResult
     redirect('/account?reason=missing-organisation')
   }
 
-  const session = await createCheckoutSession({
-    tier: parsed.tier,
-    interval: parsed.interval,
-    paymentMethod: parsed.paymentMethod,
-    organisationId: user.organisationId,
-    customerEmail: user.email,
-    customerName: user.name,
-    install: {
-      organisationId: decoded.payload.installOrgId,
-      organisationName: decoded.payload.installOrgName,
-      nonce: decoded.payload.nonce,
-    },
-    successUrl: `${env.appUrl}/checkout/success?tier=${parsed.tier}`,
-    cancelUrl: `${env.appUrl}/checkout/cancelled`,
-  })
+  let url: string
+  try {
+    const session = await createCheckoutSession({
+      productSlug: parsed.productSlug,
+      tierSlug: parsed.tierSlug,
+      interval: parsed.interval,
+      paymentMethod: parsed.paymentMethod,
+      organisationId: user.organisationId,
+      customerEmail: user.email,
+      customerName: user.name,
+      install: {
+        organisationId: decoded.payload.installOrgId,
+        organisationName: decoded.payload.installOrgName,
+        nonce: decoded.payload.nonce,
+      },
+      successUrl: `${env.appUrl}/checkout/success?product=${parsed.productSlug}&tier=${parsed.tierSlug}`,
+      cancelUrl: `${env.appUrl}/checkout/cancelled`,
+    })
+    url = session.url
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unable to start checkout' }
+  }
 
-  redirect(session.url)
+  redirect(url)
 }

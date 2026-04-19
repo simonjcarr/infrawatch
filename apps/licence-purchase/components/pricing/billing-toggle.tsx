@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import type { BillingInterval } from '@/lib/tiers'
+import type { BillingInterval } from '@/lib/billing'
 
 export function BillingToggle({
   onChange,

@@ -11,8 +11,8 @@ export function Nav({ isAuthenticated }: { isAuthenticated?: boolean }) {
           <span>Infrawatch Licensing</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
-          <Link href="/pricing" className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-            Pricing
+          <Link href="/products" className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            Products
           </Link>
           <Link href="/#trust" className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
             Security

@@ -5,46 +5,46 @@ import { Nav } from '@/components/shared/nav'
 import { Footer } from '@/components/shared/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getTier } from '@/lib/tiers'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { contacts } from '@/lib/db/schema'
-import { getTierStripePrices } from '@/lib/stripe/prices'
+import { getActiveProductBySlug, listTiersForProduct } from '@/lib/catalog/queries'
 import { CheckoutPanels } from './checkout-form'
-import type { BillingInterval, PaidTierId } from '@/lib/tiers'
+import type { BillingInterval } from '@/lib/billing'
 
 export const metadata = { title: 'Checkout' }
 
-function isPaidTier(v: string): v is PaidTierId {
-  return v === 'pro' || v === 'enterprise'
-}
+type Params = Promise<{ productSlug: string; tierSlug: string }>
+type Search = Promise<{ interval?: string }>
 
 export default async function CheckoutPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ tier: string }>
-  searchParams: Promise<{ interval?: string }>
+  params: Params
+  searchParams: Search
 }) {
-  const { tier } = await params
-  if (!isPaidTier(tier)) notFound()
-
-  const { user } = await getRequiredSession()
+  const { productSlug, tierSlug } = await params
   const { interval } = await searchParams
   const initialInterval: BillingInterval = interval === 'year' ? 'year' : 'month'
-  const tierDef = getTier(tier)
 
-  const [technical, stripePrices] = await Promise.all([
-    user.organisationId
-      ? db.query.contacts.findFirst({
-          where: and(
-            eq(contacts.organisationId, user.organisationId),
-            eq(contacts.role, 'technical'),
-          ),
-        })
-      : Promise.resolve(null),
-    getTierStripePrices(tier),
-  ])
+  const product = await getActiveProductBySlug(productSlug)
+  if (!product) notFound()
+
+  const tiers = await listTiersForProduct(product.id, { activeOnly: true })
+  const tier = tiers.find((t) => t.tierSlug === tierSlug)
+  if (!tier) notFound()
+
+  const { user } = await getRequiredSession()
+
+  const technical = user.organisationId
+    ? await db.query.contacts.findFirst({
+        where: and(
+          eq(contacts.organisationId, user.organisationId),
+          eq(contacts.role, 'technical'),
+        ),
+      })
+    : null
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -72,10 +72,12 @@ export default async function CheckoutPage({
             </Card>
           ) : (
             <CheckoutPanels
-              tier={tier}
-              tierDef={tierDef}
+              productSlug={product.slug}
+              productName={product.name}
+              tierSlug={tier.tierSlug}
+              tierName={tier.name}
+              prices={tier.prices}
               initialInterval={initialInterval}
-              stripePrices={stripePrices}
             />
           )}
         </div>

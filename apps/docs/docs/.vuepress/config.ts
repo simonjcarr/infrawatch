@@ -76,6 +76,7 @@ export default defineUserConfig({
           '/features/tasks.md',
           '/features/tags.md',
           '/features/notes.md',
+          '/features/storefront.md',
         ],
       },
       {

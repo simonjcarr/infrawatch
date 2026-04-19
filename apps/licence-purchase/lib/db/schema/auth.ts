@@ -13,6 +13,9 @@ export const users = pgTable('user', {
   organisationId: text('organisation_id').references(() => organisations.id),
   isActive: boolean('is_active').notNull().default(true),
   twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+  // 'customer' (default) or 'super_admin'. Admin-only routes and actions gate
+  // on this column.
+  role: text('role').notNull().default('customer'),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 })
 

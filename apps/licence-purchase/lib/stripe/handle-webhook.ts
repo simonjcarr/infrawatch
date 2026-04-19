@@ -1,7 +1,14 @@
 import type Stripe from 'stripe'
 import { and, desc, eq, gte } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { invoices, organisations, purchases, contacts } from '@/lib/db/schema'
+import {
+  invoices,
+  organisations,
+  purchases,
+  contacts,
+  productTiers,
+  productTierPrices,
+} from '@/lib/db/schema'
 import type { Purchase } from '@/lib/db/schema'
 import { issueLicence } from '@/lib/licence/issue'
 import { licences } from '@/lib/db/schema'
@@ -9,6 +16,10 @@ import { sendEmail } from '@/lib/email/client'
 import { receiptEmail } from '@/lib/email/templates/receipt'
 import { paymentFailedEmail } from '@/lib/email/templates/payment-failed'
 import { stripe } from '@/lib/stripe/client'
+import {
+  syncSingleStripeProduct,
+  syncPricesForStripeProduct,
+} from '@/lib/stripe/sync-catalog'
 import { env } from '@/lib/env'
 
 // Dispatches a Stripe webhook event to the appropriate handler. Each handler
@@ -31,10 +42,49 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case 'invoice.payment_failed':
       await onInvoicePaymentFailed(event.data.object as Stripe.Invoice)
       return
+    case 'product.created':
+    case 'product.updated':
+      await onProductUpserted(event.data.object as Stripe.Product)
+      return
+    case 'product.deleted':
+      await onProductDeleted(event.data.object as Stripe.Product)
+      return
+    case 'price.created':
+    case 'price.updated':
+    case 'price.deleted':
+      await onPriceChanged(event.data.object as Stripe.Price)
+      return
     default:
       // Event persisted by the route — safe to ignore unhandled types.
       return
   }
+}
+
+// ── product.created / updated / deleted ───────────────────────────────────────
+// Catalog changes flow in from Stripe. Non-carrtech products are ignored by
+// the sync because they have no `carrtech_product` metadata.
+async function onProductUpserted(product: Stripe.Product): Promise<void> {
+  await syncSingleStripeProduct(product.id)
+}
+
+async function onProductDeleted(product: Stripe.Product): Promise<void> {
+  const tier = await db.query.productTiers.findFirst({
+    where: eq(productTiers.stripeProductId, product.id),
+  })
+  if (!tier) return
+  const now = new Date()
+  await db
+    .update(productTiers)
+    .set({ isActive: false, lastSyncedAt: now, updatedAt: now })
+    .where(eq(productTiers.id, tier.id))
+}
+
+async function onPriceChanged(price: Stripe.Price): Promise<void> {
+  const productRef = price.product
+  const stripeProductId =
+    typeof productRef === 'string' ? productRef : productRef?.id
+  if (!stripeProductId) return
+  await syncPricesForStripeProduct(stripeProductId)
 }
 
 // ── checkout.session.completed ────────────────────────────────────────────────
@@ -58,19 +108,29 @@ async function onCheckoutSessionCompleted(session: Stripe.Checkout.Session): Pro
 async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promise<void> {
   const meta = subscription.metadata ?? {}
   const organisationId = meta['organisationId']
-  const tier = meta['tier']
-  const interval = meta['interval']
   const paymentMethod = meta['paymentMethod'] ?? 'card'
   const installOrganisationId = meta['installOrganisationId'] || null
   const installOrganisationName = meta['installOrganisationName'] || null
   const activationNonce = meta['activationNonce'] || null
-  if (!organisationId || !tier || !interval) return
+  if (!organisationId) return
 
   const customerId = typeof subscription.customer === 'string'
     ? subscription.customer
     : subscription.customer.id
 
   const item = subscription.items.data[0]
+  const stripePriceId = item?.price?.id
+  const catalog = stripePriceId ? await resolveCatalogFromPriceId(stripePriceId) : null
+  const interval = catalog?.interval ?? meta['interval']
+  const tierSlug = catalog?.tierSlug ?? meta['tier'] ?? meta['tierSlug']
+  if (!interval || !tierSlug) {
+    console.warn(
+      '[webhook] subscription missing catalog metadata and price lookup failed',
+      { subscriptionId: subscription.id, stripePriceId },
+    )
+    return
+  }
+
   const currentPeriodStart = toDate(item?.current_period_start ?? null)
   const currentPeriodEnd = toDate(item?.current_period_end ?? null)
   const cancelAt = toDate(subscription.cancel_at ?? null)
@@ -87,6 +147,14 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
         ...(currentPeriodStart ? { currentPeriodStart } : {}),
         ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
         cancelAt,
+        // Fill in catalog FKs if they're missing (e.g. pre-catalog subscription).
+        ...(!existing.productId && catalog
+          ? {
+              productId: catalog.productId,
+              productTierId: catalog.tierId,
+              productTierPriceId: catalog.priceRowId,
+            }
+          : {}),
         // Install-binding fields are only set on first insert; resist later
         // overwrites so a renewal can't change which install the licence
         // belongs to. Only fill them in if they're currently empty (e.g. a
@@ -102,12 +170,15 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
 
   await db.insert(purchases).values({
     organisationId,
+    productId: catalog?.productId ?? null,
+    productTierId: catalog?.tierId ?? null,
+    productTierPriceId: catalog?.priceRowId ?? null,
     installOrganisationId,
     installOrganisationName,
     activationNonce,
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
-    tier,
+    tier: tierSlug,
     interval,
     status: subscription.status,
     paymentMethod,
@@ -115,6 +186,35 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
     currentPeriodEnd,
     cancelAt,
   })
+}
+
+type CatalogLookup = {
+  productId: string
+  tierId: string
+  tierSlug: string
+  priceRowId: string
+  interval: 'month' | 'year'
+}
+
+async function resolveCatalogFromPriceId(
+  stripePriceId: string,
+): Promise<CatalogLookup | null> {
+  const priceRow = await db.query.productTierPrices.findFirst({
+    where: eq(productTierPrices.stripePriceId, stripePriceId),
+  })
+  if (!priceRow) return null
+  const tier = await db.query.productTiers.findFirst({
+    where: eq(productTiers.id, priceRow.tierId),
+  })
+  if (!tier) return null
+  const interval = priceRow.interval === 'year' ? 'year' : 'month'
+  return {
+    productId: tier.productId,
+    tierId: tier.id,
+    tierSlug: tier.tierSlug,
+    priceRowId: priceRow.id,
+    interval,
+  }
 }
 
 async function onSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {

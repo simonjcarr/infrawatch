@@ -5,13 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { startCheckout } from '@/lib/actions/checkout'
-import type { BillingInterval, PaidTierId, TierDefinition } from '@/lib/tiers'
-import type { TierStripePrices } from '@/lib/stripe/prices'
+import { formatPrice, type BillingInterval } from '@/lib/billing'
+import type { ProductTierPrice } from '@/lib/db/schema'
 
 const ACTIVATION_TOKEN_PREFIX = 'infw-act_'
 
-// Browser-safe preview decode — just shows the install name so the user can
-// sanity-check they pasted the right token. The server re-validates on submit.
 function previewInstallName(raw: string): string | null {
   const trimmed = raw.trim()
   if (!trimmed.startsWith(ACTIVATION_TOKEN_PREFIX)) return null
@@ -41,24 +39,20 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string; hint: string }[] = [
   },
 ]
 
-function formatMoney(unitAmount: number, currency: string): string {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-    maximumFractionDigits: unitAmount % 100 === 0 ? 0 : 2,
-  }).format(unitAmount / 100)
-}
-
 export function CheckoutPanels({
-  tier,
-  tierDef,
+  productSlug,
+  productName,
+  tierSlug,
+  tierName,
+  prices,
   initialInterval,
-  stripePrices,
 }: {
-  tier: PaidTierId
-  tierDef: TierDefinition
+  productSlug: string
+  productName: string
+  tierSlug: string
+  tierName: string
+  prices: ProductTierPrice[]
   initialInterval: BillingInterval
-  stripePrices: TierStripePrices
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -66,12 +60,13 @@ export function CheckoutPanels({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card')
   const [activationToken, setActivationToken] = useState('')
 
-  const activePrice = stripePrices[interval]
+  const activePrice = useMemo(
+    () => prices.find((p) => p.interval === interval && p.isActive),
+    [prices, interval],
+  )
   const displayPrice = activePrice
-    ? formatMoney(activePrice.unitAmount, activePrice.currency)
-    : tierDef.displayPrice[interval] !== null
-      ? `£${tierDef.displayPrice[interval]}`
-      : null
+    ? formatPrice(activePrice.unitAmount, activePrice.currency)
+    : null
   const intervalSuffix = interval === 'year' ? '/ year' : '/ month'
 
   const installName = useMemo(() => previewInstallName(activationToken), [activationToken])
@@ -84,10 +79,15 @@ export function CheckoutPanels({
       setError('Paste the activation token from your Infrawatch install before continuing.')
       return
     }
+    if (!activePrice) {
+      setError(`No ${interval} price is configured for this plan.`)
+      return
+    }
     start(async () => {
       try {
         const result = await startCheckout({
-          tier,
+          productSlug,
+          tierSlug,
           interval,
           paymentMethod,
           activationToken: activationToken.trim(),
@@ -105,7 +105,7 @@ export function CheckoutPanels({
     <div className="grid gap-6 md:grid-cols-[1fr_320px]">
       <Card>
         <CardHeader>
-          <CardTitle className="capitalize">Buy {tierDef.name}</CardTitle>
+          <CardTitle>Buy {productName} {tierName}</CardTitle>
         </CardHeader>
         <CardContent>
           <form action={onSubmit} className="grid gap-5">
@@ -155,7 +155,7 @@ export function CheckoutPanels({
                     />
                     <div>
                       <div className="font-medium capitalize text-foreground">
-                        {i === 'year' ? 'Annual (save 20%)' : 'Monthly'}
+                        {i === 'year' ? 'Annual' : 'Monthly'}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {i === 'year' ? 'Billed once per year.' : 'Billed monthly.'}
@@ -195,7 +195,7 @@ export function CheckoutPanels({
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-            <Button type="submit" disabled={pending || !tokenEntered} size="lg">
+            <Button type="submit" disabled={pending || !tokenEntered || !activePrice} size="lg">
               {pending ? 'Redirecting to checkout…' : 'Continue to secure checkout'}
             </Button>
             <p className="text-xs text-muted-foreground">
@@ -211,14 +211,16 @@ export function CheckoutPanels({
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
+            <span>Product</span>
+            <span className="font-medium">{productName}</span>
+          </div>
+          <div className="flex justify-between">
             <span>Tier</span>
-            <span className="font-medium capitalize">{tierDef.name}</span>
+            <span className="font-medium">{tierName}</span>
           </div>
           <div className="flex justify-between">
             <span>Billing</span>
-            <span className="font-medium">
-              {interval === 'year' ? 'Annual (save 20%)' : 'Monthly'}
-            </span>
+            <span className="font-medium">{interval === 'year' ? 'Annual' : 'Monthly'}</span>
           </div>
           <div className="flex items-baseline justify-between pt-2">
             <span className="text-muted-foreground">Price</span>

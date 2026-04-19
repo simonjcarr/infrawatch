@@ -49,18 +49,6 @@ export const env = {
   get stripeWebhookSecret() {
     return required('STRIPE_WEBHOOK_SECRET')
   },
-  get stripePrices() {
-    return {
-      pro: {
-        month: optional('STRIPE_PRICE_PRO_MONTHLY') ?? '',
-        year: optional('STRIPE_PRICE_PRO_YEARLY') ?? '',
-      },
-      enterprise: {
-        month: optional('STRIPE_PRICE_ENTERPRISE_MONTHLY') ?? '',
-        year: optional('STRIPE_PRICE_ENTERPRISE_YEARLY') ?? '',
-      },
-    }
-  },
   get stripePaymentMethods(): string[] {
     return (optional('STRIPE_PAYMENT_METHODS') ?? 'card').split(',').map((s) => s.trim())
   },

@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, integer, jsonb } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
+import { products, productTiers, productTierPrices } from './products'
 
 // A subscription purchase. One row per Stripe subscription.
 export const purchases = pgTable('purchase', {
@@ -8,6 +9,11 @@ export const purchases = pgTable('purchase', {
   organisationId: text('organisation_id')
     .notNull()
     .references(() => organisations.id),
+  // Catalog FKs — populated from Stripe session metadata. Nullable so legacy
+  // rows keep resolving; a backfill script fills them in after first sync.
+  productId: text('product_id').references(() => products.id),
+  productTierId: text('product_tier_id').references(() => productTiers.id),
+  productTierPriceId: text('product_tier_price_id').references(() => productTierPrices.id),
   // Identity of the customer's Infrawatch install, captured from the activation
   // token the customer pastes into checkout. Used as the JWT `sub` so the
   // minted licence can only be activated on that specific install.
@@ -16,7 +22,10 @@ export const purchases = pgTable('purchase', {
   activationNonce: text('activation_nonce'),
   stripeCustomerId: text('stripe_customer_id').notNull(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
-  tier: text('tier').notNull(), // 'pro' | 'enterprise'
+  // Denormalised snapshot from the catalog at purchase time. Retained so
+  // operator queries on `tier`/`interval` keep working and so a purchase row
+  // still tells a story if a Stripe product is later removed.
+  tier: text('tier').notNull(),
   interval: text('interval').notNull(), // 'month' | 'year'
   status: text('status').notNull().default('pending'),
   // status values: 'pending' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired'

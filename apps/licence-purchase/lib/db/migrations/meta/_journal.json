@@ -15,6 +15,13 @@
       "when": 1776611409663,
       "tag": "0001_flat_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776619094540,
+      "tag": "0002_cheerful_james_howlett",
+      "breakpoints": true
     }
   ]
 }

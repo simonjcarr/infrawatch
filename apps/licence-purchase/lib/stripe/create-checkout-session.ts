@@ -1,13 +1,17 @@
 import type Stripe from 'stripe'
+import { and, eq } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { products, productTiers, productTierPrices } from '@/lib/db/schema'
 import { env } from '@/lib/env'
-import type { BillingInterval, PaidTierId } from '@/lib/tiers'
+import type { BillingInterval } from '@/lib/billing'
 import { stripe } from './client'
 import { ensureStripeCustomer } from './ensure-customer'
 
 export type PaymentMethodChoice = 'card' | 'bacs_debit' | 'invoice'
 
 export type CreateCheckoutSessionInput = {
-  tier: PaidTierId
+  productSlug: string
+  tierSlug: string
   interval: BillingInterval
   paymentMethod: PaymentMethodChoice
   organisationId: string
@@ -27,19 +31,82 @@ export type CreateCheckoutSessionResult = {
   sessionId: string
 }
 
-function resolvePriceId(tier: PaidTierId, interval: BillingInterval): string {
-  const priceId = env.stripePrices[tier][interval]
-  if (!priceId) {
-    const envVar = `STRIPE_PRICE_${tier.toUpperCase()}_${interval === 'month' ? 'MONTHLY' : 'YEARLY'}`
-    throw new Error(`Missing Stripe price id for ${tier}/${interval} — set ${envVar}`)
+export type ResolvedTierPrice = {
+  productId: string
+  productSlug: string
+  productName: string
+  tierId: string
+  tierSlug: string
+  tierName: string
+  features: string[]
+  priceRowId: string
+  stripePriceId: string
+  unitAmount: number
+  currency: string
+}
+
+// Joins product + tier + price by slug, filtered on active everywhere. Throws
+// a user-visible error if any part of the chain is missing or inactive, so the
+// route can render "this plan is no longer available".
+export async function resolveTierPrice(args: {
+  productSlug: string
+  tierSlug: string
+  interval: BillingInterval
+}): Promise<ResolvedTierPrice> {
+  const product = await db.query.products.findFirst({
+    where: and(eq(products.slug, args.productSlug), eq(products.isActive, true)),
+  })
+  if (!product) {
+    throw new Error(`Product "${args.productSlug}" is not available`)
   }
-  return priceId
+  const tier = await db.query.productTiers.findFirst({
+    where: and(
+      eq(productTiers.productId, product.id),
+      eq(productTiers.tierSlug, args.tierSlug),
+      eq(productTiers.isActive, true),
+    ),
+  })
+  if (!tier) {
+    throw new Error(`This plan is no longer available`)
+  }
+  const priceRow = await db.query.productTierPrices.findFirst({
+    where: and(
+      eq(productTierPrices.tierId, tier.id),
+      eq(productTierPrices.interval, args.interval),
+      eq(productTierPrices.isActive, true),
+    ),
+  })
+  if (!priceRow) {
+    throw new Error(`No active ${args.interval} price for this plan`)
+  }
+  if (tier.features.length === 0) {
+    // A tier with no features would mint a licence that unlocks nothing —
+    // safer to block the sale than ship a broken licence.
+    throw new Error(`This plan is misconfigured (no features). Please contact support.`)
+  }
+  return {
+    productId: product.id,
+    productSlug: product.slug,
+    productName: product.name,
+    tierId: tier.id,
+    tierSlug: tier.tierSlug,
+    tierName: tier.name,
+    features: tier.features,
+    priceRowId: priceRow.id,
+    stripePriceId: priceRow.stripePriceId,
+    unitAmount: priceRow.unitAmount,
+    currency: priceRow.currency,
+  }
 }
 
 export async function createCheckoutSession(
   input: CreateCheckoutSessionInput,
 ): Promise<CreateCheckoutSessionResult> {
-  const priceId = resolvePriceId(input.tier, input.interval)
+  const resolved = await resolveTierPrice({
+    productSlug: input.productSlug,
+    tierSlug: input.tierSlug,
+    interval: input.interval,
+  })
 
   const customerId = await ensureStripeCustomer({
     organisationId: input.organisationId,
@@ -49,7 +116,12 @@ export async function createCheckoutSession(
 
   const metadata: Record<string, string> = {
     organisationId: input.organisationId,
-    tier: input.tier,
+    carrtechProductSlug: resolved.productSlug,
+    carrtechProductId: resolved.productId,
+    productTierId: resolved.tierId,
+    productTierPriceId: resolved.priceRowId,
+    tierSlug: resolved.tierSlug,
+    tier: resolved.tierSlug,
     interval: input.interval,
     paymentMethod: input.paymentMethod,
     installOrganisationId: input.install.organisationId,
@@ -60,7 +132,7 @@ export async function createCheckoutSession(
   if (input.paymentMethod === 'invoice') {
     const subscription = await stripe().subscriptions.create({
       customer: customerId,
-      items: [{ price: priceId, quantity: 1 }],
+      items: [{ price: resolved.stripePriceId, quantity: 1 }],
       collection_method: 'send_invoice',
       days_until_due: env.stripeInvoiceCollectionDays,
       metadata,
@@ -84,7 +156,7 @@ export async function createCheckoutSession(
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: [input.paymentMethod],
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [{ price: resolved.stripePriceId, quantity: 1 }],
     customer: customerId,
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,

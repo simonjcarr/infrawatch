@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { importPKCS8, SignJWT } from 'jose'
 import { env } from '@/lib/env'
-import type { PaidTierId } from '@/lib/tiers'
 
 export type SignLicenceInput = {
   // The install's organisation id, captured from the activation token. Used
@@ -9,7 +8,8 @@ export type SignLicenceInput = {
   // this specific install and reject it if pasted into a different install.
   installOrganisationId: string
   customer: { name: string; email: string }
-  tier: PaidTierId
+  productSlug: string
+  tier: string
   features: string[]
   jti: string
   issuedAt: Date
@@ -50,6 +50,7 @@ export async function signLicence(input: SignLicenceInput): Promise<SignedLicenc
   const key = await loadSigningKey()
 
   const claims: Record<string, unknown> = {
+    product_slug: input.productSlug,
     tier: input.tier,
     features: input.features,
     customer: input.customer,

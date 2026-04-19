@@ -22,17 +22,17 @@ export default async function LandingPage() {
                 Offline-capable, JWT-signed licences
               </div>
               <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-                Licences for Infrawatch — ready for procurement, friendly for engineers.
+                Licences for CarrTech.dev products — ready for procurement, friendly for engineers.
               </h1>
               <p className="mt-4 max-w-prose text-muted-foreground">
-                Buy Pro and Enterprise tier licences for your Infrawatch deployment. Pay by card, BACS Direct Debit,
-                or invoice. Every licence is a signed JWT — download it, install it on the server, and unlock
+                Buy licences for any CarrTech.dev product. Pay by card, BACS Direct Debit, or invoice.
+                Every licence is a signed JWT — download it, install it on the server, and unlock
                 paid features without any phone-home.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Button asChild size="lg">
-                  <Link href="/pricing">
-                    View pricing <ArrowRight aria-hidden />
+                  <Link href="/products">
+                    Browse products <ArrowRight aria-hidden />
                   </Link>
                 </Button>
                 <Button asChild size="lg" variant="outline">
@@ -85,8 +85,8 @@ YXVkaXRMb2ciXSwiZXhwIjoxNzg4MDAwMDAwfQ...`}
             Compare tiers, see exactly what&apos;s included, and check out in minutes.
           </p>
           <Button asChild size="lg" className="mt-6">
-            <Link href="/pricing">
-              See pricing <ArrowRight aria-hidden />
+            <Link href="/products">
+              Browse products <ArrowRight aria-hidden />
             </Link>
           </Button>
         </section>

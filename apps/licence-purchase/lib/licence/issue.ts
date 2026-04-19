@@ -1,12 +1,18 @@
 import { and, eq } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { db } from '@/lib/db'
-import { contacts, licences, organisations, purchases } from '@/lib/db/schema'
+import {
+  contacts,
+  licences,
+  organisations,
+  products,
+  productTiers,
+  purchases,
+} from '@/lib/db/schema'
 import type { Licence } from '@/lib/db/schema'
 import { env } from '@/lib/env'
 import { sendEmail } from '@/lib/email/client'
 import { licenceReadyEmail } from '@/lib/email/templates/licence-ready'
-import { featureKeysForTier, type PaidTierId } from '@/lib/tiers'
 import { signLicence } from './sign'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -14,10 +20,6 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export type IssueLicenceInput = {
   purchaseId: string
   issuedAt?: Date
-}
-
-function isPaidTier(tier: string): tier is PaidTierId {
-  return tier === 'pro' || tier === 'enterprise'
 }
 
 // Issues a fresh signed licence for a purchase. Called on first `invoice.paid`
@@ -30,11 +32,30 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
   if (!purchase) {
     throw new Error(`Purchase ${input.purchaseId} not found`)
   }
-  if (!isPaidTier(purchase.tier)) {
-    throw new Error(`Purchase ${purchase.id} has non-paid tier: ${purchase.tier}`)
-  }
   if (purchase.interval !== 'month' && purchase.interval !== 'year') {
     throw new Error(`Purchase ${purchase.id} has invalid interval: ${purchase.interval}`)
+  }
+  if (!purchase.productTierId) {
+    throw new Error(
+      `Purchase ${purchase.id} has no product tier — the checkout metadata is missing catalog references`,
+    )
+  }
+
+  const tier = await db.query.productTiers.findFirst({
+    where: eq(productTiers.id, purchase.productTierId),
+  })
+  if (!tier) {
+    throw new Error(`Product tier ${purchase.productTierId} not found`)
+  }
+  if (tier.features.length === 0) {
+    throw new Error(`Product tier ${tier.id} has no features — cannot issue a licence`)
+  }
+
+  const product = await db.query.products.findFirst({
+    where: eq(products.id, tier.productId),
+  })
+  if (!product) {
+    throw new Error(`Product ${tier.productId} not found`)
   }
 
   const organisation = await db.query.organisations.findFirst({
@@ -64,7 +85,7 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
   const expiresAt = new Date(issuedAt.getTime() + termDays * DAY_MS)
 
   const jti = createId()
-  const features = featureKeysForTier(purchase.tier)
+  const features = tier.features
 
   const signed = await signLicence({
     installOrganisationId: purchase.installOrganisationId,
@@ -72,7 +93,8 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
       name: purchase.installOrganisationName ?? organisation.name,
       email: technicalContact.email,
     },
-    tier: purchase.tier,
+    productSlug: product.slug,
+    tier: tier.tierSlug,
     features,
     jti,
     issuedAt,
@@ -85,7 +107,9 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
       jti,
       organisationId: organisation.id,
       purchaseId: purchase.id,
-      tier: purchase.tier,
+      productId: product.id,
+      productTierId: tier.id,
+      tier: tier.tierSlug,
       features,
       signedJwt: signed.jwt,
       issuedAt,

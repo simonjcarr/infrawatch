@@ -63,6 +63,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.IMAGE_PREFIX }}/web,push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha,scope=web-${{ matrix.suffix }}
           cache-to: type=gha,mode=max,scope=web-${{ matrix.suffix }}
 
@@ -170,6 +172,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.IMAGE_PREFIX }}/ingest,push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha,scope=ingest-${{ matrix.suffix }}
           cache-to: type=gha,mode=max,scope=ingest-${{ matrix.suffix }}
 

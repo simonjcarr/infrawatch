@@ -92,6 +92,15 @@ jobs:
             -o "dist/infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
             ./agent/cmd/agent
 
+      - name: Generate SBOM for binary
+        uses: anchore/sbom-action@v0
+        with:
+          path: dist/infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}
+          format: spdx-json
+          output-file: dist/infrawatch-agent-${{ matrix.asset_suffix }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       - name: Checksum and upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,9 +108,12 @@ jobs:
           cd dist
           sha256sum "infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
             > "infrawatch-agent-${{ matrix.asset_suffix }}.sha256"
+          sha256sum "infrawatch-agent-${{ matrix.asset_suffix }}.spdx.json" \
+            >> "infrawatch-agent-${{ matrix.asset_suffix }}.sha256"
           gh release upload "${{ needs.release-please.outputs.tag_name }}" \
             "infrawatch-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
-            "infrawatch-agent-${{ matrix.asset_suffix }}.sha256"
+            "infrawatch-agent-${{ matrix.asset_suffix }}.sha256" \
+            "infrawatch-agent-${{ matrix.asset_suffix }}.spdx.json"
 
   # ── Customer bundle for web releases ─────────────────────────────────────
   # Runs in the same workflow run as release-please so the GITHUB_TOKEN
@@ -136,6 +148,15 @@ jobs:
           (cd dist && zip -r "../infrawatch-single-${VERSION}.zip" infrawatch)
           cp "infrawatch-single-${VERSION}.zip" infrawatch-single.zip
 
+      - name: Generate SBOM for web bundle source
+        uses: anchore/sbom-action@v0
+        with:
+          path: apps/web
+          format: spdx-json
+          output-file: infrawatch-web.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -146,4 +167,5 @@ jobs:
           gh release upload "$TAG" \
             "infrawatch-single-${VERSION}.zip" \
             "infrawatch-single.zip" \
+            "infrawatch-web.spdx.json" \
             --clobber

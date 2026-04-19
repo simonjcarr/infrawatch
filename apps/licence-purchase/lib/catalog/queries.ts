@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { products, productTiers, productTierPrices } from '@/lib/db/schema'
 import type { Product, ProductTier, ProductTierPrice } from '@/lib/db/schema'
@@ -82,9 +82,9 @@ export async function listTiersForProduct(
       options.activeOnly
         ? and(
             eq(productTierPrices.isActive, true),
-            sql`${productTierPrices.tierId} = ANY(${tierIds})`,
+            inArray(productTierPrices.tierId, tierIds),
           )
-        : sql`${productTierPrices.tierId} = ANY(${tierIds})`,
+        : inArray(productTierPrices.tierId, tierIds),
     )
 
   const byTier = new Map<string, ProductTierPrice[]>()

@@ -1,0 +1,105 @@
+version: 2
+
+updates:
+  # --- GitHub Actions -------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "area:ci"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # --- Container base images -----------------------------------------------
+  - package-ecosystem: "docker"
+    directories:
+      - "/apps/web"
+      - "/apps/docs"
+      - "/apps/ingest"
+      - "/apps/licence-purchase"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "area:docker"
+    open-pull-requests-limit: 5
+    groups:
+      docker:
+        patterns:
+          - "*"
+
+  # --- Node / pnpm workspaces ----------------------------------------------
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/apps/web"
+      - "/apps/docs"
+      - "/apps/licence-purchase"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "area:npm"
+    open-pull-requests-limit: 10
+    versioning-strategy: "increase"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      production-minor-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Major framework bumps are never silent — do them by hand.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "drizzle-orm"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "drizzle-kit"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "better-auth"
+        update-types: ["version-update:semver-major"]
+
+  # --- Go modules -----------------------------------------------------------
+  - package-ecosystem: "gomod"
+    directories:
+      - "/agent"
+      - "/apps/ingest"
+      - "/proto/gen/go"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "area:go"
+    open-pull-requests-limit: 5
+    groups:
+      go-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "google.golang.org/grpc"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "google.golang.org/protobuf"
+        update-types: ["version-update:semver-major"]

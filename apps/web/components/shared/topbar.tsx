@@ -15,6 +15,7 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { LogOut, User } from 'lucide-react'
 import { NotificationBell } from './notification-bell'
+import { CommandPaletteTrigger } from './command-palette'
 
 function getInitials(name: string): string {
   return name
@@ -45,6 +46,7 @@ export function Topbar({ orgId }: TopbarProps) {
     <header className="flex h-14 items-center gap-3 border-b bg-background px-4">
       <SidebarTrigger />
       <div className="flex-1" />
+      <CommandPaletteTrigger />
       {userId && orgId && (
         <NotificationBell orgId={orgId} userId={userId} />
       )}

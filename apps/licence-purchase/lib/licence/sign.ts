@@ -8,7 +8,6 @@ export type SignLicenceInput = {
   customer: { name: string; email: string }
   tier: PaidTierId
   features: string[]
-  maxHosts?: number
   jti: string
   issuedAt: Date
   expiresAt: Date
@@ -51,9 +50,6 @@ export async function signLicence(input: SignLicenceInput): Promise<SignedLicenc
     tier: input.tier,
     features: input.features,
     customer: input.customer,
-  }
-  if (input.maxHosts !== undefined) {
-    claims['maxHosts'] = input.maxHosts
   }
 
   const iat = Math.floor(input.issuedAt.getTime() / 1000)

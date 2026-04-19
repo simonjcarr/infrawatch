@@ -59,14 +59,12 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
 
   const jti = createId()
   const features = featureKeysForTier(purchase.tier)
-  const maxHosts = purchase.seatCount ?? undefined
 
   const signed = await signLicence({
     organisationId: organisation.id,
     customer: { name: organisation.name, email: technicalContact.email },
     tier: purchase.tier,
     features,
-    ...(maxHosts !== undefined ? { maxHosts } : {}),
     jti,
     issuedAt,
     expiresAt,
@@ -80,7 +78,6 @@ export async function issueLicence(input: IssueLicenceInput): Promise<Licence> {
       purchaseId: purchase.id,
       tier: purchase.tier,
       features,
-      ...(maxHosts !== undefined ? { maxHosts } : {}),
       signedJwt: signed.jwt,
       issuedAt,
       expiresAt,

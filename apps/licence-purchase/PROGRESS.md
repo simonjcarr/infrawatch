@@ -28,7 +28,7 @@ Related references:
 - [x] Better Auth instance (email/password + TOTP) wired at `/api/auth/[...all]`.
 - [x] Landing page, pricing page (driven by `lib/tiers.ts`, monthly/annual toggle), register, login, forgot-password.
 - [x] Authenticated `/dashboard`, `/licences/[id]`, `/invoices`, `/account` pages.
-- [x] Checkout flow scaffold: `/checkout/[tier]` collects interval + payment method + seat count, Server Action calls the Stripe stub, redirects to `/checkout/success` (copy-to-clipboard) or `/checkout/cancelled`.
+- [x] Checkout flow: `/checkout/[tier]` collects interval + payment method (flat per-tier pricing, no seat limits), Server Action redirects to Stripe Checkout / hosted invoice / `/checkout/cancelled`.
 - [x] Stripe webhook endpoint at `/api/webhooks/stripe` — verifies signature, persists raw event, calls stubbed handler.
 - [x] Licence download endpoint at `/api/licences/[id]/download` streams the `.jwt` with ownership check.
 - [x] shadcn primitives: button, card, input, label, badge, separator, switch.
@@ -99,7 +99,7 @@ All templates exist as stubs in `lib/email/templates/`. Each needs an HTML + tex
 ## Phase 7 — Open questions to resolve
 
 - [ ] **Pricing amounts** — the numbers in `lib/tiers.ts` are placeholders. Confirm final monthly / annual figures and annual-discount percentage.
-- [ ] **Seat model** — is `maxHosts` a tier property, a per-purchase add-on, or a usage-based billing meter? Current schema has it nullable on `licence` and `purchase.seatCount`.
+- [x] **Seat model decided**: flat per-tier pricing, unlimited hosts/users at every tier. Customers pay for features (SSO, audit log, compliance packs), not scale. `licence.maxHosts` and `purchase.seatCount` have been dropped from the schema.
 - [ ] **Renewal JWT strategy** — new JWT per period vs. mutate `exp` on existing. Recommendation: new JWT, so revocation-by-expiry still works for air-gapped installs.
 - [ ] **BACS mandate UX** — Stripe `bacs_debit` requires a 3-business-day settlement before the first charge confirms. Policy: issue the licence immediately on subscription activation, or wait for first payment? Current plan: issue on first `invoice.paid` regardless of method.
 - [ ] **Refund policy** — define before the first real customer.

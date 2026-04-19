@@ -10,7 +10,6 @@ const schema = z.object({
   tier: z.enum(['pro', 'enterprise']),
   interval: z.enum(['month', 'year']),
   paymentMethod: z.enum(['card', 'bacs_debit', 'invoice']),
-  seatCount: z.coerce.number().int().min(1).max(10_000).optional(),
 })
 
 export async function startCheckout(input: unknown): Promise<void> {
@@ -27,7 +26,6 @@ export async function startCheckout(input: unknown): Promise<void> {
     organisationId: user.organisationId,
     customerEmail: user.email,
     customerName: user.name,
-    seatCount: parsed.seatCount,
     successUrl: `${env.appUrl}/checkout/success?tier=${parsed.tier}`,
     cancelUrl: `${env.appUrl}/checkout/cancelled`,
   })

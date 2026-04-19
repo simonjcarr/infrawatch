@@ -39,7 +39,7 @@ export function TierCard({
               <div className="flex items-baseline gap-1">
                 <span className="text-3xl font-semibold tracking-tight text-foreground">£{price}</span>
                 <span className="text-sm text-muted-foreground">
-                  {perMonth ? '/ host / month' : ''}
+                  {perMonth ? '/ month' : ''}
                 </span>
               </div>
               {interval === 'year' ? (

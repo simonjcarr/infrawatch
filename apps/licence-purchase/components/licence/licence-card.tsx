@@ -31,9 +31,6 @@ export function LicenceCard({ licence }: { licence: Licence }) {
         <div className="text-xs text-muted-foreground">
           Licence ID: <span className="font-mono text-foreground">{licence.jti}</span>
         </div>
-        {licence.maxHosts ? (
-          <div className="mt-1 text-xs text-muted-foreground">Host cap: {licence.maxHosts}</div>
-        ) : null}
         <div className="mt-4 flex gap-2">
           <Button asChild size="sm">
             <Link href={`/licences/${licence.id}`}>View &amp; download</Link>

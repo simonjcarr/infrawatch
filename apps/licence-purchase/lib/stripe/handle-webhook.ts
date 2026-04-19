@@ -67,7 +67,6 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
     : subscription.customer.id
 
   const item = subscription.items.data[0]
-  const seatCount = item?.quantity ?? null
   const currentPeriodStart = toDate(item?.current_period_start ?? null)
   const currentPeriodEnd = toDate(item?.current_period_end ?? null)
   const cancelAt = toDate(subscription.cancel_at ?? null)
@@ -81,7 +80,6 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
       .update(purchases)
       .set({
         status: subscription.status,
-        ...(seatCount !== null ? { seatCount } : {}),
         ...(currentPeriodStart ? { currentPeriodStart } : {}),
         ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
         cancelAt,
@@ -97,7 +95,6 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
     stripeSubscriptionId: subscription.id,
     tier,
     interval,
-    seatCount,
     status: subscription.status,
     paymentMethod,
     currentPeriodStart,

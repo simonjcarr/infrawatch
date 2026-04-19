@@ -63,12 +63,6 @@ export default async function LicencePage({ params }: { params: Promise<{ id: st
               <div className="text-xs uppercase text-muted-foreground">Expires</div>
               <div className="text-foreground">{licence.expiresAt.toLocaleString()}</div>
             </div>
-            {licence.maxHosts ? (
-              <div>
-                <div className="text-xs uppercase text-muted-foreground">Host cap</div>
-                <div className="text-foreground">{licence.maxHosts}</div>
-              </div>
-            ) : null}
             <div>
               <div className="text-xs uppercase text-muted-foreground">Features</div>
               <div className="text-foreground">{licence.features.length} unlocked</div>

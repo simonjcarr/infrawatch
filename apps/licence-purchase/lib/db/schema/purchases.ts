@@ -12,7 +12,6 @@ export const purchases = pgTable('purchase', {
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   tier: text('tier').notNull(), // 'pro' | 'enterprise'
   interval: text('interval').notNull(), // 'month' | 'year'
-  seatCount: integer('seat_count'), // null = unlimited within tier limits
   status: text('status').notNull().default('pending'),
   // status values: 'pending' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired'
   paymentMethod: text('payment_method').notNull(), // 'card' | 'bacs_debit' | 'invoice'

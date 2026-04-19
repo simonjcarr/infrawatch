@@ -13,7 +13,6 @@ export type CreateCheckoutSessionInput = {
   organisationId: string
   customerEmail: string
   customerName?: string | null
-  seatCount?: number
   successUrl: string
   cancelUrl: string
 }
@@ -36,7 +35,6 @@ export async function createCheckoutSession(
   input: CreateCheckoutSessionInput,
 ): Promise<CreateCheckoutSessionResult> {
   const priceId = resolvePriceId(input.tier, input.interval)
-  const quantity = input.seatCount ?? 1
 
   const customerId = await ensureStripeCustomer({
     organisationId: input.organisationId,
@@ -48,14 +46,13 @@ export async function createCheckoutSession(
     organisationId: input.organisationId,
     tier: input.tier,
     interval: input.interval,
-    seatCount: String(quantity),
     paymentMethod: input.paymentMethod,
   }
 
   if (input.paymentMethod === 'invoice') {
     const subscription = await stripe().subscriptions.create({
       customer: customerId,
-      items: [{ price: priceId, quantity }],
+      items: [{ price: priceId, quantity: 1 }],
       collection_method: 'send_invoice',
       days_until_due: env.stripeInvoiceCollectionDays,
       metadata,
@@ -79,7 +76,7 @@ export async function createCheckoutSession(
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: [input.paymentMethod],
-    line_items: [{ price: priceId, quantity }],
+    line_items: [{ price: priceId, quantity: 1 }],
     customer: customerId,
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,

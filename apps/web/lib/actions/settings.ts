@@ -73,34 +73,24 @@ export async function updateMetricRetention(
       .where(eq(organisations.id, orgId))
 
     // Update TimescaleDB retention policies for both metric hypertables.
-    // Wrapped in a DO block so this silently degrades on plain PostgreSQL.
-    // Each policy call is in its own sub-block so one failure doesn't abort the other.
-    const days = parsed.data.days
-    await db.execute(sql`
-      DO $$
-      BEGIN
-        BEGIN
-          PERFORM drop_retention_policy('host_metrics', if_exists => true);
-        EXCEPTION WHEN OTHERS THEN
-          NULL;
-        END;
-        BEGIN
-          PERFORM add_retention_policy('host_metrics', INTERVAL '${sql.raw(String(days))} days', if_not_exists => true);
-        EXCEPTION WHEN OTHERS THEN
-          NULL;
-        END;
-        BEGIN
-          PERFORM drop_retention_policy('check_results', if_exists => true);
-        EXCEPTION WHEN OTHERS THEN
-          NULL;
-        END;
-        BEGIN
-          PERFORM add_retention_policy('check_results', INTERVAL '${sql.raw(String(days))} days', if_not_exists => true);
-        EXCEPTION WHEN OTHERS THEN
-          NULL;
-        END;
-      END $$;
-    `)
+    // Each statement is wrapped in its own try/catch so failures silently degrade
+    // on plain PostgreSQL (where these functions do not exist).
+    // make_interval(days => N) uses a proper query parameter — no sql.raw required.
+    const d = parsed.data.days
+    for (const table of ['host_metrics', 'check_results']) {
+      try {
+        await db.execute(sql`SELECT drop_retention_policy(${table}, if_exists => true)`)
+      } catch {
+        // TimescaleDB not available
+      }
+      try {
+        await db.execute(
+          sql`SELECT add_retention_policy(${table}, make_interval(days => ${d}), if_not_exists => true)`,
+        )
+      } catch {
+        // TimescaleDB not available
+      }
+    }
 
     return { success: true }
   } catch (err) {

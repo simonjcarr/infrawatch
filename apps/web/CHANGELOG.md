@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.56.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.55.1...web/v0.56.0) (2026-04-19)
+
+
+### Features
+
+* **web:** add Cmd+K command palette scaffold ([f6c7273](https://github.com/carrtech-dev/ct-ops/commit/f6c72739fbd4117f312cd1581df46f39cdd63620))
+
 ## [0.55.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.55.0...web/v0.55.1) (2026-04-18)
 
 

@@ -34,7 +34,9 @@ export function TerminalSession({
   const hasInitializedRef = useRef(false)
   // Hold the latest font size so the init effect doesn't need it in its deps.
   const fontSizeRef = useRef(fontSize)
-  fontSizeRef.current = fontSize
+  useEffect(() => {
+    fontSizeRef.current = fontSize
+  }, [fontSize])
 
   const updateStatus = useCallback(
     (s: TerminalSessionStatus) => {

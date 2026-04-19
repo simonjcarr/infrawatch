@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search, Server, Terminal, User, Loader2, WifiOff } from 'lucide-react'
 import {
@@ -75,15 +75,29 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
 
   const directAccess = terminalAccess?.allowed === true ? terminalAccess.directAccess : false
 
-  // Derive last-used username from localStorage (updates when host is selected)
-  const savedUsername = useMemo(() => {
-    if (typeof window === 'undefined' || !session?.user?.id || !selectedHostId) return ''
+  // Read last-used username from localStorage via useSyncExternalStore so
+  // the impure read happens inside the store snapshot, not during render.
+  const storageKey =
+    session?.user?.id && selectedHostId
+      ? `terminal-username:${session.user.id}:${selectedHostId}`
+      : null
+  const subscribe = useCallback((onChange: () => void) => {
+    if (typeof window === 'undefined') return () => {}
+    const handler = (e: StorageEvent) => {
+      if (!storageKey || e.key === storageKey) onChange()
+    }
+    window.addEventListener('storage', handler)
+    return () => window.removeEventListener('storage', handler)
+  }, [storageKey])
+  const getSnapshot = useCallback(() => {
+    if (typeof window === 'undefined' || !storageKey) return ''
     try {
-      return localStorage.getItem(`terminal-username:${session.user.id}:${selectedHostId}`) ?? ''
+      return localStorage.getItem(storageKey) ?? ''
     } catch {
       return ''
     }
-  }, [session?.user?.id, selectedHostId])
+  }, [storageKey])
+  const savedUsername = useSyncExternalStore(subscribe, getSnapshot, () => '')
 
   const username = typedUsername ?? savedUsername
 

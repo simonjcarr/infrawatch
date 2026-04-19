@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
@@ -251,10 +251,13 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
   // Either the committed zoom window or the active preset — drives all three metric queries
   const activeQuery: MetricsQuery = zoomedBounds ?? metricsRange
 
-  // Stable timestamp for this render pass — used for domain boundaries and the sentinel point.
-  // Defined here (before queries) so xAxisDomain is available when chart props are assembled.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const now = useMemo(() => Date.now(), [metricsRange, zoomedBounds])
+  // Timestamp anchoring the right edge of the chart. Each render pass
+  // (range change or metrics refetch) advances it so live-preset views
+  // follow the clock. We intentionally read the wall clock here — there
+  // is no external store to subscribe to, and a stable-per-mount value
+  // would freeze the chart's right edge.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
 
   // X-axis domain — always explicit so the chart spans the full intended range even when
   // data has gaps or fewer points than expected (e.g. hourly buckets for 7d).

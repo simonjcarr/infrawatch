@@ -93,27 +93,6 @@ if [ -z "${BETTER_AUTH_SECRET:-}" ]; then
   echo "Generated BETTER_AUTH_SECRET and wrote it to .env."
 fi
 
-# Generate a per-host licence signing keypair if it doesn't exist. The public
-# PEM is exported into LICENCE_PUBLIC_KEY so the web container can verify
-# licence JWTs; the matching private key is kept locally (gitignored) and used
-# by the licence-purchase app when issuing licences. A unique keypair per host
-# ensures the production guard in apps/web/lib/licence.ts doesn't trip on the
-# embedded dev key.
-LICENCE_KEY_DIR="$SCRIPT_DIR/deploy/scripts"
-LICENCE_PRIVATE_KEY="$LICENCE_KEY_DIR/licence-localprod-private.pem"
-if [ ! -f "$LICENCE_PRIVATE_KEY" ]; then
-  if ! command -v openssl >/dev/null 2>&1; then
-    echo "ERROR: openssl is required to generate the licence signing keypair" >&2
-    exit 1
-  fi
-  echo "Generating per-host licence signing keypair..."
-  mkdir -p "$LICENCE_KEY_DIR"
-  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$LICENCE_PRIVATE_KEY" 2>/dev/null
-  chmod 600 "$LICENCE_PRIVATE_KEY"
-  echo "Licence signing keypair written to $LICENCE_PRIVATE_KEY (gitignored)."
-fi
-export LICENCE_PUBLIC_KEY="$(openssl rsa -in "$LICENCE_PRIVATE_KEY" -pubout 2>/dev/null)"
-
 # Generate dev TLS certificates for the ingest service if they don't exist
 CERT_DIR="$SCRIPT_DIR/deploy/dev-tls"
 if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then

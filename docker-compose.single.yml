@@ -37,10 +37,9 @@ services:
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
       INGEST_WS_URL: ${INGEST_WS_URL:-ws://localhost:8080}
       INFRAWATCH_LOADTEST_ADMIN_KEY: ${INFRAWATCH_LOADTEST_ADMIN_KEY:-}
-      # RSA public key PEM used to verify licence JWTs. start.sh auto-generates
-      # a per-host keypair on first run and exports the public PEM into this
-      # variable; the matching private key lives at deploy/scripts/licence-localprod-private.pem
-      # and is used by the licence-purchase app when issuing licences.
+      # Optional override for licence JWT verification. The web image already
+      # includes the official infrawatch.io public key baked in; only set this
+      # if you are an enterprise issuing licences against your own PKI.
       LICENCE_PUBLIC_KEY: ${LICENCE_PUBLIC_KEY:-}
     volumes:
       - agent_dist:/var/lib/infrawatch/agent-dist

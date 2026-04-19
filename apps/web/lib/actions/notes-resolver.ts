@@ -16,6 +16,15 @@ export type ResolvedNote = Omit<Note, 'searchVector'> & {
   // runbooks spraying across every host matched by env:prod).
   isPinned: boolean
   sources: ResolvedNoteSource[]
+  // The id of the note_targets row that directly anchors this note to this
+  // host (targetType='host', targetId=$hostId). Surfaced so the UI can toggle
+  // pin state without a second round trip. Null when the note only reaches
+  // the host via host_group or tag_selector — the pin action in that case
+  // lives on the group page, not the host.
+  directTargetId: string | null
+  // Joined in the resolver to avoid a second query just to render the byline.
+  authorName: string | null
+  lastEditedByName: string | null
 }
 
 // Resolves every visible, non-deleted note that applies to a host via any of
@@ -54,7 +63,7 @@ export async function resolveNotesForHost(
   // uniquely indexes lower(key), lower(value)).
   const rows = await db.execute(sql`
     WITH direct AS (
-      SELECT nt.note_id, nt.is_pinned
+      SELECT nt.note_id, nt.is_pinned, nt.id AS direct_target_id
       FROM note_targets nt
       WHERE nt.organisation_id = ${orgId}
         AND nt.target_type = 'host'
@@ -134,9 +143,15 @@ export async function resolveNotesForHost(
       n.id, n.organisation_id, n.author_id, n.last_edited_by_id,
       n.title, n.body, n.category, n.is_private,
       n.created_at, n.updated_at, n.deleted_at, n.metadata,
-      m.is_pinned, m.sources
+      m.is_pinned, m.sources,
+      d.direct_target_id,
+      author.name AS author_name,
+      editor.name AS last_edited_by_name
     FROM matched m
     JOIN notes n ON n.id = m.note_id
+    LEFT JOIN direct d ON d.note_id = n.id
+    LEFT JOIN "user" author ON author.id = n.author_id
+    LEFT JOIN "user" editor ON editor.id = n.last_edited_by_id
     WHERE n.deleted_at IS NULL
       AND n.organisation_id = ${orgId}
       AND (
@@ -163,5 +178,8 @@ export async function resolveNotesForHost(
     metadata: (r.metadata as Note['metadata']) ?? null,
     isPinned: r.is_pinned as boolean,
     sources: r.sources as ResolvedNoteSource[],
+    directTargetId: (r.direct_target_id as string | null) ?? null,
+    authorName: (r.author_name as string | null) ?? null,
+    lastEditedByName: (r.last_edited_by_name as string | null) ?? null,
   }))
 }

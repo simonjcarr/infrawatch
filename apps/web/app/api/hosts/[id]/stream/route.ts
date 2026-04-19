@@ -6,6 +6,7 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getHost } from '@/lib/actions/agents'
 import { getChecksWithHistory } from '@/lib/actions/checks'
+import { listNotesForHost } from '@/lib/actions/notes'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,8 +42,14 @@ export async function GET(
       }
       send('update', initial)
       send('checks', await getChecksWithHistory(orgId, hostId))
+      send('notes', await listNotesForHost(orgId, hostId))
 
+      // Notes change infrequently compared to metrics — poll them every third
+      // tick (≈15s) to keep the DB load down. The counter lives in closure so
+      // we avoid an extra setInterval timer just for the slower cadence.
+      let tick = 0
       const interval = setInterval(async () => {
+        tick += 1
         try {
           const host = await getHost(orgId, hostId)
           if (!host) {
@@ -53,6 +60,9 @@ export async function GET(
           }
           send('update', host)
           send('checks', await getChecksWithHistory(orgId, hostId))
+          if (tick % 3 === 0) {
+            send('notes', await listNotesForHost(orgId, hostId))
+          }
         } catch {
           // transient DB error — skip this tick
         }

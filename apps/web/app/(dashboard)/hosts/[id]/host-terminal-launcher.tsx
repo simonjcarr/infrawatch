@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
 import { Terminal, User, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,15 +20,28 @@ export function HostTerminalLauncher({ orgId, host, directAccess, accessDeniedRe
   const { openTerminal } = useTerminalPanel()
   const { data: session } = useSession()
 
-  // Derive last-used username from localStorage (updates when session loads)
-  const savedUsername = useMemo(() => {
-    if (typeof window === 'undefined' || !session?.user?.id) return ''
+  // Read last-used username from localStorage via useSyncExternalStore so
+  // the impure read happens inside the store snapshot, not during render.
+  const storageKey = session?.user?.id
+    ? `terminal-username:${session.user.id}:${host.id}`
+    : null
+  const subscribe = useCallback((onChange: () => void) => {
+    if (typeof window === 'undefined') return () => {}
+    const handler = (e: StorageEvent) => {
+      if (!storageKey || e.key === storageKey) onChange()
+    }
+    window.addEventListener('storage', handler)
+    return () => window.removeEventListener('storage', handler)
+  }, [storageKey])
+  const getSnapshot = useCallback(() => {
+    if (typeof window === 'undefined' || !storageKey) return ''
     try {
-      return localStorage.getItem(`terminal-username:${session.user.id}:${host.id}`) ?? ''
+      return localStorage.getItem(storageKey) ?? ''
     } catch {
       return ''
     }
-  }, [session?.user?.id, host.id])
+  }, [storageKey])
+  const savedUsername = useSyncExternalStore(subscribe, getSnapshot, () => '')
 
   const [typedUsername, setTypedUsername] = useState<string | null>(null)
   const username = typedUsername ?? savedUsername

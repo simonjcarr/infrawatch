@@ -8,6 +8,7 @@ import { licences } from '@/lib/db/schema'
 import { sendEmail } from '@/lib/email/client'
 import { receiptEmail } from '@/lib/email/templates/receipt'
 import { paymentFailedEmail } from '@/lib/email/templates/payment-failed'
+import { stripe } from '@/lib/stripe/client'
 import { env } from '@/lib/env'
 
 // Dispatches a Stripe webhook event to the appropriate handler. Each handler
@@ -117,15 +118,22 @@ async function onInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   const subscriptionId = getInvoiceSubscriptionId(invoice)
   if (!subscriptionId) return
 
-  const purchase = await db.query.purchases.findFirst({
+  // Stripe commonly delivers invoice.paid before customer.subscription.created.
+  // If the purchase row is missing, fetch the subscription directly and create
+  // it inline so we're order-independent.
+  let purchase = await db.query.purchases.findFirst({
     where: eq(purchases.stripeSubscriptionId, subscriptionId),
   })
   if (!purchase) {
-    // Subscription event hasn't arrived yet; Stripe will retry delivery so we
-    // throw and let the webhook route capture the error for replay.
-    throw new Error(
-      `invoice.paid for subscription ${subscriptionId} arrived before the purchase row existed`,
-    )
+    const subscription = await stripe().subscriptions.retrieve(subscriptionId)
+    await onSubscriptionUpserted(subscription)
+    purchase = await db.query.purchases.findFirst({
+      where: eq(purchases.stripeSubscriptionId, subscriptionId),
+    })
+  }
+  if (!purchase) {
+    // Metadata missing — nothing we can do with this invoice.
+    return
   }
 
   const invoiceRow = await upsertInvoice(invoice, purchase.id)

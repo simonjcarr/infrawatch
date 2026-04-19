@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.27.1...agent/v0.28.0) (2026-04-19)
+
+
+### Features
+
+* **loadtest:** widen synthetic CPU/memory to 0-100 ([2f946f6](https://github.com/carrtech-dev/ct-ops/commit/2f946f6911007ea217d93248186d06484998d273))
+* **loadtest:** widen synthetic CPU/memory to 0-100 range ([6f61737](https://github.com/carrtech-dev/ct-ops/commit/6f617370cfbddabe4c25d1b52616647ad8ef8820))
+
 ## [0.27.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.27.0...agent/v0.27.1) (2026-04-18)
 
 

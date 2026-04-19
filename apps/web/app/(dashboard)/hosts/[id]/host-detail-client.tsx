@@ -65,6 +65,8 @@ import { TasksTab } from './tasks-tab'
 import { LogsTab } from './logs-tab'
 import { InventoryTab } from './inventory-tab'
 import { HostTerminalLauncher } from './host-terminal-launcher'
+import { NotesTab } from '@/components/notes/notes-tab'
+import { PinnedNotesCard } from '@/components/notes/pinned-notes-card'
 import { checkTerminalAccess } from '@/lib/actions/terminal'
 import { getAlertInstances } from '@/lib/actions/alerts'
 import { getHostCollectionSettings } from '@/lib/actions/host-settings'
@@ -75,8 +77,8 @@ import type { HostGroup } from '@/lib/db/schema'
 import type { HostGroupWithCount } from '@/lib/actions/host-groups'
 import type { NetworkWithMembership, NetworkWithCount } from '@/lib/actions/networks'
 
-type ParentTabId = 'overview' | 'monitoring' | 'infrastructure' | 'inventory' | 'management' | 'tools'
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'host-networks' | 'tasks' | 'logs' | 'terminal' | 'packages'
+type ParentTabId = 'overview' | 'monitoring' | 'infrastructure' | 'inventory' | 'notes' | 'management' | 'tools'
+type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'host-networks' | 'tasks' | 'logs' | 'terminal' | 'packages' | 'notes'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -93,6 +95,7 @@ const TAB_LABELS: Record<Tab, string> = {
   logs: 'Logs',
   terminal: 'Terminal',
   packages: 'Packages',
+  notes: 'Notes',
 }
 
 const PARENT_TABS: Array<{
@@ -105,6 +108,7 @@ const PARENT_TABS: Array<{
   { id: 'monitoring', label: 'Monitoring', defaultTab: 'metrics', children: ['metrics', 'checks', 'alerts'] },
   { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network'] },
   { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages'] },
+  { id: 'notes', label: 'Notes', defaultTab: 'notes', children: null },
   { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'host-networks', 'settings'] },
   { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'logs', 'terminal'] },
 ]
@@ -654,6 +658,17 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
               </CardContent>
             </Card>
           </div>
+
+          <PinnedNotesCard
+            orgId={orgId}
+            hostId={initialHost.id}
+            currentUserId={currentUserId}
+            userRole={userRole}
+            onViewAll={() => {
+              setActiveParentTab('notes')
+              setActiveTab('notes')
+            }}
+          />
         </div>
       )}
 
@@ -1128,6 +1143,16 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
       {/* Inventory Tab */}
       {activeTab === 'packages' && (
         <InventoryTab orgId={orgId} hostId={initialHost.id} />
+      )}
+
+      {/* Notes Tab */}
+      {activeTab === 'notes' && (
+        <NotesTab
+          orgId={orgId}
+          hostId={initialHost.id}
+          currentUserId={currentUserId}
+          userRole={userRole}
+        />
       )}
 
       {/* Tasks Tab */}

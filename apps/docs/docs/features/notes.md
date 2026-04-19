@@ -49,9 +49,13 @@ Readers can mark a note **helpful** or **outdated**. A user can only cast each r
 
 Three entry points:
 
-1. **Per-host Notes tab** — everything that resolves to this host
+1. **Per-host Notes tab** — everything that resolves to this host. Supports category filters and a "New note" action that attaches the note to the current host. Category templates seed the body when you choose a category on a new note, so runbooks and contacts land with a consistent shape. Changes stream in via the host SSE channel (`notes` event on `/api/hosts/[id]/stream`) so another engineer's edit shows up without a refresh.
 2. **Global `/notes` page** — org-wide list with full-text search (`websearch_to_tsquery` over title + body, title weighted higher) and category / author / "mine only" filters
 3. **Cmd+K palette** — type `/notes` or a note title to jump straight to it
+
+## Overview card
+
+Pinned notes surface as a "Pinned notes" card on the host's Overview tab — above the fold, below the top-line metric gauges. Bodies render in compact mode (long notes collapse behind a "Show more" toggle) so a pinned runbook doesn't push the rest of the Overview off-screen. The card is suppressed entirely when the host has no pinned notes.
 
 ## Permissions
 

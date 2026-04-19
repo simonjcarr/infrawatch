@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ShieldCheck } from 'lucide-react'
+import { LogoutButton } from '@/components/shared/logout-button'
 
 export function Nav({ isAuthenticated }: { isAuthenticated?: boolean }) {
   return (
@@ -21,9 +22,12 @@ export function Nav({ isAuthenticated }: { isAuthenticated?: boolean }) {
             Docs
           </Link>
           {isAuthenticated ? (
-            <Button asChild size="sm">
-              <Link href="/dashboard">Dashboard</Link>
-            </Button>
+            <>
+              <Button asChild size="sm">
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+              <LogoutButton />
+            </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">

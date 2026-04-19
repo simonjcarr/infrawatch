@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.59.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.59.1...web/v0.59.2) (2026-04-19)
+
+
+### Bug Fixes
+
+* **web:** satisfy react-hooks purity / set-state-in-effect rules ([49225a9](https://github.com/carrtech-dev/ct-ops/commit/49225a9b4e924eaced3be47ccb431743bc062917))
+* **web:** satisfy react-hooks purity / set-state-in-effect rules ([0940029](https://github.com/carrtech-dev/ct-ops/commit/0940029f041923f76b5a7687c454188440f50087))
+
 ## [0.59.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.59.0...web/v0.59.1) (2026-04-19)
 
 

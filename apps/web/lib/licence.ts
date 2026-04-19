@@ -1,8 +1,9 @@
 import { importSPKI, jwtVerify } from 'jose'
 import type { Feature, LicenceTier } from './features'
 
-// Dev public key (RS256) — replace with your production signing key before release.
-// The matching private key is in deploy/scripts/licence-dev-private.pem (never commit).
+// Dev-only public key (RS256) — used in development when LICENCE_PUBLIC_KEY is not set.
+// In production, set LICENCE_PUBLIC_KEY to your RSA public key PEM.
+// The matching private key lives in deploy/scripts/licence-dev-private.pem (never commit).
 const DEV_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5Wep87Fxy2SUYnx8MLx2
 oVWA94ygeDMKfRQWm16Vdvc+fzpTQettcbMQN6AMe/SzFk0oipzs2wB//9DyoFhK
@@ -12,6 +13,40 @@ OcVgn3vrZ0RfExrMhelwZvgDoutHol9KhoqCQkSLxaL2eMC9NzYtCuESLCYOEiIS
 q6YFpCA6PtWXuwKYMfj9egw/d2KePf5YiBEBZJzLu1L57Fouf1fVWc7hr32BrL9N
 wQIDAQAB
 -----END PUBLIC KEY-----`
+
+/**
+ * Returns the RSA public key PEM to use for licence JWT verification.
+ *
+ * Resolution order:
+ *   1. LICENCE_PUBLIC_KEY env var (always preferred)
+ *   2. Dev key — only allowed when NODE_ENV !== 'production'
+ *
+ * Throws at startup in production if the env var is absent or still set to
+ * the development key, so misconfigured deployments fail fast rather than
+ * silently accepting forged licences.
+ */
+export function resolveLicencePublicKeyPem(): string {
+  const envKey = process.env.LICENCE_PUBLIC_KEY?.trim()
+
+  if (envKey) {
+    if (process.env.NODE_ENV === 'production' && envKey === DEV_PUBLIC_KEY_PEM.trim()) {
+      throw new Error(
+        'LICENCE_PUBLIC_KEY is set to the development key. ' +
+          'Set it to your production RSA public key PEM before deploying.',
+      )
+    }
+    return envKey
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'LICENCE_PUBLIC_KEY environment variable is required in production. ' +
+        'Set it to your RSA public key PEM (see docs/getting-started/configuration.md).',
+    )
+  }
+
+  return DEV_PUBLIC_KEY_PEM.trim()
+}
 
 const LICENCE_ISSUER = 'infrawatch-licensing'
 const LICENCE_AUDIENCE = 'infrawatch'
@@ -57,7 +92,7 @@ function isCustomer(v: unknown): v is LicenceCustomer {
 
 export async function validateLicenceKey(key: string): Promise<LicenceValidationResult> {
   try {
-    const publicKey = await importSPKI(DEV_PUBLIC_KEY_PEM.trim(), 'RS256')
+    const publicKey = await importSPKI(resolveLicencePublicKeyPem(), 'RS256')
     const { payload } = await jwtVerify(key, publicKey, {
       algorithms: ['RS256'],
       issuer: LICENCE_ISSUER,

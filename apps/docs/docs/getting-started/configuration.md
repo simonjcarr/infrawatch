@@ -12,10 +12,23 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `BETTER_AUTH_SECRET` | ✓ | — | Secret key for signing sessions (min 32 chars, keep private) |
 | `BETTER_AUTH_URL` | ✓ | — | Public URL of the web app (e.g. `https://ct-ops.corp.example.com`) |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | — | Same as `BETTER_AUTH_URL` | Comma-separated list of allowed origins for CORS |
+| `LICENCE_PUBLIC_KEY` | ✓ (prod) | dev key | RSA public key PEM for validating licence JWTs. **Required in production** — the server refuses to start without it. See below. |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |
 | `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download |
 | `INGEST_WS_URL` | — | `ws://localhost:8080` | WebSocket URL of the ingest service (for real-time agent status) |
+
+### Licence public key
+
+CT-Ops validates licence JWTs using an RSA public key. In development this falls back to a built-in dev key. In **production** you must supply your own:
+
+```bash
+# Generate a key pair (keep the private key safe — it signs licence tokens)
+openssl genrsa -out licence-private.pem 2048
+openssl rsa -in licence-private.pem -pubout -out licence-public.pem
+```
+
+Set `LICENCE_PUBLIC_KEY` to the contents of `licence-public.pem`. The server will refuse to start in production if the variable is absent or still set to the development key.
 
 ### Example `.env.local` (development)
 

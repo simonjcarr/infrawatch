@@ -1,0 +1,13 @@
+# Infrawatch / CT-Ops security contact — RFC 9116
+#
+# This file is served by the self-hosted web app at /.well-known/security.txt.
+# Operators who deploy CT-Ops are welcome to replace the Contact lines below
+# with their own security contact so that researchers report to the team
+# responsible for this specific deployment. The upstream project will continue
+# to honour reports sent via the GitHub Security Advisory link.
+
+Contact: https://github.com/carrtech-dev/ct-ops/security/advisories/new
+Contact: mailto:security@infrawatch.io
+Expires: 2027-04-19T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://github.com/carrtech-dev/ct-ops/blob/main/SECURITY_DISCLOSURE.md

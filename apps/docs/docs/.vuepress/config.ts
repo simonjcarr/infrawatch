@@ -92,6 +92,10 @@ export default defineUserConfig({
         text: 'Licensing',
         link: '/licensing.md',
       },
+      {
+        text: 'Security',
+        link: '/security.md',
+      },
     ],
   }),
 

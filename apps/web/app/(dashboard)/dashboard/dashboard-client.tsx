@@ -70,7 +70,7 @@ export function DashboardClient() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Overview</h1>
+        <h1 className="text-2xl font-semibold text-foreground" data-testid="dashboard-heading">Overview</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Current state of your infrastructure
         </p>

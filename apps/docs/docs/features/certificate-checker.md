@@ -72,7 +72,7 @@ Use the **Download** button in the results header to export the leaf certificate
 | **Summary** | Valid from/to, key type/size, issuer, expiry countdown |
 | **Subject** | CN, O, OU, C, ST, L, full DN |
 | **Issuer** | CN, O, full DN |
-| **Validity & Fingerprints** | Not before, not after, serial number, SHA-1 / SHA-256 / SHA-512 fingerprints |
+| **Validity & Fingerprints** | Not before, not after, serial number, SHA-256 / SHA-512 fingerprints |
 | **Key & Algorithm** | Key algorithm, key size, curve (EC), signature algorithm, Subject Key ID, Authority Key ID |
 | **Extensions** | CA flag, path length, key usage, extended key usage, certificate policies |
 | **Subject Alternative Names** | All DNS, IP, email, and URI SANs |

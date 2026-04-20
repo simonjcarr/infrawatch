@@ -505,7 +505,6 @@ function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
           <InfoRow label="Not Before" value={format(new Date(cert.notBefore), "MMM d, yyyy HH:mm:ss 'UTC'")} />
           <InfoRow label="Not After" value={format(new Date(cert.notAfter), "MMM d, yyyy HH:mm:ss 'UTC'")} />
           <InfoRow label="Serial Number" value={cert.serialNumber} mono copyable />
-          <InfoRow label="SHA-1 Fingerprint" value={cert.fingerprintSha1} mono copyable />
           <InfoRow label="SHA-256 Fingerprint" value={cert.fingerprintSha256} mono copyable />
           <InfoRow label="SHA-512 Fingerprint" value={cert.fingerprintSha512} mono copyable />
         </dl>

@@ -36,7 +36,6 @@ export interface ParsedCertificate {
   isExpiringSoon: boolean
 
   serialNumber: string
-  fingerprintSha1: string
   fingerprintSha256: string
   fingerprintSha512: string
   isSelfSigned: boolean
@@ -97,9 +96,6 @@ export function parseForgeCert(forgeCert: forge.pki.Certificate, pemStr: string)
   const isSelfSigned = forgeCert.isIssuer(forgeCert)
 
   const derBytes = forge.asn1.toDer(forge.pki.certificateToAsn1(forgeCert)).getBytes()
-  const sha1 = colonHex(
-    forge.md.sha1.create().update(derBytes).digest().toHex()
-  )
   const sha256 = colonHex(
     forge.md.sha256.create().update(derBytes).digest().toHex()
   )
@@ -258,7 +254,6 @@ export function parseForgeCert(forgeCert: forge.pki.Certificate, pemStr: string)
     isExpired: daysRemaining < 0,
     isExpiringSoon: daysRemaining >= 0 && daysRemaining <= 30,
     serialNumber: colonHex(forgeCert.serialNumber),
-    fingerprintSha1: sha1,
     fingerprintSha256: sha256,
     fingerprintSha512: sha512,
     isSelfSigned,

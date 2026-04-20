@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.1...agent/v0.28.2) (2026-04-20)
+
+
+### Bug Fixes
+
+* **agent:** write to Windows Event Log when running as a service ([#463](https://github.com/carrtech-dev/ct-ops/issues/463)) ([254739e](https://github.com/carrtech-dev/ct-ops/commit/254739eedde8bb3b41febf96031f36e847fefa2e))
+
 ## [0.28.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.0...agent/v0.28.1) (2026-04-20)
 
 

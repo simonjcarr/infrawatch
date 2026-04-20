@@ -16,6 +16,15 @@ const eslintConfig = defineConfig([
     "migrate.js",
     "scripts/validate-migrations.js",
   ]),
+  {
+    // Playwright fixtures use a `use()` callback that the react-hooks plugin
+    // mistakes for React's `use()` hook. Disable that rule inside the e2e
+    // suite — no React code lives here.
+    files: ["tests/e2e/**/*.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

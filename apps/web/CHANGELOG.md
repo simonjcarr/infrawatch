@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.60.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.59.2...web/v0.60.0) (2026-04-20)
+
+
+### Features
+
+* **tasks:** add cron-driven scheduled task runner ([#456](https://github.com/carrtech-dev/ct-ops/issues/456)) ([deee1cc](https://github.com/carrtech-dev/ct-ops/commit/deee1cc2fc26f6d5dd6b31acec78ecbdff45641a))
+
+
+### Bug Fixes
+
+* **certificates:** drop SHA1 fingerprint from cert checker ([3765bad](https://github.com/carrtech-dev/ct-ops/commit/3765bad368a184d5103f8e797c3bf2eb97d6726a))
+* **certificates:** drop SHA1 fingerprint from cert checker ([#348](https://github.com/carrtech-dev/ct-ops/issues/348)) ([4ae8106](https://github.com/carrtech-dev/ct-ops/commit/4ae8106310a6c318cea208d3b43a1897f88cbd02))
+* **security:** constant-time comparison for admin key + cert fingerprint ([740f489](https://github.com/carrtech-dev/ct-ops/commit/740f48942554cf8470d4cd569705efdfc8b77001))
+* **security:** constant-time comparison for admin key + cert fingerprint ([#352](https://github.com/carrtech-dev/ct-ops/issues/352)) ([245eacd](https://github.com/carrtech-dev/ct-ops/commit/245eacd68ec4176df4c97787176f53eef057a1fb))
+
 ## [0.59.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.59.1...web/v0.59.2) (2026-04-19)
 
 

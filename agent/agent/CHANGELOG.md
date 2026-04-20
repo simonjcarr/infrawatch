@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.0...agent/v0.28.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* **agent:** create agent and uninstall logs with 0640 ([#357](https://github.com/carrtech-dev/ct-ops/issues/357)) ([51a7d56](https://github.com/carrtech-dev/ct-ops/commit/51a7d56e73a3ac42a93492879dc2660d2d59ab77))
+* **agent:** create agent and uninstall logs with mode 0640 ([2a82873](https://github.com/carrtech-dev/ct-ops/commit/2a828737599b7e837eed4af5d9bff64bed5f294e))
+
 ## [0.28.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.27.1...agent/v0.28.0) (2026-04-19)
 
 

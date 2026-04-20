@@ -5,6 +5,10 @@
 // for the ticket, and updates the row. No Redis required — fits the air-gap
 // story.
 
+import { config as loadDotenv } from 'dotenv'
+loadDotenv({ path: '.env.local' })
+loadDotenv({ path: '.env' })
+
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { supportAiJobs } from '@/lib/db/schema'

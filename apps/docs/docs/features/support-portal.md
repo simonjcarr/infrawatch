@@ -56,6 +56,17 @@ Each ticket is capped at 10 AI responses per rolling hour. If a ticket hits the 
 
 ---
 
+## Admin health banner
+
+When any support ticket needs staff attention, a strip appears at the top of every admin page. It shows:
+
+- the count of tickets currently awaiting a staff reply (`pending_staff` status), linking to the ticket list;
+- the count of tickets flagged with an AI error (e.g. the model couldn't reach the GitHub repo) along with clickable pills that go straight to each flagged ticket.
+
+The banner is driven by a server-side read of the tickets table and auto-refreshes every 15 seconds while any flag is active (30 seconds when clean). If the customer would otherwise have seen an "I'm having trouble reaching the codebase" style apology, the system now pauses the ticket and raises the flag instead — the customer just waits for a human reply rather than being told we have technical issues.
+
+---
+
 ## Data that leaves your network
 
 When AI triage is enabled, the following data is sent to Anthropic's API on each AI turn:

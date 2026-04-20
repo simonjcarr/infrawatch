@@ -105,6 +105,9 @@ export async function runAiTurn(ticketId: string): Promise<RunOutcome> {
   let finalText = ''
   let totalInput = 0
   let totalOutput = 0
+  let toolErrorCount = 0
+  let toolCallCount = 0
+  let firstToolError: { tool: string; detail: string } | null = null
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
     const res = await client.messages.create({
@@ -137,7 +140,14 @@ export async function runAiTurn(ticketId: string): Promise<RunOutcome> {
 
     const toolResults: Anthropic.ToolResultBlockParam[] = []
     for (const tu of toolUses) {
+      toolCallCount += 1
       const r = await handleTool(tu.name, tu.input, { orgId: ticket.organisationId })
+      if (r.is_error) {
+        toolErrorCount += 1
+        if (!firstToolError) {
+          firstToolError = { tool: tu.name, detail: r.content.slice(0, 400) }
+        }
+      }
       toolResults.push({
         type: 'tool_result',
         tool_use_id: tu.id,
@@ -146,6 +156,25 @@ export async function runAiTurn(ticketId: string): Promise<RunOutcome> {
       })
     }
     messages.push({ role: 'user', content: toolResults })
+  }
+
+  // If tools kept failing, don't post an apology reply to the customer — that
+  // leaks implementation trouble and makes us look broken. Flag the ticket so
+  // the admin health banner picks it up and staff can take over.
+  const toolsBroken =
+    toolCallCount >= 2 && toolErrorCount >= 2 && toolErrorCount / toolCallCount >= 0.5
+  if (toolsBroken && firstToolError) {
+    const reason = `AI tool error (${firstToolError.tool}): ${firstToolError.detail}`
+    await db
+      .update(supportTickets)
+      .set({
+        aiPaused: true,
+        aiFlagReason: reason,
+        status: 'pending_staff',
+        updatedAt: new Date(),
+      })
+      .where(eq(supportTickets.id, ticketId))
+    return { kind: 'error', reason: 'tool-errors' }
   }
 
   if (!finalText) finalText = 'I was unable to produce a reply. A human will follow up shortly.'

@@ -53,6 +53,7 @@ The system prompt is marked with `cache_control: ephemeral` so Anthropic's promp
 5. **Redaction** — the module's `redact.ts` strips emails, phone numbers, JWTs, AWS keys, Stripe keys, GitHub PATs and long base64 blobs before anything reaches the API.
 6. **Pseudonymisation** — the model sees `org_<orgId>`, never the raw customer name or email.
 7. **Rate limits** — 10 AI responses per ticket per hour via `support_ai_rate`. Hitting the cap pauses the ticket.
+8. **Tool-failure containment** — when ≥2 tool calls in a single turn error out and they're ≥50% of that turn's calls, the orchestrator **does not** post an apology reply. Instead it sets `aiPaused=true`, `aiFlagReason="AI tool error (…)"`, flips the ticket to `pending_staff`, and returns an `error` outcome from `runAiTurn`. The customer sees silence rather than a "having trouble" message; the admin health banner picks up the flag within seconds.
 
 ---
 

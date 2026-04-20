@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { Nav } from '@/components/shared/nav'
 import { Footer } from '@/components/shared/footer'
+import { AdminHealthBanner } from '@/components/support/admin-health-banner'
 
 export const metadata = { title: 'Admin' }
 
@@ -29,6 +30,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </Link>
         </div>
       </div>
+      <AdminHealthBanner />
       <main className="flex-1">{children}</main>
       <Footer />
     </div>

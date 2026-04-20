@@ -1,7 +1,7 @@
 'use server'
 
 import { z } from 'zod'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import {
@@ -224,6 +224,52 @@ export async function listAllTicketsForAdmin(): Promise<SupportTicket[]> {
   return db.query.supportTickets.findMany({
     orderBy: [desc(supportTickets.lastMessageAt)],
   })
+}
+
+export type SupportHealth = {
+  unansweredCount: number
+  flaggedCount: number
+  flagged: Array<{ id: string; subject: string; flagReason: string | null }>
+}
+
+// Summary counts used by the admin health banner. Super-admin only.
+// - unanswered: tickets awaiting a staff response (pending_staff, not closed/resolved).
+// - flagged: tickets paused because of an AI tool error or injection flag.
+export async function getSupportHealth(): Promise<SupportHealth> {
+  await assertSuperAdmin()
+
+  const unansweredRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(supportTickets)
+    .where(
+      and(
+        eq(supportTickets.status, 'pending_staff'),
+      ),
+    )
+  const unansweredCount = unansweredRows[0]?.count ?? 0
+
+  const flaggedTickets = await db
+    .select({
+      id: supportTickets.id,
+      subject: supportTickets.subject,
+      flagReason: supportTickets.aiFlagReason,
+    })
+    .from(supportTickets)
+    .where(
+      and(
+        eq(supportTickets.aiPaused, true),
+        isNotNull(supportTickets.aiFlagReason),
+        inArray(supportTickets.status, ['open', 'pending_customer', 'pending_staff']),
+      ),
+    )
+    .orderBy(desc(supportTickets.updatedAt))
+    .limit(10)
+
+  return {
+    unansweredCount,
+    flaggedCount: flaggedTickets.length,
+    flagged: flaggedTickets,
+  }
 }
 
 export async function getAdminTicket(id: string): Promise<{

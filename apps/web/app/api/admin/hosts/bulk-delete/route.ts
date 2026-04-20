@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { and, isNull, like } from 'drizzle-orm'
+import { timingSafeEqual } from 'crypto'
 import { db } from '@/lib/db'
 import { hosts } from '@/lib/db/schema'
 import { deleteHost } from '@/lib/actions/agents'
@@ -14,6 +15,13 @@ const bodySchema = z.object({
     .max(200)
     .regex(/^loadtest-/, "hostnamePrefix must start with 'loadtest-'"),
 })
+
+function constantTimeEqualUtf8(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, 'utf8')
+  const bBuf = Buffer.from(b, 'utf8')
+  if (aBuf.length !== bBuf.length) return false
+  return timingSafeEqual(aBuf, bBuf)
+}
 
 // POST /api/admin/hosts/bulk-delete
 // Admin-key-gated endpoint used by the `infrawatch-loadtest cleanup` CLI to
@@ -29,7 +37,11 @@ export async function POST(request: NextRequest) {
     )
   }
   const presented = request.headers.get('x-loadtest-admin-key')
-  if (!presented || presented !== configuredKey) {
+  // Compare in constant time so a remote attacker cannot recover the key
+  // byte-by-byte by measuring response latency. Buffer length is leaked
+  // (Buffer.compare requires equal lengths), which is acceptable: a well-
+  // generated key is fixed-length, so length alone reveals nothing useful.
+  if (!presented || !constantTimeEqualUtf8(presented, configuredKey)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

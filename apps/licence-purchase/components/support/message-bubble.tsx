@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { MarkdownRenderer } from './markdown-renderer'
 
 type Author = 'customer' | 'ai' | 'staff'
 
@@ -38,7 +39,11 @@ export function MessageBubble({
         <span className={cn('font-medium uppercase tracking-wide', styles.label)}>{authorLabel}</span>
         <span className="text-muted-foreground">{new Date(createdAt).toLocaleString()}</span>
       </div>
-      <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{body}</div>
+      {author === 'customer' ? (
+        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{body}</div>
+      ) : (
+        <MarkdownRenderer>{body}</MarkdownRenderer>
+      )}
     </div>
   )
 }

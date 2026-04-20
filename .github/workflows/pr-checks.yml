@@ -9,7 +9,7 @@ on:
 jobs:
   web:
     name: Web (lint / type-check / build)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
 
@@ -42,7 +42,7 @@ jobs:
 
   go:
     name: Go (test / build)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
 

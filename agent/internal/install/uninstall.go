@@ -99,6 +99,12 @@ func uninstallWindows() error {
 	_ = run("sc.exe", "stop", "InfrawatchAgent")
 	_ = run("sc.exe", "delete", "InfrawatchAgent")
 
+	// Deregister the Application event log source so Windows no longer lists
+	// the agent under HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application.
+	if err := removeEventLogSource(); err != nil {
+		slog.Warn("removing Windows Event Log source", "err", err)
+	}
+
 	// Remove binary directory and config/data directory
 	removeDir(binDir)
 	removeDir(cfgDir)

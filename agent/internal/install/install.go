@@ -240,6 +240,14 @@ func installWindows(orgToken, ingestAddress string, tlsSkipVerify bool, tags []s
 		return fmt.Errorf("writing config: %w", err)
 	}
 
+	// Register under the Application event log before the service starts so the
+	// agent's first log lines on service entry land in the right source rather
+	// than a synthetic "Application" fallback.
+	if err := installEventLogSource(); err != nil {
+		// Non-fatal: the service still runs, it just won't write to Event Log.
+		slog.Warn("registering Windows Event Log source", "err", err)
+	}
+
 	binPath := fmt.Sprintf(`"%s" -config "%s"`, dest, cfgFile)
 	if err := run("sc.exe", "create", "InfrawatchAgent",
 		"binPath=", binPath,
@@ -258,7 +266,10 @@ func installWindows(orgToken, ingestAddress string, tlsSkipVerify bool, tags []s
 		return fmt.Errorf("starting Windows service: %w", err)
 	}
 
-	printSuccess("sc query InfrawatchAgent", `Get-EventLog -LogName Application -Source InfrawatchAgent`)
+	printSuccess(
+		"sc query InfrawatchAgent",
+		`Get-WinEvent -LogName Application -FilterXPath "*[System/Provider/@Name='InfrawatchAgent']" -MaxEvents 20`,
+	)
 	return nil
 }
 

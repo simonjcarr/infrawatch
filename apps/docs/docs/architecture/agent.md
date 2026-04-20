@@ -150,16 +150,28 @@ journalctl -u ct-ops-agent -f
 
 ## Log Output
 
-The agent logs structured text to stdout:
+The agent emits structured `slog` records. The service manager decides where they land:
+
+| Platform | Destination | How to view |
+|---|---|---|
+| **Linux** (systemd) | systemd journal (`StandardOutput=journal`) | `journalctl -u infrawatch-agent -f` |
+| **macOS** (launchd) | `/var/log/infrawatch-agent.log` (mode `0640`, root:wheel) | `tail -f /var/log/infrawatch-agent.log` |
+| **Windows** (SCM) | Application event log, source `InfrawatchAgent` (registered at install) | `Get-WinEvent -LogName Application -FilterXPath "*[System/Provider/@Name='InfrawatchAgent']" -MaxEvents 50` |
+
+When started interactively (not via the service manager), logs always go to stdout regardless of platform.
+
+Sample records:
 
 ```
-level=INFO msg="agent identity ready" data_dir=/var/lib/ct-ops/agent
+level=INFO msg="agent identity ready" data_dir=/var/lib/infrawatch/agent
 level=INFO msg="registering agent" address=ingest.corp.example.com:9443
 level=INFO msg="registration response" status=active agent_id=clxyz123...
 level=INFO msg="agent registered and active"
 level=INFO msg="starting heartbeat" interval_secs=30
 level=INFO msg="heartbeat stream opened"
 ```
+
+On Windows, slog levels map to event log types: `INFO`/`DEBUG` → Information, `WARN` → Warning, `ERROR` → Error. Uninstall removes the event source registration.
 
 ---
 

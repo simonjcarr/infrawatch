@@ -42,6 +42,14 @@ func runService(ctx context.Context, cancel context.CancelFunc, runFn func(conte
 		return runFn(ctx)
 	}
 
+	// Under the SCM there is no attached console, so the default stdout
+	// handler discards everything. Swap the default slog handler to one that
+	// writes to the Windows Event Log so operators can actually see agent
+	// output. Fall through to stdout if the source isn't registered.
+	if h := openEventLogHandler(slog.LevelInfo); h != nil {
+		slog.SetDefault(slog.New(h))
+	}
+
 	ws := &windowsService{cancel: cancel}
 	// Run the agent loop in a goroutine — svc.Run blocks until the service stops.
 	go func() {

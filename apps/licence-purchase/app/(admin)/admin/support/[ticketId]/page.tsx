@@ -4,7 +4,7 @@ import { MessageBubble } from '@/components/support/message-bubble'
 import { AdminTicketControls } from '@/components/support/admin-ticket-controls'
 import { AdminReplyForm } from '@/components/support/admin-reply-form'
 import { TicketAutoRefresh } from '@/components/support/ticket-auto-refresh'
-import { getAdminTicket } from '@/lib/actions/support'
+import { getAdminTicket, getAttachmentsForMessagesAdmin } from '@/lib/actions/support'
 
 export const metadata = { title: 'Ticket · Admin' }
 
@@ -19,6 +19,8 @@ export default async function AdminTicketPage({
   const { ticket, messages, orgName } = data
 
   const isClosed = ticket.status === 'closed'
+  const messageIds = messages.map((m) => m.id)
+  const attachmentsMap = await getAttachmentsForMessagesAdmin(messageIds)
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -63,6 +65,7 @@ export default async function AdminTicketPage({
             }
             body={m.body}
             createdAt={m.createdAt}
+            attachments={attachmentsMap.get(m.id) ?? []}
           />
         ))}
       </div>

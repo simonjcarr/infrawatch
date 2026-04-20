@@ -11,6 +11,28 @@ import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
 import { users } from './auth'
 
+export const ATTACHMENT_ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/json',
+  'application/x-yaml',
+  'text/yaml',
+  'application/zip',
+  'application/gzip',
+  'application/x-gzip',
+] as const
+
+export type AllowedMimeType = (typeof ATTACHMENT_ALLOWED_MIME_TYPES)[number]
+
+export function isImageMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('image/')
+}
+
 export type SupportTicketStatus =
   | 'open'
   | 'pending_customer'
@@ -119,6 +141,29 @@ export const supportAiRate = pgTable(
   }),
 )
 
+// Attachments uploaded by customers alongside their support messages.
+// messageId is null until the message is saved (files are uploaded before submit).
+export const supportAttachments = pgTable(
+  'support_attachment',
+  {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    ticketId: text('ticket_id').references(() => supportTickets.id, { onDelete: 'cascade' }),
+    messageId: text('message_id').references(() => supportMessages.id, { onDelete: 'cascade' }),
+    uploadedByUserId: text('uploaded_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    filename: text('filename').notNull(),
+    storagePath: text('storage_path').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    ticketIdx: index('support_attachment_ticket_idx').on(table.ticketId),
+    messageIdx: index('support_attachment_message_idx').on(table.messageId),
+  }),
+)
+
 export type SupportTicket = typeof supportTickets.$inferSelect
 export type NewSupportTicket = typeof supportTickets.$inferInsert
 export type SupportMessage = typeof supportMessages.$inferSelect
@@ -126,3 +171,5 @@ export type NewSupportMessage = typeof supportMessages.$inferInsert
 export type SupportSettingsRow = typeof supportSettings.$inferSelect
 export type SupportAiJob = typeof supportAiJobs.$inferSelect
 export type NewSupportAiJob = typeof supportAiJobs.$inferInsert
+export type SupportAttachment = typeof supportAttachments.$inferSelect
+export type NewSupportAttachment = typeof supportAttachments.$inferInsert

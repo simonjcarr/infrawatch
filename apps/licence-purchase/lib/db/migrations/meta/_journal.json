@@ -29,6 +29,13 @@
       "when": 1776694631087,
       "tag": "0003_solid_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776726282510,
+      "tag": "0004_striped_hedge_knight",
+      "breakpoints": true
     }
   ]
 }

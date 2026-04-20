@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageBubble } from '@/components/support/message-bubble'
 import { ReplyForm } from '@/components/support/reply-form'
 import { TicketAutoRefresh } from '@/components/support/ticket-auto-refresh'
-import { getMyTicket } from '@/lib/actions/support'
+import { getMyTicket, getAttachmentsForMessages } from '@/lib/actions/support'
 
 export const metadata = { title: 'Ticket' }
 
@@ -19,6 +19,9 @@ export default async function CustomerTicketPage({
   if (!data) notFound()
   const { ticket, messages } = data
   const isClosed = ticket.status === 'closed'
+
+  const messageIds = messages.map((m) => m.id)
+  const attachmentsMap = await getAttachmentsForMessages(messageIds)
 
   return (
     <>
@@ -44,6 +47,7 @@ export default async function CustomerTicketPage({
             authorLabel={m.author === 'customer' ? 'You' : m.author === 'ai' ? 'Assistant' : 'Support team'}
             body={m.body}
             createdAt={m.createdAt}
+            attachments={attachmentsMap.get(m.id) ?? []}
           />
         ))}
       </div>

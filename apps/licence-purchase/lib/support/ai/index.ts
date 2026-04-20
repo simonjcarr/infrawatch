@@ -1,16 +1,22 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { and, eq } from 'drizzle-orm'
+import { readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { and, eq, inArray } from 'drizzle-orm'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { db } from '@/lib/db'
 import {
+  supportAttachments,
   supportMessages,
   supportTickets,
 } from '@/lib/db/schema'
 import { env } from '@/lib/env'
+import { getR2Client, isR2StoragePath, storagePathToKey } from '@/lib/support/storage'
 import { classifyForInjection } from './moderation'
 import {
   buildInitialUserContent,
   buildSystemPrompt,
   wrapCustomerText,
+  type TurnAttachment,
   type TurnMessage,
 } from './prompt'
 import { redactCustomerText } from './redact'
@@ -79,14 +85,79 @@ export async function runAiTurn(ticketId: string): Promise<RunOutcome> {
 
   const customerContext = await getCustomerContext(ticket.organisationId)
 
-  const history: TurnMessage[] = rawMessages.map((m) => ({
-    author: m.author as TurnMessage['author'],
-    body:
-      m.author === 'customer'
-        ? wrapCustomerText(m.bodyRedacted ?? redactCustomerText(m.body))
-        : m.body,
-    createdAt: m.createdAt,
-  }))
+  // Load attachments for all messages so we can include images in the prompt.
+  const messageIds = rawMessages.map((m) => m.id)
+  const attachmentRows =
+    messageIds.length > 0
+      ? await db.query.supportAttachments.findMany({
+          where: inArray(supportAttachments.messageId, messageIds),
+        })
+      : []
+
+  // Map messageId → attachments
+  const attachmentsByMessage = new Map<string, typeof attachmentRows>()
+  for (const a of attachmentRows) {
+    if (!a.messageId) continue
+    const arr = attachmentsByMessage.get(a.messageId) ?? []
+    arr.push(a)
+    attachmentsByMessage.set(a.messageId, arr)
+  }
+
+  const history: TurnMessage[] = await Promise.all(
+    rawMessages.map(async (m) => {
+      const msgAttachments = attachmentsByMessage.get(m.id) ?? []
+      const isLastCustomer = m.author === 'customer' && m.id === lastCustomer?.id
+
+      const turnAttachments: TurnAttachment[] = await Promise.all(
+        msgAttachments.map(async (a) => {
+          // Only inline images for the most recent customer message.
+          if (isLastCustomer && a.mimeType.startsWith('image/')) {
+            try {
+              let data: Buffer | null = null
+              if (isR2StoragePath(a.storagePath)) {
+                const s3 = getR2Client()
+                const res = await s3.send(
+                  new GetObjectCommand({
+                    Bucket: env.r2BucketName!,
+                    Key: storagePathToKey(a.storagePath),
+                  }),
+                )
+                if (res.Body) {
+                  const chunks: Uint8Array[] = []
+                  for await (const chunk of res.Body as AsyncIterable<Uint8Array>) {
+                    chunks.push(chunk)
+                  }
+                  data = Buffer.concat(chunks)
+                }
+              } else if (existsSync(a.storagePath)) {
+                data = await readFile(a.storagePath)
+              }
+              if (data) {
+                return {
+                  filename: a.filename,
+                  mimeType: a.mimeType,
+                  base64Data: data.toString('base64'),
+                }
+              }
+            } catch {
+              // Fall through to returning metadata-only attachment.
+            }
+          }
+          return { filename: a.filename, mimeType: a.mimeType }
+        }),
+      )
+
+      return {
+        author: m.author as TurnMessage['author'],
+        body:
+          m.author === 'customer'
+            ? wrapCustomerText(m.bodyRedacted ?? redactCustomerText(m.body))
+            : m.body,
+        createdAt: m.createdAt,
+        attachments: turnAttachments.length > 0 ? turnAttachments : undefined,
+      }
+    }),
+  )
 
   const system = buildSystemPrompt()
   const initialUser = buildInitialUserContent({

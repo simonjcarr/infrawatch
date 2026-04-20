@@ -12,7 +12,10 @@
     "db:validate": "node scripts/validate-migrations.js",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:e2e": "node tests/e2e/runner.mjs",
+    "test:e2e:ui": "node tests/e2e/runner.mjs --ui",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -60,6 +63,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.0",
@@ -70,6 +74,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "testcontainers": "^11.14.0",
     "typescript": "^5"
   }
 }

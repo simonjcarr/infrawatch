@@ -133,7 +133,7 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
         <form onSubmit={localForm.handleSubmit(onLocalSubmit)}>
           <CardContent className="space-y-4">
             {serverError && (
-              <p className="text-sm text-destructive">{serverError}</p>
+              <p className="text-sm text-destructive" data-testid="login-error">{serverError}</p>
             )}
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
@@ -142,6 +142,7 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
+                data-testid="login-email"
                 {...localForm.register('email')}
               />
               {localForm.formState.errors.email && (
@@ -154,6 +155,7 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
                 id="password"
                 type="password"
                 autoComplete="current-password"
+                data-testid="login-password"
                 {...localForm.register('password')}
               />
               {localForm.formState.errors.password && (
@@ -162,7 +164,12 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={localForm.formState.isSubmitting}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={localForm.formState.isSubmitting}
+              data-testid="login-submit"
+            >
               {localForm.formState.isSubmitting ? 'Signing in...' : 'Sign in'}
             </Button>
             <p className="text-sm text-muted-foreground text-center">

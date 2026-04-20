@@ -90,6 +90,13 @@ export default defineUserConfig({
         ],
       },
       {
+        text: 'Development',
+        collapsible: true,
+        children: [
+          '/development/testing.md',
+        ],
+      },
+      {
         text: 'Licensing',
         link: '/licensing.md',
       },

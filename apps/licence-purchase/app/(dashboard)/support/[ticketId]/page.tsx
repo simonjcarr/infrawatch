@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageBubble } from '@/components/support/message-bubble'
 import { ReplyForm } from '@/components/support/reply-form'
+import { TicketAutoRefresh } from '@/components/support/ticket-auto-refresh'
 import { getMyTicket } from '@/lib/actions/support'
 
 export const metadata = { title: 'Ticket' }
@@ -21,6 +22,7 @@ export default async function CustomerTicketPage({
 
   return (
     <>
+      <TicketAutoRefresh enabled={!isClosed} />
       <div className="mb-4 text-sm">
         <Link href="/support" className="text-muted-foreground hover:text-foreground">
           ← Back to tickets

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { MessageBubble } from '@/components/support/message-bubble'
 import { AdminTicketControls } from '@/components/support/admin-ticket-controls'
 import { AdminReplyForm } from '@/components/support/admin-reply-form'
+import { TicketAutoRefresh } from '@/components/support/ticket-auto-refresh'
 import { getAdminTicket } from '@/lib/actions/support'
 
 export const metadata = { title: 'Ticket · Admin' }
@@ -17,8 +18,11 @@ export default async function AdminTicketPage({
   if (!data) notFound()
   const { ticket, messages, orgName } = data
 
+  const isClosed = ticket.status === 'closed'
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
+      <TicketAutoRefresh enabled={!isClosed} />
       <div className="mb-4 text-sm">
         <Link href="/admin/support" className="text-muted-foreground hover:text-foreground">
           ← All tickets

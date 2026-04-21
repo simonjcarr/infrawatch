@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.61.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.0...web/v0.61.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* **certs:** cap TLS cert size/chain depth and reject dangerous cert-file paths (M-19, M-11) ([4801101](https://github.com/carrtech-dev/ct-ops/commit/480110108fcdaf535f92129ee9cf40fe0c008cc2))
+* **certs:** cap TLS cert size/chain depth and reject dangerous cert-file paths (M-19, M-11) ([c26af0b](https://github.com/carrtech-dev/ct-ops/commit/c26af0bc276a1ee93588cf82c28e4cbe355cf661))
+
 ## [0.61.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.60.0...web/v0.61.0) (2026-04-21)
 
 

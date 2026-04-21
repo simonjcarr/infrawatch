@@ -475,10 +475,7 @@ export async function createEnrolmentToken(
     if (user.role !== 'super_admin') {
       return { error: 'Only super_admin users may create auto-approve enrolment tokens.' }
     }
-    const safeLabel = parsed.data.label.replace(/[\r\n\t]/g, ' ')
-    console.warn(
-      `[security] autoApprove enrolment token created by userId=${user.id} orgId=${orgId} label="${safeLabel}"`,
-    )
+    console.warn(`[security] autoApprove enrolment token created: userId=${user.id} orgId=${orgId}`)
   }
 
   try {

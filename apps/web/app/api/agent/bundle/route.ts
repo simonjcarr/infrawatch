@@ -128,10 +128,7 @@ export async function POST(request: NextRequest) {
       )
     }
     if (createToken.autoApprove) {
-      const safeLabel = createToken.label.replace(/[\r\n\t]/g, ' ')
-      console.warn(
-        `[security] autoApprove bundle token created by userId=${user.id} orgId=${orgId} label="${safeLabel}"`,
-      )
+      console.warn(`[security] autoApprove bundle token created: userId=${user.id} orgId=${orgId}`)
     }
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + createToken.expiresInDays)

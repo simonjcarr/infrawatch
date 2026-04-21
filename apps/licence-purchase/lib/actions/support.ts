@@ -6,11 +6,13 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import {
   supportAiJobs,
+  supportAttachments,
   supportMessages,
   supportSettings,
   supportTickets,
   users,
 } from '@/lib/db/schema'
+import type { SupportAttachment } from '@/lib/db/schema'
 import { getRequiredSession } from '@/lib/auth/session'
 import { assertSuperAdmin } from '@/lib/auth/require-super-admin'
 import { env } from '@/lib/env'
@@ -20,6 +22,9 @@ import type {
   SupportMessageAuthor,
   SupportTicket,
 } from '@/lib/db/schema'
+
+// Maximum attachment IDs that may be submitted per message.
+const MAX_ATTACHMENT_IDS = 5
 
 // Effective AI state = env kill switch OFF && settings row enabled.
 export async function isSupportAiEnabled(): Promise<boolean> {
@@ -45,6 +50,7 @@ async function enqueueAiJob(ticketId: string): Promise<void> {
 const createTicketSchema = z.object({
   subject: z.string().min(3).max(200),
   body: z.string().min(1).max(20_000),
+  attachmentIds: z.array(z.string().min(1)).max(MAX_ATTACHMENT_IDS).optional(),
 })
 
 export async function createTicket(input: unknown): Promise<{ id: string }> {
@@ -63,13 +69,25 @@ export async function createTicket(input: unknown): Promise<{ id: string }> {
     .returning({ id: supportTickets.id })
   if (!ticket) throw new Error('Failed to create ticket')
 
-  await db.insert(supportMessages).values({
-    ticketId: ticket.id,
-    author: 'customer' as SupportMessageAuthor,
-    authorUserId: user.id,
-    body: data.body,
-    bodyRedacted: redactCustomerText(data.body),
-  })
+  const [message] = await db
+    .insert(supportMessages)
+    .values({
+      ticketId: ticket.id,
+      author: 'customer' as SupportMessageAuthor,
+      authorUserId: user.id,
+      body: data.body,
+      bodyRedacted: redactCustomerText(data.body),
+    })
+    .returning({ id: supportMessages.id })
+
+  if (data.attachmentIds?.length && message) {
+    await linkAttachments({
+      attachmentIds: data.attachmentIds,
+      messageId: message.id,
+      ticketId: ticket.id,
+      uploadedByUserId: user.id,
+    })
+  }
 
   if (await isSupportAiEnabled()) {
     await enqueueAiJob(ticket.id)
@@ -81,6 +99,7 @@ export async function createTicket(input: unknown): Promise<{ id: string }> {
 const postMessageSchema = z.object({
   ticketId: z.string().min(1),
   body: z.string().min(1).max(20_000),
+  attachmentIds: z.array(z.string().min(1)).max(MAX_ATTACHMENT_IDS).optional(),
 })
 
 export async function postCustomerMessage(input: unknown): Promise<void> {
@@ -98,13 +117,26 @@ export async function postCustomerMessage(input: unknown): Promise<void> {
   if (ticket.status === 'closed') throw new Error('Ticket is closed')
 
   const now = new Date()
-  await db.insert(supportMessages).values({
-    ticketId: ticket.id,
-    author: 'customer',
-    authorUserId: user.id,
-    body: data.body,
-    bodyRedacted: redactCustomerText(data.body),
-  })
+  const [message] = await db
+    .insert(supportMessages)
+    .values({
+      ticketId: ticket.id,
+      author: 'customer',
+      authorUserId: user.id,
+      body: data.body,
+      bodyRedacted: redactCustomerText(data.body),
+    })
+    .returning({ id: supportMessages.id })
+
+  if (data.attachmentIds?.length && message) {
+    await linkAttachments({
+      attachmentIds: data.attachmentIds,
+      messageId: message.id,
+      ticketId: ticket.id,
+      uploadedByUserId: user.id,
+    })
+  }
+
   await db
     .update(supportTickets)
     .set({ lastMessageAt: now, status: 'open', updatedAt: now })
@@ -189,6 +221,36 @@ export async function setTicketStatus(input: unknown): Promise<void> {
   revalidatePath(`/admin/support/${data.ticketId}`)
 }
 
+// ── Attachment helpers ────────────────────────────────────────────────────
+
+async function linkAttachments({
+  attachmentIds,
+  messageId,
+  ticketId,
+  uploadedByUserId,
+}: {
+  attachmentIds: string[]
+  messageId: string
+  ticketId: string
+  uploadedByUserId: string
+}): Promise<void> {
+  if (!attachmentIds.length) return
+  // Only update attachments that were actually uploaded by this user and are
+  // still unlinked (messageId is null) to prevent another user's IDs being
+  // hijacked.
+  for (const id of attachmentIds) {
+    await db
+      .update(supportAttachments)
+      .set({ ticketId, messageId })
+      .where(
+        and(
+          eq(supportAttachments.id, id),
+          eq(supportAttachments.uploadedByUserId, uploadedByUserId),
+        ),
+      )
+  }
+}
+
 // ── Read paths ────────────────────────────────────────────────────────────
 
 export async function listMyTickets(): Promise<SupportTicket[]> {
@@ -217,6 +279,42 @@ export async function getMyTicket(
     orderBy: [supportMessages.createdAt],
   })
   return { ticket, messages }
+}
+
+export async function getAttachmentsForMessages(
+  messageIds: string[],
+): Promise<Map<string, SupportAttachment[]>> {
+  const { user } = await getRequiredSession()
+  if (!user.organisationId || !messageIds.length) return new Map()
+  const rows = await db.query.supportAttachments.findMany({
+    where: inArray(supportAttachments.messageId, messageIds),
+  })
+  const map = new Map<string, SupportAttachment[]>()
+  for (const row of rows) {
+    if (!row.messageId) continue
+    const arr = map.get(row.messageId) ?? []
+    arr.push(row)
+    map.set(row.messageId, arr)
+  }
+  return map
+}
+
+export async function getAttachmentsForMessagesAdmin(
+  messageIds: string[],
+): Promise<Map<string, SupportAttachment[]>> {
+  await assertSuperAdmin()
+  if (!messageIds.length) return new Map()
+  const rows = await db.query.supportAttachments.findMany({
+    where: inArray(supportAttachments.messageId, messageIds),
+  })
+  const map = new Map<string, SupportAttachment[]>()
+  for (const row of rows) {
+    if (!row.messageId) continue
+    const arr = map.get(row.messageId) ?? []
+    arr.push(row)
+    map.set(row.messageId, arr)
+  }
+  return map
 }
 
 export async function listAllTicketsForAdmin(): Promise<SupportTicket[]> {

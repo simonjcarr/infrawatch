@@ -136,4 +136,37 @@ export const env = {
   get supportWorkerPollMs() {
     return optionalInt('SUPPORT_WORKER_POLL_MS', 2000)
   },
+  get supportUploadDir() {
+    return optional('SUPPORT_UPLOAD_DIR') ?? './support-uploads'
+  },
+  // Max size per uploaded file in bytes (default 10 MB).
+  get supportUploadMaxBytes() {
+    return optionalInt('SUPPORT_UPLOAD_MAX_BYTES', 10 * 1024 * 1024)
+  },
+  // Max number of attachments per message.
+  get supportUploadMaxFiles() {
+    return optionalInt('SUPPORT_UPLOAD_MAX_FILES', 5)
+  },
+
+  // ── Cloudflare R2 (optional — if set, attachments are stored in R2) ───────
+  get r2AccountId() {
+    return optional('R2_ACCOUNT_ID')
+  },
+  get r2AccessKeyId() {
+    return optional('R2_ACCESS_KEY_ID')
+  },
+  get r2SecretAccessKey() {
+    return optional('R2_SECRET_ACCESS_KEY')
+  },
+  get r2BucketName() {
+    return optional('R2_BUCKET_NAME')
+  },
+  // Presigned URL expiry in seconds (default 1 hour).
+  get r2PresignedUrlExpirySecs() {
+    return optionalInt('R2_PRESIGNED_URL_EXPIRY_SECS', 3600)
+  },
+  // Returns true when all four required R2 vars are set.
+  get r2Enabled(): boolean {
+    return !!(this.r2AccountId && this.r2AccessKeyId && this.r2SecretAccessKey && this.r2BucketName)
+  },
 }

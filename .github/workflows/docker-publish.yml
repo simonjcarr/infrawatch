@@ -76,9 +76,9 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: web-digest-${{ matrix.suffix }}
+          name: web-digest-${{ matrix.suffix }}-attempt-${{ github.run_attempt }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -100,10 +100,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: web-digest-*
+          pattern: web-digest-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -186,9 +186,9 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: ingest-digest-${{ matrix.suffix }}
+          name: ingest-digest-${{ matrix.suffix }}-attempt-${{ github.run_attempt }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -210,10 +210,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: ingest-digest-*
+          pattern: ingest-digest-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
 
       - name: Set up Docker Buildx

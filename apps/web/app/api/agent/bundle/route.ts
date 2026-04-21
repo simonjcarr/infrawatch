@@ -127,9 +127,6 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       )
     }
-    if (createToken.autoApprove) {
-      console.warn(`[security] autoApprove bundle token created: userId=${user.id} orgId=${orgId}`)
-    }
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + createToken.expiresInDays)
     const [record] = await db

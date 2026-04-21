@@ -475,7 +475,6 @@ export async function createEnrolmentToken(
     if (user.role !== 'super_admin') {
       return { error: 'Only super_admin users may create auto-approve enrolment tokens.' }
     }
-    console.warn(`[security] autoApprove enrolment token created: userId=${user.id} orgId=${orgId}`)
   }
 
   try {

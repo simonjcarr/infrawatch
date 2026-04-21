@@ -25,11 +25,19 @@ export function escapeLdapFilterValue(value: string): string {
     .replace(/\0/g, '\\00')
 }
 
+function safeDecrypt(value: string): string {
+  try { return decrypt(value) } catch { return value }
+}
+
 function getTlsOptions(config: LdapConfiguration): Record<string, unknown> | undefined {
   if (!config.useTls && !config.useStartTls) return undefined
   return config.tlsCertificate
-    ? { ca: [config.tlsCertificate], rejectUnauthorized: true }
+    ? { ca: [safeDecrypt(config.tlsCertificate)], rejectUnauthorized: true }
     : { rejectUnauthorized: false }
+}
+
+function getBindDn(config: LdapConfiguration): string {
+  return safeDecrypt(config.bindDn)
 }
 
 function createClient(config: LdapConfiguration): Client {
@@ -75,7 +83,7 @@ export async function testConnection(
   config: LdapConfiguration,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    const client = await connectAndBind(config, config.bindDn, getBindPassword(config))
+    const client = await connectAndBind(config, getBindDn(config), getBindPassword(config))
     await client.unbind()
     return { success: true }
   } catch (err) {
@@ -90,7 +98,7 @@ export async function searchUsers(
 ): Promise<LdapUser[]> {
   let client: Client | undefined
   try {
-    client = await connectAndBind(config, config.bindDn, getBindPassword(config))
+    client = await connectAndBind(config, getBindDn(config), getBindPassword(config))
 
     const searchBase = resolveSearchBase(config.userSearchBase, config.baseDn)
 
@@ -256,7 +264,7 @@ export async function lookupUserByDn(
 ): Promise<LdapUserDetail | null> {
   let client: Client | undefined
   try {
-    client = await connectAndBind(config, config.bindDn, getBindPassword(config))
+    client = await connectAndBind(config, getBindDn(config), getBindPassword(config))
 
     const { searchEntries } = await client.search(dn, {
       filter: '(objectClass=*)',
@@ -310,7 +318,7 @@ export async function authenticateUser(
   let client: Client | undefined
   try {
     // First bind as service account to search for the user
-    client = await connectAndBind(config, config.bindDn, getBindPassword(config))
+    client = await connectAndBind(config, getBindDn(config), getBindPassword(config))
 
     const searchBase = resolveSearchBase(config.userSearchBase, config.baseDn)
 

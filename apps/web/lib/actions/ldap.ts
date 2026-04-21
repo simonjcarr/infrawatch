@@ -5,7 +5,19 @@ import { db } from '@/lib/db'
 import { ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import type { LdapConfiguration } from '@/lib/db/schema'
-import { encrypt } from '@/lib/crypto/encrypt'
+import { encrypt, decrypt } from '@/lib/crypto/encrypt'
+
+function safeDecrypt(value: string): string {
+  try { return decrypt(value) } catch { return value }
+}
+
+function decryptConfigForDisplay<T extends { bindDn: string; tlsCertificate: string | null }>(config: T): T {
+  return {
+    ...config,
+    bindDn: safeDecrypt(config.bindDn),
+    tlsCertificate: config.tlsCertificate ? safeDecrypt(config.tlsCertificate) : null,
+  }
+}
 import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
 import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
@@ -53,13 +65,14 @@ const updateLdapConfigSchema = z.object({
 export async function getLdapConfigurations(
   orgId: string,
 ): Promise<LdapConfiguration[]> {
-  return db.query.ldapConfigurations.findMany({
+  const rows = await db.query.ldapConfigurations.findMany({
     where: and(
       eq(ldapConfigurations.organisationId, orgId),
       isNull(ldapConfigurations.deletedAt),
     ),
     orderBy: ldapConfigurations.createdAt,
   })
+  return rows.map(decryptConfigForDisplay)
 }
 
 export async function getLdapConfiguration(
@@ -73,7 +86,7 @@ export async function getLdapConfiguration(
       isNull(ldapConfigurations.deletedAt),
     ),
   })
-  return result ?? null
+  return result ? decryptConfigForDisplay(result) : null
 }
 
 export async function createLdapConfiguration(
@@ -86,8 +99,6 @@ export async function createLdapConfiguration(
   }
 
   try {
-    const encryptedPassword = encrypt(parsed.data.bindPassword)
-
     const [row] = await db
       .insert(ldapConfigurations)
       .values({
@@ -97,10 +108,10 @@ export async function createLdapConfiguration(
         port: parsed.data.port,
         useTls: parsed.data.useTls,
         useStartTls: parsed.data.useStartTls,
-        tlsCertificate: parsed.data.tlsCertificate || null,
+        tlsCertificate: parsed.data.tlsCertificate ? encrypt(parsed.data.tlsCertificate) : null,
         baseDn: parsed.data.baseDn,
-        bindDn: parsed.data.bindDn,
-        bindPassword: encryptedPassword,
+        bindDn: encrypt(parsed.data.bindDn),
+        bindPassword: encrypt(parsed.data.bindPassword),
         userSearchBase: parsed.data.userSearchBase || null,
         userSearchFilter: parsed.data.userSearchFilter,
         groupSearchBase: parsed.data.groupSearchBase || null,
@@ -147,9 +158,9 @@ export async function updateLdapConfiguration(
   if (data.port !== undefined) updates.port = data.port
   if (data.useTls !== undefined) updates.useTls = data.useTls
   if (data.useStartTls !== undefined) updates.useStartTls = data.useStartTls
-  if (data.tlsCertificate !== undefined) updates.tlsCertificate = data.tlsCertificate || null
+  if (data.tlsCertificate !== undefined) updates.tlsCertificate = data.tlsCertificate ? encrypt(data.tlsCertificate) : null
   if (data.baseDn !== undefined) updates.baseDn = data.baseDn
-  if (data.bindDn !== undefined) updates.bindDn = data.bindDn
+  if (data.bindDn !== undefined) updates.bindDn = encrypt(data.bindDn)
   if (data.bindPassword !== undefined) updates.bindPassword = encrypt(data.bindPassword)
   if (data.userSearchBase !== undefined) updates.userSearchBase = data.userSearchBase || null
   if (data.userSearchFilter !== undefined) updates.userSearchFilter = data.userSearchFilter

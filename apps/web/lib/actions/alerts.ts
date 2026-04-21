@@ -65,12 +65,21 @@ const updateAlertRuleSchema = z.object({
 
 const smtpEncryptionSchema = z.enum(['none', 'starttls', 'tls'])
 
+// Standard SMTP submission ports. Port 25 (server-to-server relay) is included
+// for self-hosted mail servers; 465 (SMTPS), 587 (submission), 2525 (alt).
+const SMTP_ALLOWED_PORTS = [25, 465, 587, 2525] as const
+
+const httpsUrl = z
+  .string()
+  .url()
+  .refine((u) => u.startsWith('https://'), { message: 'URL must use HTTPS' })
+
 const createNotificationChannelSchema = z.discriminatedUnion('type', [
   z.object({
     name: z.string().min(1).max(100),
     type: z.literal('webhook'),
     config: z.object({
-      url: z.string().url(),
+      url: httpsUrl,
       secret: z.string().optional(),
     }),
   }),
@@ -79,7 +88,12 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
     type: z.literal('smtp'),
     config: z.object({
       host: z.string().min(1),
-      port: z.number().int().min(1).max(65535),
+      port: z
+        .number()
+        .int()
+        .refine((p) => (SMTP_ALLOWED_PORTS as readonly number[]).includes(p), {
+          message: `SMTP port must be one of: ${SMTP_ALLOWED_PORTS.join(', ')}`,
+        }),
       encryption: smtpEncryptionSchema,
       username: z.string().optional(),
       password: z.string().optional(),
@@ -92,7 +106,7 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
     name: z.string().min(1).max(100),
     type: z.literal('slack'),
     config: z.object({
-      webhookUrl: z.string().url(),
+      webhookUrl: httpsUrl,
     }),
   }),
   z.object({
@@ -567,14 +581,19 @@ export async function deleteNotificationChannel(
 
 const updateWebhookChannelSchema = z.object({
   name: z.string().min(1).max(100),
-  url: z.string().url(),
+  url: httpsUrl,
   secret: z.string().optional(),
 })
 
 const updateSmtpChannelSchema = z.object({
   name: z.string().min(1).max(100),
   host: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
+  port: z
+    .number()
+    .int()
+    .refine((p) => (SMTP_ALLOWED_PORTS as readonly number[]).includes(p), {
+      message: `SMTP port must be one of: ${SMTP_ALLOWED_PORTS.join(', ')}`,
+    }),
   encryption: smtpEncryptionSchema,
   username: z.string().optional(),
   password: z.string().optional(),
@@ -585,7 +604,7 @@ const updateSmtpChannelSchema = z.object({
 
 const updateSlackChannelSchema = z.object({
   name: z.string().min(1).max(100),
-  webhookUrl: z.string().url(),
+  webhookUrl: httpsUrl,
 })
 
 const updateTelegramChannelSchema = z.object({

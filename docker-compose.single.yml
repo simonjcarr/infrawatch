@@ -3,9 +3,9 @@ services:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: infrawatch
-      POSTGRES_PASSWORD: infrawatch
-      POSTGRES_DB: infrawatch
+      POSTGRES_USER: ${POSTGRES_USER:-infrawatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in your .env file. Run: openssl rand -hex 16}
+      POSTGRES_DB: ${POSTGRES_DB:-infrawatch}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -28,8 +28,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-in-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-infrawatch}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-infrawatch}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in your .env file}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
       NODE_ENV: production
@@ -53,7 +53,7 @@ services:
       - "9443:9443"   # gRPC (TLS)
       - "8080:8080"   # JWKS + healthz HTTP
     environment:
-      DATABASE_URL: postgresql://infrawatch:infrawatch@db:5432/infrawatch
+      DATABASE_URL: postgresql://${POSTGRES_USER:-infrawatch}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-infrawatch}
       INGEST_TLS_CERT: /etc/infrawatch/tls/server.crt
       INGEST_TLS_KEY: /etc/infrawatch/tls/server.key
       INGEST_JWT_KEY_FILE: /var/lib/infrawatch/jwt_key.pem

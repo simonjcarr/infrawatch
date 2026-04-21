@@ -47,15 +47,7 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          queries: security-and-quality
-          # js/disabling-certificate-validation fires on the intentional rejectUnauthorized: false
-          # in lib/certificates/fetch.ts, which exists to retrieve certs from TLS endpoints that
-          # may be self-signed or expired. The SSRF denylist in that function ensures only public
-          # IPs are reachable. Inline lgtm[] comments do not suppress this rule in CodeQL v4.
-          config: |
-            query-filters:
-              - exclude:
-                  id: js/disabling-certificate-validation
+          config-file: .github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4

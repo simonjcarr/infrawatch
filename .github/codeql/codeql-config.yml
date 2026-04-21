@@ -1,0 +1,13 @@
+name: "CodeQL config"
+
+queries:
+  - uses: security-and-quality
+
+query-filters:
+  # rejectUnauthorized: false in lib/certificates/fetch.ts is intentional.
+  # That function's sole purpose is to retrieve TLS certificates from endpoints
+  # that may be self-signed or expired. An SSRF denylist ensures only public
+  # IPs are reachable. lgtm[] inline comments do not suppress this rule in
+  # CodeQL v4, so it is excluded at the config level instead.
+  - exclude:
+      id: js/disabling-certificate-validation

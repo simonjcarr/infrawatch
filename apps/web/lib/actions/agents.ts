@@ -877,12 +877,24 @@ export async function deleteHost(
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),
-    })
-    if (!host) return { error: 'Host not found' }
+    // Capture the result of the "not found" check that happens inside the
+    // transaction so we can surface it as an error after the transaction closes.
+    let hostNotFound = false
 
     await db.transaction(async (tx) => {
+      // Lock the host row for the duration of this transaction so that
+      // concurrent delete requests cannot race past this check (TOCTOU fix).
+      const [host] = await tx
+        .select()
+        .from(hosts)
+        .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+        .for('update')
+
+      if (!host) {
+        hostNotFound = true
+        return
+      }
+
       // 1. Identity events (references service_account_id, ssh_key_id, host_id)
       await tx
         .delete(identityEvents)
@@ -1047,6 +1059,7 @@ export async function deleteHost(
       }
     })
 
+    if (hostNotFound) return { error: 'Host not found' }
     return { success: true }
   } catch (err) {
     console.error('Failed to delete host:', err)

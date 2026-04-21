@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.2...web/v0.61.3) (2026-04-21)
+
+
+### Bug Fixes
+
+* **security:** require HTTPS for notification webhooks, restrict SMTP ports, remove default DB password (M-12, H-31) ([9d05c3e](https://github.com/carrtech-dev/ct-ops/commit/9d05c3efc36f0dacfddb00fcad0dd6f4d4d89350))
+
 ## [0.61.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.1...web/v0.61.2) (2026-04-21)
 
 

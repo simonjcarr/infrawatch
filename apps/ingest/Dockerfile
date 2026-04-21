@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 
@@ -14,7 +14,7 @@ RUN go work sync && go mod download
 # Build
 RUN go build -o /dist/ingest ./apps/ingest/cmd/ingest
 
-FROM alpine:3.20
+FROM alpine:3.23
 
 RUN apk add --no-cache ca-certificates wget && \
     addgroup --system --gid 1001 ingest && \

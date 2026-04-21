@@ -33,7 +33,14 @@ const certificateConfigSchema = z.object({
 })
 
 const certFileConfigSchema = z.object({
-  filePath: z.string().min(1),
+  filePath: z
+    .string()
+    .min(1)
+    .max(4096)
+    .refine((p) => !p.includes('..'), { message: 'File path must not contain ".."' })
+    .refine((p) => !/^\/(?:proc|sys|dev)(?:\/|$)/.test(p), {
+      message: 'File path must not reference system pseudo-filesystems (/proc, /sys, /dev)',
+    }),
   format: z.enum(['pem', 'pkcs12', 'jks']),
   password: z.string().optional(),
   alias: z.string().optional(),

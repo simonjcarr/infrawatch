@@ -93,6 +93,26 @@ if [ -z "${BETTER_AUTH_SECRET:-}" ]; then
   echo "Generated BETTER_AUTH_SECRET and wrote it to .env."
 fi
 
+# Auto-generate POSTGRES_PASSWORD on first run if blank. The default
+# "infrawatch" password in the example config must not reach production.
+if [ -z "${POSTGRES_PASSWORD:-}" ]; then
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "ERROR: openssl is required to generate POSTGRES_PASSWORD" >&2
+    exit 1
+  fi
+  GENERATED_PG_PASS=$(openssl rand -hex 16)
+  if grep -q '^# POSTGRES_PASSWORD=' .env; then
+    awk -v p="$GENERATED_PG_PASS" '/^# POSTGRES_PASSWORD=/ {print "POSTGRES_PASSWORD=" p; next} {print}' .env > .env.tmp && mv .env.tmp .env
+  elif grep -q '^POSTGRES_PASSWORD=' .env; then
+    awk -v p="$GENERATED_PG_PASS" '/^POSTGRES_PASSWORD=/ {print "POSTGRES_PASSWORD=" p; next} {print}' .env > .env.tmp && mv .env.tmp .env
+  else
+    echo "POSTGRES_PASSWORD=$GENERATED_PG_PASS" >> .env
+  fi
+  chmod 600 .env
+  export POSTGRES_PASSWORD="$GENERATED_PG_PASS"
+  echo "Generated POSTGRES_PASSWORD and wrote it to .env."
+fi
+
 # Generate dev TLS certificates for the ingest service if they don't exist
 CERT_DIR="$SCRIPT_DIR/deploy/dev-tls"
 if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then

@@ -1,5 +1,6 @@
 'use server'
 
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { hostGroups, hostGroupMembers, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, sql } from 'drizzle-orm'
@@ -9,19 +10,28 @@ import type { Host } from '@/lib/db/schema'
 export type HostGroupWithCount = HostGroup & { hostCount: number }
 export type HostGroupWithMembers = HostGroup & { members: Host[] }
 
+const groupSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(1000).optional(),
+})
+
 // ── Group CRUD ─────────────────────────────────────────────────────────────
 
 export async function createGroup(
   orgId: string,
-  data: { name: string; description?: string },
+  input: unknown,
 ): Promise<{ success: true; group: HostGroup } | { error: string }> {
+  const parsed = groupSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
   try {
     const rows = await db
       .insert(hostGroups)
       .values({
         organisationId: orgId,
-        name: data.name,
-        description: data.description ?? null,
+        name: parsed.data.name,
+        description: parsed.data.description ?? null,
       })
       .returning()
     const group = rows[0]
@@ -36,12 +46,16 @@ export async function createGroup(
 export async function updateGroup(
   orgId: string,
   groupId: string,
-  data: { name: string; description?: string },
+  input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  const parsed = groupSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
   try {
     const result = await db
       .update(hostGroups)
-      .set({ name: data.name, description: data.description ?? null, updatedAt: new Date() })
+      .set({ name: parsed.data.name, description: parsed.data.description ?? null, updatedAt: new Date() })
       .where(and(eq(hostGroups.id, groupId), eq(hostGroups.organisationId, orgId), isNull(hostGroups.deletedAt)))
       .returning({ id: hostGroups.id })
 

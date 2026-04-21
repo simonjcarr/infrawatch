@@ -25,6 +25,10 @@ import { requireFeature } from '@/lib/actions/licence-guard'
 import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { createRateLimiter } from '@/lib/rate-limit'
+
+const triggerScanLimiter = createRateLimiter(60_000, 5)
+const softwareReportLimiter = createRateLimiter(60_000, 10)
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +98,9 @@ export async function triggerSoftwareScan(
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
+  }
+  if (!triggerScanLimiter.check(orgId)) {
+    return { error: 'Too many scan requests — please wait before triggering another scan.' }
   }
 
   try {
@@ -300,6 +307,9 @@ export async function getSoftwareReport(
   filters: SoftwareReportFilters = {},
 ): Promise<SoftwareReportResult> {
   await requireFeature(orgId, 'reportsExport')
+  if (!softwareReportLimiter.check(orgId)) {
+    throw new Error('Too many requests — please wait before generating another report.')
+  }
   const page = filters.page ?? 1
   const pageSize = Math.min(filters.pageSize ?? 50, 200)
   const offset = (page - 1) * pageSize

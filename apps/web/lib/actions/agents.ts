@@ -38,6 +38,9 @@ import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs'
 import { assignTagsToResource, getOrgDefaultTags, mergeTagLayers } from '@/lib/actions/tags'
 import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
+import { createRateLimiter } from '@/lib/rate-limit'
+
+const createEnrolmentTokenLimiter = createRateLimiter(60_000, 10)
 
 export type OfflinePeriod = { start: number; end: number | null }
 
@@ -456,6 +459,9 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
+  if (!createEnrolmentTokenLimiter.check(orgId)) {
+    return { error: 'Too many requests — please wait before creating another enrolment token.' }
+  }
   const parsed = createEnrolmentTokenSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }

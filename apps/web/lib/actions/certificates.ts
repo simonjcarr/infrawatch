@@ -16,6 +16,9 @@ import {
   type ParsedCertificate,
 } from '@/lib/certificates/fetch'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
+import { createRateLimiter } from '@/lib/rate-limit'
+
+const trackFromUrlLimiter = createRateLimiter(60_000, 20)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -236,6 +239,9 @@ export async function trackCertificateFromUrl(
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) {
     return { error: 'Organisation mismatch' }
+  }
+  if (!trackFromUrlLimiter.check(orgId)) {
+    return { error: 'Too many requests — please wait before adding more certificates.' }
   }
 
   const parsed = trackFromUrlSchema.safeParse(input)

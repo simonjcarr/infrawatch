@@ -3,6 +3,9 @@
 import { z } from 'zod'
 import { createHmac } from 'crypto'
 import nodemailer from 'nodemailer'
+import { createRateLimiter } from '@/lib/rate-limit'
+
+const testNotificationLimiter = createRateLimiter(60_000, 5)
 import { db } from '@/lib/db'
 import { alertRules, alertInstances, notificationChannels, alertSilences, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, desc, inArray, sql, lte, gte, count } from 'drizzle-orm'
@@ -693,6 +696,9 @@ export async function sendTestNotification(
   orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
+  if (!testNotificationLimiter.check(orgId)) {
+    return { error: 'Too many requests — please wait before sending another test notification.' }
+  }
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),

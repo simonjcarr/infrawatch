@@ -445,9 +445,13 @@ export async function fetchCertPemsFromUrl(host: string, port: number, serverNam
   }
 
   return new Promise((resolve, reject) => {
+    // rejectUnauthorized: false is intentional — this function retrieves the server's TLS
+    // certificate for inspection, including self-signed and expired certificates. The SSRF
+    // guard above ensures the target IP is not a private/loopback address. No sensitive data
+    // is sent over this connection; it exists solely to collect the certificate chain.
     // Connect via the resolved IP; pass original hostname as SNI servername to avoid breaking TLS.
     const socket = tls.connect(
-      { host: resolvedIp, port, servername: serverName, rejectUnauthorized: false, timeout: 10_000 },
+      { host: resolvedIp, port, servername: serverName, rejectUnauthorized: false, timeout: 10_000 }, // lgtm[js/disabling-certificate-validation]
       () => {
         const peerCert = socket.getPeerCertificate(true)
         socket.end()

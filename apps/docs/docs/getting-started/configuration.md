@@ -22,7 +22,11 @@ All CT-Ops configuration is via environment variables. There are no config files
 
 ### Licence verification
 
-CT-Ops validates licence JWTs using an RSA public key. The production public key for verifying licences purchased from infrawatch.io is **baked into the web image** — there is nothing to configure. In development the server uses a separate built-in dev key, used only when `NODE_ENV !== 'production'`.
+CT-Ops validates licence JWTs using an RSA public key. The production public key for verifying licences purchased from infrawatch.io is **baked into the web image** — there is nothing to configure for standard deployments. In development the server uses a separate built-in dev key, used only when `NODE_ENV !== 'production'`.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `LICENCE_PUBLIC_KEY` | — 🔒 | *(baked-in prod key)* | PEM-encoded RSA public key used to verify licence JWTs. **Do not set this in normal deployments.** Reserved for emergency key rotation and internal QA/staging environments using a non-production keypair. In production, the dev key is explicitly rejected even if supplied here. |
 
 ### Example `.env.local` (development)
 

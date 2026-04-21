@@ -34,9 +34,23 @@ EQIDAQAB
 -----END PUBLIC KEY-----`
 
 export function resolveLicencePublicKeyPem(): string {
+  const override = process.env.LICENCE_PUBLIC_KEY?.trim()
+
+  if (override) {
+    // Prevent the dev key being smuggled into production via the env var override.
+    if (process.env.NODE_ENV === 'production' && override === DEV_PUBLIC_KEY_PEM.trim()) {
+      throw new Error(
+        'LICENCE_PUBLIC_KEY is set to the development public key in a production environment. ' +
+          'Remove LICENCE_PUBLIC_KEY to use the baked-in production key, or supply a valid production override.',
+      )
+    }
+    return override
+  }
+
   if (process.env.NODE_ENV === 'production') {
     return PROD_PUBLIC_KEY_PEM.trim()
   }
+
   return DEV_PUBLIC_KEY_PEM.trim()
 }
 

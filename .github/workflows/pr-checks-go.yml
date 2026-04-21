@@ -1,0 +1,43 @@
+name: PR Checks (Go)
+
+on:
+  pull_request:
+    paths:
+      - 'agent/**'
+      - 'apps/ingest/**'
+      - 'proto/**'
+      - 'go.work'
+      - 'go.work.sum'
+      - '.github/workflows/pr-checks-go.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'agent/**'
+      - 'apps/ingest/**'
+      - 'proto/**'
+      - 'go.work'
+      - 'go.work.sum'
+      - '.github/workflows/pr-checks-go.yml'
+
+jobs:
+  go:
+    name: Go (test / build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache-dependency-path: |
+            agent/go.sum
+            apps/ingest/go.sum
+
+      - name: Test agent
+        run: go test ./...
+        working-directory: agent
+
+      - name: Test ingest
+        run: go test ./...
+        working-directory: apps/ingest

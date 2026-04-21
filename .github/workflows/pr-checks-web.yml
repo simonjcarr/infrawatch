@@ -1,10 +1,30 @@
-name: PR Checks
+name: PR Checks (Web)
 
 on:
   pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'apps/docs/**'
+      - 'apps/licence-purchase/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.github/workflows/pr-checks-web.yml'
   push:
     branches:
       - main
+    paths:
+      - 'apps/web/**'
+      - 'apps/docs/**'
+      - 'apps/licence-purchase/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.github/workflows/pr-checks-web.yml'
 
 jobs:
   web:
@@ -39,24 +59,3 @@ jobs:
           BETTER_AUTH_SECRET: dummy-secret-for-ci-build-only-at-least-32
           BETTER_AUTH_URL: http://localhost:3000
           NEXT_PUBLIC_APP_URL: http://localhost:3000
-
-  go:
-    name: Go (test / build)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.25'
-          cache-dependency-path: |
-            agent/go.sum
-            apps/ingest/go.sum
-
-      - name: Test agent
-        run: go test ./...
-        working-directory: agent
-
-      - name: Test ingest
-        run: go test ./...
-        working-directory: apps/ingest

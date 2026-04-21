@@ -40,11 +40,16 @@ const filterSchema = z.object({
   hostId: z.string().max(50).optional(),
 })
 
-/** Escape a CSV cell value. Prefixes formula-injection chars with a literal '. */
+/** Escape a CSV cell value.
+ * Uses a tab prefix for formula-injection chars: single-quote alone is
+ * insufficient because some spreadsheet applications (Google Sheets,
+ * LibreOffice) still execute a formula starting with "'=". A leading tab
+ * is not a formula indicator and is ignored visually in most UIs.
+ */
 function escapeCsvCell(value: string | number | null | undefined): string {
   const str = String(value ?? '')
   if (/^[=+\-@\t\r\n]/.test(str)) {
-    return `"'${str.replace(/"/g, '""')}"`
+    return `"\t${str.replace(/"/g, '""')}"`
   }
   if (str.includes('"') || str.includes(',') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`

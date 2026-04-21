@@ -164,8 +164,17 @@ const trackFromUrlSchema = z.object({
   ).optional(),
 })
 
+// 64 KB is well beyond any real certificate chain; rejects degenerate payloads.
+const MAX_UPLOAD_PEM_BYTES = 65_536
+
 const trackFromUploadSchema = z.object({
-  pem: z.string().min(1),
+  pem: z
+    .string()
+    .min(1)
+    .max(MAX_UPLOAD_PEM_BYTES, 'Certificate data exceeds the 64 KB limit')
+    .refine((s) => s.includes('-----BEGIN'), {
+      message: 'Certificate must be in PEM format (-----BEGIN CERTIFICATE----- …)',
+    }),
   host: z.string().max(255).optional(),
   port: z.number().int().min(0).max(65535).optional(),
   serverName: z.string().max(255).optional(),

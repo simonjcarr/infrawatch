@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.61.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.60.0...web/v0.61.0) (2026-04-21)
+
+
+### Features
+
+* **licence:** add LICENCE_PUBLIC_KEY env var override with dev-key-in-prod rejection ([26c65fc](https://github.com/carrtech-dev/ct-ops/commit/26c65fc93712861f921896a137dc42d05f82f273)), closes [#399](https://github.com/carrtech-dev/ct-ops/issues/399)
+* **licence:** LICENCE_PUBLIC_KEY env var override with dev-key-in-prod rejection ([b7af559](https://github.com/carrtech-dev/ct-ops/commit/b7af5593b4797544a7d018933da5fba72c7cd97a))
+
+
+### Bug Fixes
+
+* **auth:** always include BETTER_AUTH_URL in trustedOrigins ([a78d927](https://github.com/carrtech-dev/ct-ops/commit/a78d9271a3fa19e64afee10a51e2b77fd52f1fe3))
+* **auth:** always include BETTER_AUTH_URL in trustedOrigins ([5ab0388](https://github.com/carrtech-dev/ct-ops/commit/5ab0388bec181e02884e62206d1b1c15b401794d))
+* **certs:** bound upload size and require PEM format in trackCertificateFromUpload ([b7fdb85](https://github.com/carrtech-dev/ct-ops/commit/b7fdb85c5d973bd9b99cf956eb86cd720c886d34)), closes [#342](https://github.com/carrtech-dev/ct-ops/issues/342)
+* **reports:** use tab prefix for CSV formula-injection mitigation (M-23) ([588d073](https://github.com/carrtech-dev/ct-ops/commit/588d0730eba862f1e738897b2cd2b009a74d639d)), closes [#338](https://github.com/carrtech-dev/ct-ops/issues/338)
+
 ## [0.60.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.59.2...web/v0.60.0) (2026-04-20)
 
 

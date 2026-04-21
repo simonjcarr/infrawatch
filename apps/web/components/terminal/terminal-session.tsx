@@ -180,7 +180,13 @@ export function TerminalSession({
           return
         }
 
-        const ws = new WebSocket(result.ingestWsUrl)
+        // A path-only ingestWsUrl (e.g. "/ws/terminal/...") means "use the
+        // same origin as the page" — required for reverse-proxy / tunnel
+        // deployments where the ingest service is not directly reachable.
+        const wsUrl = result.ingestWsUrl.startsWith('/')
+          ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${result.ingestWsUrl}`
+          : result.ingestWsUrl
+        const ws = new WebSocket(wsUrl)
         wsRef.current = ws
 
         let agentDidConnect = false

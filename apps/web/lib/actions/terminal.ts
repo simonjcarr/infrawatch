@@ -111,10 +111,25 @@ export async function createTerminalSession(
       status: 'pending',
     })
 
-    const ingestWsUrl = process.env['INGEST_WS_URL'] ?? 'ws://localhost:8080'
+    // When INGEST_WS_URL is an absolute URL, the browser connects directly to
+    // the ingest service. When it is empty or a path, we return a path-only
+    // URL so the browser connects to the same origin it loaded the page from.
+    // Same-origin mode is required for deployments behind a reverse proxy or
+    // Cloudflare tunnel, where only the web app's hostname is publicly
+    // reachable and the proxy routes /ws/terminal/* to the ingest service.
+    const rawBase = (process.env['INGEST_WS_URL'] ?? '').trim().replace(/\/+$/, '')
+    // Accept http(s):// for convenience and rewrite to ws(s):// — new WebSocket()
+    // only accepts the ws schemes.
+    const normalised = rawBase
+      .replace(/^http:\/\//i, 'ws://')
+      .replace(/^https:\/\//i, 'wss://')
+    const isAbsolute = /^wss?:\/\//i.test(normalised)
+    const ingestWsUrl = isAbsolute
+      ? `${normalised}/ws/terminal/${sessionId}`
+      : `/ws/terminal/${sessionId}`
     return {
       sessionId,
-      ingestWsUrl: `${ingestWsUrl}/ws/terminal/${sessionId}`,
+      ingestWsUrl,
     }
   } catch (err) {
     console.error('Failed to create terminal session:', err)

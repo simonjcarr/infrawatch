@@ -5,9 +5,24 @@ import { eq, and, isNull } from 'drizzle-orm'
 import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
 import { randomBytes, createHmac } from 'crypto'
+import { createRateLimiter } from '@/lib/rate-limit'
+
+// 5 attempts per IP per 60 seconds — prevents brute-force and user enumeration
+const ldapRateLimit = createRateLimiter(60_000, 5)
 
 export async function POST(request: NextRequest) {
   try {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? request.headers.get('x-real-ip')
+    ?? 'unknown'
+
+  if (!ldapRateLimit.check(ip)) {
+    return NextResponse.json(
+      { error: 'Too many login attempts — please wait before trying again.' },
+      { status: 429 },
+    )
+  }
+
   const body = await request.json()
   const { username, password } = body as { username?: string; password?: string }
 

@@ -12,8 +12,10 @@ import { computeExpiryStatus } from '@/lib/certificates/expiry'
 import {
   fetchCertificateFromUrl,
   parseCertificateBuffer,
+  resolveUrlTarget,
   type ParsedCertificate,
 } from '@/lib/certificates/fetch'
+import { assertPublicHost } from '@/lib/net/ssrf-guard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -245,6 +247,8 @@ export async function trackCertificateFromUrl(
 
   let result
   try {
+    const { host } = resolveUrlTarget(url)
+    await assertPublicHost(host)
     result = await fetchCertificateFromUrl(url)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch certificate'

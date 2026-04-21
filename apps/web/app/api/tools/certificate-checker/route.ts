@@ -8,7 +8,9 @@ import {
   fetchCertificateFromUrl,
   parseCertificateBuffer,
   pemToForgeCert,
+  resolveUrlTarget,
 } from '@/lib/certificates/fetch'
+import { assertPublicHost } from '@/lib/net/ssrf-guard'
 
 export type { ParsedCertificate, ParsedSAN, ChainEntry } from '@/lib/certificates/fetch'
 
@@ -79,6 +81,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (data.action === 'fetch-url') {
+      const { host } = resolveUrlTarget(data.url, data.port)
+      await assertPublicHost(host)
       const { certificate } = await fetchCertificateFromUrl(data.url, data.port, data.servername)
       const keyMatch = data.keyPem ? checkKeyMatch(data.keyPem, certificate.pem) : undefined
       return NextResponse.json({ ok: true, certificate, keyMatch } satisfies CertCheckerResponse)

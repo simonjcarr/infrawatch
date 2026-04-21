@@ -1,7 +1,5 @@
 import * as tls from 'tls'
 import * as crypto from 'crypto'
-import * as dns from 'dns'
-import * as net from 'net'
 import * as forge from 'node-forge'
 
 export interface ParsedSAN {
@@ -391,48 +389,8 @@ const MAX_CERT_BYTES = 65_536
 // Practical PKI chains are ≤ 5; cap at 10 to prevent memory exhaustion from crafted loops.
 const MAX_CHAIN_DEPTH = 10
 
-// Returns true for private/loopback/link-local/CGNAT addresses that must not be reachable
-// from a server-side fetch (SSRF guard).
-function isPrivateIp(ip: string): boolean {
-  if (net.isIPv4(ip)) {
-    const parts = ip.split('.').map(Number)
-    const [a = 0, b = 0] = parts
-    return (
-      a === 127 ||                           // 127.0.0.0/8  loopback
-      a === 10 ||                            // 10.0.0.0/8   RFC 1918
-      a === 0 ||                             // 0.0.0.0/8    "this" network
-      (a === 172 && b >= 16 && b <= 31) ||   // 172.16.0.0/12 RFC 1918
-      (a === 192 && b === 168) ||            // 192.168.0.0/16 RFC 1918
-      (a === 169 && b === 254) ||            // 169.254.0.0/16 link-local
-      (a === 100 && b >= 64 && b <= 127)     // 100.64.0.0/10 CGNAT
-    )
-  }
-  if (net.isIPv6(ip)) {
-    const norm = ip.toLowerCase()
-    // IPv4-mapped ::ffff:x.x.x.x
-    const mapped = norm.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-    if (mapped) return isPrivateIp(mapped[1]!)
-    return (
-      norm === '::1' ||          // loopback
-      norm === '::' ||           // unspecified
-      norm.startsWith('fc') ||   // fc00::/7 unique local
-      norm.startsWith('fd') ||   // fc00::/7 unique local
-      norm.startsWith('fe8') ||  // fe80::/10 link-local
-      norm.startsWith('fe9') ||
-      norm.startsWith('fea') ||
-      norm.startsWith('feb')
-    )
-  }
-  return true // unrecognised format — deny by default
-}
-
-// host must already be a validated, SSRF-checked IP address — callers are responsible
-// for resolving the hostname and rejecting private ranges before calling this function.
 export function fetchCertPemsFromUrl(host: string, port: number, serverName: string): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    // rejectUnauthorized: false is intentional: this function retrieves TLS certificates
-    // for inspection, including self-signed and expired ones. Callers must pass a
-    // pre-resolved public IP (SSRF guard enforced in fetchCertificateFromUrl).
     const socket = tls.connect(
       { host, port, servername: serverName, rejectUnauthorized: false, timeout: 10_000 },
       () => {
@@ -472,25 +430,7 @@ export async function fetchCertificateFromUrl(
   serverNameOverride?: string,
 ): Promise<FetchUrlResult> {
   const { host, port, serverName } = resolveUrlTarget(rawUrl, portOverride, serverNameOverride)
-
-  // SSRF guard: resolve hostname to an IP and reject private/reserved ranges.
-  // The resolved IP is passed to fetchCertPemsFromUrl so the TCP socket connects
-  // directly to that IP, closing the DNS-rebinding window between check and connect.
-  let resolvedIp: string
-  if (net.isIPv4(host) || net.isIPv6(host)) {
-    resolvedIp = host
-  } else {
-    const { address } = await dns.promises.lookup(host)
-    resolvedIp = address
-  }
-  if (isPrivateIp(resolvedIp)) {
-    throw new Error(
-      `Blocked: target resolves to a private or reserved address (${resolvedIp}). ` +
-        'Use a publicly routable hostname.',
-    )
-  }
-
-  const pems = await fetchCertPemsFromUrl(resolvedIp, port, serverName)
+  const pems = await fetchCertPemsFromUrl(host, port, serverName)
   const forgeCerts = pems.map(pemToForgeCert)
   const chain = forgeCerts.length > 1 ? buildChain(forgeCerts) : []
   const certificate = parseForgeCert(forgeCerts[0]!, pems[0]!)

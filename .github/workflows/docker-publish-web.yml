@@ -49,6 +49,12 @@ jobs:
             suffix: arm64
 
     steps:
+      - name: Reset workspace ownership
+        if: matrix.runner == 'self-hosted'
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
       - name: Checkout
         uses: actions/checkout@v6
 

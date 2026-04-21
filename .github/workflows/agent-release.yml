@@ -42,6 +42,11 @@ jobs:
       web_release_created: ${{ steps.release.outputs['apps/web--release_created'] }}
       web_tag_name:        ${{ steps.release.outputs['apps/web--tag_name'] }}
     steps:
+      - name: Reset workspace ownership
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
       - uses: googleapis/release-please-action@v4
         id: release
         with:
@@ -66,6 +71,11 @@ jobs:
           - { goos: windows, goarch: amd64, asset_suffix: windows-amd64, exe_suffix: .exe }
 
     steps:
+      - name: Reset workspace ownership
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -125,6 +135,11 @@ jobs:
     if: needs.release-please.outputs.web_release_created == 'true'
     runs-on: self-hosted
     steps:
+      - name: Reset workspace ownership
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release-please.outputs.web_tag_name }}

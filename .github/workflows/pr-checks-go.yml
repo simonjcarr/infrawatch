@@ -25,6 +25,11 @@ jobs:
     name: Go (test / build)
     runs-on: self-hosted
     steps:
+      - name: Reset workspace ownership
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6

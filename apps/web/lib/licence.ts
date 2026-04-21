@@ -89,6 +89,9 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
       algorithms: ['RS256'],
       issuer: LICENCE_ISSUER,
       audience: LICENCE_AUDIENCE,
+      // Explicitly assert the token type so that JWT type-confusion attacks
+      // (e.g. using a licence token as a different JWT) are rejected.
+      typ: 'JWT',
     })
 
     if (!isPaidTier(payload['tier'])) {

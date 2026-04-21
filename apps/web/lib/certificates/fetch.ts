@@ -384,6 +384,11 @@ export function resolveUrlTarget(rawUrl: string, portOverride?: number, serverNa
   return { host, port, serverName }
 }
 
+// 64 KB per cert is well above any real-world certificate; rejects degenerate TLS responses.
+const MAX_CERT_BYTES = 65_536
+// Practical PKI chains are ≤ 5; cap at 10 to prevent memory exhaustion from crafted loops.
+const MAX_CHAIN_DEPTH = 10
+
 export function fetchCertPemsFromUrl(host: string, port: number, serverName: string): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const socket = tls.connect(
@@ -398,6 +403,10 @@ export function fetchCertPemsFromUrl(host: string, port: number, serverName: str
         let current: tls.DetailedPeerCertificate | null = peerCert
         const seen = new Set<string>()
         while (current && current.raw && !seen.has(current.fingerprint256)) {
+          if (current.raw.length > MAX_CERT_BYTES) {
+            return reject(new Error(`Server returned a certificate exceeding the ${MAX_CERT_BYTES}-byte size limit`))
+          }
+          if (seen.size >= MAX_CHAIN_DEPTH) break
           seen.add(current.fingerprint256)
           const b64 = current.raw.toString('base64').match(/.{1,64}/g)!.join('\n')
           pems.push(`-----BEGIN CERTIFICATE-----\n${b64}\n-----END CERTIFICATE-----`)

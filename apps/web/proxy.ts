@@ -29,11 +29,21 @@ export function proxy(request: NextRequest) {
     (r) => pathname === r || pathname.startsWith(r + '/'),
   )
 
+  // Honour an upstream-supplied request ID (load balancer, proxy) or generate one.
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-request-id', requestId)
+
   if (!isAuthenticated && isProtectedRoute) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
+    redirectResponse.headers.set('X-Request-Id', requestId)
+    return redirectResponse
   }
 
-  return NextResponse.next()
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  // Echo the ID back to the client so it appears in browser DevTools / client logs.
+  response.headers.set('X-Request-Id', requestId)
+  return response
 }
 
 export const config = {

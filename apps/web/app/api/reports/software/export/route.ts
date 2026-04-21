@@ -5,7 +5,7 @@ import { createElement, type ReactElement } from 'react'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { organisations, softwarePackages, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, ilike } from 'drizzle-orm'
+import { eq, and, isNull, ilike, sql } from 'drizzle-orm'
 import { SoftwareReportPDF } from '@/lib/pdf/software-report'
 import { compareVersions } from '@/lib/version-compare'
 
@@ -114,24 +114,45 @@ export async function GET(req: NextRequest) {
     osFamily ? ilike(hosts.os, `%${osFamily}%`) : undefined,
   )
 
-  let rows = await db
-    .select({
-      name: softwarePackages.name,
-      version: softwarePackages.version,
-      source: softwarePackages.source,
-      architecture: softwarePackages.architecture,
-      firstSeenAt: softwarePackages.firstSeenAt,
-      lastSeenAt: softwarePackages.lastSeenAt,
-      hostname: hosts.hostname,
-      displayName: hosts.displayName,
-      os: hosts.os,
-      osVersion: hosts.osVersion,
+  const rowsOrTimeout = await db
+    .transaction(async (tx) => {
+      // tx type differs from db in drizzle-orm/postgres-js — cast matches the pattern in tags.ts
+      await (tx as unknown as typeof db).execute(sql`SET LOCAL statement_timeout = '30s'`)
+      return await tx
+        .select({
+          name: softwarePackages.name,
+          version: softwarePackages.version,
+          source: softwarePackages.source,
+          architecture: softwarePackages.architecture,
+          firstSeenAt: softwarePackages.firstSeenAt,
+          lastSeenAt: softwarePackages.lastSeenAt,
+          hostname: hosts.hostname,
+          displayName: hosts.displayName,
+          os: hosts.os,
+          osVersion: hosts.osVersion,
+        })
+        .from(softwarePackages)
+        .innerJoin(hosts, eq(hosts.id, softwarePackages.hostId))
+        .where(whereConditions)
+        .orderBy(softwarePackages.name, softwarePackages.version, hosts.hostname)
+        .limit(250_001)
     })
-    .from(softwarePackages)
-    .innerJoin(hosts, eq(hosts.id, softwarePackages.hostId))
-    .where(whereConditions)
-    .orderBy(softwarePackages.name, softwarePackages.version, hosts.hostname)
-    .limit(250_001)
+    .catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('statement timeout') || msg.includes('canceling statement')) {
+        return 'timeout' as const
+      }
+      throw err
+    })
+
+  if (rowsOrTimeout === 'timeout') {
+    return NextResponse.json(
+      { error: 'Export query timed out (30 s). Narrow your filters and try again.' },
+      { status: 408 },
+    )
+  }
+
+  let rows = rowsOrTimeout
 
   if (rows.length > 250_000) {
     return NextResponse.json(

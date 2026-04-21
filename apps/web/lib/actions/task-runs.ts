@@ -318,6 +318,14 @@ export async function cancelTaskRun(
 
 // ── Custom script actions ─────────────────────────────────────────────────────
 
+// 64 KB is enough for any reasonable operational script; larger payloads are
+// almost certainly mistakes or abuse attempts.
+const MAX_SCRIPT_LENGTH: Record<'sh' | 'bash' | 'python3', number> = {
+  sh:      65_536,
+  bash:    65_536,
+  python3: 65_536,
+}
+
 /**
  * Triggers a custom script run against a single host.
  * Works on any OS — the agent will return an error if the interpreter is absent.
@@ -330,6 +338,10 @@ export async function triggerCustomScriptRun(
   interpreter: 'sh' | 'bash' | 'python3',
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
+    return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
+  }
+
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })
@@ -352,6 +364,9 @@ export async function triggerGroupCustomScriptRun(
   maxParallel: number,
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
+    return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
+  }
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),

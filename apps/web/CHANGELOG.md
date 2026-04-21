@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.61.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.4...web/v0.61.5) (2026-04-21)
+
+
+### Bug Fixes
+
+* **sec:** H-05 encrypt bindDn and tlsCertificate for LDAP configs at rest ([880b446](https://github.com/carrtech-dev/ct-ops/commit/880b4467680539d2e3add7fe74c868ea7ad59b76))
+* **sec:** H-06 raise minimum password length to 12 characters ([6eb847f](https://github.com/carrtech-dev/ct-ops/commit/6eb847f31f0fa23ae41f0540706bce64303fdc0a))
+* **sec:** H-09 align LDAP session cookie signing with Hono's exact format ([61bd0f9](https://github.com/carrtech-dev/ct-ops/commit/61bd0f94f35b9ed46bb03b30dd9518ee00fad35e))
+
 ## [0.61.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.3...web/v0.61.4) (2026-04-21)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.61.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.1...web/v0.61.2) (2026-04-21)
+
+
+### Bug Fixes
+
+* **security:** agent/latest caching+rate-limit, licence JWT typ, entrypoint fail-fast (M-25, M-03, L-12) ([7c8d3b0](https://github.com/carrtech-dev/ct-ops/commit/7c8d3b092d6c32be3b90316ed3d7eea8a7bd94bd))
+* **security:** assert JWT typ header in licence validation; fail-fast env var checks (M-03, L-12) ([168cfe6](https://github.com/carrtech-dev/ct-ops/commit/168cfe68f55f1ce99f0145d4bb07b61dceaed62b))
+
 ## [0.61.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.0...web/v0.61.1) (2026-04-21)
 
 

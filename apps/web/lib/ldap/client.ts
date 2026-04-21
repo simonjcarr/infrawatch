@@ -15,6 +15,16 @@ export interface LdapUser {
   passwordLastChangedAt?: Date | null
 }
 
+// RFC 4515 §3: escape special characters before interpolating user input into LDAP filters.
+export function escapeLdapFilterValue(value: string): string {
+  return value
+    .replace(/\\/g, '\\5c')
+    .replace(/\*/g, '\\2a')
+    .replace(/\(/g, '\\28')
+    .replace(/\)/g, '\\29')
+    .replace(/\0/g, '\\00')
+}
+
 function getTlsOptions(config: LdapConfiguration): Record<string, unknown> | undefined {
   if (!config.useTls && !config.useStartTls) return undefined
   return config.tlsCertificate
@@ -304,7 +314,7 @@ export async function authenticateUser(
 
     const searchBase = resolveSearchBase(config.userSearchBase, config.baseDn)
 
-    const searchFilter = config.userSearchFilter.replace('{{username}}', username)
+    const searchFilter = config.userSearchFilter.replace('{{username}}', escapeLdapFilterValue(username))
 
     const { searchEntries } = await client.search(searchBase, {
       filter: searchFilter,

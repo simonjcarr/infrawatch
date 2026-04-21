@@ -6,7 +6,7 @@ import { ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import type { LdapConfiguration } from '@/lib/db/schema'
 import { encrypt } from '@/lib/crypto/encrypt'
-import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn } from '@/lib/ldap/client'
+import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
 import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
 const createLdapConfigSchema = z.object({
@@ -251,7 +251,7 @@ export async function searchLdapDirectory(
   if (!config) return { error: 'Configuration not found' }
 
   try {
-    const filter = config.userSearchFilter.replace('{{username}}', `${query.trim()}*`)
+    const filter = config.userSearchFilter.replace('{{username}}', `${escapeLdapFilterValue(query.trim())}*`)
     const users = await searchUsers(config, filter)
     return { success: true, users: users.slice(0, 5).map(toLdapUserResult) }
   } catch (err) {

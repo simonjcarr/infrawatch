@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.7...web/v0.61.8) (2026-04-22)
+
+
+### Bug Fixes
+
+* **security:** require re-approval after keypair rotation and restrict direct terminal access ([#503](https://github.com/carrtech-dev/ct-ops/issues/503)) ([f3cd3c9](https://github.com/carrtech-dev/ct-ops/commit/f3cd3c91754cda73b88c42ec5cc6975fe1d758af))
+
 ## [0.61.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.6...web/v0.61.7) (2026-04-22)
 
 

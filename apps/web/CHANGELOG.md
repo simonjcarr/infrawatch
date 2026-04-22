@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.6...web/v0.61.7) (2026-04-22)
+
+
+### Bug Fixes
+
+* **sec:** H-24 add composite index on host_metrics; M-17 hash enrolment tokens ([#501](https://github.com/carrtech-dev/ct-ops/issues/501)) ([4c88ef5](https://github.com/carrtech-dev/ct-ops/commit/4c88ef56523b27222d8fbe577120796dd3c9de70))
+
 ## [0.61.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.5...web/v0.61.6) (2026-04-22)
 
 

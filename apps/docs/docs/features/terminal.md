@@ -103,3 +103,80 @@ All terminal sessions are logged to the event spine — commands typed and outpu
 ## Authentication
 
 Each terminal session authenticates using per-user credentials derived from the agent JWT. The web app issues a short-lived session token for each terminal tab. This token is included in the WebSocket handshake and validated by the agent before the shell is spawned.
+
+---
+
+## Deployment: Reverse Proxies and Cloudflare Tunnels
+
+The terminal relies on a WebSocket connection from the browser to the ingest service on port `8080`. The `INGEST_WS_URL` environment variable controls which URL the browser uses.
+
+There are two supported modes.
+
+### Direct mode (default)
+
+`INGEST_WS_URL=ws://host:8080` (or `wss://host:8080`). The browser opens the WebSocket directly to that URL. This is the simplest setup for local/LAN deployments where the ingest port is reachable from every user's browser.
+
+### Same-origin mode (reverse proxy / Cloudflare tunnel)
+
+Leave `INGEST_WS_URL` blank. The browser opens the WebSocket against the page's own origin, e.g. `wss://ct-ops.example.com/ws/terminal/<id>`. Your reverse proxy or tunnel must route `/ws/terminal/*` to the ingest service on port `8080` and forward the HTTP Upgrade header.
+
+This is the mode to use when only the web app is publicly reachable (for example, when you expose the server through a Cloudflare tunnel that points at the web container on port `3000`).
+
+#### Cloudflare Tunnel example
+
+In your `cloudflared` config, add a path-based ingress rule for `/ws/terminal/*` **before** the catch-all rule for the web app:
+
+```yaml
+ingress:
+  - hostname: ct-ops.example.com
+    path: ^/ws/terminal/.*
+    service: http://localhost:8080
+  - hostname: ct-ops.example.com
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
+If you use the Cloudflare dashboard's Public Hostname UI, create two public hostnames for the same domain: one with Path set to `^/ws/terminal/.*` pointing at `http://localhost:8080`, and a second with no path pointing at `http://localhost:3000`. Cloudflare Tunnels forward WebSocket upgrades transparently — no extra configuration is needed on the tunnel side.
+
+Then either unset `INGEST_WS_URL` in your `.env` or set it to an empty value:
+
+```env
+INGEST_WS_URL=
+```
+
+#### Nginx example
+
+```nginx
+location /ws/terminal/ {
+    proxy_pass http://ingest:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
+
+location / {
+    proxy_pass http://web:3000;
+    proxy_set_header Host $host;
+}
+```
+
+#### Caddy example
+
+```caddy
+ct-ops.example.com {
+    reverse_proxy /ws/terminal/* ingest:8080
+    reverse_proxy web:3000
+}
+```
+
+### Troubleshooting
+
+If the terminal spins at "Connecting…" and never attaches:
+
+- **Check the browser's network tab** for the WebSocket request. It should show a `101 Switching Protocols` response. If you see a `502`, `503`, `520`, or the request times out, your reverse proxy is not forwarding the Upgrade header or cannot reach the ingest service.
+- **Verify that `/ws/terminal/...` is routed to port 8080**, not port 3000 — the web app does not answer this path.
+- **Confirm your tunnel forwards WebSockets**. Cloudflare Tunnels do so by default; other proxies may need explicit Upgrade/Connection header forwarding.
+- **If `INGEST_WS_URL` is set to an absolute URL**, the browser will ignore same-origin routing and try to connect directly. Make sure the URL is reachable from every user's browser, or clear the variable to switch to same-origin mode.

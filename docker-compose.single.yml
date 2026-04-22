@@ -35,7 +35,10 @@ services:
       NODE_ENV: production
       AGENT_DIST_DIR: /var/lib/infrawatch/agent-dist
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
-      INGEST_WS_URL: ${INGEST_WS_URL:-ws://localhost:8080}
+      # Leave INGEST_WS_URL blank when running behind a reverse proxy or
+      # Cloudflare tunnel — the browser will use the page's own origin and
+      # the proxy must route /ws/terminal/* to the ingest container on 8080.
+      INGEST_WS_URL: ${INGEST_WS_URL-ws://localhost:8080}
       INFRAWATCH_LOADTEST_ADMIN_KEY: ${INFRAWATCH_LOADTEST_ADMIN_KEY:-}
     volumes:
       - agent_dist:/var/lib/infrawatch/agent-dist

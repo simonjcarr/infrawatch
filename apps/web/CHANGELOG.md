@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.61.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.5...web/v0.61.6) (2026-04-22)
+
+
+### Bug Fixes
+
+* **sec:** enforce GCM auth tag length; sanitise log interpolation ([d23c174](https://github.com/carrtech-dev/ct-ops/commit/d23c174f8c465e980e518e9655065b80abf15cbf))
+* **sec:** M-07 terminal regex, H-03/H-04 LDAP encryption, M-14 crypto-lint CI, M-29 autoApprove gate ([feb0a87](https://github.com/carrtech-dev/ct-ops/commit/feb0a87194021d328b77fb6d9d40a0f13a7e3a4c))
+* **sec:** M-07 tighten terminal username regex; H-03/H-04 per-record salt + LDAP key; M-14 crypto-lint CI; M-29 restrict autoApprove tokens to super_admin ([5b151c4](https://github.com/carrtech-dev/ct-ops/commit/5b151c4be905f6251d2ddf158a0292caec068e65))
+* **sec:** move nosemgrep annotations inline with createDecipheriv calls ([abc77a2](https://github.com/carrtech-dev/ct-ops/commit/abc77a2e1e9cda2f4c61fe46414edf71b9ec9889))
+* **sec:** remove console.warn with tainted parameters from autoApprove gate ([4d18106](https://github.com/carrtech-dev/ct-ops/commit/4d181065f9cd263f748f7acc2e4fce2fcd442810))
+* **sec:** remove user-supplied label from autoApprove audit log ([81e8921](https://github.com/carrtech-dev/ct-ops/commit/81e8921a48d8a25ef01910ee99cc1e82e181d443))
+* **terminal:** support same-origin WebSocket for Cloudflare tunnel ([195a6ec](https://github.com/carrtech-dev/ct-ops/commit/195a6ec3dd2fee81398efb06506792b9a824b3dd))
+* **terminal:** support same-origin WebSocket for Cloudflare tunnel ([490882e](https://github.com/carrtech-dev/ct-ops/commit/490882e0f29ac80859683730baa996261504ae57))
+
 ## [0.61.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.4...web/v0.61.5) (2026-04-21)
 
 

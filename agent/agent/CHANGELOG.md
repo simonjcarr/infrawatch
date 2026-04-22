@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.2...agent/v0.28.3) (2026-04-22)
+
+
+### Bug Fixes
+
+* **sec:** M-07 terminal regex, H-03/H-04 LDAP encryption, M-14 crypto-lint CI, M-29 autoApprove gate ([feb0a87](https://github.com/carrtech-dev/ct-ops/commit/feb0a87194021d328b77fb6d9d40a0f13a7e3a4c))
+* **sec:** M-07 tighten terminal username regex; H-03/H-04 per-record salt + LDAP key; M-14 crypto-lint CI; M-29 restrict autoApprove tokens to super_admin ([5b151c4](https://github.com/carrtech-dev/ct-ops/commit/5b151c4be905f6251d2ddf158a0292caec068e65))
+
 ## [0.28.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.1...agent/v0.28.2) (2026-04-20)
 
 

@@ -63,7 +63,10 @@ export async function checkTerminalAccess(
     return { allowed: false, reason: 'You are not authorised to access this host terminal' }
   }
 
-  return { allowed: true, directAccess: orgMeta.terminalDirectAccess === true }
+  // directAccess (shell runs as agent user/root) is restricted to admins only.
+  // Non-admin engineers can open a terminal but must supply a username (H-21).
+  const isAdmin = ADMIN_ROLES.includes(user.role)
+  return { allowed: true, directAccess: isAdmin && orgMeta.terminalDirectAccess === true }
 }
 
 // POSIX-compliant: starts with letter or underscore, contains only [a-zA-Z0-9_-], max 32 chars

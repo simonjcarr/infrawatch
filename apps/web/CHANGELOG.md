@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.62.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.8...web/v0.62.0) (2026-04-22)
+
+
+### Features
+
+* **web:** bake agent binaries into the web image ([#508](https://github.com/carrtech-dev/ct-ops/issues/508)) ([aa052eb](https://github.com/carrtech-dev/ct-ops/commit/aa052eb593da0da8839a8bde7102f1c94f6d893e))
+
+
+### Bug Fixes
+
+* **web:** cascade delete host_network_memberships when deleting host ([#510](https://github.com/carrtech-dev/ct-ops/issues/510)) ([9f76abf](https://github.com/carrtech-dev/ct-ops/commit/9f76abfd6d5797d85f3b37a468e85f52d7194e2f))
+
 ## [0.61.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.61.7...web/v0.61.8) (2026-04-22)
 
 

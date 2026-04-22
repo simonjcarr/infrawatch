@@ -156,8 +156,16 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 			if err := queries.ReattachHostToAgent(ctx, h.pool, collision.HostID, collision.AgentID, hostname); err != nil {
 				slog.Warn("reattaching host during adoption", "err", err)
 			}
-			if err := queries.InsertAgentStatusHistory(ctx, h.pool, collision.AgentID, orgID, collision.AgentStatus, nil,
-				"adopted re-registration (keypair rotated; matched by hostname or IP)"); err != nil {
+			// A keypair change is a new identity claim — always require re-approval
+			// regardless of the prior agent status. Resuming "active" without
+			// re-approval would let anyone who learns the enrolment token silently
+			// hijack an already-trusted agent identity (H-11).
+			if err := queries.SetAgentStatus(ctx, h.pool, collision.AgentID, "pending"); err != nil {
+				slog.Error("resetting agent status to pending after keypair rotation", "err", err)
+				return nil, status.Error(codes.Internal, "internal error")
+			}
+			if err := queries.InsertAgentStatusHistory(ctx, h.pool, collision.AgentID, orgID, "pending", nil,
+				"keypair rotated on re-registration; requires admin re-approval"); err != nil {
 				slog.Warn("inserting adoption history", "err", err)
 			}
 			if err := queries.IncrementUsageCount(ctx, h.pool, token.ID); err != nil {
@@ -169,26 +177,10 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 				"hostname", hostname,
 				"prior_status", collision.AgentStatus,
 			)
-			// Preserve prior approval state. If the existing agent was active
-			// before going offline, return active + JWT immediately so the
-			// machine resumes without requiring re-approval.
-			if collision.AgentStatus == "active" {
-				jwtToken, err := h.issuer.IssueAgentToken(collision.AgentID, orgID)
-				if err != nil {
-					slog.Error("issuing JWT for adopted agent", "err", err)
-					return nil, status.Error(codes.Internal, "internal error")
-				}
-				return &agentv1.RegisterResponse{
-					AgentId:  collision.AgentID,
-					Status:   "active",
-					Message:  "re-registration adopted existing host; resumed active state",
-					JwtToken: jwtToken,
-				}, nil
-			}
 			return &agentv1.RegisterResponse{
 				AgentId: collision.AgentID,
-				Status:  collision.AgentStatus,
-				Message: "re-registration adopted existing host; status: " + collision.AgentStatus,
+				Status:  "pending",
+				Message: "re-registration adopted existing host; keypair rotated — awaiting admin approval",
 			}, nil
 		}
 	}

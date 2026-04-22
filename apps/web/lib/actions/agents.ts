@@ -27,6 +27,7 @@ import {
   terminalSessions,
   softwarePackages,
   softwareScans,
+  hostNetworkMemberships,
 } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, lte, asc, desc, sql, inArray, ilike, or, count } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
@@ -1075,6 +1076,14 @@ export async function deleteHost(
       await tx
         .delete(hostGroupMembers)
         .where(eq(hostGroupMembers.hostId, hostId))
+
+      // 14d. Host network memberships (FK to hosts)
+      await tx
+        .delete(hostNetworkMemberships)
+        .where(and(
+          eq(hostNetworkMemberships.hostId, hostId),
+          eq(hostNetworkMemberships.organisationId, orgId),
+        ))
 
       // 15. Host itself
       await tx

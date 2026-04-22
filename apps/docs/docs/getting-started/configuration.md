@@ -14,7 +14,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `BETTER_AUTH_SECRET` | ✓ 🔒 | — | Secret used to sign session cookies AND for LDAP bind-password decryption (min 32 chars, never reuse across environments) |
 | `BETTER_AUTH_URL` | ✓ 🔒 | — | Public URL of the web app (e.g. `https://ct-ops.corp.example.com`). Use `https://` — `http://` disables cookie Secure flag |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | ✓ 🔒 | — | Comma-separated list of allowed origins. Auth flows from origins not in this list are rejected |
-| `INFRAWATCH_LOADTEST_ADMIN_KEY` | — 🔒 | — | Bearer credential for `/api/admin/hosts/bulk-delete`. Endpoint returns 503 when unset. Set only on environments running load tests |
+| `CT_OPS_LOADTEST_ADMIN_KEY` | — 🔒 | — | Bearer credential for `/api/admin/hosts/bulk-delete`. Endpoint returns 503 when unset. Set only on environments running load tests |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |
 | `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download |
@@ -22,7 +22,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 
 ### Licence verification
 
-CT-Ops validates licence JWTs using an RSA public key. The production public key for verifying licences purchased from infrawatch.io is **baked into the web image** — there is nothing to configure for standard deployments. In development the server uses a separate built-in dev key, used only when `NODE_ENV !== 'production'`.
+CT-Ops validates licence JWTs using an RSA public key. The production public key for verifying licences purchased from carrtech.dev is **baked into the web image** — there is nothing to configure for standard deployments. In development the server uses a separate built-in dev key, used only when `NODE_ENV !== 'production'`.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|

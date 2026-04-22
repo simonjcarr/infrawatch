@@ -7,7 +7,7 @@ import (
 	"strings"
 	"syscall"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // readAllDisks reads /proc/mounts and calls syscall.Statfs on each real filesystem.

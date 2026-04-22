@@ -27,8 +27,8 @@ type AgentDistributionConfig struct {
 	// When an agent heartbeats with a different version, update_available is set.
 	// Set via INGEST_LATEST_AGENT_VERSION. Leave empty to disable update signalling.
 	LatestVersion string `yaml:"latest_version"`
-	// DownloadBaseURL is the base URL of the Infrawatch web app, used to construct
-	// the agent download URL returned to agents. E.g. "https://infrawatch.example.com".
+	// DownloadBaseURL is the base URL of the CT-Ops web app, used to construct
+	// the agent download URL returned to agents. E.g. "https://ct-ops.example.com".
 	// Set via INGEST_AGENT_DOWNLOAD_BASE_URL.
 	DownloadBaseURL string `yaml:"download_base_url"`
 }
@@ -87,7 +87,7 @@ func Load(path string) (*Config, error) {
 func loadAgentVersionFromManifest() string {
 	candidates := []string{
 		os.Getenv("INGEST_RELEASE_MANIFEST_PATH"),
-		"/var/lib/infrawatch/.release-please-manifest.json",
+		"/var/lib/ct-ops/.release-please-manifest.json",
 		".release-please-manifest.json",
 		"../../.release-please-manifest.json",
 	}
@@ -114,14 +114,14 @@ func defaults() *Config {
 	return &Config{
 		GRPCPort:    9443,
 		HTTPPort:    8080,
-		DatabaseURL: "postgresql://infrawatch:infrawatch@localhost:5432/infrawatch",
+		DatabaseURL: "postgresql://ctops:ctops@localhost:5432/ctops",
 		TLS: TLSConfig{
-			CertFile: "/etc/infrawatch/tls/server.crt",
-			KeyFile:  "/etc/infrawatch/tls/server.key",
+			CertFile: "/etc/ct-ops/tls/server.crt",
+			KeyFile:  "/etc/ct-ops/tls/server.key",
 		},
 		JWT: JWTConfig{
-			KeyFile:  "/var/lib/infrawatch/jwt_key.pem",
-			Issuer:   "infrawatch-ingest",
+			KeyFile:  "/var/lib/ct-ops/jwt_key.pem",
+			Issuer:   "ct-ops-ingest",
 			TokenTTL: 24 * time.Hour,
 		},
 		Queue: QueueConfig{

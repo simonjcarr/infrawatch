@@ -1,6 +1,6 @@
 # SECURITY.md — Pre-Pentest Findings
 
-Findings from an internal, pre-pentest code audit of the Infrawatch codebase. Each item is logged as a TODO for later triage, prioritisation and remediation. **Nothing in this file has been fixed.**
+Findings from an internal, pre-pentest code audit of the CT-Ops codebase. Each item is logged as a TODO for later triage, prioritisation and remediation. **Nothing in this file has been fixed.**
 
 Scope covered:
 - Authentication, session, identity, RBAC, licence
@@ -71,7 +71,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [x] **[C-11] Hardcoded development public key used to validate production licence JWTs**
   - Location: `apps/web/lib/licence.ts`
-  - Resolved: the production public key (`PROD_PUBLIC_KEY_PEM`) is now baked into the web image and used whenever `NODE_ENV=production`. The dev key is only used in non-production. Customers verify infrawatch.io-issued licences against the embedded prod key with no configuration.
+  - Resolved: the production public key (`PROD_PUBLIC_KEY_PEM`) is now baked into the web image and used whenever `NODE_ENV=production`. The dev key is only used in non-production. Customers verify carrtech.dev-issued licences against the embedded prod key with no configuration.
 
 - [ ] **[C-12] Raw SQL interpolation in `updateMetricRetention`**
   - Location: `apps/web/lib/actions/settings.ts:~80, ~90`
@@ -92,7 +92,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
   - Fix: verify Better Auth `trustedOrigins` is set to a tight allowlist; for API routes, validate `Origin`/`Referer`; or implement the double-submit cookie pattern.
 
 - [ ] **[H-03] LDAP bind password encryption uses a hardcoded, shared salt**
-  - Location: `apps/web/lib/crypto/encrypt.ts:~5-10` (`SALT = 'infrawatch-ldap-encryption-salt'`)
+  - Location: `apps/web/lib/crypto/encrypt.ts:~5-10` (`SALT = 'ct-ops-ldap-encryption-salt'`)
   - `scryptSync(secret, SALT, 32)` produces the same key for every ciphertext, every config, every customer. If `BETTER_AUTH_SECRET` leaks once, every stored LDAP password (across all orgs, installations) is decryptable.
   - Fix: random per-record salt persisted alongside ciphertext; separate dedicated encryption secret (not reused from auth).
 
@@ -165,7 +165,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [ ] **[H-18] Dockerfile `entrypoint.sh` runs as root before dropping to `nextjs`**
   - Location: `apps/web/Dockerfile:~92-103` + `apps/web/entrypoint.sh`
-  - `chown -R nextjs:nodejs /var/lib/infrawatch/agent-dist` runs as root at every boot. If the script or the directory is writable by the `nextjs` user, a privilege-escalation primitive exists.
+  - `chown -R nextjs:nodejs /var/lib/ct-ops/agent-dist` runs as root at every boot. If the script or the directory is writable by the `nextjs` user, a privilege-escalation primitive exists.
   - Fix: pre-create directories with correct ownership at build time; drop root entirely; make the volume owned by `nextjs` via `--chown` mount options.
 
 - [ ] **[H-19] Docker images referenced by tag, not digest**
@@ -227,7 +227,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
   - Fix: soft-delete via `deletedAt`; revisit any other `db.delete(...)` occurrences.
 
 - [ ] **[H-31] Default Postgres credentials in `docker-compose.single.yml`**
-  - Location: `docker-compose.single.yml:~6-8, ~31` (`infrawatch:infrawatch@db:5432/infrawatch`)
+  - Location: `docker-compose.single.yml:~6-8, ~31` (`ctops:ctops@db:5432/ctops`)
   - Operators who skip editing `.env` will ship with trivially guessable credentials.
   - Fix: require `POSTGRES_PASSWORD` to be set (no default); generate a random password on first run; document the requirement prominently.
 

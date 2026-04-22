@@ -10,14 +10,14 @@ const installRateLimit = createRateLimiter(60_000, 30)
  * token is provided) or prints the command for the user to complete.
  *
  * Usage — one-command install (token from UI):
- *   curl -fsSL "https://infrawatch.example.com/api/agent/install?token=<TOKEN>" | sh
+ *   curl -fsSL "https://ct-ops.example.com/api/agent/install?token=<TOKEN>" | sh
  *
  * Usage — download only, then install manually:
- *   curl -fsSL "https://infrawatch.example.com/api/agent/install" | sh
- *   sudo ./infrawatch-agent --install --token <TOKEN>
+ *   curl -fsSL "https://ct-ops.example.com/api/agent/install" | sh
+ *   sudo ./ct-ops-agent --install --token <TOKEN>
  *
  * Query parameters:
- *   token       - Enrolment token from the Infrawatch UI
+ *   token       - Enrolment token from the CT-Ops UI
  *   ingest      - gRPC ingest address host:port (default: <server-hostname>:9443)
  *   skip_verify - Set to "true" to disable TLS certificate verification (for self-signed certs)
  */
@@ -81,13 +81,13 @@ case "\$ARCH" in
 esac
 
 # ── Download binary ────────────────────────────────────────────────────────────
-echo "Downloading infrawatch-agent for \${OS}/\${ARCH}..."
-curl -fsSL "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o infrawatch-agent
-chmod +x infrawatch-agent
+echo "Downloading ct-ops-agent for \${OS}/\${ARCH}..."
+curl -fsSL "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o ct-ops-agent
+chmod +x ct-ops-agent
 echo "Binary downloaded."
 
 # ── Self-install ───────────────────────────────────────────────────────────────
-sudo ./infrawatch-agent --install --token "${token}" --address "${ingestAddress}"${tlsFlag}
+sudo ./ct-ops-agent --install --token "${token}" --address "${ingestAddress}"${tlsFlag}
 `
 }
 
@@ -110,12 +110,12 @@ case "\$ARCH" in
 esac
 
 # ── Download binary ────────────────────────────────────────────────────────────
-echo "Downloading infrawatch-agent for \${OS}/\${ARCH}..."
-curl -fsSL "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o infrawatch-agent
-chmod +x infrawatch-agent
+echo "Downloading ct-ops-agent for \${OS}/\${ARCH}..."
+curl -fsSL "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o ct-ops-agent
+chmod +x ct-ops-agent
 
 echo ""
 echo "Binary downloaded. Now run:"
-echo "  sudo ./infrawatch-agent --install --token <YOUR-TOKEN> --address ${ingestAddress}"
+echo "  sudo ./ct-ops-agent --install --token <YOUR-TOKEN> --address ${ingestAddress}"
 `
 }

@@ -32,8 +32,8 @@ YvAIzi0rDcPBMRFMGm6M7n6lwN/XCPgdXEAzI2z+/PiBAK3suh3jyaxtD0D4FHdt
 EQIDAQAB
 -----END PUBLIC KEY-----`
 
-const EXPECTED_ISS = 'licence.infrawatch.io'
-const EXPECTED_AUD = 'install.infrawatch.io'
+const EXPECTED_ISS = 'licence.carrtech.dev'
+const EXPECTED_AUD = 'install.carrtech.dev'
 
 function readJwtInput() {
   const arg = process.argv[2]

@@ -91,7 +91,7 @@ export function RegisterForm() {
       <CardHeader>
         <CardTitle>Create an account</CardTitle>
         <CardDescription>
-          {invite ? `You've been invited to join a team` : 'Get started with Infrawatch'}
+          {invite ? `You've been invited to join a team` : 'Get started with CT-Ops'}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>

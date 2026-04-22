@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/infrawatch/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
 const softwareSweeperInterval = 60 * time.Second

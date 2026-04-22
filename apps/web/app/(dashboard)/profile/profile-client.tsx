@@ -282,7 +282,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Appearance</CardTitle>
-          <CardDescription>Choose how Infrawatch looks for you</CardDescription>
+          <CardDescription>Choose how CT-Ops looks for you</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3">

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# Infrawatch — Start Script
+# CT-Ops — Start Script
 #
 # Production mode (default):  Pull images from GHCR and run the full stack.
 # Local dev mode (--local):   Build everything from source, run the ingest
@@ -94,7 +94,7 @@ if [ -z "${BETTER_AUTH_SECRET:-}" ]; then
 fi
 
 # Auto-generate POSTGRES_PASSWORD on first run if blank. The default
-# "infrawatch" password in the example config must not reach production.
+# "ctops" password in the example config must not reach production.
 if [ -z "${POSTGRES_PASSWORD:-}" ]; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "ERROR: openssl is required to generate POSTGRES_PASSWORD" >&2
@@ -138,7 +138,7 @@ if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
     -keyout "$CERT_DIR/server.key" \
     -out "$CERT_DIR/server.crt" \
     -sha256 -days 365 -nodes \
-    -subj "/CN=infrawatch-ingest" \
+    -subj "/CN=ct-ops-ingest" \
     -addext "subjectAltName=${SAN}" 2>/dev/null
   echo "TLS certificates generated (SANs: ${SAN}, expiry: 365 days — dev only)."
 fi
@@ -150,12 +150,12 @@ if ! $LOCAL; then
   # AGENT_DOWNLOAD_BASE_URL is the URL agents use to download new binaries.
   # It must be reachable from each agent host, not just from inside Docker.
   # Defaults to http://localhost:3000 for single-host dev; export it before
-  # running this script for remote agents (e.g. AGENT_DOWNLOAD_BASE_URL=https://infrawatch.example.com).
+  # running this script for remote agents (e.g. AGENT_DOWNLOAD_BASE_URL=https://ct-ops.example.com).
   export AGENT_DOWNLOAD_BASE_URL="${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}"
   echo "Agent download base URL: ${AGENT_DOWNLOAD_BASE_URL}"
 
   # Always pull the latest published images from GHCR. This is the production
-  # install path — users running Infrawatch from Docker do not have a source
+  # install path — users running CT-Ops from Docker do not have a source
   # checkout to build from. To run a locally-built image instead, set
   # WEB_IMAGE / INGEST_IMAGE in your environment (or .env) before invoking this
   # script, or run `docker compose -f docker-compose.single.yml build` manually.
@@ -185,9 +185,9 @@ if [ ! -f "apps/web/.env.local" ]; then
   fi
 fi
 
-export POSTGRES_USER="${POSTGRES_USER:-infrawatch}"
-export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-infrawatch}"
-export POSTGRES_DB="${POSTGRES_DB:-infrawatch}"
+export POSTGRES_USER="${POSTGRES_USER:-ctops}"
+export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-ctops}"
+export POSTGRES_DB="${POSTGRES_DB:-ctops}"
 export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
 # ---- Build agent binaries ----
@@ -195,7 +195,7 @@ export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 # the Next.js app at /api/agent/download. Re-run with --rebuild-agents or
 # `make agent` to rebuild after source changes.
 AGENT_DIST_DIR="$SCRIPT_DIR/apps/web/data/agent-dist"
-if $REBUILD_AGENTS || [ ! -f "$AGENT_DIST_DIR/infrawatch-agent-linux-amd64" ]; then
+if $REBUILD_AGENTS || [ ! -f "$AGENT_DIST_DIR/ct-ops-agent-linux-amd64" ]; then
   echo "Building agent binaries for all platforms (this may take a minute)..."
   make agent
   echo "Agent binaries ready."

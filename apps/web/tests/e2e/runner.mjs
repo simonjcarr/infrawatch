@@ -27,7 +27,7 @@ async function main() {
     .withEnvironment({
       POSTGRES_USER: 'test',
       POSTGRES_PASSWORD: 'test',
-      POSTGRES_DB: 'infrawatch_test',
+      POSTGRES_DB: 'ctops_test',
     })
     .withExposedPorts(5432)
     .withTmpFs({ '/var/lib/postgresql/data': 'rw,size=512m' })
@@ -38,7 +38,7 @@ async function main() {
   try {
     const host = container.getHost()
     const mappedPort = container.getMappedPort(5432)
-    const databaseUrl = `postgres://test:test@${host}:${mappedPort}/infrawatch_test`
+    const databaseUrl = `postgres://test:test@${host}:${mappedPort}/ctops_test`
 
     process.env.DATABASE_URL = databaseUrl
     process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ?? 'e2e-test-secret-do-not-use-in-prod'

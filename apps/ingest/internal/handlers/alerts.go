@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/infrawatch/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
 // heartbeatMetrics holds the current metric values from a heartbeat for alert evaluation.

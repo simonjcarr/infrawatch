@@ -58,7 +58,6 @@ export async function updateSoftwareInventorySettings(
   orgId: string,
   settings: SoftwareInventorySettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireFeature(orgId, 'reportsScheduled')
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }

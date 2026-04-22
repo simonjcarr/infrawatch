@@ -80,8 +80,8 @@ async function downloadIfMissing(
   arch: string
 ): Promise<void> {
   const suffix = os === 'windows' ? '.exe' : ''
-  const baseName = `infrawatch-agent-${os}-${arch}${suffix}`
-  const versionedName = `infrawatch-agent-${os}-${arch}-${version}${suffix}`
+  const baseName = `ct-ops-agent-${os}-${arch}${suffix}`
+  const versionedName = `ct-ops-agent-${os}-${arch}-${version}${suffix}`
   const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
 
   if (fs.existsSync(versionedPath)) {

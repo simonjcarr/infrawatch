@@ -28,7 +28,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/infrawatch
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/ct-ops
 
 jobs:
   build-ingest:

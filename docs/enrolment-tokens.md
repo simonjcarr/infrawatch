@@ -65,7 +65,7 @@ Expired and exhausted tokens are shown in the table for audit purposes. Only **A
 
 Click **Revoke** next to an active token. This immediately prevents any new agents from registering with it. **Agents that already registered are not affected** — they authenticate with their JWT, not the enrolment token.
 
-If you need to block a specific agent (not just stop new registrations), reject it from the **Hosts** page while it's in pending state, or contact the Infrawatch admin to revoke the agent's DB entry directly.
+If you need to block a specific agent (not just stop new registrations), reject it from the **Hosts** page while it's in pending state, or contact the CT-Ops admin to revoke the agent's DB entry directly.
 
 ---
 

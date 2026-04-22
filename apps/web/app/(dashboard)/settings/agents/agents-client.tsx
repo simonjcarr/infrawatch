@@ -584,7 +584,7 @@ function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogP
       }
       const disposition = res.headers.get('content-disposition') ?? ''
       const filenameMatch = /filename="?([^";]+)"?/.exec(disposition)
-      const filename = filenameMatch?.[1] ?? `infrawatch-agent-${os}-${arch}.zip`
+      const filename = filenameMatch?.[1] ?? `ct-ops-agent-${os}-${arch}.zip`
 
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -716,7 +716,7 @@ function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogP
                 <div className="flex-1">
                   <span className="text-sm font-medium">No token (operator supplies it)</span>
                   <p className="text-xs text-muted-foreground">
-                    Installer reads the token from <code>INFRAWATCH_ORG_TOKEN</code> at install
+                    Installer reads the token from <code>CT_OPS_ORG_TOKEN</code> at install
                     time — safest for wide distribution.
                   </p>
                 </div>

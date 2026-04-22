@@ -7,8 +7,8 @@ PROTO_OUT := proto/gen/go
 # Persistent host-directory caches for Go builds.
 # Using host dirs (owned by the current user) avoids permission errors when
 # Docker runs with --user $(id -u):$(id -g) and a root-owned named volume.
-GO_CACHE_DIR := $(HOME)/.cache/infrawatch/go-build
-GO_MOD_DIR   := $(HOME)/.cache/infrawatch/go-mod
+GO_CACHE_DIR := $(HOME)/.cache/ct-ops/go-build
+GO_MOD_DIR   := $(HOME)/.cache/ct-ops/go-mod
 
 # Host platform — used to cross-compile the ingest binary for the machine
 # running this Makefile (e.g. darwin/arm64 on Apple Silicon).
@@ -53,7 +53,7 @@ agent:
 			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
 			echo "  $$os/$$arch..."; \
 			GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags="-s -w" \
-				-o $(AGENT_DIST_DIR)/infrawatch-agent-$$os-$$arch$$ext ./agent/cmd/agent; \
+				-o $(AGENT_DIST_DIR)/ct-ops-agent-$$os-$$arch$$ext ./agent/cmd/agent; \
 		done'
 	@echo "Agent binaries ready in $(AGENT_DIST_DIR)/"
 
@@ -71,11 +71,11 @@ ingest:
 		go build -o dist/ingest ./apps/ingest/cmd/ingest
 	@echo "Ingest binary: dist/ingest ($(HOST_OS)/$(HOST_ARCH))"
 
-# Build the infrawatch-loadtest binary for the host platform only. This is a
+# Build the ct-ops-loadtest binary for the host platform only. This is a
 # dev/ops tool for measuring sustainable fleet capacity of a given server
 # profile; it is not shipped as a release artefact.
 loadtest:
-	@echo "Building infrawatch-loadtest for $(HOST_OS)/$(HOST_ARCH)..."
+	@echo "Building ct-ops-loadtest for $(HOST_OS)/$(HOST_ARCH)..."
 	@mkdir -p dist $(GO_CACHE_DIR) $(GO_MOD_DIR)
 	docker run --rm \
 		-v "$(CURDIR):/src" \
@@ -86,8 +86,8 @@ loadtest:
 		-e CGO_ENABLED=0 \
 		$(GO_CACHE_ARGS) \
 		golang:1.25 \
-		go build -trimpath -ldflags="-s -w" -o dist/infrawatch-loadtest ./agent/cmd/loadtest
-	@echo "Load-test binary: dist/infrawatch-loadtest ($(HOST_OS)/$(HOST_ARCH))"
+		go build -trimpath -ldflags="-s -w" -o dist/ct-ops-loadtest ./agent/cmd/loadtest
+	@echo "Load-test binary: dist/ct-ops-loadtest ($(HOST_OS)/$(HOST_ARCH))"
 
 go-test:
 	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_DIR)

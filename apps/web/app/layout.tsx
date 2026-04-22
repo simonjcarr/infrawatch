@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Infrawatch',
-    template: '%s | Infrawatch',
+    default: 'CT-Ops',
+    template: '%s | CT-Ops',
   },
   description: 'Open-source infrastructure monitoring and tooling platform',
 }

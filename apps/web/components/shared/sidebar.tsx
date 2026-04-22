@@ -279,7 +279,7 @@ export function AppSidebar({ orgId, tier }: { orgId: string; tier: LicenceTier }
           <div className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
             IW
           </div>
-          <span className="font-semibold text-sm text-sidebar-foreground">Infrawatch</span>
+          <span className="font-semibold text-sm text-sidebar-foreground">CT-Ops</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

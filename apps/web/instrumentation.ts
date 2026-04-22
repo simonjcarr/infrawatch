@@ -36,7 +36,7 @@ export async function register() {
       // to set this before configuring LDAP. Without it, BETTER_AUTH_SECRET is used as
       // the LDAP KDF input, meaning rotating auth secrets breaks stored LDAP credentials.
       console.warn(
-        '[infrawatch] LDAP_ENCRYPTION_KEY is not set. If you use LDAP, set a dedicated ' +
+        '[ct-ops] LDAP_ENCRYPTION_KEY is not set. If you use LDAP, set a dedicated ' +
           '32-byte key (openssl rand -base64 32) to decouple LDAP credential encryption ' +
           'from the session signing secret.',
       )

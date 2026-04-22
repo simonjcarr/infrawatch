@@ -1,19 +1,20 @@
-# Infrawatch — Quickstart
+# ct-ops — Quickstart
 
-This bundle contains everything you need to run Infrawatch on a single host
+This bundle contains everything you need to run ct-ops on a single host
 using Docker. The container images are pulled from GitHub Container Registry
-(`ghcr.io/carrtech-dev/infrawatch/*`) the first time you start the stack.
+(`ghcr.io/carrtech-dev/ct-ops/*`) the first time you start the stack.
 
 ## Prerequisites
 
 - Docker Engine 24+ with the Compose plugin (`docker compose version`)
 - `openssl`
 - `curl`
+- `zip` (only required if you intend to build an air-gap bundle)
 
 ## First run
 
 ```sh
-cd infrawatch
+cd ct-ops
 ./start.sh
 ```
 
@@ -40,6 +41,7 @@ This will:
 2. Generate dev TLS certificates under `./deploy/dev-tls/` for the ingest
    service
 3. Pull the latest `web`, `ingest`, and `db` images from GHCR
+   (or load `images.tar.gz` if it is present — see *Air-gap installs* below)
 4. Start the stack
 5. The web container runs database migrations on its own startup
 
@@ -47,11 +49,21 @@ Open `http://localhost:3000` (or whatever you set as `BETTER_AUTH_URL`) and
 follow the in-app onboarding to create your first organisation and admin
 user.
 
+## Commands
+
+```sh
+./start.sh            # start (or update) the stack
+./start.sh --logs     # tail logs from all containers
+./start.sh --down     # stop the stack (data is preserved)
+./start.sh --version  # show bundle version, app version and licence tier
+./start.sh --help     # links to documentation and support
+```
+
 ## Installing the agent
 
 After signing in, follow the in-app instructions on the **Hosts** page to
 install the agent on a server you want to monitor. Agents download their
-binary from your Infrawatch server using `AGENT_DOWNLOAD_BASE_URL`.
+binary from your ct-ops server using `AGENT_DOWNLOAD_BASE_URL`.
 
 ## Updating
 
@@ -63,6 +75,24 @@ re-pulls `:latest` and recreates any containers whose image has changed.
 
 To pin to a specific image version instead of `:latest`, set `WEB_IMAGE`
 and `INGEST_IMAGE` in `.env` (see commented examples in `.env.example`).
+
+## Air-gap installs
+
+For hosts with no internet access, build an offline bundle on a connected
+machine:
+
+```sh
+./build-offline-installer.sh
+```
+
+This pulls every image referenced by `docker-compose.yml`, saves them to
+`images.tar.gz`, and writes `ct-ops-single-<version>-airgap.zip` next to
+the bundle directory. Transfer that zip to the air-gapped host, unzip,
+and run `./start.sh` — it detects `images.tar.gz` and loads the images
+locally instead of attempting a GHCR pull.
+
+To update an air-gapped host, repeat the process: produce a new airgap
+zip on the connected machine and ship it across.
 
 ## Troubleshooting
 

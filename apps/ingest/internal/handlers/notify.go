@@ -18,7 +18,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/infrawatch/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
 // AlertEvent is the payload sent to webhook notification channels.
@@ -32,7 +32,7 @@ type AlertEvent struct {
 }
 
 // postWebhook POSTs an AlertEvent to a single URL. If secret is non-empty, an
-// HMAC-SHA256 signature is added as X-Infrawatch-Signature. Failures are logged
+// HMAC-SHA256 signature is added as X-CT-Ops-Signature. Failures are logged
 // and discarded — webhook delivery is best-effort.
 func postWebhook(ctx context.Context, url, secret string, event AlertEvent) {
 	body, err := json.Marshal(event)
@@ -50,7 +50,7 @@ func postWebhook(ctx context.Context, url, secret string, event AlertEvent) {
 	if secret != "" {
 		mac := hmac.New(sha256.New, []byte(secret))
 		mac.Write(body)
-		req.Header.Set("X-Infrawatch-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
+		req.Header.Set("X-CT-Ops-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -108,7 +108,7 @@ func sendSmtpEmail(cfg smtpChannelConfig, event AlertEvent) error {
 		eventLabel = strings.ToUpper(event.Event)
 	}
 
-	subject := fmt.Sprintf("[Infrawatch] %s — %s on %s", eventLabel, event.Rule, event.Host)
+	subject := fmt.Sprintf("[CT-Ops] %s — %s on %s", eventLabel, event.Rule, event.Host)
 	body := fmt.Sprintf(
 		"Alert: %s\r\nSeverity: %s\r\nHost: %s\r\nRule: %s\r\nMessage: %s\r\nTime: %s\r\n",
 		event.Event, event.Severity, event.Host, event.Rule, event.Message, event.Timestamp,

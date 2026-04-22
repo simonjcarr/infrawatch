@@ -21,7 +21,7 @@ import {
 import { useNavigationItems, useHostItems } from './providers'
 import type { CommandPaletteGroup, CommandPaletteItem } from './types'
 
-const RECENTS_STORAGE_KEY = 'infrawatch.command-palette.recents'
+const RECENTS_STORAGE_KEY = 'ct-ops.command-palette.recents'
 const MAX_RECENTS = 5
 
 interface CommandPaletteContextValue {

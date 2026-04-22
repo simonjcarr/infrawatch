@@ -13,9 +13,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/infrawatch/ingest/internal/auth"
-	"github.com/infrawatch/ingest/internal/db/queries"
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // InventoryHandler implements the SubmitSoftwareInventory client-streaming RPC.

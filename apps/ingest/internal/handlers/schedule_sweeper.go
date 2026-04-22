@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/robfig/cron/v3"
 
-	"github.com/infrawatch/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
 const scheduleSweepBatchSize = 100

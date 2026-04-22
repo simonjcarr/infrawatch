@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	agentgrpc "github.com/infrawatch/agent/internal/grpc"
+	agentgrpc "github.com/carrtech-dev/ct-ops/agent/internal/grpc"
 )
 
 // ConnPool is a lazy, thread-safe pool of shared gRPC connections.

@@ -24,15 +24,15 @@ function constantTimeEqualUtf8(a: string, b: string): boolean {
 }
 
 // POST /api/admin/hosts/bulk-delete
-// Admin-key-gated endpoint used by the `infrawatch-loadtest cleanup` CLI to
+// Admin-key-gated endpoint used by the `ct-ops-loadtest cleanup` CLI to
 // remove all virtual hosts registered by a prior load-test run. Runs the same
 // deleteHost() cascade used elsewhere in the app so any FK added in future is
 // handled automatically.
 export async function POST(request: NextRequest) {
-  const configuredKey = process.env.INFRAWATCH_LOADTEST_ADMIN_KEY
+  const configuredKey = process.env.CT_OPS_LOADTEST_ADMIN_KEY
   if (!configuredKey) {
     return Response.json(
-      { error: 'Load-test admin endpoint is disabled (INFRAWATCH_LOADTEST_ADMIN_KEY not set)' },
+      { error: 'Load-test admin endpoint is disabled (CT_OPS_LOADTEST_ADMIN_KEY not set)' },
       { status: 503 },
     )
   }

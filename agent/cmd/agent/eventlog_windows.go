@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sys/windows/svc/eventlog"
 
-	"github.com/infrawatch/agent/internal/install"
+	"github.com/carrtech-dev/ct-ops/agent/internal/install"
 )
 
 // Event IDs written alongside each record. Windows surfaces them in Event
@@ -23,7 +23,7 @@ const (
 )
 
 // eventLogHandler is a slog.Handler that forwards records to the Windows
-// Application event log under the InfrawatchAgent source. Messages are
+// Application event log under the CtOpsAgent source. Messages are
 // rendered inline (message + key=value attrs) because AsEventCreate-style
 // sources have no message table to look up strings at render time.
 type eventLogHandler struct {

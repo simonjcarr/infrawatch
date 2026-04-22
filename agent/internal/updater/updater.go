@@ -41,7 +41,7 @@ func Update(latestVersion, downloadBaseURL string) error {
 	// Download to a temp file in the same directory so the rename is atomic
 	// (same filesystem, no cross-device move).
 	dir := filepath.Dir(exe)
-	tmp, err := os.CreateTemp(dir, ".infrawatch-agent-update-*")
+	tmp, err := os.CreateTemp(dir, ".ct-ops-agent-update-*")
 	if err != nil {
 		return fmt.Errorf("creating temp file for update: %w", err)
 	}

@@ -6,7 +6,7 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"github.com/infrawatch/agent/internal/identity"
+	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 )
 
 // GenerateInMemoryKeypair returns a fresh Ed25519 keypair without touching

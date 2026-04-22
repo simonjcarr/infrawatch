@@ -28,14 +28,14 @@ func Uninstall() error {
 
 func uninstallLinux() error {
 	if os.Getuid() != 0 {
-		return fmt.Errorf("uninstall must be run as root (try: sudo ./infrawatch-agent -uninstall)")
+		return fmt.Errorf("uninstall must be run as root (try: sudo ./ct-ops-agent -uninstall)")
 	}
 
-	const serviceName = "infrawatch-agent"
-	const unitPath = "/etc/systemd/system/infrawatch-agent.service"
-	const binaryPath = "/usr/local/bin/infrawatch-agent"
-	const cfgDir = "/etc/infrawatch"
-	const dataDir = "/var/lib/infrawatch"
+	const serviceName = "ct-ops-agent"
+	const unitPath = "/etc/systemd/system/ct-ops-agent.service"
+	const binaryPath = "/usr/local/bin/ct-ops-agent"
+	const cfgDir = "/etc/ct-ops"
+	const dataDir = "/var/lib/ct-ops"
 
 	// Stop and disable the service (ignore errors — it may not be running)
 	slog.Info("stopping service", "name", serviceName)
@@ -60,14 +60,14 @@ func uninstallLinux() error {
 
 func uninstallDarwin() error {
 	if os.Getuid() != 0 {
-		return fmt.Errorf("uninstall must be run as root (try: sudo ./infrawatch-agent -uninstall)")
+		return fmt.Errorf("uninstall must be run as root (try: sudo ./ct-ops-agent -uninstall)")
 	}
 
-	const plistPath = "/Library/LaunchDaemons/com.infrawatch.agent.plist"
-	const binaryPath = "/usr/local/bin/infrawatch-agent"
-	const cfgDir = "/etc/infrawatch"
-	const dataDir = "/var/lib/infrawatch"
-	const logFile = "/var/log/infrawatch-agent.log"
+	const plistPath = "/Library/LaunchDaemons/dev.carrtech.ct-ops.agent.plist"
+	const binaryPath = "/usr/local/bin/ct-ops-agent"
+	const cfgDir = "/etc/ct-ops"
+	const dataDir = "/var/lib/ct-ops"
+	const logFile = "/var/log/ct-ops-agent.log"
 
 	// Unload the launchd service (ignore errors — it may not be loaded)
 	slog.Info("unloading launchd service")
@@ -91,13 +91,13 @@ func uninstallWindows() error {
 		return fmt.Errorf("uninstall must be run as Administrator")
 	}
 
-	binDir := filepath.Join(`C:\Program Files`, "infrawatch")
-	cfgDir := filepath.Join(`C:\ProgramData`, "infrawatch")
+	binDir := filepath.Join(`C:\Program Files`, "ct-ops")
+	cfgDir := filepath.Join(`C:\ProgramData`, "ct-ops")
 
 	// Stop and delete the Windows service (ignore errors — it may not exist)
-	slog.Info("stopping Windows service", "name", "InfrawatchAgent")
-	_ = run("sc.exe", "stop", "InfrawatchAgent")
-	_ = run("sc.exe", "delete", "InfrawatchAgent")
+	slog.Info("stopping Windows service", "name", "CtOpsAgent")
+	_ = run("sc.exe", "stop", "CtOpsAgent")
+	_ = run("sc.exe", "delete", "CtOpsAgent")
 
 	// Deregister the Application event log source so Windows no longer lists
 	// the agent under HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application.
@@ -137,6 +137,6 @@ func removeDir(path string) {
 
 func printUninstallSuccess() {
 	fmt.Println()
-	fmt.Println("Infrawatch agent has been uninstalled.")
+	fmt.Println("CT-Ops agent has been uninstalled.")
 	fmt.Println("All service files, configuration, and data have been removed.")
 }

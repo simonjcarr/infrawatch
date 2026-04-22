@@ -9,9 +9,9 @@ import (
 	"runtime"
 	"time"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 
-	"github.com/infrawatch/agent/internal/identity"
+	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 )
 
 const pollInterval = 30 * time.Second

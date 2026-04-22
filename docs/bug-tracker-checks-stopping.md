@@ -189,7 +189,7 @@ Three targeted changes, no schema/SQL/proto changes:
 3. **Check agent logs** for: `"heartbeat stream ended, reconnecting"` — indicates a stream reconnect occurred (which resets check goroutines)
 4. SSH into agent: `carrtech-adm@10.10.8.210` and check agent logs:
    ```bash
-   sudo journalctl -u infrawatch-agent -n 200 --no-pager
+   sudo journalctl -u ct-ops-agent -n 200 --no-pager
    ```
 5. Look for the timestamp when checks last appeared in the UI — compare against stream reconnect events in agent/ingest logs
 

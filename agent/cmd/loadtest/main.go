@@ -1,5 +1,5 @@
-// Command infrawatch-loadtest simulates N virtual agents against a running
-// Infrawatch server to measure sustainable fleet capacity on a given hardware
+// Command ct-ops-loadtest simulates N virtual agents against a running
+// CT-Ops server to measure sustainable fleet capacity on a given hardware
 // profile. See docs/deployment/load-testing.md for the operator guide.
 package main
 
@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/infrawatch/agent/internal/loadtest"
+	"github.com/carrtech-dev/ct-ops/agent/internal/loadtest"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func exit(err error) {
 }
 
 func printRootUsage(w io.Writer) {
-	fmt.Fprintln(w, "infrawatch-loadtest — simulate N virtual agents against an Infrawatch server")
+	fmt.Fprintln(w, "ct-ops-loadtest — simulate N virtual agents against a CT-Ops server")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Subcommands:")
 	fmt.Fprintln(w, "  run      Start a load-test run")
@@ -82,7 +82,7 @@ func runCmd(args []string) error {
 	fs.BoolVar(&cfg.SimulateInventory, "simulate-inventory", true, "upload fake software inventory on software_inventory_scan tasks")
 	fs.Float64Var(&cfg.CheckFailureRate, "check-failure-rate", 0.05, "fraction of simulated check results that report 'fail'")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: infrawatch-loadtest run [flags]")
+		fmt.Fprintln(fs.Output(), "Usage: ct-ops-loadtest run [flags]")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -116,13 +116,13 @@ type bulkDeleteResponse struct {
 
 func cleanupCmd(args []string) error {
 	fs := flag.NewFlagSet("cleanup", flag.ContinueOnError)
-	webURL := fs.String("web-url", "", "base URL of the Infrawatch web app (required)")
-	adminKey := fs.String("admin-key", "", "admin key configured via INFRAWATCH_LOADTEST_ADMIN_KEY on the web server (required)")
+	webURL := fs.String("web-url", "", "base URL of the CT-Ops web app (required)")
+	adminKey := fs.String("admin-key", "", "admin key configured via CT_OPS_LOADTEST_ADMIN_KEY on the web server (required)")
 	runID := fs.String("run-id", "", "run-id of the load test to clean up (required)")
 	hostnamePrefix := fs.String("hostname-prefix", "loadtest", "same prefix passed to `run`")
 	timeout := fs.Duration("timeout", 5*time.Minute, "HTTP request timeout")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: infrawatch-loadtest cleanup [flags]")
+		fmt.Fprintln(fs.Output(), "Usage: ct-ops-loadtest cleanup [flags]")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {

@@ -18,7 +18,7 @@ const (
 
 // launchDetachedUninstaller copies the agent binary to %TEMP% and spawns it
 // there with -uninstall. Running from a temp path is required because the
-// uninstall step removes C:\Program Files\infrawatch, which would fail on
+// uninstall step removes C:\Program Files\ct-ops, which would fail on
 // Windows if the currently-running executable was located inside it.
 // The child is detached so it survives SCM stopping the service.
 func launchDetachedUninstaller(binPath string) error {
@@ -41,7 +41,7 @@ func launchDetachedUninstaller(binPath string) error {
 // returns the destination path. Overwrites any prior copy.
 func stageWindowsUninstaller(binPath string) (string, error) {
 	tmpDir := os.TempDir()
-	dst := filepath.Join(tmpDir, "infrawatch-uninstaller.exe")
+	dst := filepath.Join(tmpDir, "ct-ops-uninstaller.exe")
 
 	srcFile, err := os.Open(binPath)
 	if err != nil {

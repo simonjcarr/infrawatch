@@ -165,7 +165,7 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"\tAgentInfo\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1a\n" +
-	"\bhostname\x18\x03 \x01(\tR\bhostnameB.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\bhostname\x18\x03 \x01(\tR\bhostnameB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_agent_proto_rawDescOnce sync.Once

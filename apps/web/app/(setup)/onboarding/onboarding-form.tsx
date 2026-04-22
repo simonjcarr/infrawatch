@@ -104,7 +104,7 @@ export function OnboardingForm() {
           <div className="space-y-1.5">
             <Label htmlFor="slug">URL slug</Label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">infrawatch.local/</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">ct-ops.local/</span>
               <Input
                 id="slug"
                 type="text"

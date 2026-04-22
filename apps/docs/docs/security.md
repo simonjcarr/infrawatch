@@ -10,7 +10,7 @@ Do **not** open a public GitHub issue. Use one of:
 
 - **GitHub Security Advisory** (preferred):
   <https://github.com/carrtech-dev/ct-ops/security/advisories/new>
-- **Email:** security@infrawatch.io
+- **Email:** security@carrtech.dev
 
 Please include reproduction steps, affected version / commit / image digest,
 and any known mitigations.

@@ -1,8 +1,8 @@
-# Infrawatch
+# CT-Ops
 
 > Infrastructure monitoring built for engineering teams that can't phone home.
 
-Infrawatch is an open-source monitoring and operations platform designed to run **entirely on your own infrastructure** — no SaaS dependencies, no telemetry, no licence servers. Deploy it in five minutes on a single Docker host or scale it to a Redpanda-backed HA cluster. Either way, it works in an air-gapped environment out of the box.
+CT-Ops is an open-source monitoring and operations platform designed to run **entirely on your own infrastructure** — no SaaS dependencies, no telemetry, no licence servers. Deploy it in five minutes on a single Docker host or scale it to a Redpanda-backed HA cluster. Either way, it works in an air-gapped environment out of the box.
 
 **[Documentation →](https://carrtech-dev.github.io/ct-ops/)**
 
@@ -33,7 +33,7 @@ Infrawatch is an open-source monitoring and operations platform designed to run 
 # Download and unpack the latest release
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
 
-cd infrawatch
+cd ct-ops
 
 # First run creates .env from the example file
 ./start.sh
@@ -51,7 +51,7 @@ To pin a specific version:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh \
-  | INFRAWATCH_VERSION=v0.3.0 bash
+  | CT_OPS_VERSION=v0.3.0 bash
 ```
 
 ### Enrol your first agent

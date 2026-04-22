@@ -22,7 +22,7 @@ export const auth = betterAuth({
   },
   plugins: [
     twoFactor({
-      issuer: 'Infrawatch',
+      issuer: 'CT-Ops',
       totpOptions: {
         period: 30,
         digits: 6,

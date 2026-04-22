@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/infrawatch/ingest/internal/queue"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/queue"
 )
 
 const defaultBufferSize = 1000

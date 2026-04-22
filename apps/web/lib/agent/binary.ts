@@ -24,7 +24,7 @@ interface GitHubRelease {
 
 export function binaryBaseName(os: AgentOS, arch: AgentArch): string {
   const suffix = os === 'windows' ? '.exe' : ''
-  return `infrawatch-agent-${os}-${arch}${suffix}`
+  return `ct-ops-agent-${os}-${arch}${suffix}`
 }
 
 /**
@@ -40,7 +40,7 @@ export async function resolveAgentBinary(
 ): Promise<{ bytes: Buffer; fileName: string } | null> {
   const baseName = binaryBaseName(os, arch)
   const suffix = os === 'windows' ? '.exe' : ''
-  const versionedName = `infrawatch-agent-${os}-${arch}-${REQUIRED_AGENT_VERSION}${suffix}`
+  const versionedName = `ct-ops-agent-${os}-${arch}-${REQUIRED_AGENT_VERSION}${suffix}`
   const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
 
   if (fs.existsSync(versionedPath)) {

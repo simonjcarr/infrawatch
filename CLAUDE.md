@@ -1,4 +1,4 @@
-# CLAUDE.md — Infrawatch (working title)
+# CLAUDE.md — CT-Ops
 > This file is the permanent reference for architecture, conventions, and decisions.
 > Never modify this file during a development session unless correcting a factual error.
 > All project decisions are recorded here so any session can start with full context.
@@ -7,7 +7,7 @@
 
 ## Project Overview
 
-Infrawatch is an open-source infrastructure monitoring and tooling platform aimed at corporate engineering teams and individuals. It is designed to run in air-gapped environments with no external dependencies.
+CT-Ops is an open-source infrastructure monitoring and tooling platform aimed at corporate engineering teams and individuals. It is designed to run in air-gapped environments with no external dependencies.
 
 Core capabilities (in roadmap order):
 - Agent-based server monitoring (Go agent, gRPC)
@@ -21,7 +21,7 @@ Core capabilities (in roadmap order):
 
 ## Naming
 
-The product working title is **Infrawatch**. All code, variables, and references should use this. It will be renamed before public release — a single grep/replace should handle it. Do not bikeshed the name during development sessions.
+The product is **CT-Ops** (repo: `carrtech-dev/ct-ops`, images published to `ghcr.io/carrtech-dev/ct-ops/*`, Go modules under `github.com/carrtech-dev/ct-ops/*`). The product was previously developed under the working title "Infrawatch" — that name should no longer appear anywhere in code, config, or docs.
 
 ---
 
@@ -37,7 +37,7 @@ The product working title is **Infrawatch**. All code, variables, and references
 ## Monorepo Structure
 
 ```
-infrawatch/
+ct-ops/
 ├── apps/
 │   ├── web/                          # Next.js application (primary)
 │   └── ingest/                       # Go gRPC ingest service
@@ -280,10 +280,10 @@ ha        PostgreSQL primary/replica + Redpanda cluster +
 ```
 
 **Air-gap support:**
-- All images bundleable as a tarball: `docker save | gzip > infrawatch.tar.gz`
+- All images bundleable as a tarball: `docker save | gzip > ct-ops.tar.gz`
 - `deploy/scripts/airgap-bundle.sh` produces the offline installer
 - No CDN dependencies — all assets served locally
-- Agent updates served from the infrawatch server, not the internet
+- Agent updates served from the ct-ops server, not the internet
 
 ---
 

@@ -1,6 +1,6 @@
 # Agent
 
-The Infrawatch agent is a small Go binary that runs on each host you want to monitor. It connects to the ingest service over gRPC (TLS), registers itself, and sends periodic heartbeats with system vitals.
+The CT-Ops agent is a small Go binary that runs on each host you want to monitor. It connects to the ingest service over gRPC (TLS), registers itself, and sends periodic heartbeats with system vitals.
 
 It has no runtime dependencies, produces a single static binary, and is designed to run in fully air-gapped environments.
 
@@ -54,20 +54,20 @@ go build -o dist/agent ./agent/cmd/agent
 
 ### Running as a service (systemd)
 
-Create `/etc/systemd/system/infrawatch-agent.service`:
+Create `/etc/systemd/system/ct-ops-agent.service`:
 
 ```ini
 [Unit]
-Description=Infrawatch Agent
+Description=CT-Ops Agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/infrawatch-agent -config /etc/infrawatch/agent.toml
+ExecStart=/usr/local/bin/ct-ops-agent -config /etc/ct-ops/agent.toml
 Restart=on-failure
 RestartSec=10
-User=infrawatch
-Group=infrawatch
+User=ct-ops
+Group=ct-ops
 
 [Install]
 WantedBy=multi-user.target
@@ -76,26 +76,26 @@ WantedBy=multi-user.target
 Then:
 
 ```bash
-systemctl enable --now infrawatch-agent
+systemctl enable --now ct-ops-agent
 ```
 
 ---
 
 ## Configuration
 
-The agent reads a TOML file (default: `/etc/infrawatch/agent.toml`). Pass a different path with the `-config` flag:
+The agent reads a TOML file (default: `/etc/ct-ops/agent.toml`). Pass a different path with the `-config` flag:
 
 ```bash
-infrawatch-agent -config /path/to/agent.toml
+ct-ops-agent -config /path/to/agent.toml
 ```
 
 ### Full config reference
 
 ```toml
 [ingest]
-# Address of the Infrawatch ingest service.
+# Address of the CT-Ops ingest service.
 # Format: host:port
-address = "infrawatch.yourdomain.com:9443"
+address = "ct-ops.yourdomain.com:9443"
 
 # Path to the server's CA certificate PEM file.
 # Required when using a self-signed or private CA certificate.
@@ -105,14 +105,14 @@ ca_cert_file = ""
 
 
 [agent]
-# Enrolment token from the Infrawatch UI (Settings → Agent Enrolment).
-# Can also be set via the INFRAWATCH_ORG_TOKEN environment variable.
+# Enrolment token from the CT-Ops UI (Settings → Agent Enrolment).
+# Can also be set via the CT_OPS_ORG_TOKEN environment variable.
 org_token = ""
 
 # Directory where the agent stores its identity.
 # Contains: agent_key.pem, agent_key.pub, agent_state.json
 # Must be readable/writable by the agent process.
-data_dir = "/var/lib/infrawatch/agent"
+data_dir = "/var/lib/ct-ops/agent"
 
 # Agent binary version string.
 version = "0.1.0"
@@ -128,17 +128,17 @@ All config values can be overridden with environment variables. Useful for conta
 
 | Environment variable | Config equivalent |
 |---|---|
-| `INFRAWATCH_INGEST_ADDRESS` | `ingest.address` |
-| `INFRAWATCH_INGEST_CA_CERT` | `ingest.ca_cert_file` |
-| `INFRAWATCH_ORG_TOKEN` | `agent.org_token` |
-| `INFRAWATCH_DATA_DIR` | `agent.data_dir` |
+| `CT_OPS_INGEST_ADDRESS` | `ingest.address` |
+| `CT_OPS_INGEST_CA_CERT` | `ingest.ca_cert_file` |
+| `CT_OPS_ORG_TOKEN` | `agent.org_token` |
+| `CT_OPS_DATA_DIR` | `agent.data_dir` |
 
 Example:
 
 ```bash
-INFRAWATCH_ORG_TOKEN=abc123 \
-INFRAWATCH_INGEST_ADDRESS=ingest.internal:9443 \
-infrawatch-agent -config /etc/infrawatch/agent.toml
+CT_OPS_ORG_TOKEN=abc123 \
+CT_OPS_INGEST_ADDRESS=ingest.internal:9443 \
+ct-ops-agent -config /etc/ct-ops/agent.toml
 ```
 
 ---
@@ -202,8 +202,8 @@ The bidirectional design allows the server to push commands back to the agent wi
 The agent logs to stdout in a structured text format:
 
 ```
-time=2026-03-28T10:00:00Z level=INFO msg="agent identity ready" data_dir=/var/lib/infrawatch/agent
-time=2026-03-28T10:00:00Z level=INFO msg="registering agent" address=infrawatch.internal:9443
+time=2026-03-28T10:00:00Z level=INFO msg="agent identity ready" data_dir=/var/lib/ct-ops/agent
+time=2026-03-28T10:00:00Z level=INFO msg="registering agent" address=ct-ops.internal:9443
 time=2026-03-28T10:00:01Z level=INFO msg="registration response" status=pending agent_id=abc123
 time=2026-03-28T10:00:01Z level=INFO msg="agent pending approval, polling" interval=30s
 time=2026-03-28T10:00:31Z level=INFO msg="registration response" status=active agent_id=abc123
@@ -212,7 +212,7 @@ time=2026-03-28T10:00:31Z level=INFO msg="starting heartbeat" interval_secs=30
 time=2026-03-28T10:00:31Z level=INFO msg="heartbeat stream opened" agent_id=abc123
 ```
 
-For systemd, logs are available via `journalctl -u infrawatch-agent -f`.
+For systemd, logs are available via `journalctl -u ct-ops-agent -f`.
 
 ---
 
@@ -221,6 +221,6 @@ For systemd, logs are available via `journalctl -u infrawatch-agent -f`.
 To fully remove an agent:
 
 1. Stop the agent process
-2. In the Infrawatch UI, go to **Hosts** and find the host — it will show as `Offline`
+2. In the CT-Ops UI, go to **Hosts** and find the host — it will show as `Offline`
 3. To prevent it from re-registering, revoke its enrolment token in **Settings → Agent Enrolment** (if no other agents use that token)
-4. Delete the data directory on the host: `rm -rf /var/lib/infrawatch/agent`
+4. Delete the data directory on the host: `rm -rf /var/lib/ct-ops/agent`

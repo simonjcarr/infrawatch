@@ -58,5 +58,5 @@ func runService(ctx context.Context, cancel context.CancelFunc, runFn func(conte
 			cancel()
 		}
 	}()
-	return svc.Run("InfrawatchAgent", ws)
+	return svc.Run("CtOpsAgent", ws)
 }

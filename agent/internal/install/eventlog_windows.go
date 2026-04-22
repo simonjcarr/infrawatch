@@ -11,7 +11,7 @@ import (
 
 // EventLogSource is the Windows Event Log source name the agent writes under.
 // Registered on install, removed on uninstall, opened by the running service.
-const EventLogSource = "InfrawatchAgent"
+const EventLogSource = "CtOpsAgent"
 
 // installEventLogSource registers the agent as an event source under the
 // Application log. AsEventCreate avoids needing a compiled message table —

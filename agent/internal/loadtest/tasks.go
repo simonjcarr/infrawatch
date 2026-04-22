@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // simulateTask emits 2-4 fake progress chunks spread over a few seconds, then

@@ -1,5 +1,5 @@
 // Activation token — an unsigned, URL-safe handle the customer copies from
-// their Infrawatch install and pastes into the licence-purchase checkout. It
+// their CT-Ops install and pastes into the licence-purchase checkout. It
 // tells the licence-purchase service *which* install the licence must be
 // minted for, so the resulting JWT carries that install's organisation id as
 // the `sub` claim and can't be reused on another install.

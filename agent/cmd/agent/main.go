@@ -13,15 +13,15 @@ import (
 
 	"google.golang.org/grpc"
 
-	agentgrpc "github.com/infrawatch/agent/internal/grpc"
-	"github.com/infrawatch/agent/internal/checks"
-	"github.com/infrawatch/agent/internal/config"
-	"github.com/infrawatch/agent/internal/heartbeat"
-	"github.com/infrawatch/agent/internal/identity"
-	"github.com/infrawatch/agent/internal/install"
-	"github.com/infrawatch/agent/internal/registration"
-	"github.com/infrawatch/agent/internal/tasks"
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentgrpc "github.com/carrtech-dev/ct-ops/agent/internal/grpc"
+	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
+	"github.com/carrtech-dev/ct-ops/agent/internal/config"
+	"github.com/carrtech-dev/ct-ops/agent/internal/heartbeat"
+	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
+	"github.com/carrtech-dev/ct-ops/agent/internal/install"
+	"github.com/carrtech-dev/ct-ops/agent/internal/registration"
+	"github.com/carrtech-dev/ct-ops/agent/internal/tasks"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // version is injected at build time via -ldflags "-X main.version=<tag>".
@@ -82,9 +82,9 @@ func mergeTags(layers ...[]string) []*agentv1.Tag {
 }
 
 func main() {
-	configPath := flag.String("config", "/etc/infrawatch/agent.toml", "Path to agent TOML config file")
-	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and INFRAWATCH_ORG_TOKEN)")
-	addressFlag := flag.String("address", "", "Ingest address host:port (overrides config file and INFRAWATCH_INGEST_ADDRESS)")
+	configPath := flag.String("config", "/etc/ct-ops/agent.toml", "Path to agent TOML config file")
+	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and CT_OPS_ORG_TOKEN)")
+	addressFlag := flag.String("address", "", "Ingest address host:port (overrides config file and CT_OPS_INGEST_ADDRESS)")
 	installFlag := flag.Bool("install", false, "Install agent as a system service and exit (requires --token)")
 	uninstallFlag := flag.Bool("uninstall", false, "Stop and remove the agent service, binary, config, and data files")
 	tlsSkipVerifyFlag := flag.Bool("tls-skip-verify", false, "Skip TLS certificate verification — use when ingest uses a self-signed cert (insecure)")
@@ -95,7 +95,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag || *versionFlagShort {
-		fmt.Printf("infrawatch-agent %s\n", version)
+		fmt.Printf("ct-ops-agent %s\n", version)
 		os.Exit(0)
 	}
 
@@ -143,7 +143,7 @@ func main() {
 	}
 
 	if cfg.Agent.OrgToken == "" {
-		slog.Error("org_token is required in config or INFRAWATCH_ORG_TOKEN environment variable")
+		slog.Error("org_token is required in config or CT_OPS_ORG_TOKEN environment variable")
 		os.Exit(1)
 	}
 

@@ -111,19 +111,22 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
-      - name: Checksum and upload to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate checksums
         run: |
           cd dist
           sha256sum "ct-ops-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
             > "ct-ops-agent-${{ matrix.asset_suffix }}.sha256"
           sha256sum "ct-ops-agent-${{ matrix.asset_suffix }}.spdx.json" \
             >> "ct-ops-agent-${{ matrix.asset_suffix }}.sha256"
-          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
-            "ct-ops-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}" \
-            "ct-ops-agent-${{ matrix.asset_suffix }}.sha256" \
-            "ct-ops-agent-${{ matrix.asset_suffix }}.spdx.json"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            dist/ct-ops-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}
+            dist/ct-ops-agent-${{ matrix.asset_suffix }}.sha256
+            dist/ct-ops-agent-${{ matrix.asset_suffix }}.spdx.json
 
   # ── Customer bundle for web releases ─────────────────────────────────────
   # Runs in the same workflow run as release-please so the GITHUB_TOKEN
@@ -519,15 +522,19 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve bundle filename
+        id: bundle
         run: |
           set -euo pipefail
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
-          gh release upload "$TAG" \
-            "ct-ops-single-${VERSION}.zip" \
-            "ct-ops-single.zip" \
-            "ct-ops-web.spdx.json" \
-            --clobber
+          echo "versioned=ct-ops-single-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.web_tag_name }}
+          files: |
+            ${{ steps.bundle.outputs.versioned }}
+            ct-ops-single.zip
+            ct-ops-web.spdx.json

@@ -31,6 +31,16 @@ export async function register() {
           '(e.g. https://ct-ops.corp.example.com).',
       )
     }
+    if (!process.env.LDAP_ENCRYPTION_KEY) {
+      // Not a hard failure — LDAP may not be used — but warn loudly so operators know
+      // to set this before configuring LDAP. Without it, BETTER_AUTH_SECRET is used as
+      // the LDAP KDF input, meaning rotating auth secrets breaks stored LDAP credentials.
+      console.warn(
+        '[infrawatch] LDAP_ENCRYPTION_KEY is not set. If you use LDAP, set a dedicated ' +
+          '32-byte key (openssl rand -base64 32) to decouple LDAP credential encryption ' +
+          'from the session signing secret.',
+      )
+    }
   }
 
   const { prewarmAgentCache } = await import('./lib/agent/cache-prewarm')

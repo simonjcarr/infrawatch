@@ -20,7 +20,8 @@ import (
 	agentv1 "github.com/infrawatch/proto/agent/v1"
 )
 
-var validUsernameRE = regexp.MustCompile(`^[a-zA-Z0-9._@\\-]+$`)
+// POSIX-compliant: starts with letter or underscore, contains only [a-zA-Z0-9_-], max 32 chars
+var validUsernameRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`)
 
 // OpenSession opens a Terminal gRPC stream to the ingest service, creates a
 // PTY running the user's shell, and bridges bytes between the PTY and the
@@ -88,9 +89,14 @@ func OpenSession(dialFunc func() (*grpc.ClientConn, error), jwtToken string, req
 		//
 		// This approach works on both Debian/Ubuntu and RHEL/AlmaLinux, unlike
 		// the login command which has cross-distro PAM/SELinux differences.
-		if len(req.Username) > 256 || !validUsernameRE.MatchString(req.Username) {
+		if !validUsernameRE.MatchString(req.Username) {
 			sendClosedMsg(stream, sessionID, -1)
 			return fmt.Errorf("terminal: invalid username %q", req.Username)
+		}
+		// Verify the user actually exists on this system before spawning su.
+		if _, err := user.Lookup(req.Username); err != nil {
+			sendClosedMsg(stream, sessionID, -1)
+			return fmt.Errorf("terminal: unknown user %q: %w", req.Username, err)
 		}
 		nobodyUID, nobodyGID, err := lookupNobody()
 		if err != nil {

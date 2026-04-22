@@ -120,6 +120,13 @@ export async function POST(request: NextRequest) {
       bundleTags = [...tokenMetaTags]
     }
   } else if (createToken) {
+    // autoApprove bypasses the approval queue — restrict to super_admin (M-29).
+    if (createToken.autoApprove && user.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Only super_admin users may create auto-approve enrolment tokens.' },
+        { status: 403 },
+      )
+    }
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + createToken.expiresInDays)
     const [record] = await db

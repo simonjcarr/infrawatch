@@ -39,6 +39,7 @@ import { assignTagsToResource, getOrgDefaultTags, mergeTagLayers } from '@/lib/a
 import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getRequiredSession } from '@/lib/auth/session'
 
 const createEnrolmentTokenLimiter = createRateLimiter(60_000, 10)
 
@@ -465,6 +466,15 @@ export async function createEnrolmentToken(
   const parsed = createEnrolmentTokenSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
+  // autoApprove bypasses the registration approval queue — restrict to super_admin to limit
+  // blast radius if an org_admin account is compromised (M-29).
+  if (parsed.data.autoApprove) {
+    const { user } = await getRequiredSession()
+    if (user.role !== 'super_admin') {
+      return { error: 'Only super_admin users may create auto-approve enrolment tokens.' }
+    }
   }
 
   try {

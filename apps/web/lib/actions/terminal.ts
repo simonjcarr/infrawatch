@@ -66,7 +66,8 @@ export async function checkTerminalAccess(
   return { allowed: true, directAccess: orgMeta.terminalDirectAccess === true }
 }
 
-const VALID_USERNAME_RE = /^[a-zA-Z0-9._@\\-]+$/
+// POSIX-compliant: starts with letter or underscore, contains only [a-zA-Z0-9_-], max 32 chars
+const VALID_USERNAME_RE = /^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$/
 
 /**
  * Creates a terminal session record and returns the session ID + ingest WS URL.

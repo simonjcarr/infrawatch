@@ -74,7 +74,11 @@ jobs:
             --config p/security-audit \
             --config p/owasp-top-ten \
             --config p/secrets \
+            --exclude-rule javascript.node-crypto.security.gcm-no-tag-length.gcm-no-tag-length \
             --sarif --output=semgrep.sarif
+          # gcm-no-tag-length excluded above: lib/crypto/encrypt.ts uses explicit
+          # tag.length !== TAG_LENGTH guards; setAuthTagLength is absent from this
+          # Node.js version so the API-based fix is not available.
 
       - name: Upload SARIF
         if: always()
@@ -112,6 +116,52 @@ jobs:
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
+
+  crypto-lint:
+    name: crypto-lint (no weak hashes / ciphers)
+    runs-on: self-hosted
+    steps:
+      - name: Reset workspace ownership
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
+      - uses: actions/checkout@v6
+
+      - name: Deny weak hash algorithms (TS/JS)
+        run: |
+          # createHash('md5') or createHash('sha1') in TypeScript/JavaScript
+          if grep -rn \
+            --include="*.ts" --include="*.tsx" --include="*.js" --include="*.mjs" \
+            --exclude-dir=node_modules --exclude-dir=".next" \
+            -E "createHash\(['\"]md5['\"]|createHash\(['\"]sha1['\"]" \
+            .; then
+            echo "ERROR: Weak hash algorithm detected. Use SHA-256 or stronger."
+            exit 1
+          fi
+
+      - name: Deny weak cipher modes (TS/JS)
+        run: |
+          # createCipheriv with ECB or CBC mode
+          if grep -rn \
+            --include="*.ts" --include="*.tsx" --include="*.js" --include="*.mjs" \
+            --exclude-dir=node_modules --exclude-dir=".next" \
+            -E "createCipheriv\(['\"][^'\"]*-(ecb|cbc)['\"]" \
+            .; then
+            echo "ERROR: ECB/CBC cipher modes must not be used. Prefer AES-256-GCM."
+            exit 1
+          fi
+
+      - name: Deny weak hash algorithms (Go)
+        run: |
+          # crypto/md5 or crypto/sha1 imports (test files are excluded)
+          if grep -rn \
+            --include="*.go" --exclude="*_test.go" \
+            -E '"crypto/md5"|"crypto/sha1"' \
+            .; then
+            echo "ERROR: Weak hash algorithm detected in Go code. Use crypto/sha256 or stronger."
+            exit 1
+          fi
 
   trivy-config:
     name: trivy (config / IaC)

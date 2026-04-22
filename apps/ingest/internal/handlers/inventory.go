@@ -95,10 +95,14 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 	totalReceived := 0
 	totalAdded := 0
 
+	const maxPackagesPerChunk = 10_000
 	processChunk := func(chunk *agentv1.SoftwareInventoryChunk) error {
 		pkgs := chunk.Packages
 		if len(pkgs) == 0 {
 			return nil
+		}
+		if len(pkgs) > maxPackagesPerChunk {
+			return status.Errorf(codes.InvalidArgument, "chunk exceeds max package limit (%d > %d)", len(pkgs), maxPackagesPerChunk)
 		}
 
 		names := make([]string, len(pkgs))
@@ -133,7 +137,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 	if err := processChunk(first); err != nil {
 		slog.Error("inventory: upserting first chunk", "scan_id", scanID, "err", err)
 		_ = queries.FailSoftwareScan(ctx, h.pool, softwareScanID, err.Error())
-		return status.Error(codes.Internal, "failed to persist packages")
+		return err
 	}
 
 	if first.IsLast {
@@ -156,7 +160,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 		if err := processChunk(chunk); err != nil {
 			slog.Error("inventory: upserting chunk", "scan_id", scanID, "chunk", chunk.ChunkIndex, "err", err)
 			_ = queries.FailSoftwareScan(ctx, h.pool, softwareScanID, err.Error())
-			return status.Error(codes.Internal, "failed to persist packages")
+			return err
 		}
 
 		if chunk.IsLast {

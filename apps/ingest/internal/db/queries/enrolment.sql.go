@@ -34,11 +34,16 @@ type EnrolmentToken struct {
 
 // GetEnrolmentToken looks up a valid (non-deleted, non-expired, not exhausted)
 // enrolment token by its token value.
+//
+// New tokens store a SHA-256 hex digest in token_hash; the primary match is
+// against the hash so the plaintext is never compared in cleartext. Tokens
+// created before the token_hash column was added (token_hash IS NULL) fall
+// back to a direct plaintext comparison during the migration window.
 func GetEnrolmentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*EnrolmentToken, error) {
 	const q = `
 		SELECT id, organisation_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
 		FROM agent_enrolment_tokens
-		WHERE token = $1
+		WHERE (token_hash = encode(sha256($1::bytea), 'hex') OR (token_hash IS NULL AND token = $1))
 		  AND deleted_at IS NULL
 		  AND (expires_at IS NULL OR expires_at > NOW())
 		  AND (max_uses IS NULL OR usage_count < max_uses)

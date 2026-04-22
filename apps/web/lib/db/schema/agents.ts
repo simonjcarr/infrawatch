@@ -17,6 +17,10 @@ export const agentEnrolmentTokens = pgTable('agent_enrolment_tokens', {
     .references(() => organisations.id),
   label: text('label').notNull(),
   token: text('token').notNull().unique().$defaultFn(() => createId()),
+  // SHA-256 hex digest of token. Used for hash-based ingest validation so the
+  // plaintext is never compared in cleartext over the DB wire. Nullable for
+  // backward compat with tokens created before this column was added.
+  tokenHash: text('token_hash').unique(),
   createdById: text('created_by_id')
     .notNull()
     .references(() => users.id),

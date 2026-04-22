@@ -274,6 +274,20 @@
       "when": 1776647755868,
       "tag": "0038_sleepy_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1776838405081,
+      "tag": "0039_brown_vision",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1776838580255,
+      "tag": "0040_dry_sunset_bain",
+      "breakpoints": true
     }
   ]
 }

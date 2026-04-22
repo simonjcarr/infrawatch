@@ -40,6 +40,12 @@ import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getRequiredSession } from '@/lib/auth/session'
+import { createHash } from 'crypto'
+import { createId } from '@paralleldrive/cuid2'
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
 
 const createEnrolmentTokenLimiter = createRateLimiter(60_000, 10)
 
@@ -484,6 +490,9 @@ export async function createEnrolmentToken(
       expiresAt.setDate(expiresAt.getDate() + parsed.data.expiresInDays)
     }
 
+    // Generate the token explicitly so we can hash it before insertion.
+    // The plaintext is returned to the caller once; subsequent list queries omit it.
+    const token = createId()
     const [record] = await db
       .insert(agentEnrolmentTokens)
       .values({
@@ -495,6 +504,8 @@ export async function createEnrolmentToken(
         maxUses: parsed.data.maxUses ?? null,
         expiresAt: expiresAt ?? null,
         metadata: parsed.data.tags.length > 0 ? { tags: parsed.data.tags } : null,
+        token,
+        tokenHash: hashToken(token),
       })
       .returning()
 
@@ -507,13 +518,21 @@ export async function createEnrolmentToken(
   }
 }
 
-export async function listEnrolmentTokens(orgId: string): Promise<AgentEnrolmentToken[]> {
-  return db.query.agentEnrolmentTokens.findMany({
+export type EnrolmentTokenSafe = Omit<AgentEnrolmentToken, 'token' | 'tokenHash'> & {
+  tokenHint: string
+}
+
+export async function listEnrolmentTokens(orgId: string): Promise<EnrolmentTokenSafe[]> {
+  const rows = await db.query.agentEnrolmentTokens.findMany({
     where: and(
       eq(agentEnrolmentTokens.organisationId, orgId),
       isNull(agentEnrolmentTokens.deletedAt),
     ),
   })
+  return rows.map(({ token, tokenHash: _hash, ...rest }) => ({
+    ...rest,
+    tokenHint: token.slice(-4),
+  }))
 }
 
 export async function revokeEnrolmentToken(

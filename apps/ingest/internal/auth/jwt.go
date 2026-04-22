@@ -16,7 +16,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/infrawatch/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
 const jwtKeyConfigKey = "jwt_private_key"

@@ -709,18 +709,18 @@ export async function sendTestNotification(
       severity: 'info',
       host: 'test-host',
       rule: 'Test Notification',
-      message: 'This is a test notification from Infrawatch.',
+      message: 'This is a test notification from CT-Ops.',
       timestamp: new Date().toISOString(),
     })
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'Infrawatch/1.0',
+      'User-Agent': 'CT-Ops/1.0',
     }
 
     if (cfg.secret) {
       const sig = createHmac('sha256', cfg.secret).update(payload).digest('hex')
-      headers['X-Infrawatch-Signature'] = `sha256=${sig}`
+      headers['X-CT-Ops-Signature'] = `sha256=${sig}`
     }
 
     try {
@@ -751,9 +751,9 @@ export async function sendTestNotification(
       await transporter.sendMail({
         from: cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress,
         to: cfg.toAddresses.join(', '),
-        subject: 'Infrawatch Test Notification',
-        text: 'This is a test notification from Infrawatch. Your SMTP channel is configured correctly.',
-        html: '<p>This is a test notification from <strong>Infrawatch</strong>. Your SMTP channel is configured correctly.</p>',
+        subject: 'CT-Ops Test Notification',
+        text: 'This is a test notification from CT-Ops. Your SMTP channel is configured correctly.',
+        html: '<p>This is a test notification from <strong>CT-Ops</strong>. Your SMTP channel is configured correctly.</p>',
       })
       return { success: true }
     } catch (err) {
@@ -765,7 +765,7 @@ export async function sendTestNotification(
       blocks: [
         {
           type: 'header',
-          text: { type: 'plain_text', text: ':large_blue_circle: [TEST] Infrawatch Test Notification' },
+          text: { type: 'plain_text', text: ':large_blue_circle: [TEST] CT-Ops Test Notification' },
         },
         {
           type: 'section',

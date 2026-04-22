@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypt
 
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 16
-const SALT = 'infrawatch-ldap-encryption-salt'
+const SALT = 'ct-ops-ldap-encryption-salt'
 
 function deriveKey(): Buffer {
   const secret = process.env.BETTER_AUTH_SECRET

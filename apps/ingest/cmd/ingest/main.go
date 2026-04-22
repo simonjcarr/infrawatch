@@ -11,17 +11,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/infrawatch/ingest/internal/auth"
-	"github.com/infrawatch/ingest/internal/config"
-	"github.com/infrawatch/ingest/internal/db"
-	"github.com/infrawatch/ingest/internal/handlers"
-	ingestgrpc "github.com/infrawatch/ingest/internal/grpc"
-	"github.com/infrawatch/ingest/internal/queue/inprocess"
-	ingesttls "github.com/infrawatch/ingest/internal/tls"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/config"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
+	ingestgrpc "github.com/carrtech-dev/ct-ops/ingest/internal/grpc"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/queue/inprocess"
+	ingesttls "github.com/carrtech-dev/ct-ops/ingest/internal/tls"
 )
 
 func main() {
-	configPath := flag.String("config", "/etc/infrawatch/ingest.yaml", "Path to ingest YAML config file")
+	configPath := flag.String("config", "/etc/ct-ops/ingest.yaml", "Path to ingest YAML config file")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{

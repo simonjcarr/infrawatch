@@ -1184,7 +1184,7 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\x0fcancel_task_ids\x18\n" +
 	" \x03(\tR\rcancelTaskIds\x12\\\n" +
 	"\x19pending_terminal_sessions\x18\v \x03(\v2 .agent.v1.TerminalSessionRequestR\x17pendingTerminalSessions\x128\n" +
-	"\x18cancel_terminal_sessions\x18\f \x03(\tR\x16cancelTerminalSessionsB.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\x18cancel_terminal_sessions\x18\f \x03(\tR\x16cancelTerminalSessionsB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_heartbeat_proto_rawDescOnce sync.Once

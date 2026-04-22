@@ -253,7 +253,7 @@ const file_agent_v1_ingest_proto_rawDesc = "" +
 	"\bRegister\x12\x19.agent.v1.RegisterRequest\x1a\x1a.agent.v1.RegisterResponse\x12H\n" +
 	"\tHeartbeat\x12\x1a.agent.v1.HeartbeatRequest\x1a\x1b.agent.v1.HeartbeatResponse(\x010\x01\x12O\n" +
 	"\bTerminal\x12\x1e.agent.v1.TerminalAgentMessage\x1a\x1f.agent.v1.TerminalServerMessage(\x010\x01\x12]\n" +
-	"\x17SubmitSoftwareInventory\x12 .agent.v1.SoftwareInventoryChunk\x1a\x1e.agent.v1.SoftwareInventoryAck(\x01B.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\x17SubmitSoftwareInventory\x12 .agent.v1.SoftwareInventoryChunk\x1a\x1e.agent.v1.SoftwareInventoryAck(\x01B7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_ingest_proto_rawDescOnce sync.Once

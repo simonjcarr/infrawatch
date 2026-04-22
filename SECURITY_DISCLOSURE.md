@@ -1,6 +1,6 @@
 # Security Disclosure Policy
 
-We take the security of Infrawatch / CT-Ops seriously. This document describes
+We take the security of CT-Ops seriously. This document describes
 how to report a vulnerability, what to expect once you do, and the scope of
 our coordinated disclosure programme.
 
@@ -16,7 +16,7 @@ the following channels so that we can triage privately:
 
 - **GitHub Security Advisory** (preferred):
   <https://github.com/carrtech-dev/ct-ops/security/advisories/new>
-- **Email:** security@infrawatch.io
+- **Email:** security@carrtech.dev
 
 Include as much detail as you can:
 

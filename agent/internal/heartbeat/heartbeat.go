@@ -18,11 +18,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/infrawatch/agent/internal/checks"
-	"github.com/infrawatch/agent/internal/tasks"
-	"github.com/infrawatch/agent/internal/terminal"
-	"github.com/infrawatch/agent/internal/updater"
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
+	"github.com/carrtech-dev/ct-ops/agent/internal/tasks"
+	"github.com/carrtech-dev/ct-ops/agent/internal/terminal"
+	"github.com/carrtech-dev/ct-ops/agent/internal/updater"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // ErrAgentDeregistered is returned when the server rejects the agent with

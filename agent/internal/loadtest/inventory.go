@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 const inventoryChunkSize = 500

@@ -30,7 +30,7 @@ The ingest service is stateless except for the RSA signing key (loaded from disk
 
 ## Configuration
 
-The ingest service reads a YAML config file (default: `/etc/infrawatch/ingest.yaml`). Pass a different path with `-config`:
+The ingest service reads a YAML config file (default: `/etc/ct-ops/ingest.yaml`). Pass a different path with `-config`:
 
 ```bash
 ingest -config /path/to/ingest.yaml
@@ -46,20 +46,20 @@ grpc_port: 9443
 http_port: 8080
 
 # PostgreSQL connection string
-database_url: postgresql://infrawatch:infrawatch@db:5432/infrawatch
+database_url: postgresql://ctops:ctops@db:5432/ctops
 
 tls:
   # Path to the TLS certificate (PEM)
-  cert_file: /etc/infrawatch/tls/server.crt
+  cert_file: /etc/ct-ops/tls/server.crt
   # Path to the TLS private key (PEM)
-  key_file: /etc/infrawatch/tls/server.key
+  key_file: /etc/ct-ops/tls/server.key
 
 jwt:
   # Path to the RSA private key used to sign agent JWTs.
   # Generated automatically on first start if this file does not exist.
-  key_file: /var/lib/infrawatch/jwt_key.pem
+  key_file: /var/lib/ct-ops/jwt_key.pem
   # Issuer claim in the JWT (must match what the agent expects)
-  issuer: infrawatch-ingest
+  issuer: ct-ops-ingest
   # How long issued JWTs are valid for
   token_ttl: 24h
 
@@ -147,7 +147,7 @@ The ingest service logs to stdout in structured text format. Each RPC call is lo
 
 ```
 time=... level=INFO msg="database connected"
-time=... level=INFO msg="JWT issuer ready" issuer=infrawatch-ingest
+time=... level=INFO msg="JWT issuer ready" issuer=ct-ops-ingest
 time=... level=INFO msg="gRPC server starting" port=9443
 time=... level=INFO msg="grpc stream opened" method=/agent.v1.IngestService/Heartbeat peer=192.168.1.10:54321
 time=... level=INFO msg="agent registered" agent_id=abc123 hostname=web-01 auto_approve=true

@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/infrawatch/ingest/internal/handlers"
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // ingestService implements agentv1.IngestServiceServer.

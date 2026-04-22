@@ -25,7 +25,7 @@ type IngestConfig struct {
 }
 
 type AgentConfig struct {
-	// OrgToken is the enrolment token from the Infrawatch UI.
+	// OrgToken is the enrolment token from the CT-Ops UI.
 	OrgToken string `toml:"org_token"`
 	// DataDir is where the agent stores its keypair and state.
 	DataDir string `toml:"data_dir"`
@@ -35,7 +35,7 @@ type AgentConfig struct {
 	Tags []string `toml:"tags"`
 }
 
-// Load reads a TOML config file and applies INFRAWATCH_ environment overrides.
+// Load reads a TOML config file and applies CT_OPS_ environment overrides.
 func Load(path string) (*Config, error) {
 	cfg := defaults()
 
@@ -55,23 +55,23 @@ func defaults() *Config {
 			Address: "localhost:9443",
 		},
 		Agent: AgentConfig{
-			DataDir:               "/var/lib/infrawatch/agent",
+			DataDir:               "/var/lib/ct-ops/agent",
 			HeartbeatIntervalSecs: 30,
 		},
 	}
 }
 
 func applyEnv(cfg *Config) {
-	if v := os.Getenv("INFRAWATCH_INGEST_ADDRESS"); v != "" {
+	if v := os.Getenv("CT_OPS_INGEST_ADDRESS"); v != "" {
 		cfg.Ingest.Address = v
 	}
-	if v := os.Getenv("INFRAWATCH_INGEST_CA_CERT"); v != "" {
+	if v := os.Getenv("CT_OPS_INGEST_CA_CERT"); v != "" {
 		cfg.Ingest.CACertFile = v
 	}
-	if v := os.Getenv("INFRAWATCH_ORG_TOKEN"); v != "" {
+	if v := os.Getenv("CT_OPS_ORG_TOKEN"); v != "" {
 		cfg.Agent.OrgToken = v
 	}
-	if v := os.Getenv("INFRAWATCH_DATA_DIR"); v != "" {
+	if v := os.Getenv("CT_OPS_DATA_DIR"); v != "" {
 		cfg.Agent.DataDir = v
 	}
 	// Trim accidental whitespace from tokens/addresses

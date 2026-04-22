@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // OpenSession is not supported on Windows — PTY requires a Unix-like OS.

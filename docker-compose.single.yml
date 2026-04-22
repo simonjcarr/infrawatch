@@ -3,21 +3,21 @@ services:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-infrawatch}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in your .env file. Run: openssl rand -hex 16}
-      POSTGRES_DB: ${POSTGRES_DB:-infrawatch}
+      POSTGRES_USER: ${POSTGRES_USER:-ctops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ctops}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U infrawatch -d infrawatch"]
+      test: ["CMD-SHELL", "pg_isready -U ctops -d ctops"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   web:
-    image: ${WEB_IMAGE:-ghcr.io/carrtech-dev/infrawatch/web:latest}
+    image: ${WEB_IMAGE:-ghcr.io/carrtech-dev/ct-ops/web:latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -28,20 +28,20 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-infrawatch}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-infrawatch}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ctops}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-ctops}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in your .env file}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
       NODE_ENV: production
-      AGENT_DIST_DIR: /var/lib/infrawatch/agent-dist
+      AGENT_DIST_DIR: /var/lib/ct-ops/agent-dist
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}
       INGEST_WS_URL: ${INGEST_WS_URL:-ws://localhost:8080}
-      INFRAWATCH_LOADTEST_ADMIN_KEY: ${INFRAWATCH_LOADTEST_ADMIN_KEY:-}
+      CT_OPS_LOADTEST_ADMIN_KEY: ${CT_OPS_LOADTEST_ADMIN_KEY:-}
     volumes:
-      - agent_dist:/var/lib/infrawatch/agent-dist
+      - agent_dist:/var/lib/ct-ops/agent-dist
 
   ingest:
-    image: ${INGEST_IMAGE:-ghcr.io/carrtech-dev/infrawatch/ingest:latest}
+    image: ${INGEST_IMAGE:-ghcr.io/carrtech-dev/ct-ops/ingest:latest}
     build:
       context: .
       dockerfile: apps/ingest/Dockerfile
@@ -53,10 +53,10 @@ services:
       - "9443:9443"   # gRPC (TLS)
       - "8080:8080"   # JWKS + healthz HTTP
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-infrawatch}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-infrawatch}
-      INGEST_TLS_CERT: /etc/infrawatch/tls/server.crt
-      INGEST_TLS_KEY: /etc/infrawatch/tls/server.key
-      INGEST_JWT_KEY_FILE: /var/lib/infrawatch/jwt_key.pem
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ctops}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-ctops}
+      INGEST_TLS_CERT: /etc/ct-ops/tls/server.crt
+      INGEST_TLS_KEY: /etc/ct-ops/tls/server.key
+      INGEST_JWT_KEY_FILE: /var/lib/ct-ops/jwt_key.pem
       # Public base URL of the web app — agents construct their download URL
       # from this, so it must be reachable from the agent host (not just from
       # inside the docker network). Override via .env / start.sh for remote
@@ -67,8 +67,8 @@ services:
       # set there as well, so production users running from GHCR do not need
       # a source checkout for the agent version to be discovered.
     volumes:
-      - ./deploy/dev-tls:/etc/infrawatch/tls:ro
-      - ingest_data:/var/lib/infrawatch
+      - ./deploy/dev-tls:/etc/ct-ops/tls:ro
+      - ingest_data:/var/lib/ct-ops
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 10s

@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"time"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 func init() {
@@ -59,7 +59,7 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 	}
 
 	// Write the script body to a temp file and make it executable.
-	tmpFile, err := os.CreateTemp("", "infrawatch-script-*")
+	tmpFile, err := os.CreateTemp("", "ct-ops-script-*")
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to create temp file: %v", err))
 	}

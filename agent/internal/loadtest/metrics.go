@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // SyntheticMetrics generates plausible-looking CPU/memory/disk/network metrics

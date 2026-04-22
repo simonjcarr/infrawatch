@@ -237,7 +237,7 @@ const file_agent_v1_registration_proto_rawDesc = "" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12\x1b\n" +
-	"\tjwt_token\x18\x04 \x01(\tR\bjwtTokenB.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\tjwt_token\x18\x04 \x01(\tR\bjwtTokenB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_registration_proto_rawDescOnce sync.Once

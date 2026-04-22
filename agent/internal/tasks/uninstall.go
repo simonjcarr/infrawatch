@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 func init() {
@@ -31,7 +31,7 @@ type uninstallResult struct {
 // A short delay is inserted between the handler returning and the child
 // launching so that the "scheduled" result is shipped back to the server on
 // the next heartbeat before we are killed. Output is captured to
-// /tmp/infrawatch-uninstall.log on the host for post-mortem inspection.
+// /tmp/ct-ops-uninstall.log on the host for post-mortem inspection.
 func RunUninstall(ctx context.Context, configJSON string, progressFn func(chunk string)) *agentv1.AgentTaskResult {
 	_ = configJSON // reserved for future flags
 
@@ -44,7 +44,7 @@ func RunUninstall(ctx context.Context, configJSON string, progressFn func(chunk 
 	progressFn(fmt.Sprintf("Binary: %s\n", binPath))
 	progressFn("Spawning detached uninstaller process in 3 seconds.\n")
 	progressFn("On systemd hosts the uninstaller is launched as a transient systemd unit (systemd-run) so it survives the agent cgroup being torn down.\n")
-	progressFn("The agent service will stop shortly after; uninstaller output is written to /tmp/infrawatch-uninstall.log on the host.\n")
+	progressFn("The agent service will stop shortly after; uninstaller output is written to /tmp/ct-ops-uninstall.log on the host.\n")
 
 	// Run the launcher in a goroutine so the result below is shipped first.
 	go func() {

@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
     where: eq(organisations.id, orgId),
     columns: { name: true },
   })
-  const orgName = org?.name ?? 'Infrawatch'
+  const orgName = org?.name ?? 'CT-Ops'
 
   const pdfElement = createElement(SoftwareReportPDF, {
     orgName,

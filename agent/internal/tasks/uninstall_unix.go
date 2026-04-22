@@ -10,13 +10,13 @@ import (
 	"syscall"
 )
 
-const uninstallLogPath = "/tmp/infrawatch-uninstall.log"
+const uninstallLogPath = "/tmp/ct-ops-uninstall.log"
 
 // launchDetachedUninstaller spawns the agent binary with -uninstall so it
 // survives the service manager terminating the current agent process.
 //
 // Linux/systemd requires special handling: the agent runs in a systemd cgroup
-// with the default KillMode=control-group, so `systemctl stop infrawatch-agent`
+// with the default KillMode=control-group, so `systemctl stop ct-ops-agent`
 // sends SIGTERM to every process in that cgroup — including any children we
 // detach via setsid, because cgroup membership is inherited regardless of
 // session. We therefore hand the uninstall off to `systemd-run` which creates
@@ -52,7 +52,7 @@ func launchViaSystemdRun(binPath string) error {
 		"systemd-run",
 		"--no-block",
 		"--collect",
-		"--description=Infrawatch agent self-uninstall",
+		"--description=CT-Ops agent self-uninstall",
 		"/bin/sh", "-c",
 		fmt.Sprintf("exec %s -uninstall >>%s 2>&1", binPath, uninstallLogPath),
 	)

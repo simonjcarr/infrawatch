@@ -212,7 +212,7 @@ func (r *Runner) printCleanupHint() {
 	fmt.Fprintln(r.output, "")
 	fmt.Fprintln(r.output, "Cleanup — these virtual hosts remain registered on the server:")
 	fmt.Fprintf(r.output, "  Hostname filter:  %s*\n", prefix)
-	fmt.Fprintf(r.output, "  Bulk-delete CLI:  infrawatch-loadtest cleanup --web-url <url> --admin-key <key> --run-id %s\n", r.cfg.RunID)
+	fmt.Fprintf(r.output, "  Bulk-delete CLI:  ct-ops-loadtest cleanup --web-url <url> --admin-key <key> --run-id %s\n", r.cfg.RunID)
 	fmt.Fprintf(r.output, "  Dev-only SQL:     DELETE FROM hosts WHERE hostname LIKE '%s%%';\n", prefix)
 }
 

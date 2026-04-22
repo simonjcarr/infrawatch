@@ -13,11 +13,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/infrawatch/ingest/internal/auth"
-	"github.com/infrawatch/ingest/internal/config"
-	"github.com/infrawatch/ingest/internal/db/queries"
-	"github.com/infrawatch/ingest/internal/queue"
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/config"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/queue"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // HeartbeatHandler implements the Heartbeat streaming RPC.

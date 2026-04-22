@@ -59,8 +59,8 @@ function renderWindowsTagFlags(tags: Array<{ key: string; value: string }> | und
 /**
  * Produces an offline install bundle as a zip buffer. Layout:
  *
- *   infrawatch-agent-<os>-<arch>/
- *     infrawatch-agent[.exe]
+ *   ct-ops-agent-<os>-<arch>/
+ *     ct-ops-agent[.exe]
  *     agent.toml
  *     install.sh         (linux / darwin)
  *     install.ps1        (windows)
@@ -72,7 +72,7 @@ export async function buildInstallBundle(opts: BundleOptions): Promise<{
   fileName: string
 }> {
   const zip = new JSZip()
-  const rootName = `infrawatch-agent-${opts.os}-${opts.arch}`
+  const rootName = `ct-ops-agent-${opts.os}-${opts.arch}`
   const root = zip.folder(rootName)
   if (!root) throw new Error('Failed to create zip root folder')
 
@@ -117,15 +117,15 @@ function renderAgentToml(opts: BundleOptions): string {
   const skipVerify = opts.skipVerify ? 'true' : 'false'
   const tokenLine = opts.token
     ? `org_token = "${opts.token}"`
-    : `# Paste the enrolment token from the Infrawatch UI (Settings → Agent Enrolment).
-# Can also be set via the INFRAWATCH_ORG_TOKEN environment variable.
+    : `# Paste the enrolment token from the CT-Ops UI (Settings → Agent Enrolment).
+# Can also be set via the CT_OPS_ORG_TOKEN environment variable.
 org_token = ""`
 
-  return `# Infrawatch Agent Configuration
+  return `# CT-Ops Agent Configuration
 # Generated install bundle — edit values as needed before running install.
 
 [ingest]
-# Address of the Infrawatch ingest service (host:port)
+# Address of the CT-Ops ingest service (host:port)
 address = "${opts.ingestAddress}"
 
 # Path to the server's CA certificate for TLS verification.
@@ -141,7 +141,7 @@ ${tokenLine}
 
 # Directory where the agent stores its identity keypair and state.
 # Must be writable by the user running the agent.
-data_dir = "/var/lib/infrawatch/agent"
+data_dir = "/var/lib/ct-ops/agent"
 
 # How often to send a heartbeat to the ingest service (seconds)
 heartbeat_interval_secs = 30
@@ -152,17 +152,17 @@ ${renderTagTomlLine(opts.tags)}
 
 function renderUnixInstallScript(opts: BundleOptions): string {
   const tlsFlag = opts.skipVerify ? ' --tls-skip-verify' : ''
-  const tokenArg = opts.token ? `"${opts.token}"` : '"$INFRAWATCH_ORG_TOKEN"'
+  const tokenArg = opts.token ? `"${opts.token}"` : '"$CT_OPS_ORG_TOKEN"'
   const tokenGuard = opts.token
     ? ''
-    : `if [ -z "\${INFRAWATCH_ORG_TOKEN:-}" ]; then
-  echo "Set INFRAWATCH_ORG_TOKEN before running this script, or pass --token to the agent manually." >&2
+    : `if [ -z "\${CT_OPS_ORG_TOKEN:-}" ]; then
+  echo "Set CT_OPS_ORG_TOKEN before running this script, or pass --token to the agent manually." >&2
   exit 1
 fi
 `
 
   return `#!/bin/sh
-# Infrawatch agent offline install — ${opts.os}/${opts.arch}
+# CT-Ops agent offline install — ${opts.os}/${opts.arch}
 # Run from the extracted bundle directory:
 #   sudo ./install.sh
 set -e
@@ -186,7 +186,7 @@ fi
 
 chmod +x "\$BINARY"
 
-echo "Installing infrawatch-agent..."
+echo "Installing ct-ops-agent..."
 "\$BINARY" --install --token ${tokenArg} --address "${opts.ingestAddress}"${tlsFlag}${renderUnixTagFlags(opts.tags)}
 `
 }
@@ -195,16 +195,16 @@ function renderWindowsInstallScript(opts: BundleOptions): string {
   const tlsFlag = opts.skipVerify ? ' --tls-skip-verify' : ''
   const tokenExpr = opts.token
     ? `"${opts.token}"`
-    : '$env:INFRAWATCH_ORG_TOKEN'
+    : '$env:CT_OPS_ORG_TOKEN'
   const tokenGuard = opts.token
     ? ''
-    : `if (-not $env:INFRAWATCH_ORG_TOKEN) {
-  Write-Error "Set the INFRAWATCH_ORG_TOKEN environment variable before running this script."
+    : `if (-not $env:CT_OPS_ORG_TOKEN) {
+  Write-Error "Set the CT_OPS_ORG_TOKEN environment variable before running this script."
   exit 1
 }
 `
 
-  return `# Infrawatch agent offline install — windows/${opts.arch}
+  return `# CT-Ops agent offline install — windows/${opts.arch}
 # Run from an elevated PowerShell session in the extracted bundle directory:
 #   .\\install.ps1
 $ErrorActionPreference = "Stop"
@@ -226,7 +226,7 @@ if ($expected -ne $actual) {
 }
 Write-Host "Checksum OK."
 
-Write-Host "Installing infrawatch-agent..."
+Write-Host "Installing ct-ops-agent..."
 & $Binary --install --token ${tokenExpr} --address "${opts.ingestAddress}"${tlsFlag}${renderWindowsTagFlags(opts.tags)}
 `
 }
@@ -247,17 +247,17 @@ ${
 }`
     : `This bundle does **not** contain an enrolment token. Before running the install script:
 
-- **Linux / macOS:** \`export INFRAWATCH_ORG_TOKEN=<token-from-ui>\`
-- **Windows (PowerShell):** \`$env:INFRAWATCH_ORG_TOKEN = "<token-from-ui>"\`
+- **Linux / macOS:** \`export CT_OPS_ORG_TOKEN=<token-from-ui>\`
+- **Windows (PowerShell):** \`$env:CT_OPS_ORG_TOKEN = "<token-from-ui>"\`
 
-Create a token in the Infrawatch UI under **Settings → Agent Enrolment**.`
+Create a token in the CT-Ops UI under **Settings → Agent Enrolment**.`
 
   const installCmd =
     opts.os === 'windows'
       ? 'From an elevated PowerShell prompt in the extracted bundle directory:\n\n```powershell\n.\\install.ps1\n```'
       : 'From the extracted bundle directory:\n\n```sh\nsudo ./install.sh\n```'
 
-  return `# Infrawatch Agent — Offline Install Bundle
+  return `# CT-Ops Agent — Offline Install Bundle
 
 - **Target:** ${opts.os}/${opts.arch}
 - **Agent version:** ${opts.agentVersion}
@@ -268,7 +268,7 @@ Create a token in the Infrawatch UI under **Settings → Agent Enrolment**.`
 
 | File | Purpose |
 | --- | --- |
-| \`${opts.binary.fileName}\` | The Infrawatch agent binary |
+| \`${opts.binary.fileName}\` | The CT-Ops agent binary |
 | \`agent.toml\` | Config template, pre-populated with the server URL |
 | \`${opts.os === 'windows' ? 'install.ps1' : 'install.sh'}\` | Install helper that registers the agent |
 | \`SHA256SUMS\` | SHA-256 checksum of the binary |
@@ -282,7 +282,7 @@ ${tokenSection}
 
 ${installCmd}
 
-The agent will register with the Infrawatch server and appear in **Settings → Agents** as _pending_ (unless the token has auto-approve enabled). An admin approves the agent in the UI; after approval, it starts heartbeating.
+The agent will register with the CT-Ops server and appear in **Settings → Agents** as _pending_ (unless the token has auto-approve enabled). An admin approves the agent in the UI; after approval, it starts heartbeating.
 
 ## Verify manually
 

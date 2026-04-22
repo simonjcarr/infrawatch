@@ -1,4 +1,4 @@
-# PROGRESS.md — Infrawatch Build State
+# PROGRESS.md — CT-Ops Build State
 > This file is updated at the END of every Claude Code session.
 > It is the source of truth for what exists, what works, and what comes next.
 > Read this at the START of every session before doing anything.
@@ -36,7 +36,7 @@
 
 ### Session 52 — Repo rename + agent enrolment URL env var plumbing
 
-**Repo/image rename** — the repository moved to `carrtech-dev/ct-ops`, so container images now publish to `ghcr.io/carrtech-dev/infrawatch/*`
+**Repo/image rename** — the repository moved to `carrtech-dev/ct-ops`, so container images now publish to `ghcr.io/carrtech-dev/ct-ops/*`
 - Updated hardcoded references in `docker-compose.single.yml`, `.env.example`, customer-bundle README, and `apps/docs/docs/deployment/docker-compose.md`
 - PR: carrtech-dev/ct-ops#253
 
@@ -75,7 +75,7 @@
 
 **New download route** (`apps/web/app/api/agent/bundle/route.ts`, `apps/web/lib/agent/bundle.ts`, `apps/web/lib/agent/binary.ts`)
 - **Settings → Agent Enrolment → Download Install Bundle** — produces a per-OS/arch zip containing the agent binary, install helper (`install.sh` on Linux/macOS, `install.ps1` on Windows), pre-populated `agent.toml`, `SHA256SUMS`, and a `README.md`
-- Three token options: generate a fresh single-use token (default 7-day expiry), embed an existing active token, or ship without a token (operator exports `INFRAWATCH_ORG_TOKEN` before install)
+- Three token options: generate a fresh single-use token (default 7-day expiry), embed an existing active token, or ship without a token (operator exports `CT_OPS_ORG_TOKEN` before install)
 - Gated to `super_admin` / `org_admin`; scoped by `organisationId`; single-use tokens persisted via `agent_enrolment_tokens` with `metadata.source = 'install-bundle'` and `metadata.os` / `metadata.arch` for audit
 - Shared binary resolver extracted to `apps/web/lib/agent/binary.ts` so the new route reuses the download route's cache / GitHub-release / baked-binary fallback
 - Zip built with `jszip`
@@ -799,11 +799,11 @@
 ### Session 18 — Overview dashboard and System Health separation
 
 **Problem: operational data was on the wrong page**
-- Certificates and Active Alerts were displayed on the System Health page (`/settings/system`), which is an admin view for Infrawatch's own platform internals. The Overview page (`/dashboard`) was an empty placeholder.
+- Certificates and Active Alerts were displayed on the System Health page (`/settings/system`), which is an admin view for CT-Ops's own platform internals. The Overview page (`/dashboard`) was an empty placeholder.
 - Engineers had to navigate into Settings to see whether alerts were firing or certificates were expiring — the wrong mental model.
 
 **Fix: split data by audience**
-- **System Health** now shows only Infrawatch platform internals: version, licence tier, database connection status, metric retention, and agent pipeline counts. Description updated to "Platform status and configuration".
+- **System Health** now shows only CT-Ops platform internals: version, licence tier, database connection status, metric retention, and agent pipeline counts. Description updated to "Platform status and configuration".
 - **Overview** now shows the operational state of infrastructure: Agents (online/offline), Certificates (valid/expiring/expired), Active Alerts (firing/acknowledged), and a Summary panel. All cards link through to their respective detail pages.
 
 **New `/api/overview` endpoint** (`apps/web/app/api/overview/route.ts`)
@@ -1095,8 +1095,8 @@
 
 **Build state**
 - `npm run build` — zero TypeScript errors ✅
-- `go build github.com/infrawatch/ingest/...` — compiles ✅
-- `go build github.com/infrawatch/agent/...` — compiles ✅
+- `go build github.com/carrtech-dev/ct-ops/ingest/...` — compiles ✅
+- `go build github.com/carrtech-dev/ct-ops/agent/...` — compiles ✅
 
 ---
 
@@ -1174,7 +1174,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 
 **Server-hosted binaries and version-aware cache** (`apps/web/app/api/agent/download/route.ts`)
 - `GET /api/agent/download?os=X&arch=Y` — fetches from GitHub Releases on first request, caches locally in `AGENT_DIST_DIR`
-- Filenames are versioned (`infrawatch-agent-linux-amd64-v0.5.0`); new releases picked up automatically without cache invalidation
+- Filenames are versioned (`ct-ops-agent-linux-amd64-v0.5.0`); new releases picked up automatically without cache invalidation
 - 5-minute TTL check against GitHub for latest version
 - Enables air-gapped deployments — server is the single binary source
 
@@ -1187,13 +1187,13 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `curl -fsSL "https://server/api/agent/install?token=TOKEN" | sh` — complete zero-touch setup
 - Shell script detects OS/arch, downloads versioned binary, runs `--install --token TOKEN`
 - Agent `--install` flag: copies binary to system path, writes TOML config, installs service unit, starts service
-- Also supports `-address` CLI flag and `INFRAWATCH_ORG_TOKEN` / `INFRAWATCH_INGEST_ADDRESS` env vars for config-less operation
+- Also supports `-address` CLI flag and `CT_OPS_ORG_TOKEN` / `CT_OPS_INGEST_ADDRESS` env vars for config-less operation
 - Enrolment token dialog shows the ready-to-run curl command as the primary action
 
 **Multi-platform service install** (`agent/internal/install/install.go`, `agent/cmd/agent/service_windows.go`)
-- **Linux:** systemd unit written to `/etc/systemd/system/infrawatch-agent.service`, `systemctl enable --now`
-- **macOS:** launchd plist written to `/Library/LaunchDaemons/com.infrawatch.agent.plist`, `launchctl load`
-- **Windows:** binary copied to `C:\Program Files\infrawatch\`; service installed via `sc.exe` with proper Stop/Shutdown signal handling
+- **Linux:** systemd unit written to `/etc/systemd/system/ct-ops-agent.service`, `systemctl enable --now`
+- **macOS:** launchd plist written to `/Library/LaunchDaemons/dev.carrtech.ct-ops.agent.plist`, `launchctl load`
+- **Windows:** binary copied to `C:\Program Files\ct-ops\`; service installed via `sc.exe` with proper Stop/Shutdown signal handling
 
 **Agent self-update** (`agent/internal/updater/updater.go`, `apps/ingest/internal/handlers/heartbeat.go`)
 - Ingest compares agent version in each heartbeat against configured latest version
@@ -1354,14 +1354,14 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `messages.go` — all message types as plain Go structs
 - `codec.go` — JSON codec registered as "proto" (development stub; replace with `make proto` output)
 - `ingest_grpc.go` — full gRPC client/server interfaces, stream types, `ServiceDesc`
-- `proto/gen/go/go.mod` — `module github.com/infrawatch/proto`
+- `proto/gen/go/go.mod` — `module github.com/carrtech-dev/ct-ops/proto`
 
 **Go workspace** (`go.work` at repo root)
 - References `./proto/gen/go`, `./agent`, `./apps/ingest`
 - `replace` directives in each `go.mod` for local proto module
 
 **Go agent** (`agent/`)
-- `internal/config/` — TOML config + `INFRAWATCH_` env overrides
+- `internal/config/` — TOML config + `CT_OPS_` env overrides
 - `internal/identity/keypair.go` — Ed25519 key generation + persistence to `data_dir`
 - `internal/identity/token.go` — agent state (ID + JWT) persistence to `agent_state.json`
 - `internal/grpc/` — gRPC connection builder + TLS credentials (server-side, structured for mTLS)

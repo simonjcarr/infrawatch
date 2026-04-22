@@ -1,5 +1,5 @@
 {
-  "name": "infrawatch",
+  "name": "ct-ops",
   "private": true,
   "scripts": {
     "build": "turbo run build",

@@ -1,5 +1,5 @@
 ##
-# Infrawatch — Local Development Infrastructure
+# CT-Ops — Local Development Infrastructure
 #
 # Starts only the backing services. Run the app separately with:
 #   cd apps/web && pnpm dev

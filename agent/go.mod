@@ -1,11 +1,11 @@
-module github.com/infrawatch/agent
+module github.com/carrtech-dev/ct-ops/agent
 
 go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/creack/pty v1.1.24
-	github.com/infrawatch/proto v0.0.0
+	github.com/carrtech-dev/ct-ops/proto v0.0.0
 	github.com/pavlo-v-chernykh/keystore-go/v4 v4.5.0
 	golang.org/x/crypto v0.50.0
 	golang.org/x/sys v0.43.0
@@ -20,4 +20,4 @@ require (
 )
 
 // Local workspace module — resolved via go.work in the repo root.
-replace github.com/infrawatch/proto => ../proto/gen/go
+replace github.com/carrtech-dev/ct-ops/proto => ../proto/gen/go

@@ -890,7 +890,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 <p className="text-sm font-medium text-foreground">Step 1 — Generate an activation token</p>
                 <p className="text-xs text-muted-foreground">
                   Generate a token here and paste it into the checkout at{' '}
-                  <span className="font-mono">licence.infrawatch.io</span>. The resulting
+                  <span className="font-mono">licence.carrtech.dev</span>. The resulting
                   licence key is bound to this install and cannot be used on another.
                 </p>
               </div>

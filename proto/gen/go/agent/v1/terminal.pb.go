@@ -426,7 +426,7 @@ const file_agent_v1_terminal_proto_rawDesc = "" +
 	"\x05input\x18\x02 \x01(\fH\x00R\x05input\x125\n" +
 	"\x06resize\x18\x03 \x01(\v2\x1b.agent.v1.TerminalResizeMsgH\x00R\x06resize\x12\x16\n" +
 	"\x05close\x18\x04 \x01(\bH\x00R\x05closeB\t\n" +
-	"\apayloadB.Z,github.com/infrawatch/proto/agent/v1;agentv1b\x06proto3"
+	"\apayloadB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_terminal_proto_rawDescOnce sync.Once

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	agentconfig "github.com/infrawatch/agent/internal/config"
+	agentconfig "github.com/carrtech-dev/ct-ops/agent/internal/config"
 )
 
 // Run performs a full system installation for the current OS.
@@ -90,17 +90,17 @@ func backupConfig(cfgPath string) {
 
 func installLinux(orgToken, ingestAddress string, tlsSkipVerify bool, tags []string) error {
 	if os.Getuid() != 0 {
-		return fmt.Errorf("install must be run as root (try: sudo ./infrawatch-agent --install ...)")
+		return fmt.Errorf("install must be run as root (try: sudo ./ct-ops-agent --install ...)")
 	}
 
-	const dest = "/usr/local/bin/infrawatch-agent"
-	const cfgPath = "/etc/infrawatch/agent.toml"
-	const dataDir = "/var/lib/infrawatch/agent"
+	const dest = "/usr/local/bin/ct-ops-agent"
+	const cfgPath = "/etc/ct-ops/agent.toml"
+	const dataDir = "/var/lib/ct-ops/agent"
 
 	if err := copyBinary(dest); err != nil {
 		return fmt.Errorf("copying binary: %w", err)
 	}
-	if err := mkdirs("/etc/infrawatch", dataDir); err != nil {
+	if err := mkdirs("/etc/ct-ops", dataDir); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 	cfg := mergeConfig(cfgPath, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
@@ -109,12 +109,12 @@ func installLinux(orgToken, ingestAddress string, tlsSkipVerify bool, tags []str
 	}
 
 	unit := `[Unit]
-Description=Infrawatch Agent
+Description=CT-Ops Agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/infrawatch-agent -config /etc/infrawatch/agent.toml
+ExecStart=/usr/local/bin/ct-ops-agent -config /etc/ct-ops/agent.toml
 # Restart=always so that the agent comes back up after a clean self-update
 # exit (the update path swaps the binary and exits 0, relying on systemd to
 # re-exec it). on-failure would leave the service dead.
@@ -126,20 +126,20 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `
-	if err := writeFile("/etc/systemd/system/infrawatch-agent.service", unit, 0o644); err != nil {
+	if err := writeFile("/etc/systemd/system/ct-ops-agent.service", unit, 0o644); err != nil {
 		return fmt.Errorf("writing systemd unit: %w", err)
 	}
 
 	for _, args := range [][]string{
 		{"systemctl", "daemon-reload"},
-		{"systemctl", "enable", "--now", "infrawatch-agent"},
+		{"systemctl", "enable", "--now", "ct-ops-agent"},
 	} {
 		if err := run(args[0], args[1:]...); err != nil {
 			return fmt.Errorf("running %v: %w", args, err)
 		}
 	}
 
-	printSuccess("systemctl status infrawatch-agent", "journalctl -u infrawatch-agent -f")
+	printSuccess("systemctl status ct-ops-agent", "journalctl -u ct-ops-agent -f")
 	return nil
 }
 
@@ -147,18 +147,18 @@ WantedBy=multi-user.target
 
 func installDarwin(orgToken, ingestAddress string, tlsSkipVerify bool, tags []string) error {
 	if os.Getuid() != 0 {
-		return fmt.Errorf("install must be run as root (try: sudo ./infrawatch-agent --install ...)")
+		return fmt.Errorf("install must be run as root (try: sudo ./ct-ops-agent --install ...)")
 	}
 
-	const dest = "/usr/local/bin/infrawatch-agent"
-	const cfgPath = "/etc/infrawatch/agent.toml"
-	const dataDir = "/var/lib/infrawatch/agent"
-	const plistPath = "/Library/LaunchDaemons/com.infrawatch.agent.plist"
+	const dest = "/usr/local/bin/ct-ops-agent"
+	const cfgPath = "/etc/ct-ops/agent.toml"
+	const dataDir = "/var/lib/ct-ops/agent"
+	const plistPath = "/Library/LaunchDaemons/dev.carrtech.ct-ops.agent.plist"
 
 	if err := copyBinary(dest); err != nil {
 		return fmt.Errorf("copying binary: %w", err)
 	}
-	if err := mkdirs("/etc/infrawatch", dataDir, "/var/log"); err != nil {
+	if err := mkdirs("/etc/ct-ops", dataDir, "/var/log"); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 	cfg := mergeConfig(cfgPath, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
@@ -172,21 +172,21 @@ func installDarwin(orgToken, ingestAddress string, tlsSkipVerify bool, tags []st
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.infrawatch.agent</string>
+    <string>dev.carrtech.ct-ops.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/infrawatch-agent</string>
+        <string>/usr/local/bin/ct-ops-agent</string>
         <string>-config</string>
-        <string>/etc/infrawatch/agent.toml</string>
+        <string>/etc/ct-ops/agent.toml</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/infrawatch-agent.log</string>
+    <string>/var/log/ct-ops-agent.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/infrawatch-agent.log</string>
+    <string>/var/log/ct-ops-agent.log</string>
 </dict>
 </plist>
 `
@@ -200,7 +200,7 @@ func installDarwin(orgToken, ingestAddress string, tlsSkipVerify bool, tags []st
 	// makes the file world-readable. The agent runs as root and the log
 	// can contain hostnames, command output, and other fingerprinting
 	// material that there's no reason to expose to other local users.
-	if err := touchLogFile("/var/log/infrawatch-agent.log", 0o640); err != nil {
+	if err := touchLogFile("/var/log/ct-ops-agent.log", 0o640); err != nil {
 		// Non-fatal — install can continue, but warn so an operator notices.
 		slog.Warn("pre-creating agent log file", "err", err)
 	}
@@ -210,8 +210,8 @@ func installDarwin(orgToken, ingestAddress string, tlsSkipVerify bool, tags []st
 	}
 
 	printSuccess(
-		"launchctl list com.infrawatch.agent",
-		"tail -f /var/log/infrawatch-agent.log",
+		"launchctl list dev.carrtech.ct-ops.agent",
+		"tail -f /var/log/ct-ops-agent.log",
 	)
 	return nil
 }
@@ -223,10 +223,10 @@ func installWindows(orgToken, ingestAddress string, tlsSkipVerify bool, tags []s
 		return fmt.Errorf("install must be run as Administrator")
 	}
 
-	binDir := filepath.Join(`C:\Program Files`, "infrawatch")
-	cfgDir := filepath.Join(`C:\ProgramData`, "infrawatch")
+	binDir := filepath.Join(`C:\Program Files`, "ct-ops")
+	cfgDir := filepath.Join(`C:\ProgramData`, "ct-ops")
 	dataDir := filepath.Join(cfgDir, "agent")
-	dest := filepath.Join(binDir, "infrawatch-agent.exe")
+	dest := filepath.Join(binDir, "ct-ops-agent.exe")
 	cfgFile := filepath.Join(cfgDir, "agent.toml")
 
 	if err := mkdirs(binDir, cfgDir, dataDir); err != nil {
@@ -249,26 +249,26 @@ func installWindows(orgToken, ingestAddress string, tlsSkipVerify bool, tags []s
 	}
 
 	binPath := fmt.Sprintf(`"%s" -config "%s"`, dest, cfgFile)
-	if err := run("sc.exe", "create", "InfrawatchAgent",
+	if err := run("sc.exe", "create", "CtOpsAgent",
 		"binPath=", binPath,
-		"DisplayName=", "Infrawatch Agent",
+		"DisplayName=", "CT-Ops Agent",
 		"start=", "auto",
 	); err != nil {
 		return fmt.Errorf("creating Windows service: %w", err)
 	}
-	if err := run("sc.exe", "description", "InfrawatchAgent",
-		"Infrawatch infrastructure monitoring agent",
+	if err := run("sc.exe", "description", "CtOpsAgent",
+		"CT-Ops infrastructure monitoring agent",
 	); err != nil {
 		// Non-fatal — description is cosmetic
 		slog.Warn("setting service description", "err", err)
 	}
-	if err := run("sc.exe", "start", "InfrawatchAgent"); err != nil {
+	if err := run("sc.exe", "start", "CtOpsAgent"); err != nil {
 		return fmt.Errorf("starting Windows service: %w", err)
 	}
 
 	printSuccess(
-		"sc query InfrawatchAgent",
-		`Get-WinEvent -LogName Application -FilterXPath "*[System/Provider/@Name='InfrawatchAgent']" -MaxEvents 20`,
+		"sc query CtOpsAgent",
+		`Get-WinEvent -LogName Application -FilterXPath "*[System/Provider/@Name='CtOpsAgent']" -MaxEvents 20`,
 	)
 	return nil
 }
@@ -391,7 +391,7 @@ func run(name string, args ...string) error {
 
 func printSuccess(statusCmd, logsCmd string) {
 	fmt.Println()
-	fmt.Println("Infrawatch agent installed and started.")
+	fmt.Println("CT-Ops agent installed and started.")
 	fmt.Printf("Check status:  %s\n", statusCmd)
 	fmt.Printf("View logs:     %s\n", logsCmd)
 }

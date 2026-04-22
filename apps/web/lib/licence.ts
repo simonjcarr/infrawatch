@@ -2,7 +2,7 @@ import { importSPKI, jwtVerify } from 'jose'
 import type { Feature, LicenceTier } from './features'
 
 // Production public key (RS256) — used to verify licence JWTs issued by the
-// official infrawatch.io licence-purchase service. The matching private key
+// official carrtech.dev licence-purchase service. The matching private key
 // lives only on the licence-purchase server (deploy/scripts/licence-prod-private.pem
 // during MVP, KMS / Vault Transit before customer launch).
 //
@@ -54,8 +54,8 @@ export function resolveLicencePublicKeyPem(): string {
   return DEV_PUBLIC_KEY_PEM.trim()
 }
 
-const LICENCE_ISSUER = 'licence.infrawatch.io'
-const LICENCE_AUDIENCE = 'install.infrawatch.io'
+const LICENCE_ISSUER = 'licence.carrtech.dev'
+const LICENCE_AUDIENCE = 'install.carrtech.dev'
 
 export type PaidTier = Exclude<LicenceTier, 'community'>
 

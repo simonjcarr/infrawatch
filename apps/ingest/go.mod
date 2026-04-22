@@ -1,11 +1,11 @@
-module github.com/infrawatch/ingest
+module github.com/carrtech-dev/ct-ops/ingest
 
 go 1.25.0
 
 require (
 	github.com/coder/websocket v1.8.14
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/infrawatch/proto v0.0.0
+	github.com/carrtech-dev/ct-ops/proto v0.0.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/robfig/cron/v3 v3.0.1
 	google.golang.org/grpc v1.80.0
@@ -27,4 +27,4 @@ require (
 )
 
 // Local workspace module — resolved via go.work in the repo root.
-replace github.com/infrawatch/proto => ../../proto/gen/go
+replace github.com/carrtech-dev/ct-ops/proto => ../../proto/gen/go

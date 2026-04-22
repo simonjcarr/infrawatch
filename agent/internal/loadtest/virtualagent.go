@@ -11,9 +11,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/infrawatch/agent/internal/identity"
-	"github.com/infrawatch/agent/internal/registration"
-	agentv1 "github.com/infrawatch/proto/agent/v1"
+	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
+	"github.com/carrtech-dev/ct-ops/agent/internal/registration"
+	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 const agentVersion = "loadtest-v1"

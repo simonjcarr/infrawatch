@@ -378,7 +378,7 @@ function AddSmtpDialog({
               <Label htmlFor="smtp-fromname">
                 From name <span className="text-muted-foreground font-normal">(optional)</span>
               </Label>
-              <Input id="smtp-fromname" placeholder="Infrawatch Alerts" {...register('fromName')} />
+              <Input id="smtp-fromname" placeholder="CT-Ops Alerts" {...register('fromName')} />
             </div>
           </div>
           <div className="space-y-1.5">

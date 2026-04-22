@@ -1,6 +1,6 @@
 # End-to-end testing
 
-Infrawatch's web application is covered by a Playwright E2E suite that runs against a real Next.js dev server and a real TimescaleDB instance. The database is started on-demand inside a Docker container with its data directory mounted as `tmpfs`, so every test run starts from an empty, in-memory database — no local Postgres needed and no state bleeds between runs.
+CT-Ops's web application is covered by a Playwright E2E suite that runs against a real Next.js dev server and a real TimescaleDB instance. The database is started on-demand inside a Docker container with its data directory mounted as `tmpfs`, so every test run starts from an empty, in-memory database — no local Postgres needed and no state bleeds between runs.
 
 ## Running the tests
 

@@ -6,6 +6,7 @@ import {
   agents,
   agentStatusHistory,
   agentEnrolmentTokens,
+  revokedCertificates,
   hosts,
   hostMetrics,
   hostGroupMembers,
@@ -228,6 +229,16 @@ export async function rejectAgent(
         actorId,
         reason: 'Rejected by admin',
       })
+
+      // If the agent had an mTLS client cert, add its serial to the
+      // revocation list so the ingest will reject any future handshake.
+      if (agent.clientCertSerial) {
+        await tx.insert(revokedCertificates).values({
+          organisationId: orgId,
+          serial: agent.clientCertSerial,
+          reason: 'Rejected by admin',
+        }).onConflictDoNothing()
+      }
     })
 
     return { success: true }
@@ -1094,6 +1105,24 @@ export async function deleteHost(
       //     can no longer connect; without this the agent keeps heartbeating
       //     against a host row that no longer exists)
       if (host.agentId) {
+        // Capture the agent's client cert serial before we delete the row so
+        // we can blacklist it — otherwise a deleted agent whose cert is still
+        // inside its validity window could reconnect and register fresh.
+        const [agentRow] = await tx
+          .select({ serial: agents.clientCertSerial })
+          .from(agents)
+          .where(eq(agents.id, host.agentId))
+        if (agentRow?.serial) {
+          await tx
+            .insert(revokedCertificates)
+            .values({
+              organisationId: orgId,
+              serial: agentRow.serial,
+              reason: 'Host deleted',
+            })
+            .onConflictDoNothing()
+        }
+
         await tx
           .delete(agentStatusHistory)
           .where(eq(agentStatusHistory.agentId, host.agentId))

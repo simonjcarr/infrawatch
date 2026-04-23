@@ -17,6 +17,12 @@ export interface BundleOptions {
   agentVersion: string
   /** Tags to apply on every registration from this bundle. Embedded into agent.toml and passed as --tag flags into the installer. */
   tags?: Array<{ key: string; value: string }>
+  /**
+   * PEM-encoded server TLS CA cert. When provided the zip ships a
+   * server-ca.crt file and agent.toml points at it, so skip_verify is
+   * unnecessary even for self-signed dev setups.
+   */
+  serverCaPem?: string
 }
 
 function escapeToml(s: string): string {
@@ -86,6 +92,12 @@ export async function buildInstallBundle(opts: BundleOptions): Promise<{
   // Config template (agent.toml)
   root.file('agent.toml', renderAgentToml(opts))
 
+  // Ship the server CA cert alongside the config so agents can verify TLS
+  // without --tls-skip-verify in production installs.
+  if (opts.serverCaPem) {
+    root.file('server-ca.crt', opts.serverCaPem, { unixPermissions: 0o644 })
+  }
+
   // Install script(s)
   if (opts.os === 'windows') {
     root.file('install.ps1', renderWindowsInstallScript(opts), {
@@ -129,8 +141,9 @@ org_token = ""`
 address = "${opts.ingestAddress}"
 
 # Path to the server's CA certificate for TLS verification.
+# The enrolment bundle ships this file alongside agent.toml when available.
 # Leave empty to use the system's default CA bundle.
-ca_cert_file = ""
+ca_cert_file = "${opts.serverCaPem ? './server-ca.crt' : ''}"
 
 # Disable TLS certificate verification entirely. INSECURE — for development or
 # self-signed setups only.

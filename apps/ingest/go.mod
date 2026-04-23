@@ -8,6 +8,7 @@ require (
 	github.com/carrtech-dev/ct-ops/proto v0.0.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/robfig/cron/v3 v3.0.1
+	golang.org/x/crypto v0.50.0
 	google.golang.org/grpc v1.80.0
 	gopkg.in/yaml.v3 v3.0.1
 )

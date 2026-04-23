@@ -53,6 +53,13 @@ export const agents = pgTable('agents', {
   approvedById: text('approved_by_id').references(() => users.id),
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   enrolmentTokenId: text('enrolment_token_id').references(() => agentEnrolmentTokens.id),
+  // mTLS client cert issued by the internal agent CA. The agent picks up a
+  // newly-signed PEM on its next heartbeat and re-dials with mTLS. Serial is
+  // unique and is the revocation key.
+  clientCertPem: text('client_cert_pem'),
+  clientCertSerial: text('client_cert_serial').unique(),
+  clientCertIssuedAt: timestamp('client_cert_issued_at', { withTimezone: true }),
+  clientCertNotAfter: timestamp('client_cert_not_after', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

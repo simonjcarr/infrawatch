@@ -101,7 +101,11 @@ export default defineUserConfig({
       },
       {
         text: 'Security',
-        link: '/security.md',
+        collapsible: true,
+        children: [
+          '/security.md',
+          '/security/mtls.md',
+        ],
       },
     ],
   }),

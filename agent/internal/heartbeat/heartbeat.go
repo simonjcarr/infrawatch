@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
+	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 	"github.com/carrtech-dev/ct-ops/agent/internal/tasks"
 	"github.com/carrtech-dev/ct-ops/agent/internal/terminal"
 	"github.com/carrtech-dev/ct-ops/agent/internal/updater"
@@ -89,6 +90,19 @@ type Runner struct {
 	// an immediate heartbeat rather than waiting for the next 30s tick.
 	resultsReady chan struct{}
 
+	// Signalled when the server pushes a new client cert or when a local
+	// renewal check has obtained a new one via RenewCertificate. The stream
+	// loop tears down the current stream so the next dial picks up the new
+	// cert from disk.
+	certRotated chan struct{}
+
+	// dataDir is the agent's on-disk identity directory (passed through from
+	// config). Used to persist a newly-issued cert atomically.
+	dataDir string
+
+	// keypair is needed to generate a fresh CSR when renewing.
+	keypair *identity.Keypair
+
 	// lastKnownDefs is the most recent non-empty set of check definitions
 	// received from the server. Used to restore checks after a stream reconnect
 	// if the executor has no running goroutines (e.g. after an agent restart).
@@ -97,8 +111,9 @@ type Runner struct {
 
 // New creates a new heartbeat Runner. dialFunc is called once per stream
 // attempt to obtain a fresh gRPC connection; the runner closes it when the
-// stream ends.
-func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor) *Runner {
+// stream ends. dataDir and keypair enable mTLS cert rotation — when nil/empty
+// the runner skips cert-related work (useful for tests and load-test paths).
+func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor, dataDir string, keypair *identity.Keypair) *Runner {
 	return &Runner{
 		dialFunc:     dialFunc,
 		agentID:      agentID,
@@ -110,6 +125,9 @@ func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version s
 		seenTaskIDs:     make(map[string]struct{}),
 		seenTerminalIDs: make(map[string]struct{}),
 		resultsReady:    make(chan struct{}, 1),
+		certRotated:     make(chan struct{}, 1),
+		dataDir:         dataDir,
+		keypair:         keypair,
 	}
 }
 
@@ -163,7 +181,21 @@ func (r *Runner) runStream(ctx context.Context) error {
 	}
 	defer conn.Close()
 
-	stream, err := agentv1.NewIngestServiceClient(conn).Heartbeat(ctx)
+	client := agentv1.NewIngestServiceClient(conn)
+
+	// Proactive renewal: if our leaf is within the renewal window, ask the
+	// server for a fresh one over the current (still-valid) mTLS connection
+	// before opening the long-lived heartbeat stream. If renewal succeeds we
+	// close this conn and let the outer loop redial with the new cert.
+	if r.dataDir != "" && r.keypair != nil {
+		if rotated, rErr := r.maybeRenewCert(ctx, client); rErr != nil {
+			slog.Warn("proactive cert renewal failed, continuing with current cert", "err", rErr)
+		} else if rotated {
+			return nil // outer loop will redial with new cert
+		}
+	}
+
+	stream, err := client.Heartbeat(ctx)
 	if err != nil {
 		return fmt.Errorf("opening heartbeat stream: %w", err)
 	}
@@ -223,6 +255,13 @@ func (r *Runner) runStream(ctx context.Context) error {
 			if err := r.sendHeartbeat(stream); err != nil {
 				return err
 			}
+
+		case <-r.certRotated:
+			// Fresh client cert is on disk. Close this stream cleanly so
+			// the outer loop redials with the new cert for mTLS.
+			slog.Info("client cert rotated — reconnecting stream to pick up new cert")
+			_ = stream.CloseSend()
+			return nil
 		}
 	}
 }
@@ -320,6 +359,22 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 			}
 		}
 	}
+	if resp.PendingClientCertPem != "" && r.dataDir != "" {
+		if err := identity.SaveClientCert(r.dataDir, []byte(resp.PendingClientCertPem)); err != nil {
+			slog.Warn("saving pushed client cert", "err", err)
+		} else {
+			if resp.AgentCaCertPem != "" {
+				_ = identity.SaveAgentCA(r.dataDir, []byte(resp.AgentCaCertPem))
+			}
+			slog.Info("received new client cert from server",
+				"not_after_unix", resp.PendingClientCertNotAfterUnix,
+			)
+			select {
+			case r.certRotated <- struct{}{}:
+			default: // already signalled
+			}
+		}
+	}
 	if resp.UpdateAvailable && resp.DownloadUrl != "" {
 		slog.Info("agent update available, downloading",
 			"current", r.version,
@@ -330,6 +385,49 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 		}
 		// If Update succeeds it re-execs and never returns.
 	}
+}
+
+// maybeRenewCert checks the on-disk leaf cert's expiry. If it's within the
+// renewal window, builds a fresh CSR, calls RenewCertificate, and persists
+// the new leaf atomically. Returns (rotated, err). rotated=true means the
+// caller should tear down the current conn so the outer dial picks up the
+// new cert. Renewal never makes the agent unusable — any error is returned
+// without touching the on-disk cert, and the existing cert stays in force.
+func (r *Runner) maybeRenewCert(ctx context.Context, client agentv1.IngestServiceClient) (bool, error) {
+	_, cert, err := identity.LoadClientCert(r.dataDir)
+	if err != nil {
+		return false, fmt.Errorf("loading cert for renewal check: %w", err)
+	}
+	if cert == nil {
+		return false, nil // no cert yet — pending registration flow
+	}
+	if !identity.ShouldRenew(cert, time.Now()) {
+		return false, nil
+	}
+	csrDER, err := r.keypair.BuildCSR()
+	if err != nil {
+		return false, fmt.Errorf("building renewal CSR: %w", err)
+	}
+	renewCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	resp, err := client.RenewCertificate(renewCtx, &agentv1.RenewCertificateRequest{
+		AgentId: r.agentID,
+		CsrDer:  csrDER,
+	})
+	if err != nil {
+		return false, err
+	}
+	if resp.ClientCertPem == "" {
+		return false, fmt.Errorf("empty cert PEM in RenewCertificate response")
+	}
+	if err := identity.SaveClientCert(r.dataDir, []byte(resp.ClientCertPem)); err != nil {
+		return false, fmt.Errorf("saving renewed cert: %w", err)
+	}
+	if resp.AgentCaCertPem != "" {
+		_ = identity.SaveAgentCA(r.dataDir, []byte(resp.AgentCaCertPem))
+	}
+	slog.Info("renewed client cert", "not_after_unix", resp.ClientCertNotAfterUnix)
+	return true, nil
 }
 
 // filterUnseenQueries returns queries not yet seen for this stream's lifetime.

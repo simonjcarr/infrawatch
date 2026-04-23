@@ -10,10 +10,17 @@ import (
 )
 
 // BuildTLSCredentials builds gRPC transport credentials for the agent.
-// If caCertFile is empty, the system root CAs are used.
-// If skipVerify is true, TLS certificate verification is disabled (insecure — dev/testing only).
-// Structured to slot in mTLS client certificate in a future session.
-func BuildTLSCredentials(caCertFile string, skipVerify bool) (credentials.TransportCredentials, error) {
+//
+// caCertFile:    path to the server's CA cert PEM; empty = system roots.
+// skipVerify:    if true, disable TLS verification (insecure — dev only).
+// clientCert:    if non-nil, presented during the TLS handshake for mTLS.
+//
+// Prior to the mTLS rollout clientCert would typically be nil on the very
+// first connection (the agent hasn't been issued a cert yet) and populated
+// once the server has signed one. The caller is responsible for loading the
+// cert from disk via identity.TLSCertificate and redialling when a new cert
+// arrives via HeartbeatResponse.pending_client_cert_pem.
+func BuildTLSCredentials(caCertFile string, skipVerify bool, clientCert *tls.Certificate) (credentials.TransportCredentials, error) {
 	tlsCfg := &tls.Config{
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: skipVerify, //nolint:gosec // controlled by explicit user config
@@ -30,7 +37,10 @@ func BuildTLSCredentials(caCertFile string, skipVerify bool) (credentials.Transp
 		}
 		tlsCfg.RootCAs = pool
 	}
-	// caCertFile == "" && !skipVerify → uses system roots (tlsCfg.RootCAs nil = system default)
+
+	if clientCert != nil {
+		tlsCfg.Certificates = []tls.Certificate{*clientCert}
+	}
 
 	return credentials.NewTLS(tlsCfg), nil
 }

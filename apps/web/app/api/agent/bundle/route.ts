@@ -15,6 +15,17 @@ import {
 } from '@/lib/agent/binary'
 import { buildInstallBundle } from '@/lib/agent/bundle'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
+import { readFile } from 'node:fs/promises'
+
+const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/server.crt'
+
+async function readServerCaPem(): Promise<string | undefined> {
+  try {
+    return await readFile(SERVER_TLS_CERT_PATH, 'utf-8')
+  } catch {
+    return undefined
+  }
+}
 
 const requestSchema = z.object({
   os: z.enum(SUPPORTED_OS),
@@ -175,6 +186,8 @@ export async function POST(request: NextRequest) {
   const ingestAddress =
     parsed.data.ingestAddress?.trim() || `${host.split(':')[0]}:9443`
 
+  const serverCaPem = await readServerCaPem()
+
   const bundle = await buildInstallBundle({
     os: os as AgentOS,
     arch: arch as AgentArch,
@@ -186,6 +199,7 @@ export async function POST(request: NextRequest) {
     tokenExpiresAt: embeddedTokenExpiresAt,
     agentVersion: REQUIRED_AGENT_VERSION,
     tags: bundleTags,
+    serverCaPem,
   })
 
   return new NextResponse(new Uint8Array(bundle.zipBytes), {

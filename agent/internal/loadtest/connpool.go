@@ -62,7 +62,10 @@ func (p *ConnPool) Get(agentIndex int) (*grpc.ClientConn, error) {
 		conn = nil
 	}
 
-	fresh, err := agentgrpc.Connect(p.address, p.caCertFile, p.tlsSkipVerify)
+	// Load-test doesn't exercise mTLS — the driver-host can't present one
+	// client cert per simulated agent. Keeping this non-mTLS is fine because
+	// the load test spins up against a dedicated ingest instance.
+	fresh, err := agentgrpc.Connect(p.address, p.caCertFile, p.tlsSkipVerify, nil)
 	if err != nil {
 		return nil, fmt.Errorf("dialling %s: %w", p.address, err)
 	}

@@ -27,6 +27,24 @@ service IngestService {
   // stream, sends chunks of 500 packages each, and signals completion with
   // is_last=true. The server upserts packages and responds with a final ack.
   rpc SubmitSoftwareInventory(stream SoftwareInventoryChunk) returns (SoftwareInventoryAck);
+
+  // RenewCertificate is called by an agent whose client cert is approaching
+  // expiry. The agent sends a fresh CSR signed by the same Ed25519 identity
+  // key. The server signs with the current agent CA and returns a new leaf.
+  // Requires a valid JWT; the existing (still-valid) client cert also proves
+  // wire identity during the handshake.
+  rpc RenewCertificate(RenewCertificateRequest) returns (RenewCertificateResponse);
+}
+
+message RenewCertificateRequest {
+  string agent_id = 1;
+  bytes csr_der = 2;
+}
+
+message RenewCertificateResponse {
+  string client_cert_pem = 1;
+  int64 client_cert_not_after_unix = 2;
+  string agent_ca_cert_pem = 3;
 }
 
 // SoftwareInventoryChunk carries a batch of packages from a single scan.

@@ -36,6 +36,13 @@ type AgentDistributionConfig struct {
 type TLSConfig struct {
 	CertFile string `yaml:"cert_file"`
 	KeyFile  string `yaml:"key_file"`
+	// AgentCACertFile / AgentCAKeyFile let an operator bring their own CA.
+	// When both are set, the CA is read from disk on boot and mTLS uses it
+	// directly (DB row is still upserted so the web UI can display metadata).
+	// When unset, the CA is loaded from the DB (or generated on first boot
+	// and stored there encrypted).
+	AgentCACertFile string `yaml:"agent_ca_cert_file"`
+	AgentCAKeyFile  string `yaml:"agent_ca_key_file"`
 }
 
 type JWTConfig struct {
@@ -158,5 +165,11 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("INGEST_AGENT_DOWNLOAD_BASE_URL"); v != "" {
 		cfg.Agent.DownloadBaseURL = v
+	}
+	if v := os.Getenv("INGEST_AGENT_CA_CERT"); v != "" {
+		cfg.TLS.AgentCACertFile = v
+	}
+	if v := os.Getenv("INGEST_AGENT_CA_KEY"); v != "" {
+		cfg.TLS.AgentCAKeyFile = v
 	}
 }

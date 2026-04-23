@@ -16,6 +16,7 @@ import (
 	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/config"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/queue"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
@@ -28,10 +29,11 @@ type HeartbeatHandler struct {
 	versionPoller   *config.VersionPoller
 	downloadBaseURL string
 	terminalStore   *TerminalStore
+	ca              *pki.AgentCA
 }
 
 // NewHeartbeatHandler creates a HeartbeatHandler.
-func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, versionPoller *config.VersionPoller, downloadBaseURL string, terminalStore *TerminalStore) *HeartbeatHandler {
+func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, versionPoller *config.VersionPoller, downloadBaseURL string, terminalStore *TerminalStore, ca *pki.AgentCA) *HeartbeatHandler {
 	return &HeartbeatHandler{
 		pool:            pool,
 		issuer:          issuer,
@@ -39,6 +41,7 @@ func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.P
 		versionPoller:   versionPoller,
 		downloadBaseURL: downloadBaseURL,
 		terminalStore:   terminalStore,
+		ca:              ca,
 	}
 }
 
@@ -196,6 +199,17 @@ loop:
 					slog.Info("resolved host after retry", "agent_id", agentID, "host_id", hostID)
 				} else {
 					continue
+				}
+			}
+
+			// Cert delivery: if the agents row has a signed cert whose serial
+			// differs from whatever the agent presented in the current mTLS
+			// handshake, push it. The agent persists the PEM atomically and
+			// redials with the new cert. No-op if the agent is already up to
+			// date. Running this on the 2s tick keeps rotation near-realtime.
+			if h.ca != nil {
+				if err := h.maybePushCert(ctx, stream, agentID); err != nil {
+					slog.Warn("pushing rotated client cert", "agent_id", agentID, "err", err)
 				}
 			}
 			pending, err := queries.GetPendingQueriesForHost(ctx, h.pool, hostID)
@@ -518,4 +532,43 @@ func marshalJSON(v interface{}) string {
 		return "[]"
 	}
 	return string(b)
+}
+
+// maybePushCert pushes the agent's client cert if the serial on record differs
+// from the one on the current mTLS connection. Called on every 2s poll tick.
+// Silent no-op in the common case where the agent is already up to date.
+func (h *HeartbeatHandler) maybePushCert(ctx context.Context, stream agentv1.IngestService_HeartbeatServer, agentID string) error {
+	var certPEM string
+	var serial string
+	var notAfter *time.Time
+	err := h.pool.QueryRow(ctx, `
+		SELECT COALESCE(client_cert_pem, ''), COALESCE(client_cert_serial, ''), client_cert_not_after
+		  FROM agents WHERE id = $1`, agentID,
+	).Scan(&certPEM, &serial, &notAfter)
+	if err != nil {
+		return err
+	}
+	if certPEM == "" || serial == "" {
+		return nil
+	}
+
+	// Compare against whatever the current mTLS handshake presented.
+	presented := ""
+	if ident, ok := pki.IdentityFromContext(stream.Context()); ok {
+		presented = ident.Serial
+	}
+	if presented == serial {
+		return nil
+	}
+
+	var notAfterUnix int64
+	if notAfter != nil {
+		notAfterUnix = notAfter.Unix()
+	}
+	return stream.Send(&agentv1.HeartbeatResponse{
+		Ok:                             true,
+		PendingClientCertPem:           certPEM,
+		PendingClientCertNotAfterUnix:  notAfterUnix,
+		AgentCaCertPem:                 string(h.ca.CertPEM),
+	})
 }

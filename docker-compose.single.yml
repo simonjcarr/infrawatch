@@ -60,6 +60,14 @@ services:
       INGEST_TLS_CERT: /etc/ct-ops/tls/server.crt
       INGEST_TLS_KEY: /etc/ct-ops/tls/server.key
       INGEST_JWT_KEY_FILE: /var/lib/ct-ops/jwt_key.pem
+      # Agent CA — signs per-agent mTLS client certs. Leave unset to let the
+      # ingest auto-generate on first boot and store in Postgres. To bring
+      # your own CA, mount the PEM files and uncomment below.
+      # INGEST_AGENT_CA_CERT: /etc/ct-ops/tls/agent-ca.crt
+      # INGEST_AGENT_CA_KEY: /etc/ct-ops/tls/agent-ca.key
+      # Required for encrypting the auto-generated agent CA key at rest.
+      # Same value used by the web app for LDAP bind-password encryption.
+      LDAP_ENCRYPTION_KEY: ${LDAP_ENCRYPTION_KEY:-${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}}
       # Public base URL of the web app — agents construct their download URL
       # from this, so it must be reachable from the agent host (not just from
       # inside the docker network). Override via .env / start.sh for remote

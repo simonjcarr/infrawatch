@@ -2,6 +2,7 @@ package agentgrpc
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
@@ -11,8 +12,9 @@ import (
 )
 
 // Connect establishes a gRPC connection to the ingest service.
-func Connect(address, caCertFile string, skipVerify bool) (*grpc.ClientConn, error) {
-	creds, err := BuildTLSCredentials(caCertFile, skipVerify)
+// clientCert is optional — when non-nil the agent presents it for mTLS.
+func Connect(address, caCertFile string, skipVerify bool, clientCert *tls.Certificate) (*grpc.ClientConn, error) {
+	creds, err := BuildTLSCredentials(caCertFile, skipVerify, clientCert)
 	if err != nil {
 		return nil, fmt.Errorf("building TLS credentials: %w", err)
 	}

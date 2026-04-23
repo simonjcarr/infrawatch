@@ -22,6 +22,7 @@ type ingestService struct {
 	hb       *handlers.HeartbeatHandler
 	terminal *handlers.TerminalHandler
 	inv      *handlers.InventoryHandler
+	renew    *handlers.RenewCertHandler
 }
 
 func (s *ingestService) Register(ctx context.Context, req *agentv1.RegisterRequest) (*agentv1.RegisterResponse, error) {
@@ -40,13 +41,17 @@ func (s *ingestService) SubmitSoftwareInventory(stream agentv1.IngestService_Sub
 	return s.inv.SubmitSoftwareInventory(stream)
 }
 
+func (s *ingestService) RenewCertificate(ctx context.Context, req *agentv1.RenewCertificateRequest) (*agentv1.RenewCertificateResponse, error) {
+	return s.renew.Renew(ctx, req)
+}
+
 // Serve starts the gRPC server on the given port with TLS credentials.
 // Blocks until the server stops. When ctx is cancelled (e.g. SIGTERM), Serve
 // sends a gRPC GOAWAY to all connected agents so they reconnect immediately
 // rather than hitting exponential backoff. If streams don't drain within 30s,
 // the server is force-stopped — this covers the case where a container is
 // killed before context cancellation can propagate.
-func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, terminal *handlers.TerminalHandler, inv *handlers.InventoryHandler) error {
+func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, terminal *handlers.TerminalHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("listening on :%d: %w", port, err)
@@ -68,12 +73,12 @@ func Serve(ctx context.Context, port int, creds credentials.TransportCredentials
 		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(enforcement),
 		grpc.KeepaliveParams(serverKp),
-		grpc.ChainUnaryInterceptor(RecoveryUnaryInterceptor, LoggingUnaryInterceptor),
-		grpc.ChainStreamInterceptor(RecoveryStreamInterceptor, LoggingStreamInterceptor),
+		grpc.ChainUnaryInterceptor(RecoveryUnaryInterceptor, LoggingUnaryInterceptor, NewMTLSUnaryInterceptor()),
+		grpc.ChainStreamInterceptor(RecoveryStreamInterceptor, LoggingStreamInterceptor, NewMTLSStreamInterceptor()),
 	}
 	grpcServer := grpc.NewServer(opts...)
 
-	svc := &ingestService{reg: reg, hb: hb, terminal: terminal, inv: inv}
+	svc := &ingestService{reg: reg, hb: hb, terminal: terminal, inv: inv, renew: renew}
 	agentv1.RegisterIngestServiceServer(grpcServer, svc)
 
 	// Graceful shutdown on context cancellation. GracefulStop sends GOAWAY

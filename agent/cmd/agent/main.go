@@ -172,8 +172,14 @@ func runAgent(ctx context.Context, cfg *config.Config, tags []*agentv1.Tag) erro
 	// dialFunc creates a fresh gRPC connection each time it is called. The
 	// heartbeat runner calls it once per stream attempt so that a stuck or
 	// stale ClientConn from a previous attempt can never block reconnection.
+	// The client certificate is re-read from disk on every dial so rotation
+	// picks up the latest cert after the heartbeat loop has persisted it.
 	dialFunc := func() (*grpc.ClientConn, error) {
-		return agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile, cfg.Ingest.TLSSkipVerify)
+		clientCert, err := keypair.TLSCertificate(cfg.Agent.DataDir)
+		if err != nil {
+			slog.Warn("loading client cert for mTLS", "err", err)
+		}
+		return agentgrpc.Connect(cfg.Ingest.Address, cfg.Ingest.CACertFile, cfg.Ingest.TLSSkipVerify, clientCert)
 	}
 
 	// Inject dial function into the tasks package so the software_inventory
@@ -195,7 +201,7 @@ func runAgent(ctx context.Context, cfg *config.Config, tags []*agentv1.Tag) erro
 				slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
 				return err
 			}
-			registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.OrgToken, version, tags)
+			registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.OrgToken, version, tags, cfg.Agent.DataDir)
 			newState, err := registrar.Register(ctx, state.AgentID)
 			regConn.Close()
 			if err != nil {
@@ -216,7 +222,7 @@ func runAgent(ctx context.Context, cfg *config.Config, tags []*agentv1.Tag) erro
 		tasks.SetJWTToken(state.JWTToken)
 
 		slog.Info("starting heartbeat", "interval_secs", cfg.Agent.HeartbeatIntervalSecs, "version", version)
-		hb := heartbeat.New(dialFunc, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor)
+		hb := heartbeat.New(dialFunc, state.AgentID, state.JWTToken, version, cfg.Agent.HeartbeatIntervalSecs, executor, cfg.Agent.DataDir, keypair)
 		err = hb.Run(ctx)
 
 		if errors.Is(err, heartbeat.ErrAgentDeregistered) {

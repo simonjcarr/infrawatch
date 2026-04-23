@@ -12,6 +12,7 @@ import (
 
 	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
@@ -19,11 +20,12 @@ import (
 type RegisterHandler struct {
 	pool   *pgxpool.Pool
 	issuer *auth.JWTIssuer
+	ca     *pki.AgentCA
 }
 
 // NewRegisterHandler creates a RegisterHandler.
-func NewRegisterHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer) *RegisterHandler {
-	return &RegisterHandler{pool: pool, issuer: issuer}
+func NewRegisterHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, ca *pki.AgentCA) *RegisterHandler {
+	return &RegisterHandler{pool: pool, issuer: issuer, ca: ca}
 }
 
 // Register handles agent registration.
@@ -72,18 +74,27 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 
 	if existing != nil {
 		slog.Info("agent already registered", "agent_id", existing.ID, "status", existing.Status)
+		// Update the queued CSR in case the agent has re-generated one (e.g.
+		// after a reinstall that preserved the keypair but lost the cert).
+		if len(req.CsrDer) > 0 && existing.Status != "revoked" {
+			if err := queries.UpsertPendingCSR(ctx, h.pool, existing.ID, req.CsrDer); err != nil {
+				slog.Warn("upserting pending CSR on re-registration", "err", err)
+			}
+		}
 		if existing.Status == "active" {
 			jwtToken, err := h.issuer.IssueAgentToken(existing.ID, orgID)
 			if err != nil {
 				slog.Error("issuing JWT for existing agent", "err", err)
 				return nil, status.Error(codes.Internal, "internal error")
 			}
-			return &agentv1.RegisterResponse{
+			resp := &agentv1.RegisterResponse{
 				AgentId:  existing.ID,
 				Status:   "active",
 				Message:  "agent already registered and active",
 				JwtToken: jwtToken,
-			}, nil
+			}
+			attachCertIfReady(ctx, h.pool, h.ca, existing.ID, resp)
+			return resp, nil
 		}
 		return &agentv1.RegisterResponse{
 			AgentId: existing.ID,
@@ -193,6 +204,14 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		return nil, status.Error(codes.Internal, "failed to register agent")
 	}
 
+	// Queue CSR for signing (the sweeper only signs CSRs for active agents,
+	// so pending registrations sit until admin approval).
+	if len(req.CsrDer) > 0 {
+		if err := queries.UpsertPendingCSR(ctx, h.pool, agentID, req.CsrDer); err != nil {
+			slog.Warn("queueing CSR", "agent_id", agentID, "err", err)
+		}
+	}
+
 	if err := queries.IncrementUsageCount(ctx, h.pool, token.ID); err != nil {
 		slog.Warn("incrementing enrolment token usage", "err", err)
 	}
@@ -249,13 +268,23 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 			return nil, status.Error(codes.Internal, "internal error")
 		}
 
-		slog.Info("agent auto-approved", "agent_id", agentID)
-		return &agentv1.RegisterResponse{
+		// Sign the CSR inline so auto-approved agents receive their client
+		// cert in the Register response and can mTLS from their very next
+		// call. If anything fails we log and fall back to the async sweeper
+		// path — the agent can retry Register once and pick up its cert.
+		resp := &agentv1.RegisterResponse{
 			AgentId:  agentID,
 			Status:   "active",
 			Message:  "agent registered and auto-approved",
 			JwtToken: jwtToken,
-		}, nil
+		}
+		if len(req.CsrDer) > 0 && h.ca != nil {
+			if err := signAndAttach(ctx, h.pool, h.ca, agentID, orgID, req.CsrDer, resp); err != nil {
+				slog.Warn("inline signing CSR on auto-approve", "err", err)
+			}
+		}
+		slog.Info("agent auto-approved", "agent_id", agentID)
+		return resp, nil
 	}
 
 	// Step 6: Pending — waiting for admin approval
@@ -264,4 +293,57 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		Status:  "pending",
 		Message: "agent registered and awaiting admin approval",
 	}, nil
+}
+
+// signAndAttach signs a CSR immediately, persists the leaf onto the agents
+// row, clears any pending queue entry, and attaches the cert + CA to resp.
+func signAndAttach(ctx context.Context, pool *pgxpool.Pool, ca *pki.AgentCA, agentID, orgID string, csrDER []byte, resp *agentv1.RegisterResponse) error {
+	leaf, err := ca.Sign(csrDER, agentID, orgID)
+	if err != nil {
+		return err
+	}
+	if _, err := pool.Exec(ctx, `
+		UPDATE agents
+		   SET client_cert_pem = $1,
+		       client_cert_serial = $2,
+		       client_cert_issued_at = NOW(),
+		       client_cert_not_after = $3,
+		       updated_at = NOW()
+		 WHERE id = $4`,
+		string(leaf.PEM), leaf.Serial, leaf.NotAfter, agentID,
+	); err != nil {
+		return err
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM pending_cert_signings WHERE agent_id = $1`, agentID); err != nil {
+		slog.Warn("clearing pending CSR after inline sign", "agent_id", agentID, "err", err)
+	}
+	resp.ClientCertPem = string(leaf.PEM)
+	resp.ClientCertNotAfterUnix = leaf.NotAfter.Unix()
+	resp.AgentCaCertPem = string(ca.CertPEM)
+	return nil
+}
+
+// attachCertIfReady populates client_cert_pem and agent_ca_cert_pem on resp
+// from the agents row, if a cert has already been signed. Used for repeat
+// Register calls from pending-then-approved agents.
+func attachCertIfReady(ctx context.Context, pool *pgxpool.Pool, ca *pki.AgentCA, agentID string, resp *agentv1.RegisterResponse) {
+	var certPEM string
+	var notAfter *int64
+	err := pool.QueryRow(ctx, `
+		SELECT COALESCE(client_cert_pem, ''),
+		       CASE WHEN client_cert_not_after IS NULL
+		            THEN NULL
+		            ELSE EXTRACT(EPOCH FROM client_cert_not_after)::BIGINT END
+		  FROM agents
+		 WHERE id = $1`, agentID).Scan(&certPEM, &notAfter)
+	if err != nil || certPEM == "" {
+		return
+	}
+	resp.ClientCertPem = certPEM
+	if ca != nil {
+		resp.AgentCaCertPem = string(ca.CertPEM)
+	}
+	if notAfter != nil {
+		resp.ClientCertNotAfterUnix = *notAfter
+	}
 }

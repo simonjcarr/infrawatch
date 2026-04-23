@@ -126,4 +126,12 @@ message HeartbeatResponse {
   repeated string cancel_task_ids = 10; // task_run_hosts.id values the agent must cancel immediately
   repeated TerminalSessionRequest pending_terminal_sessions = 11; // terminal sessions to open
   repeated string cancel_terminal_sessions = 12;                  // terminal sessions to close
+  // PEM-encoded client cert the server has just signed for this agent.
+  // Populated when the server holds a newer cert than the agent reports.
+  // The agent persists it atomically and re-dials gRPC with mTLS.
+  string pending_client_cert_pem = 13;
+  int64 pending_client_cert_not_after_unix = 14;
+  // Agent CA cert bundle (PEM). Sent alongside a pending cert or when the CA
+  // has rotated — the agent stashes this so it can display the chain.
+  string agent_ca_cert_pem = 15;
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
 	ingestgrpc "github.com/carrtech-dev/ct-ops/ingest/internal/grpc"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/queue/inprocess"
 	ingesttls "github.com/carrtech-dev/ct-ops/ingest/internal/tls"
 )
@@ -54,26 +56,55 @@ func main() {
 	}
 	slog.Info("JWT issuer ready", "issuer", cfg.JWT.Issuer)
 
+	// Load or generate the agent CA (signs per-agent client certs).
+	agentCA, err := pki.LoadOrCreate(ctx, pool, cfg.TLS.AgentCACertFile, cfg.TLS.AgentCAKeyFile)
+	if err != nil {
+		slog.Error("initialising agent CA", "err", err)
+		os.Exit(1)
+	}
+
+	// Revocation set — in-memory; refreshed from DB on interval.
+	revocation, err := pki.NewRevocation(ctx, pool)
+	if err != nil {
+		slog.Error("initialising revocation set", "err", err)
+		os.Exit(1)
+	}
+	go revocation.Run(ctx, 5*time.Second)
+
 	// Set up in-process queue
 	q := inprocess.New()
 	defer q.Close()
 
-	// Set up TLS credentials
-	creds, err := ingesttls.BuildServerCredentials(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+	// Set up TLS credentials (mTLS with the agent CA as the client trust pool).
+	creds, err := ingesttls.BuildServerCredentials(
+		cfg.TLS.CertFile,
+		cfg.TLS.KeyFile,
+		agentCA.TrustPool(),
+		func(chains [][]*x509.Certificate) error {
+			if _, _, err := pki.VerifyLeaf(chains, revocation); err != nil {
+				return err
+			}
+			return nil
+		},
+	)
 	if err != nil {
 		slog.Error("building TLS credentials", "err", err)
 		os.Exit(1)
 	}
 
 	// Build handlers
-	regHandler := handlers.NewRegisterHandler(pool, issuer)
+	regHandler := handlers.NewRegisterHandler(pool, issuer, agentCA)
 	versionPoller := config.NewVersionPoller(cfg.Agent.LatestVersion, 5*time.Minute)
 	versionPoller.Start(ctx)
 	terminalStore := handlers.NewTerminalStore()
-	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, terminalStore)
+	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, terminalStore, agentCA)
 	terminalHandler := handlers.NewTerminalHandler(pool, issuer, terminalStore)
 	terminalWSHandler := handlers.NewTerminalWSHandler(pool, terminalStore)
 	inventoryHandler := handlers.NewInventoryHandler(pool, issuer)
+	renewHandler := handlers.NewRenewCertHandler(pool, agentCA)
+
+	// Start the CSR sweeper so admin-approved agents get their certs signed.
+	go pki.RunCSRSweeper(ctx, pool, agentCA, 5*time.Second)
 
 	// Start JWKS HTTP server
 	go func() {
@@ -106,7 +137,7 @@ func main() {
 	grpcErr := make(chan error, 1)
 	go func() {
 		slog.Info("gRPC server starting", "port", cfg.GRPCPort)
-		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, terminalHandler, inventoryHandler)
+		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, terminalHandler, inventoryHandler, renewHandler)
 	}()
 
 	select {

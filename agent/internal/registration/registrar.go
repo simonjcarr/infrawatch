@@ -23,6 +23,7 @@ type Registrar struct {
 	orgToken string
 	version  string
 	tags     []*agentv1.Tag
+	dataDir  string
 
 	// Optional overrides. When hostnameOverride is non-empty it replaces
 	// os.Hostname(). When ipsOverride is non-nil it replaces localIPs() —
@@ -34,14 +35,16 @@ type Registrar struct {
 }
 
 // New creates a new Registrar. Tags are applied at registration; merged order
-// (config → CLI) is resolved by the caller.
-func New(client agentv1.IngestServiceClient, keypair *identity.Keypair, orgToken, version string, tags []*agentv1.Tag) *Registrar {
+// (config → CLI) is resolved by the caller. dataDir is where the agent
+// persists any client cert / CA bundle it receives from the server.
+func New(client agentv1.IngestServiceClient, keypair *identity.Keypair, orgToken, version string, tags []*agentv1.Tag, dataDir string) *Registrar {
 	return &Registrar{
 		client:   client,
 		keypair:  keypair,
 		orgToken: orgToken,
 		version:  version,
 		tags:     tags,
+		dataDir:  dataDir,
 	}
 }
 
@@ -81,9 +84,15 @@ func (r *Registrar) Register(ctx context.Context, existingAgentID string) (*iden
 		ips = localIPs()
 	}
 
+	csrDER, err := r.keypair.BuildCSR()
+	if err != nil {
+		return nil, fmt.Errorf("building CSR: %w", err)
+	}
+
 	req := &agentv1.RegisterRequest{
 		OrgToken:  r.orgToken,
 		PublicKey: r.keypair.PublicKeyPEM,
+		CsrDer:    csrDER,
 		PlatformInfo: &agentv1.PlatformInfo{
 			Os:          runtime.GOOS,
 			Arch:        runtime.GOARCH,
@@ -107,6 +116,19 @@ func (r *Registrar) Register(ctx context.Context, existingAgentID string) (*iden
 
 		switch resp.Status {
 		case "active":
+			// Persist the signed client cert + CA bundle if the server supplied
+			// them. Auto-approve sends them inline; manual approval delivers
+			// them on a subsequent Register call once the sweeper has signed.
+			if resp.ClientCertPem != "" {
+				if err := identity.SaveClientCert(r.dataDir, []byte(resp.ClientCertPem)); err != nil {
+					slog.Warn("saving client cert from Register response", "err", err)
+				} else {
+					slog.Info("persisted client cert from Register response")
+				}
+			}
+			if resp.AgentCaCertPem != "" {
+				_ = identity.SaveAgentCA(r.dataDir, []byte(resp.AgentCaCertPem))
+			}
 			return &identity.AgentState{
 				AgentID:  resp.AgentId,
 				JWTToken: resp.JwtToken,

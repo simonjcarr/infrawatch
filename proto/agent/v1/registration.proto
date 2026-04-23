@@ -17,6 +17,10 @@ message RegisterRequest {
   PlatformInfo platform_info = 3;
   AgentInfo agent_info = 4;
   repeated Tag tags = 5;   // tags applied at registration (CLI + config merged)
+  // DER-encoded PKCS#10 CSR signed with the agent's Ed25519 private key.
+  // Used by the ingest to mint a client cert for mTLS on subsequent calls.
+  // Empty for legacy agents — server will request one via HeartbeatResponse.
+  bytes csr_der = 6;
 }
 
 message RegisterResponse {
@@ -24,4 +28,11 @@ message RegisterResponse {
   string status = 2;     // "pending" | "active" | "revoked"
   string message = 3;
   string jwt_token = 4;  // only populated when status == "active"
+  // PEM-encoded client cert signed by the agent CA. Populated when the agent
+  // sent a CSR and the registration was auto-approved; otherwise delivered
+  // later via HeartbeatResponse.pending_client_cert_pem after admin approval.
+  string client_cert_pem = 5;
+  // PEM-encoded agent CA cert(s) so the agent can display/verify its chain.
+  string agent_ca_cert_pem = 6;
+  int64 client_cert_not_after_unix = 7;
 }

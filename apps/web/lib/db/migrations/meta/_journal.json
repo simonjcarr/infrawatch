@@ -288,6 +288,13 @@
       "when": 1776838580255,
       "tag": "0040_dry_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1776931407770,
+      "tag": "0041_military_owl",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,7 @@ import {
   Network,
   FolderSearch,
   ScanSearch,
+  Lock,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -112,6 +113,7 @@ const adminNav: NavItem[] = [
       { title: 'Agent Enrolment', href: '/settings/agents', icon: Server },
       { title: 'Alert Defaults', href: '/settings/alerts', icon: BellPlus },
       { title: 'LDAP / Directory', href: '/settings/ldap', icon: Key },
+      { title: 'Security / mTLS', href: '/settings/security', icon: Lock },
       { title: 'System Health', href: '/settings/system', icon: HeartPulse },
     ],
   },

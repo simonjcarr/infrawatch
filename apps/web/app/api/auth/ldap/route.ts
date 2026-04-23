@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
   for (const config of configs) {
     const result = await authenticateUser(config, username, password)
     if ('error' in result) {
-      console.error(`[LDAP] Auth failed for config "${config.name}" (${config.host}): ${result.error}`)
+      console.error('[LDAP] Auth failed for a config')
       errors.push(`${config.name}: ${result.error}`)
       continue
     }
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     })
     if (!user || !user.isActive || user.deletedAt) {
       // Log internally but return the same generic error to avoid leaking account existence.
-      console.warn(`[LDAP] Login rejected — account inactive or deleted: userId=${userId}`)
+      console.warn('[LDAP] Login rejected — account inactive or deleted')
       return withAuthDelay(
         requestStart,
         NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
     return withAuthDelay(requestStart, response)
   }
 
-  console.error(`[LDAP] All configs failed for user "${username}":`, errors)
+  console.error('[LDAP] All configs failed')
   return withAuthDelay(
     requestStart,
     NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),

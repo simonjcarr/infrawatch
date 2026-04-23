@@ -160,7 +160,7 @@ export async function approveAgent(
       if (finalTags.length > 0) {
         const result = await assignTagsToResource(orgId, 'host', host.id, finalTags)
         if ('error' in result) {
-          console.warn('Failed to apply tags on approval:', result.error)
+          console.warn('Failed to apply tags on approval')
         }
       }
 

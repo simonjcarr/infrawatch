@@ -68,6 +68,9 @@ func Serve(ctx context.Context, port int, creds credentials.TransportCredentials
 		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(enforcement),
 		grpc.KeepaliveParams(serverKp),
+		grpc.MaxRecvMsgSize(50 * 1024 * 1024),  // 50 MB per message
+		grpc.MaxSendMsgSize(50 * 1024 * 1024),  // 50 MB per message
+		grpc.MaxConcurrentStreams(1000),         // per-connection stream cap
 		grpc.ChainUnaryInterceptor(RecoveryUnaryInterceptor, LoggingUnaryInterceptor),
 		grpc.ChainStreamInterceptor(RecoveryStreamInterceptor, LoggingStreamInterceptor),
 	}

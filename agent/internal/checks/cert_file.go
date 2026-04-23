@@ -94,6 +94,15 @@ func runCertFileCheck(cfg CertFileConfig) (status, output string) {
 
 // loadCert reads the file and returns the leaf certificate based on the configured format.
 func loadCert(cfg CertFileConfig) (*x509.Certificate, error) {
+	// Reject symlinks: an attacker with local write access to a monitored
+	// directory could point the check at arbitrary files.
+	fi, err := os.Lstat(cfg.FilePath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot stat file: %w", err)
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("refusing to read symlink %q; configure the real file path directly", cfg.FilePath)
+	}
 	data, err := os.ReadFile(cfg.FilePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read file: %w", err)

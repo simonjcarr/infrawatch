@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { organisations, hosts, terminalSessions } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
-import { createId } from '@paralleldrive/cuid2'
+import { randomBytes } from 'crypto'
 import { getRequiredSession } from '@/lib/auth/session'
 import type { OrgMetadata, HostMetadata } from '@/lib/db/schema'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
@@ -104,7 +104,7 @@ export async function createTerminalSession(
   const session = await getRequiredSession()
 
   try {
-    const sessionId = createId()
+    const sessionId = randomBytes(32).toString('hex')
 
     await db.insert(terminalSessions).values({
       organisationId: orgId,

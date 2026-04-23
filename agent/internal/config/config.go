@@ -39,7 +39,10 @@ type AgentConfig struct {
 func Load(path string) (*Config, error) {
 	cfg := defaults()
 
-	if _, err := os.Stat(path); err == nil {
+	if fi, err := os.Stat(path); err == nil {
+		if err := checkFilePermissions(path, fi); err != nil {
+			return nil, err
+		}
 		if _, err := toml.DecodeFile(path, cfg); err != nil {
 			return nil, fmt.Errorf("parsing config %s: %w", path, err)
 		}

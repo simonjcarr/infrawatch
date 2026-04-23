@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.3...agent/v0.29.0) (2026-04-23)
+
+
+### Features
+
+* **security:** mTLS on all agent↔server gRPC ([#511](https://github.com/carrtech-dev/ct-ops/issues/511)) ([81da1fd](https://github.com/carrtech-dev/ct-ops/commit/81da1fdb186f18450588d7019306427be91bcb2d))
+
 ## [0.28.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.28.2...agent/v0.28.3) (2026-04-22)
 
 

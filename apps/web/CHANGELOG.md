@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.64.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.64.0...web/v0.64.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* **web:** propagate skip_verify to bootstrap curl in install script ([#517](https://github.com/carrtech-dev/ct-ops/issues/517)) ([4190c52](https://github.com/carrtech-dev/ct-ops/commit/4190c5287f4dbaffd4fbda6657da8744a03fe417))
+
 ## [0.64.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.63.0...web/v0.64.0) (2026-04-23)
 
 

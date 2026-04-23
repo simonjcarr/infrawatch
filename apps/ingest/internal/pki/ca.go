@@ -263,9 +263,9 @@ func generateCA() (*AgentCA, error) {
 }
 
 func parseCertAndKey(certPEM, keyPEM []byte) (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	certBlock, _ := pem.Decode(certPEM)
+	certBlock := findPEMBlock(certPEM, "CERTIFICATE")
 	if certBlock == nil {
-		return nil, nil, errors.New("cert PEM has no decodable block")
+		return nil, nil, errors.New("cert PEM has no CERTIFICATE block")
 	}
 	cert, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
@@ -277,9 +277,12 @@ func parseCertAndKey(certPEM, keyPEM []byte) (*x509.Certificate, *ecdsa.PrivateK
 	if keyPEM == nil {
 		return cert, nil, nil
 	}
-	keyBlock, _ := pem.Decode(keyPEM)
+	// OpenSSL's `ecparam -genkey` output prepends an EC PARAMETERS block
+	// before the PRIVATE KEY block. Skip over params and anything else to
+	// find the actual key material.
+	keyBlock := findPEMBlock(keyPEM, "EC PRIVATE KEY", "PRIVATE KEY")
 	if keyBlock == nil {
-		return nil, nil, errors.New("key PEM has no decodable block")
+		return nil, nil, errors.New("key PEM has no (EC) PRIVATE KEY block")
 	}
 	key, err := parseECPrivateKey(keyBlock.Bytes)
 	if err != nil {
@@ -291,6 +294,25 @@ func parseCertAndKey(certPEM, keyPEM []byte) (*x509.Certificate, *ecdsa.PrivateK
 		return nil, nil, errors.New("CA key does not match CA cert public key")
 	}
 	return cert, key, nil
+}
+
+// findPEMBlock returns the first PEM block in data whose Type matches any of
+// allowed. nil if none found. Used to skip over EC PARAMETERS and similar
+// multi-block OpenSSL outputs.
+func findPEMBlock(data []byte, allowed ...string) *pem.Block {
+	rest := data
+	for {
+		block, r := pem.Decode(rest)
+		if block == nil {
+			return nil
+		}
+		for _, t := range allowed {
+			if block.Type == t {
+				return block
+			}
+		}
+		rest = r
+	}
 }
 
 func parseECPrivateKey(der []byte) (*ecdsa.PrivateKey, error) {

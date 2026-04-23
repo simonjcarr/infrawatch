@@ -43,7 +43,7 @@ func GetEnrolmentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*
 	const q = `
 		SELECT id, organisation_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
 		FROM agent_enrolment_tokens
-		WHERE (token_hash = encode(sha256($1::bytea), 'hex') OR (token_hash IS NULL AND token = $1))
+		WHERE (token_hash = encode(sha256($1::bytea), 'hex') OR (token_hash IS NULL AND token = $1::text))
 		  AND deleted_at IS NULL
 		  AND (expires_at IS NULL OR expires_at > NOW())
 		  AND (max_uses IS NULL OR usage_count < max_uses)

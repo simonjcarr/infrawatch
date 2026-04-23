@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   const script = token
     ? buildAutoInstallScript(serverURL, token, ingestAddress, skipVerify)
-    : buildDownloadScript(serverURL, ingestAddress)
+    : buildDownloadScript(serverURL, ingestAddress, skipVerify)
 
   return new NextResponse(script, {
     headers: {
@@ -63,6 +63,12 @@ function buildAutoInstallScript(
   skipVerify: boolean,
 ): string {
   const tlsFlag = skipVerify ? ' --tls-skip-verify' : ''
+  // skip_verify=true also relaxes the bootstrap curl that downloads the
+  // binary — without this, operators piping the script through bash hit a
+  // "self-signed certificate" error even after passing -k to the outer
+  // curl, because the outer flag does not propagate to commands in the
+  // downloaded script.
+  const curlFlags = skipVerify ? '-fsSLk' : '-fsSL'
   return `#!/bin/sh
 set -e
 
@@ -82,7 +88,7 @@ esac
 
 # ── Download binary ────────────────────────────────────────────────────────────
 echo "Downloading ct-ops-agent for \${OS}/\${ARCH}..."
-curl -fsSL "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o ct-ops-agent
+curl ${curlFlags} "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o ct-ops-agent
 chmod +x ct-ops-agent
 echo "Binary downloaded."
 
@@ -91,7 +97,12 @@ sudo ./ct-ops-agent --install --token "${token}" --address "${ingestAddress}"${t
 `
 }
 
-function buildDownloadScript(serverURL: string, ingestAddress: string): string {
+function buildDownloadScript(
+  serverURL: string,
+  ingestAddress: string,
+  skipVerify: boolean,
+): string {
+  const curlFlags = skipVerify ? '-fsSLk' : '-fsSL'
   return `#!/bin/sh
 set -e
 
@@ -111,7 +122,7 @@ esac
 
 # ── Download binary ────────────────────────────────────────────────────────────
 echo "Downloading ct-ops-agent for \${OS}/\${ARCH}..."
-curl -fsSL "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o ct-ops-agent
+curl ${curlFlags} "${serverURL}/api/agent/download?os=\${OS}&arch=\${ARCH}" -o ct-ops-agent
 chmod +x ct-ops-agent
 
 echo ""

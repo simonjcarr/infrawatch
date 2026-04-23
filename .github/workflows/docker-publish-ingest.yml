@@ -122,9 +122,10 @@ jobs:
 
       - name: Derive version
         id: version
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          TAG="${{ inputs.tag_name }}"
-          echo "value=${TAG#ingest/}" >> "$GITHUB_OUTPUT"
+          echo "value=${TAG_NAME#ingest/}" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata
         id: meta

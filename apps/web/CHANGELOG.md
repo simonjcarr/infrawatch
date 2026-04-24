@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.65.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.64.1...web/v0.65.0) (2026-04-24)
+
+
+### Features
+
+* **web:** add Jenkins WAR + plugins air-gap bundler ([3f5892d](https://github.com/carrtech-dev/ct-ops/commit/3f5892d3dba49e1a8c33359ff9ba2b195dbc7da1))
+* **web:** Jenkins WAR + plugins air-gap bundler ([16f570a](https://github.com/carrtech-dev/ct-ops/commit/16f570a8fb82e217bb5ea61b5507713f44d16302))
+
+
+### Bug Fixes
+
+* **web:** make Jenkins bundler proxy SSRF-safe ([ded99d9](https://github.com/carrtech-dev/ct-ops/commit/ded99d9078e3f1db8e5dd05edb1b228f14b4ef03))
+
 ## [0.64.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.64.0...web/v0.64.1) (2026-04-23)
 
 

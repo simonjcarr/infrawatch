@@ -1,13 +1,21 @@
 name: Build and publish Docker image (web)
 
-# Invoked by agent-release.yml when release-please cuts a new `web/vX.Y.Z`
-# release. Must run inside the same workflow that release-please runs in —
-# tag pushes made with GITHUB_TOKEN do not trigger downstream workflows.
+# Three trigger paths, all of which build the same image from the same
+# release tag — belt-and-braces because each path has its own failure mode:
 #
-# Also runnable manually via `workflow_dispatch` so an operator can rebuild
-# a published release if the release-please → reusable-workflow handoff ever
-# skips or fails. Provide `tag_name` (e.g. `web/v0.65.0`) to target a
-# specific release.
+#   1. workflow_call from agent-release.yml when release-please cuts a new
+#      `web/vX.Y.Z` release. This is the primary path, in-process with
+#      release-please so it sees the just-created tag immediately.
+#   2. release: { types: [published] } — fires off the GitHub Release
+#      creation event itself, so even if the in-workflow handoff above
+#      silently skips (e.g. release-please-action emits an empty
+#      `release_created` output), the build still happens. Filtered with a
+#      job-level `if:` so only `web/v*` releases trigger the web image.
+#   3. workflow_dispatch — manual one-click rebuild of any published tag,
+#      for recovering from upstream-runner failures or re-issuing an image.
+#
+# Concurrent firings of (1) and (2) are safe: both push the same
+# content-addressed digest to the same multi-arch manifest tag.
 
 on:
   workflow_call:
@@ -22,14 +30,23 @@ on:
         description: Release tag to build (e.g. web/v0.65.0). Must already exist.
         required: true
         type: string
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/ct-ops
+  # Resolved once at workflow level so steps don't have to re-derive it.
+  # `inputs` is undefined on the `release` trigger, so the `||` falls
+  # through to the release payload's tag.
+  TAG_NAME: ${{ inputs.tag_name || github.event.release.tag_name }}
 
 jobs:
   build-web:
     name: Build web image (${{ matrix.platform }})
+    # Only act on web/* releases — `release` events fire for every tag in
+    # the repo, including agent/* and ingest/*.
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'web/')
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -55,7 +72,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag_name }}
+          ref: ${{ env.TAG_NAME }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -121,6 +138,7 @@ jobs:
 
   merge-web:
     name: Merge web image manifests
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'web/')
     runs-on: self-hosted
     needs: build-web
     permissions:
@@ -150,8 +168,6 @@ jobs:
 
       - name: Derive version
         id: version
-        env:
-          TAG_NAME: ${{ inputs.tag_name }}
         run: |
           echo "value=${TAG_NAME#web/}" >> "$GITHUB_OUTPUT"
 

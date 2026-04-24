@@ -1,13 +1,18 @@
 name: Build and publish Docker image (ingest)
 
-# Invoked by agent-release.yml when release-please cuts a new `ingest/vX.Y.Z`
-# release. Must run inside the same workflow that release-please runs in —
-# tag pushes made with GITHUB_TOKEN do not trigger downstream workflows.
+# Three trigger paths, all of which build the same image from the same
+# release tag — belt-and-braces because each path has its own failure mode:
 #
-# Also runnable manually via `workflow_dispatch` so an operator can rebuild
-# a published release if the release-please → reusable-workflow handoff ever
-# skips or fails. Provide `tag_name` (e.g. `ingest/v0.1.0`) to target a
-# specific release.
+#   1. workflow_call from agent-release.yml when release-please cuts a new
+#      `ingest/vX.Y.Z` release. Primary path, in-process with release-please.
+#   2. release: { types: [published] } — fires off the GitHub Release
+#      creation event itself, so even if the in-workflow handoff above
+#      silently skips, the build still happens. Filtered with a job-level
+#      `if:` so only `ingest/v*` releases trigger the ingest image.
+#   3. workflow_dispatch — manual one-click rebuild of any published tag.
+#
+# Concurrent firings of (1) and (2) are safe: both push the same
+# content-addressed digest to the same multi-arch manifest tag.
 
 on:
   workflow_call:
@@ -22,14 +27,22 @@ on:
         description: Release tag to build (e.g. ingest/v0.1.0). Must already exist.
         required: true
         type: string
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/ct-ops
+  # Resolved once at workflow level so steps don't have to re-derive it.
+  # `inputs` is undefined on the `release` trigger, so the `||` falls
+  # through to the release payload's tag.
+  TAG_NAME: ${{ inputs.tag_name || github.event.release.tag_name }}
 
 jobs:
   build-ingest:
     name: Build ingest image (${{ matrix.platform }})
+    # Only act on ingest/* releases — `release` events fire for every tag.
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'ingest/')
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -55,7 +68,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag_name }}
+          ref: ${{ env.TAG_NAME }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -121,6 +134,7 @@ jobs:
 
   merge-ingest:
     name: Merge ingest image manifests
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'ingest/')
     runs-on: self-hosted
     needs: build-ingest
     permissions:
@@ -150,8 +164,6 @@ jobs:
 
       - name: Derive version
         id: version
-        env:
-          TAG_NAME: ${{ inputs.tag_name }}
         run: |
           echo "value=${TAG_NAME#ingest/}" >> "$GITHUB_OUTPUT"
 

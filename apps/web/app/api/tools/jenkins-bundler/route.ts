@@ -28,6 +28,11 @@ export type ResolveResponse = {
   ok: true
   coreVersion: string
   coreMinimumJava: number
+  // Where the `coreMinimumJava` value came from. Surfaced to the UI so the
+  // user knows whether the answer is the upstream-authoritative one or a
+  // local best-guess (e.g. when updates.jenkins.io has no per-version
+  // catalogue for the requested WAR).
+  coreJavaSource: 'updates.jenkins.io' | 'estimated'
   javaCompatible: boolean | null
   warUrl: string | null
   plugins: ResolvedPlugin[]
@@ -43,7 +48,8 @@ const LatestLtsSchema = z.object({ action: z.literal('latest-lts') })
 const ResolveSchema = z.object({
   action: z.literal('resolve'),
   coreVersion: z.string().regex(/^\d+\.\d+(\.\d+)?$/, 'Expected version like 2.462.3'),
-  plugins: z.array(z.string().min(1).max(200)).min(1).max(500),
+  // Empty plugin list is allowed — a user can bundle just the WAR.
+  plugins: z.array(z.string().min(1).max(200)).max(500),
   javaVersion: z.number().int().min(1).max(99).optional(),
 })
 
@@ -161,7 +167,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       getUpdateCenterForCore(coreVersion),
       resolveWarUrl(coreVersion),
     ])
-    const coreMinimumJava = minimumJavaForCore(coreVersion)
+
+    // Prefer the live answer from updates.jenkins.io's per-version catalogue,
+    // but only when its `core.version` matched the user's request. Otherwise
+    // (no per-version catalogue, or the action fell back to "current") we
+    // can't trust that field for this WAR, and we fall back to the local
+    // baseline table — flagged as `estimated` so the UI can say so.
+    const liveJava = uc.coreVersionMatches ? extractJavaMajor(uc.coreRequiredJavaVersion) : null
+    const coreMinimumJava = liveJava ?? minimumJavaForCore(coreVersion)
+    const coreJavaSource: ResolveResponse['coreJavaSource'] =
+      liveJava != null ? 'updates.jenkins.io' : 'estimated'
     const javaCompatible = javaVersion == null ? null : javaVersion >= coreMinimumJava
 
     const resolved = resolvePlugins(requested, coreVersion, uc.plugins, javaVersion ?? null)
@@ -170,6 +185,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ok: true,
       coreVersion,
       coreMinimumJava,
+      coreJavaSource,
       javaCompatible,
       warUrl,
       plugins: resolved,

@@ -25,6 +25,12 @@ export type UpdateCenterPlugin = {
 
 export type UpdateCenter = {
   coreVersion: string
+  // True iff the catalogue we successfully fetched is for the exact core
+  // version requested. Only when this is true should `coreRequiredJavaVersion`
+  // be trusted as the authoritative answer for the user's WAR — otherwise
+  // we've fallen back to a broader catalogue whose `core` describes a
+  // different version.
+  coreVersionMatches: boolean
   coreRequiredJavaVersion?: string
   plugins: Record<string, UpdateCenterPlugin>
 }
@@ -93,14 +99,19 @@ export async function getLatestLtsVersion(): Promise<string> {
 /**
  * Fetches the update-center catalogue for a specific core version.
  *
- * Jenkins serves per-version catalogues under dynamic-stable-X (for LTS lines)
- * and dynamic-X (for weekly). If neither path exists we fall back to the
- * "current" catalogue, which may list plugins whose `requiredCore` exceeds
- * the user's core — consumers filter on that field.
+ * Jenkins infrastructure (`update-center2`) generates `dynamic-{version}`
+ * catalogues per published core release, and the catalogue's `core` object
+ * describes that exact core (including `requiredJavaVersion`). We query
+ * that endpoint first so the Java requirement comes from upstream, not a
+ * stale local table. If the per-version endpoint isn't published (rare,
+ * but possible for one-off weeklies), we fall back to the "current"
+ * catalogue — which is fine for resolving plugin compatibility but its
+ * `core` describes a different version, so we mark the result with
+ * `coreVersionMatches: false` and the caller treats `coreRequiredJavaVersion`
+ * as untrustworthy.
  */
 export async function getUpdateCenterForCore(coreVersion: string): Promise<UpdateCenter> {
   const candidates = [
-    `${JENKINS_UPDATE_BASE}/dynamic-stable-${coreVersion}/update-center.actual.json`,
     `${JENKINS_UPDATE_BASE}/dynamic-${coreVersion}/update-center.actual.json`,
     `${JENKINS_UPDATE_BASE}/current/update-center.actual.json`,
   ]
@@ -137,9 +148,11 @@ export async function getUpdateCenterForCore(coreVersion: string): Promise<Updat
     }
   }
 
+  const matches = raw.core?.version === coreVersion
   return {
     coreVersion: raw.core?.version ?? coreVersion,
-    coreRequiredJavaVersion: raw.core?.requiredJavaVersion,
+    coreVersionMatches: matches,
+    coreRequiredJavaVersion: matches ? raw.core?.requiredJavaVersion : undefined,
     plugins,
   }
 }

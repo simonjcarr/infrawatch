@@ -43,6 +43,7 @@ type Report = {
   core: {
     version: string
     minimumJava: number
+    javaSource: 'updates.jenkins.io' | 'estimated'
     javaCompatible: boolean | null
     warUrl: string | null
   }
@@ -215,14 +216,11 @@ export function JenkinsBundler() {
     setResolveError(null)
     setReport(null)
     setDownloadError(null)
+    // Empty plugin list is allowed — bundling just the WAR is a valid use.
     const pluginList = pluginsText
       .split(/\r?\n|,/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0 && !s.startsWith('#'))
-    if (pluginList.length === 0) {
-      setResolveError('Enter at least one plugin name')
-      return
-    }
     if (!/^\d+\.\d+(\.\d+)?$/.test(coreVersion.trim())) {
       setResolveError('Enter a valid Jenkins core version, e.g. 2.462.3')
       return
@@ -251,6 +249,7 @@ export function JenkinsBundler() {
         core: {
           version: resolved.coreVersion,
           minimumJava: resolved.coreMinimumJava,
+          javaSource: resolved.coreJavaSource,
           javaCompatible: resolved.javaCompatible,
           warUrl: resolved.warUrl,
         },
@@ -428,7 +427,7 @@ export function JenkinsBundler() {
               </div>
               <Textarea
                 id="plugins"
-                placeholder={'One plugin short name per line, e.g.\ngit\ncredentials\nworkflow-aggregator\n…'}
+                placeholder={'One plugin short name per line, e.g.\ngit\ncredentials\nworkflow-aggregator\n…\n\n(Leave blank to bundle just the WAR.)'}
                 value={pluginsText}
                 onChange={(e) => setPluginsText(e.target.value)}
                 rows={10}
@@ -438,6 +437,7 @@ export function JenkinsBundler() {
               <p className="text-xs text-muted-foreground">
                 Use the plugin <em>short name</em> (not the display name). Lines beginning with <code>#</code> are ignored,
                 and <code>name:version</code> pins are tolerated but the latest compatible version is always selected.
+                Leave the field empty to bundle just the WAR file.
               </p>
             </div>
 
@@ -457,7 +457,7 @@ export function JenkinsBundler() {
               <Button
                 type="button"
                 onClick={downloadBundle}
-                disabled={!report || downloading || compatibleCount === 0}
+                disabled={!report || downloading || totalToDownload === 0}
                 variant="default"
               >
                 {downloading ? (
@@ -551,7 +551,10 @@ function ReportCard({
           </div>
           <div>
             <span className="text-muted-foreground">Minimum Java for WAR: </span>
-            <span className="font-mono">Java {report.core.minimumJava}+</span>
+            <span className="font-mono">Java {report.core.minimumJava}+</span>{' '}
+            <span className="text-xs text-muted-foreground">
+              ({report.core.javaSource === 'updates.jenkins.io' ? 'from updates.jenkins.io' : 'estimated — upstream catalogue did not cover this version'})
+            </span>
           </div>
           <div className="sm:col-span-2">
             <span className="text-muted-foreground">WAR download: </span>
@@ -584,11 +587,20 @@ function ReportCard({
           </Alert>
         )}
 
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge className="bg-emerald-600 hover:bg-emerald-600">{compatibleCount} compatible</Badge>
-          {incompatibleCount > 0 && <Badge variant="destructive">{incompatibleCount} incompatible / missing</Badge>}
-        </div>
+        {report.plugins.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge className="bg-emerald-600 hover:bg-emerald-600">{compatibleCount} compatible</Badge>
+            {incompatibleCount > 0 && <Badge variant="destructive">{incompatibleCount} incompatible / missing</Badge>}
+          </div>
+        )}
 
+        {report.plugins.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            No plugins requested — the bundle will contain just the WAR file.
+          </p>
+        )}
+
+        {report.plugins.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
@@ -633,6 +645,7 @@ function ReportCard({
             </TableBody>
           </Table>
         </div>
+        )}
       </CardContent>
     </Card>
   )

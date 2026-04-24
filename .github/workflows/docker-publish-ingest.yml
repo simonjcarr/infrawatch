@@ -3,12 +3,23 @@ name: Build and publish Docker image (ingest)
 # Invoked by agent-release.yml when release-please cuts a new `ingest/vX.Y.Z`
 # release. Must run inside the same workflow that release-please runs in —
 # tag pushes made with GITHUB_TOKEN do not trigger downstream workflows.
+#
+# Also runnable manually via `workflow_dispatch` so an operator can rebuild
+# a published release if the release-please → reusable-workflow handoff ever
+# skips or fails. Provide `tag_name` (e.g. `ingest/v0.1.0`) to target a
+# specific release.
 
 on:
   workflow_call:
     inputs:
       tag_name:
         description: Release tag (e.g. ingest/v0.1.0). Used as the checkout ref and stripped of its `ingest/` prefix to tag the image.
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Release tag to build (e.g. ingest/v0.1.0). Must already exist.
         required: true
         type: string
 

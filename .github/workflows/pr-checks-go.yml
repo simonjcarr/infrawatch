@@ -46,3 +46,18 @@ jobs:
       - name: Test ingest
         run: go test ./...
         working-directory: apps/ingest
+
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          # Reclaim any root-owned files Docker may have left behind so the
+          # delete below can actually remove them.
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          # "until=1h" keeps cache layers a parallel job might still be using.
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0

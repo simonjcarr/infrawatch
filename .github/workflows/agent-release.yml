@@ -55,6 +55,18 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
+
   # ── Binary build matrix ──────────────────────────────────────────────────
   # Only runs when the release PR is merged (i.e. a real release was created).
   build:
@@ -129,6 +141,18 @@ jobs:
             dist/ct-ops-agent-${{ matrix.asset_suffix }}${{ matrix.exe_suffix }}
             dist/ct-ops-agent-${{ matrix.asset_suffix }}.sha256
             dist/ct-ops-agent-${{ matrix.asset_suffix }}.spdx.json
+
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
 
   # ── Customer bundle for web releases ─────────────────────────────────────
   # Runs in the same workflow run as release-please so the GITHUB_TOKEN
@@ -540,6 +564,18 @@ jobs:
             ${{ steps.bundle.outputs.versioned }}
             ct-ops-single.zip
             ct-ops-web.spdx.json
+
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
 
   # ── Docker image publishes ───────────────────────────────────────────────
   # Each image is built at most once per release cycle, only when its

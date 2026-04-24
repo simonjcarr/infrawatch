@@ -57,6 +57,18 @@ jobs:
           sarif_file: ${{ matrix.path }}/results.sarif
           category: gosec-${{ matrix.module }}
 
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
+
   semgrep:
     name: semgrep
     runs-on: self-hosted
@@ -104,6 +116,15 @@ jobs:
           sarif_file: semgrep.sarif
           category: semgrep
 
+      - name: Clean up runner disk
+        if: always()
+        # Runs inside the semgrep container — no docker access. Clear the
+        # mounted workspace so the next run starts on a clean slate.
+        run: |
+          set +e
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          exit 0
+
   trivy-fs:
     name: trivy (filesystem)
     runs-on: self-hosted
@@ -133,6 +154,20 @@ jobs:
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
+
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          # Trivy caches vulnerability DBs under ~/.cache/trivy — let it drop
+          # entries older than 1h so we don't re-download on every job.
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
 
   crypto-lint:
     name: crypto-lint (no weak hashes / ciphers)
@@ -180,6 +215,18 @@ jobs:
             exit 1
           fi
 
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
+
   trivy-config:
     name: trivy (config / IaC)
     runs-on: self-hosted
@@ -207,3 +254,15 @@ jobs:
         with:
           sarif_file: trivy-config.sarif
           category: trivy-config
+
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0

@@ -64,3 +64,15 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Clean up runner disk
+        if: always()
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0

@@ -33,37 +33,25 @@ env:
 
 jobs:
   # ── Release PR management ────────────────────────────────────────────────
+  # Runs on a GitHub-hosted runner — the release-please action makes many
+  # GitHub API calls when walking the monorepo history, and the self-hosted
+  # runner's outbound connection to api.github.com has been killing those
+  # sessions with `read ECONNRESET` partway through. Hosted runners don't
+  # need the docker-based workspace-ownership reset or the buildx prune.
   release-please:
     name: Create or update release PR
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       release_created:        ${{ steps.release.outputs['agent--release_created'] }}
       tag_name:               ${{ steps.release.outputs['agent--tag_name'] }}
       web_release_created:    ${{ steps.release.outputs['apps/web--release_created'] }}
       web_tag_name:           ${{ steps.release.outputs['apps/web--tag_name'] }}
     steps:
-      - name: Reset workspace ownership
-        run: |
-          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
-            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
-
       - uses: googleapis/release-please-action@v4
         id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-
-      - name: Clean up runner disk
-        if: always()
-        run: |
-          set +e
-          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
-            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
-          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
-          rm -rf /tmp/digests 2>/dev/null || true
-          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
-          docker system prune -f --filter "until=1h" 2>/dev/null || true
-          exit 0
 
   # ── Binary build matrix ──────────────────────────────────────────────────
   # Only runs when the release PR is merged (i.e. a real release was created).

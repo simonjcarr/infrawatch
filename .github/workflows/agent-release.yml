@@ -37,10 +37,12 @@ jobs:
     name: Create or update release PR
     runs-on: self-hosted
     outputs:
-      release_created:     ${{ steps.release.outputs['agent--release_created'] }}
-      tag_name:            ${{ steps.release.outputs['agent--tag_name'] }}
-      web_release_created: ${{ steps.release.outputs['apps/web--release_created'] }}
-      web_tag_name:        ${{ steps.release.outputs['apps/web--tag_name'] }}
+      release_created:        ${{ steps.release.outputs['agent--release_created'] }}
+      tag_name:               ${{ steps.release.outputs['agent--tag_name'] }}
+      web_release_created:    ${{ steps.release.outputs['apps/web--release_created'] }}
+      web_tag_name:           ${{ steps.release.outputs['apps/web--tag_name'] }}
+      ingest_release_created: ${{ steps.release.outputs['apps/ingest--release_created'] }}
+      ingest_tag_name:        ${{ steps.release.outputs['apps/ingest--tag_name'] }}
     steps:
       - name: Reset workspace ownership
         run: |
@@ -574,3 +576,30 @@ jobs:
           docker buildx prune -f --filter "until=1h" 2>/dev/null || true
           docker system prune -f --filter "until=1h" 2>/dev/null || true
           exit 0
+
+  # ── Docker image publishes ───────────────────────────────────────────────
+  # Each image is built at most once per release cycle, only when its
+  # release-please package has actually cut a new version. Must run in the
+  # same workflow as release-please — a separate `push: tags` workflow would
+  # never fire because release-please pushes tags with GITHUB_TOKEN.
+  build-web-image:
+    name: Build web image
+    needs: release-please
+    if: needs.release-please.outputs.web_release_created == 'true'
+    uses: ./.github/workflows/docker-publish-web.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      tag_name: ${{ needs.release-please.outputs.web_tag_name }}
+
+  build-ingest-image:
+    name: Build ingest image
+    needs: release-please
+    if: needs.release-please.outputs.ingest_release_created == 'true'
+    uses: ./.github/workflows/docker-publish-ingest.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      tag_name: ${{ needs.release-please.outputs.ingest_tag_name }}

@@ -1,30 +1,16 @@
 name: Build and publish Docker image (ingest)
 
+# Invoked by agent-release.yml when release-please cuts a new `ingest/vX.Y.Z`
+# release. Must run inside the same workflow that release-please runs in —
+# tag pushes made with GITHUB_TOKEN do not trigger downstream workflows.
+
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/ingest/**'
-      - 'agent/go.mod'
-      - 'agent/go.sum'
-      - 'proto/**'
-      - 'go.work'
-      - 'go.work.sum'
-      - '.release-please-manifest.json'
-      - '.github/workflows/docker-publish-ingest.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'apps/ingest/**'
-      - 'agent/go.mod'
-      - 'agent/go.sum'
-      - 'proto/**'
-      - 'go.work'
-      - 'go.work.sum'
-      - '.release-please-manifest.json'
-      - '.github/workflows/docker-publish-ingest.yml'
+  workflow_call:
+    inputs:
+      tag_name:
+        description: Release tag (e.g. ingest/v0.1.0). Used as the checkout ref and stripped of its `ingest/` prefix to tag the image.
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -57,6 +43,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag_name }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -149,14 +137,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Derive version
+        id: version
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          echo "value=${TAG_NAME#ingest/}" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_PREFIX }}/ingest
           tags: |
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.value }}
+            type=raw,value=latest
 
       - name: Create manifest list and push
         working-directory: /tmp/digests

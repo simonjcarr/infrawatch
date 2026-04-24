@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.65.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.65.0...web/v0.65.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **web:** Jenkins bundler — live Java requirement, allow WAR-only ([a2a2b97](https://github.com/carrtech-dev/ct-ops/commit/a2a2b9739c2863a9fa51b928ff30175a78ec0622))
+* **web:** Jenkins bundler — live Java requirement, allow WAR-only ([c2ca272](https://github.com/carrtech-dev/ct-ops/commit/c2ca272014707b0861284907da228d1920f376ce))
+
 ## [0.65.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.64.1...web/v0.65.0) (2026-04-24)
 
 

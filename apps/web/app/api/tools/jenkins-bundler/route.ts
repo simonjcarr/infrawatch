@@ -4,7 +4,6 @@ import {
   type UpdateCenterPlugin,
   getLatestLtsVersion,
   getUpdateCenterForCore,
-  isAllowedDownloadUrl,
   minimumJavaForCore,
   resolveWarUrl,
 } from '@/lib/jenkins/update-center'
@@ -191,22 +190,55 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 /**
  * Streaming download proxy. The browser cannot fetch plugin .hpi files
- * directly due to CORS, so we pipe them through the server. URLs must be on
- * the Jenkins allow-list; otherwise the proxy refuses.
+ * directly due to CORS, so we pipe them through the server.
+ *
+ * The proxy deliberately does not accept a user-supplied URL — that would be
+ * SSRF-able even with a hostname allow-list because redirects could land on
+ * private addresses. Instead we rebuild the URL server-side from a kind and a
+ * set of strictly-validated identifiers so the string passed to fetch is
+ * always one of two literal templates against updates.jenkins.io /
+ * get.jenkins.io.
  */
+const WarQuerySchema = z.object({
+  kind: z.literal('war'),
+  version: z.string().regex(/^\d+\.\d+(\.\d+)?$/),
+})
+
+const PluginQuerySchema = z.object({
+  kind: z.literal('plugin'),
+  name: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/i).max(100),
+  version: z.string().regex(/^[0-9][0-9A-Za-z.+_-]*$/).max(100),
+})
+
+const QuerySchema = z.discriminatedUnion('kind', [WarQuerySchema, PluginQuerySchema])
+
 export async function GET(req: NextRequest): Promise<NextResponse | Response> {
-  const url = req.nextUrl.searchParams.get('url')
-  if (!url) {
-    return NextResponse.json({ ok: false, error: 'Missing url parameter' }, { status: 400 })
-  }
-  if (!isAllowedDownloadUrl(url)) {
+  const params = Object.fromEntries(req.nextUrl.searchParams.entries())
+  const parsed = QuerySchema.safeParse(params)
+  if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, error: 'URL host is not on the Jenkins download allow-list' },
+      { ok: false, error: 'Invalid or missing parameters' },
       { status: 400 },
     )
   }
 
-  const upstream = await fetch(url, { cache: 'no-store', redirect: 'follow' })
+  let resolvedUrl: string
+  if (parsed.data.kind === 'war') {
+    const { version } = parsed.data
+    const war = await resolveWarUrl(version)
+    if (!war) {
+      return NextResponse.json(
+        { ok: false, error: 'No Jenkins WAR published for that version' },
+        { status: 404 },
+      )
+    }
+    resolvedUrl = war
+  } else {
+    const { name, version } = parsed.data
+    resolvedUrl = `https://updates.jenkins.io/download/plugins/${encodeURIComponent(name)}/${encodeURIComponent(version)}/${encodeURIComponent(name)}.hpi`
+  }
+
+  const upstream = await fetch(resolvedUrl, { cache: 'no-store', redirect: 'follow' })
   if (!upstream.ok || !upstream.body) {
     return NextResponse.json(
       { ok: false, error: `Upstream returned ${upstream.status}` },

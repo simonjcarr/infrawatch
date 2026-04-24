@@ -11,14 +11,6 @@ import { compareVersions } from '@/lib/version-compare'
 const JENKINS_UPDATE_BASE = 'https://updates.jenkins.io'
 const JENKINS_DOWNLOAD_BASE = 'https://get.jenkins.io'
 
-/** Hosts the download proxy is allowed to fetch from. */
-export const ALLOWED_JENKINS_HOSTS = new Set<string>([
-  'updates.jenkins.io',
-  'get.jenkins.io',
-  'archives.jenkins.io',
-  'mirrors.jenkins-ci.org',
-])
-
 export type UpdateCenterPlugin = {
   name: string
   version: string
@@ -185,7 +177,12 @@ export function warDownloadUrls(coreVersion: string): string[] {
   ]
 }
 
-/** Resolves the first WAR URL that returns a 2xx on a HEAD request. */
+/**
+ * Resolves the first WAR URL that returns a 2xx on a HEAD request.
+ *
+ * `coreVersion` must already be validated with `/^\d+\.\d+(\.\d+)?$/`; this
+ * function is only ever called from code paths that have done so.
+ */
 export async function resolveWarUrl(coreVersion: string): Promise<string | null> {
   for (const url of warDownloadUrls(coreVersion)) {
     try {
@@ -196,14 +193,4 @@ export async function resolveWarUrl(coreVersion: string): Promise<string | null>
     }
   }
   return null
-}
-
-export function isAllowedDownloadUrl(url: string): boolean {
-  try {
-    const u = new URL(url)
-    if (u.protocol !== 'https:') return false
-    return ALLOWED_JENKINS_HOSTS.has(u.hostname)
-  } catch {
-    return false
-  }
 }

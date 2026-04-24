@@ -60,15 +60,25 @@ async function postJson<T>(body: unknown): Promise<T> {
   return data
 }
 
+type ProxyTarget =
+  | { kind: 'war'; version: string }
+  | { kind: 'plugin'; name: string; version: string }
+
 /**
- * Streams a URL via the allow-listed server proxy and reports progress.
- * Returns the downloaded bytes as a Uint8Array.
+ * Streams an asset via the server proxy and reports progress. We send kind +
+ * identifiers (not a full URL) so the server can build the download URL from
+ * trusted templates — this is what keeps the proxy from being SSRF-able.
  */
 async function fetchWithProgress(
-  url: string,
+  target: ProxyTarget,
   onProgress: (loaded: number, total: number | null) => void,
 ): Promise<Uint8Array> {
-  const proxied = `/api/tools/jenkins-bundler?url=${encodeURIComponent(url)}`
+  const qs = new URLSearchParams(
+    target.kind === 'war'
+      ? { kind: 'war', version: target.version }
+      : { kind: 'plugin', name: target.name, version: target.version },
+  )
+  const proxied = `/api/tools/jenkins-bundler?${qs.toString()}`
   const res = await fetch(proxied, { cache: 'no-store' })
   if (!res.ok || !res.body) {
     throw new Error(`Download failed (${res.status})`)
@@ -270,26 +280,32 @@ export function JenkinsBundler() {
     try {
       if (report.core.warUrl) {
         setCurrentFile('jenkins.war')
-        const bytes = await fetchWithProgress(report.core.warUrl, (loaded, total) => {
-          setCurrentLoaded(loaded)
-          setCurrentTotal(total)
-        })
+        const bytes = await fetchWithProgress(
+          { kind: 'war', version: report.core.version },
+          (loaded, total) => {
+            setCurrentLoaded(loaded)
+            setCurrentTotal(total)
+          },
+        )
         zip.file('jenkins.war', bytes)
         setDoneCount((c) => c + 1)
       }
 
       for (let i = 0; i < updated.length; i++) {
         const plugin = updated[i]!
-        if (plugin.status !== 'compatible' || !plugin.url) continue
+        if (plugin.status !== 'compatible' || !plugin.version) continue
         const filename = `${plugin.name}.hpi`
         setCurrentFile(`plugins/${filename}`)
         setCurrentLoaded(0)
         setCurrentTotal(plugin.size ?? null)
         try {
-          const bytes = await fetchWithProgress(plugin.url, (loaded, total) => {
-            setCurrentLoaded(loaded)
-            setCurrentTotal(total ?? plugin.size ?? null)
-          })
+          const bytes = await fetchWithProgress(
+            { kind: 'plugin', name: plugin.name, version: plugin.version },
+            (loaded, total) => {
+              setCurrentLoaded(loaded)
+              setCurrentTotal(total ?? plugin.size ?? null)
+            },
+          )
           pluginsFolder.file(filename, bytes)
           updated[i] = { ...plugin, downloaded: true, downloadedBytes: bytes.byteLength }
         } catch (err) {

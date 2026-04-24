@@ -20,7 +20,8 @@
       "component": "ingest",
       "tag-separator": "/",
       "include-component-in-tag": true,
-      "changelog-path": "apps/ingest/CHANGELOG.md"
+      "changelog-path": "apps/ingest/CHANGELOG.md",
+      "bootstrap-sha": "0e9528387c990e60e551f9826077519e363193f3"
     }
   }
 }

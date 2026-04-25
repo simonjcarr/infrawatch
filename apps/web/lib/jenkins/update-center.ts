@@ -14,30 +14,13 @@ export type UpdateCenterPlugin = {
   version: string
   url: string
   requiredCore: string
-  minimumJavaVersion?: string
   dependencies?: Array<{ name: string; optional: boolean; version: string }>
   size?: number
   sha256?: string
   sha1?: string
 }
 
-export type UpdateCenter = {
-  coreVersion: string
-  // True iff the catalogue we successfully fetched is for the exact core
-  // version requested. Only when this is true should `coreRequiredJavaVersion`
-  // be trusted as the authoritative answer for the user's WAR — otherwise
-  // we've fallen back to a broader catalogue whose `core` describes a
-  // different version.
-  coreVersionMatches: boolean
-  coreRequiredJavaVersion?: string
-  plugins: Record<string, UpdateCenterPlugin>
-}
-
 type RawUpdateCenter = {
-  core?: {
-    version?: string
-    requiredJavaVersion?: string
-  }
   plugins?: Record<
     string,
     {
@@ -45,7 +28,6 @@ type RawUpdateCenter = {
       version?: string
       url?: string
       requiredCore?: string
-      minimumJavaVersion?: string
       dependencies?: Array<{ name: string; optional: boolean; version: string }>
       size?: number
       sha256?: string
@@ -95,22 +77,17 @@ export async function getLatestLtsVersion(): Promise<string> {
 }
 
 /**
- * Fetches the update-center catalogue for a specific core version.
+ * Fetches the plugin catalogue Jenkins infra publishes for a given core.
  *
- * Jenkins infrastructure (`update-center2`) publishes per-version catalogues
- * under two prefixes: `dynamic-stable-{version}` for LTS releases (e.g.
- * `2.555.1`) and `dynamic-{version}` for weekly releases (e.g. `2.543`).
- * Both catalogues' `core` object describes that exact core including the
- * authoritative `requiredJavaVersion` for that WAR. We try the LTS path
- * first because that's what users select via the "Latest LTS" button, then
- * fall through to the weekly path, and finally to the "current" catalogue.
- * The "current" catalogue is fine for resolving plugin compatibility but its
- * `core` describes the latest weekly — never the user's chosen WAR — so we
- * mark the result with `coreVersionMatches: false` and the caller treats
- * `coreRequiredJavaVersion` as untrustworthy (and surfaces "could not
- * determine" rather than guessing).
+ * `update-center2` exposes per-version catalogues under `dynamic-stable-{v}`
+ * for LTS releases and `dynamic-{v}` for weeklies; if neither responds we
+ * fall back to the `current` catalogue. We only need the plugin map — the
+ * caller filters by `requiredCore` against the user's chosen WAR — so this
+ * function returns just that.
  */
-export async function getUpdateCenterForCore(coreVersion: string): Promise<UpdateCenter> {
+export async function getUpdateCenterForCore(
+  coreVersion: string,
+): Promise<Record<string, UpdateCenterPlugin>> {
   const candidates = [
     `${JENKINS_UPDATE_BASE}/dynamic-stable-${coreVersion}/update-center.actual.json`,
     `${JENKINS_UPDATE_BASE}/dynamic-${coreVersion}/update-center.actual.json`,
@@ -141,21 +118,13 @@ export async function getUpdateCenterForCore(coreVersion: string): Promise<Updat
       version: p.version,
       url: p.url,
       requiredCore: p.requiredCore ?? '1.0',
-      minimumJavaVersion: p.minimumJavaVersion,
       dependencies: p.dependencies,
       size: p.size,
       sha256: p.sha256,
       sha1: p.sha1,
     }
   }
-
-  const matches = raw.core?.version === coreVersion
-  return {
-    coreVersion: raw.core?.version ?? coreVersion,
-    coreVersionMatches: matches,
-    coreRequiredJavaVersion: matches ? raw.core?.requiredJavaVersion : undefined,
-    plugins,
-  }
+  return plugins
 }
 
 /** Built WAR download URL for a given core version. Tries the LTS path first. */

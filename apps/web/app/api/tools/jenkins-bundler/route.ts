@@ -13,11 +13,10 @@ export const runtime = 'nodejs'
 export type ResolvedPlugin = {
   name: string
   requested: string
-  status: 'compatible' | 'java-incompatible' | 'not-found' | 'core-incompatible'
+  status: 'compatible' | 'not-found' | 'core-incompatible'
   version?: string
   url?: string
   requiredCore?: string
-  minimumJavaVersion?: string
   size?: number
   sha256?: string
   reason?: string
@@ -26,14 +25,6 @@ export type ResolvedPlugin = {
 export type ResolveResponse = {
   ok: true
   coreVersion: string
-  // Null when updates.jenkins.io did not publish a per-version catalogue for
-  // the requested WAR, in which case we have no authoritative answer and we
-  // refuse to guess. The UI surfaces this as "could not determine".
-  coreMinimumJava: number | null
-  coreJavaSource: 'updates.jenkins.io' | 'unavailable'
-  // Null when either the user didn't specify a Java version, or we couldn't
-  // determine the WAR's requirement.
-  javaCompatible: boolean | null
   warUrl: string | null
   plugins: ResolvedPlugin[]
 }
@@ -50,25 +41,14 @@ const ResolveSchema = z.object({
   coreVersion: z.string().regex(/^\d+\.\d+(\.\d+)?$/, 'Expected version like 2.462.3'),
   // Empty plugin list is allowed — a user can bundle just the WAR.
   plugins: z.array(z.string().min(1).max(200)).max(500),
-  javaVersion: z.number().int().min(1).max(99).optional(),
 })
 
 const BodySchema = z.discriminatedUnion('action', [LatestLtsSchema, ResolveSchema])
-
-function extractJavaMajor(s: string | undefined): number | null {
-  if (!s) return null
-  // Normalise "1.8" → 8, "11" → 11, "17.0.2" → 17.
-  const m = s.match(/^\s*1\.(\d+)/) ?? s.match(/^\s*(\d+)/)
-  if (!m) return null
-  const n = parseInt(m[1]!, 10)
-  return Number.isFinite(n) ? n : null
-}
 
 function resolvePlugins(
   names: string[],
   coreVersion: string,
   catalogue: Record<string, UpdateCenterPlugin>,
-  userJava: number | null,
 ): ResolvedPlugin[] {
   const seen = new Set<string>()
   const out: ResolvedPlugin[] = []
@@ -100,27 +80,9 @@ function resolvePlugins(
         version: p.version,
         url: p.url,
         requiredCore: p.requiredCore,
-        minimumJavaVersion: p.minimumJavaVersion,
         size: p.size,
         sha256: p.sha256,
         reason: `Requires Jenkins core ${p.requiredCore} (you have ${coreVersion})`,
-      })
-      continue
-    }
-
-    const pluginJava = extractJavaMajor(p.minimumJavaVersion)
-    if (userJava != null && pluginJava != null && pluginJava > userJava) {
-      out.push({
-        name,
-        requested: trimmed,
-        status: 'java-incompatible',
-        version: p.version,
-        url: p.url,
-        requiredCore: p.requiredCore,
-        minimumJavaVersion: p.minimumJavaVersion,
-        size: p.size,
-        sha256: p.sha256,
-        reason: `Requires Java ${pluginJava} (you have Java ${userJava})`,
       })
       continue
     }
@@ -132,7 +94,6 @@ function resolvePlugins(
       version: p.version,
       url: p.url,
       requiredCore: p.requiredCore,
-      minimumJavaVersion: p.minimumJavaVersion,
       size: p.size,
       sha256: p.sha256,
     })
@@ -162,32 +123,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, version } satisfies JenkinsBundlerResponse)
     }
 
-    const { coreVersion, plugins: requested, javaVersion } = parsed.data
-    const [uc, warUrl] = await Promise.all([
+    const { coreVersion, plugins: requested } = parsed.data
+    const [catalogue, warUrl] = await Promise.all([
       getUpdateCenterForCore(coreVersion),
       resolveWarUrl(coreVersion),
     ])
 
-    // The only Java-requirement source we trust is updates.jenkins.io's
-    // per-version catalogue, and only when its `core.version` matches the
-    // user's WAR. If the catalogue isn't published for this version (or only
-    // the "current" weekly catalogue responded), we report `unavailable`
-    // rather than guessing.
-    const liveJava = uc.coreVersionMatches ? extractJavaMajor(uc.coreRequiredJavaVersion) : null
-    const coreMinimumJava = liveJava
-    const coreJavaSource: ResolveResponse['coreJavaSource'] =
-      liveJava != null ? 'updates.jenkins.io' : 'unavailable'
-    const javaCompatible =
-      javaVersion == null || coreMinimumJava == null ? null : javaVersion >= coreMinimumJava
-
-    const resolved = resolvePlugins(requested, coreVersion, uc.plugins, javaVersion ?? null)
+    const resolved = resolvePlugins(requested, coreVersion, catalogue)
 
     return NextResponse.json({
       ok: true,
       coreVersion,
-      coreMinimumJava,
-      coreJavaSource,
-      javaCompatible,
       warUrl,
       plugins: resolved,
     } satisfies JenkinsBundlerResponse)

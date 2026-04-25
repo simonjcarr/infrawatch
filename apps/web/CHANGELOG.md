@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.67.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.66.0...web/v0.67.0) (2026-04-25)
+
+
+### Features
+
+* **web:** Jenkins bundler — recursive plugin dependency traversal ([d646a01](https://github.com/carrtech-dev/ct-ops/commit/d646a0143c65874d149636793efd0f3219a706dd))
+* **web:** Jenkins bundler — recursive plugin dependency traversal ([be1c7d7](https://github.com/carrtech-dev/ct-ops/commit/be1c7d7072677f79869d927dc6529b531a5b3652))
+
 ## [0.66.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.65.2...web/v0.66.0) (2026-04-25)
 
 

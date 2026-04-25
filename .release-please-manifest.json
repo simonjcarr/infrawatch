@@ -1,5 +1,5 @@
 {
   "agent": "0.30.0",
-  "apps/web": "0.66.0",
+  "apps/web": "0.67.0",
   "apps/ingest": "0.1.1"
 }

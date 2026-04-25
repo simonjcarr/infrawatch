@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.67.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.0...web/v0.67.1) (2026-04-25)
+
+
+### Bug Fixes
+
+* **web:** harden installer release checks ([83d84f3](https://github.com/carrtech-dev/ct-ops/commit/83d84f38d6931799d8ccbab46aa0d8ba8ba27cb2))
+* **web:** harden installer release checks ([e43e090](https://github.com/carrtech-dev/ct-ops/commit/e43e090f5d942baa81a01a8fe00a5dae0685ec82))
+
 ## [0.67.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.66.0...web/v0.67.0) (2026-04-25)
 
 

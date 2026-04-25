@@ -1,0 +1,48 @@
+name: Customer bundle check
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/agent-release.yml"
+      - ".github/workflows/customer-bundle-check.yml"
+      - "deploy/customer-bundle/**"
+      - "deploy/nginx/nginx.conf"
+      - "docker-compose.single.yml"
+      - ".env.example"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Stage customer bundle
+        run: |
+          set -euo pipefail
+          mkdir -p dist/ct-ops/deploy/nginx
+          cp docker-compose.single.yml dist/ct-ops/docker-compose.yml
+          cp .env.example dist/ct-ops/.env.example
+          cp deploy/customer-bundle/README.md dist/ct-ops/README.md
+          cp deploy/customer-bundle/start.sh dist/ct-ops/start.sh
+          cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
+          cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
+          echo "test" > dist/ct-ops/VERSION
+          chmod +x dist/ct-ops/start.sh dist/ct-ops/build-offline-installer.sh
+
+      - name: Validate scripts and required files
+        working-directory: dist/ct-ops
+        run: |
+          set -euo pipefail
+          test -f docker-compose.yml
+          test -f deploy/nginx/nginx.conf
+          test -f .env.example
+          bash -n start.sh
+          bash -n build-offline-installer.sh
+
+      - name: Render compose config
+        working-directory: dist/ct-ops
+        env:
+          BETTER_AUTH_SECRET: build-time-placeholder
+          POSTGRES_PASSWORD: build-time-placeholder
+        run: docker compose config --quiet

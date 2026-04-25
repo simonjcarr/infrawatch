@@ -30,6 +30,10 @@ REQUIRED_VARS=(BETTER_AUTH_URL BETTER_AUTH_TRUSTED_ORIGINS BETTER_AUTH_SECRET PO
 # Optional variables — missing values get a warning, not an error. Most have
 # safe localhost defaults baked into docker-compose.yml.
 OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE)
+REQUIRED_FILES=(
+  docker-compose.yml
+  deploy/nginx/nginx.conf
+)
 
 show_help() {
   cat <<EOF
@@ -58,6 +62,37 @@ require_docker() {
     echo "Upgrade Docker Engine to a release that bundles the Compose plugin." >&2
     exit 1
   fi
+}
+
+check_bundle_files() {
+  local missing=()
+  local wrong_type=()
+  local file
+
+  for file in "${REQUIRED_FILES[@]}"; do
+    if [ -d "$file" ]; then
+      wrong_type+=("$file is a directory")
+    elif [ ! -f "$file" ]; then
+      missing+=("$file")
+    fi
+  done
+
+  if [ ${#missing[@]} -eq 0 ] && [ ${#wrong_type[@]} -eq 0 ]; then
+    return 0
+  fi
+
+  echo "ERROR: this CT-Ops bundle is incomplete or corrupt." >&2
+  if [ ${#missing[@]} -gt 0 ]; then
+    echo "Missing required files:" >&2
+    for file in "${missing[@]}"; do echo "  - $file"; done >&2
+  fi
+  if [ ${#wrong_type[@]} -gt 0 ]; then
+    echo "Invalid paths:" >&2
+    for file in "${wrong_type[@]}"; do echo "  - $file"; done >&2
+  fi
+  echo "" >&2
+  echo "Re-download the release bundle and unpack it into a clean directory." >&2
+  exit 1
 }
 
 show_version() {
@@ -212,6 +247,21 @@ gen_cert() {
   echo "Wrote ${out_dir}/server.{crt,key} (CN=${cn}, SANs: ${san})"
 }
 
+fix_ingest_tls_permissions() {
+  local cert_dir="$SCRIPT_DIR/deploy/dev-tls"
+  [ -f "$cert_dir/server.key" ] || return 0
+  [ -f "$cert_dir/server.crt" ] || return 0
+
+  # The ingest image runs as uid/gid 1001. These files are bind-mounted
+  # read-only, so make the key readable before Docker starts the container.
+  if chown 1001:1001 "$cert_dir/server.key" "$cert_dir/server.crt" 2>/dev/null; then
+    chmod 600 "$cert_dir/server.key"
+  else
+    chmod 644 "$cert_dir/server.key"
+  fi
+  chmod 644 "$cert_dir/server.crt"
+}
+
 ensure_tls_certs() {
   # Ingest mTLS cert — consumed by the gRPC listener on :9443.
   if [ ! -f "$SCRIPT_DIR/deploy/dev-tls/server.crt" ] || [ ! -f "$SCRIPT_DIR/deploy/dev-tls/server.key" ]; then
@@ -228,6 +278,8 @@ ensure_tls_certs() {
     echo "Replace deploy/tls/server.crt and deploy/tls/server.key with your own"
     echo "certificate at any time to remove the browser warning."
   fi
+
+  fix_ingest_tls_permissions
 }
 
 # check_ports_free fails fast when :80 or :443 are already bound on the host,
@@ -274,20 +326,32 @@ warn_legacy_env() {
 }
 
 start_stack() {
+  check_bundle_files
   require_docker
   check_env
   warn_legacy_env
   check_ports_free
   ensure_tls_certs
 
-  echo "Pulling latest images from GHCR..."
-  if ! docker compose pull db web ingest nginx; then
-    echo "" >&2
-    echo "ERROR: failed to pull one or more images from GHCR." >&2
-    echo "  - Check your network access to ghcr.io" >&2
-    echo "  - If you pinned WEB_IMAGE/INGEST_IMAGE in .env, verify the tag exists" >&2
-    echo "  - For air-gapped installs, load images with: docker load < ct-ops.tar.gz" >&2
-    exit 1
+  if [ -f "images.tar.gz" ]; then
+    echo "Loading bundled Docker images (offline mode)..."
+    if ! docker load -i images.tar.gz; then
+      echo "ERROR: failed to load images from images.tar.gz" >&2
+      echo "  - The archive may be corrupted; rebuild the air-gap bundle" >&2
+      echo "  - Verify free disk space with: df -h" >&2
+      exit 1
+    fi
+  else
+    echo "Pulling latest images from GHCR..."
+    if ! docker compose pull db web migrate ingest nginx tls-init; then
+      echo "" >&2
+      echo "ERROR: failed to pull one or more images from GHCR." >&2
+      echo "  - Check your network access to ghcr.io" >&2
+      echo "  - If you pinned WEB_IMAGE/INGEST_IMAGE in .env, verify the tag exists" >&2
+      echo "  - For air-gapped installs, run ./build-offline-installer.sh on a" >&2
+      echo "    connected host and ship the resulting *-airgap.zip to this host" >&2
+      exit 1
+    fi
   fi
 
   docker compose down --remove-orphans >/dev/null 2>&1 || true

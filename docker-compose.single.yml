@@ -24,8 +24,8 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       # Loopback-only — browser traffic flows in via the nginx container on :443.
       # Keeping :3000 on 127.0.0.1 lets operators tunnel for debugging without
@@ -56,6 +56,19 @@ services:
       # bundle route can embed it in agent downloads.
       - ./deploy/tls:/var/lib/ct-ops/server-tls:ro
 
+  migrate:
+    image: ${WEB_IMAGE:-ghcr.io/carrtech-dev/ct-ops/web:latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ctops}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-ctops}
+    command: ["node", "migrate.js"]
+
   ingest:
     image: ${INGEST_IMAGE:-ghcr.io/carrtech-dev/ct-ops/ingest:latest}
     build:
@@ -63,8 +76,8 @@ services:
       dockerfile: apps/ingest/Dockerfile
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "9443:9443"   # gRPC (mTLS) — agents connect here directly, bypassing nginx.
       # Loopback-only — nginx reaches :8080 over the docker network; there is
@@ -116,7 +129,7 @@ services:
       web:
         condition: service_started
       ingest:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${NGINX_HTTPS_PORT:-443}:443"
       - "${NGINX_HTTP_PORT:-80}:80"

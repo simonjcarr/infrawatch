@@ -43,11 +43,20 @@ This will:
 3. Pull the latest `web`, `ingest`, and `db` images from GHCR
    (or load `images.tar.gz` if it is present — see *Air-gap installs* below)
 4. Start the stack
-5. The web container runs database migrations on its own startup
+5. A one-shot migration container applies database migrations before web and ingest start
 
-Open `http://localhost:3000` (or whatever you set as `BETTER_AUTH_URL`) and
+Open `https://localhost` (or whatever you set as `BETTER_AUTH_URL`) and
 follow the in-app onboarding to create your first organisation and admin
-user.
+user. Your browser will warn about the self-signed certificate on first
+visit unless you replace `deploy/tls/server.{crt,key}` with a certificate
+from your own CA.
+
+If ports 80 or 443 are already in use, set `NGINX_HTTP_PORT` and
+`NGINX_HTTPS_PORT` in `.env` before the second run. Include the external
+HTTPS port in `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, and
+`AGENT_DOWNLOAD_BASE_URL`, for example `https://ct-ops.example.com:8443`.
+If CT-Ops is running inside a VM, LXC, or Incus instance behind NAT, forward
+the external HTTPS port and `9443` to the instance.
 
 ## Commands
 

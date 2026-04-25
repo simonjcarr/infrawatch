@@ -17,7 +17,7 @@ COPY proto/gen/go/  ./proto/gen/go/
 COPY .release-please-manifest.json ./
 RUN AGENT_VERSION="v$(jq -r '.agent' .release-please-manifest.json)" && \
     mkdir -p /out && cd agent && \
-    for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do \
+    for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do \
       os="${p%%/*}"; arch="${p##*/}"; \
       ext=""; [ "$os" = "windows" ] && ext=".exe"; \
       echo "Building agent ${os}/${arch} (version ${AGENT_VERSION})..."; \

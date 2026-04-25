@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -254,9 +253,9 @@ export function JenkinsBundler() {
   const [coreVersion, setCoreVersion] = useState('')
   const [javaVersion, setJavaVersion] = useState<string>('')
   const [pluginsText, setPluginsText] = useState('')
-  const [includeDeps, setIncludeDeps] = useState(false)
   const [loadingLts, setLoadingLts] = useState(false)
   const [resolving, setResolving] = useState(false)
+  const [resolvingMode, setResolvingMode] = useState<'flat' | 'deps' | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [report, setReport] = useState<Report | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -320,7 +319,7 @@ export function JenkinsBundler() {
     e.target.value = ''
   }
 
-  async function resolve() {
+  async function resolve(includeTransitiveDeps: boolean) {
     setResolveError(null)
     setReport(null)
     setDownloadError(null)
@@ -341,13 +340,14 @@ export function JenkinsBundler() {
     }
 
     setResolving(true)
+    setResolvingMode(includeTransitiveDeps ? 'deps' : 'flat')
     try {
       const data = await postJson<JenkinsBundlerResponse>({
         action: 'resolve',
         coreVersion: coreVersion.trim(),
         plugins: pluginList,
         javaVersion: javaNum,
-        includeTransitiveDeps: includeDeps,
+        includeTransitiveDeps,
       })
       if (!data.ok) {
         setResolveError(data.error)
@@ -364,7 +364,7 @@ export function JenkinsBundler() {
         },
         plugins: resolved.plugins,
         transitivePlugins: resolved.transitivePlugins.map((p) => ({ ...p, downloaded: false })),
-        includesTransitive: includeDeps,
+        includesTransitive: includeTransitiveDeps,
         generatedAt: new Date().toISOString(),
       })
       // Pre-expand top-level plugins so the tree opens to its first level by
@@ -374,6 +374,7 @@ export function JenkinsBundler() {
       setResolveError(e instanceof Error ? e.message : 'Failed to resolve plugins')
     } finally {
       setResolving(false)
+      setResolvingMode(null)
     }
   }
 
@@ -706,28 +707,28 @@ export function JenkinsBundler() {
               </Alert>
             )}
 
-            <div className="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
-              <Switch
-                id="include-deps"
-                checked={includeDeps}
-                onCheckedChange={setIncludeDeps}
-                disabled={resolving || downloading}
-              />
-              <div className="space-y-0.5">
-                <Label htmlFor="include-deps" className="cursor-pointer">
-                  Pull in plugin dependencies recursively
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Walks each listed plugin&apos;s required dependencies, includes them in the bundle, and shows
-                  the full tree below. Optional dependencies are surfaced but not pulled in.
-                </p>
-              </div>
-            </div>
-
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={resolve} disabled={resolving || downloading}>
-                {resolving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <RefreshCw className="mr-1.5 size-4" />}
+              <Button type="button" onClick={() => resolve(false)} disabled={resolving || downloading}>
+                {resolving && resolvingMode === 'flat' ? (
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-1.5 size-4" />
+                )}
                 Resolve compatibility
+              </Button>
+              <Button
+                type="button"
+                onClick={() => resolve(true)}
+                disabled={resolving || downloading}
+                variant="outline"
+                title="Resolve the listed plugins and recursively add their required dependencies to the bundle."
+              >
+                {resolving && resolvingMode === 'deps' ? (
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                ) : (
+                  <Package className="mr-1.5 size-4" />
+                )}
+                Pull dependencies
               </Button>
               <Button
                 type="button"
@@ -974,39 +975,45 @@ function ReportCard({
           </div>
         )}
 
-        {report.transitivePlugins.length > 0 && (
+        {report.includesTransitive && (
           <div className="space-y-2">
             <div className="text-sm font-medium">
               All dependencies that will be added ({report.transitivePlugins.length})
             </div>
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Plugin</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Version</TableHead>
-                    <TableHead>Needs core</TableHead>
-                    <TableHead>Min Java</TableHead>
-                    <TableHead className="text-right">Size</TableHead>
-                    <TableHead>Download</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.transitivePlugins.map((p) => (
-                    <TableRow key={p.name}>
-                      <TableCell className="font-mono text-xs">{p.name}</TableCell>
-                      <TableCell>{statusBadge(p.status)}</TableCell>
-                      <TableCell className="font-mono text-xs">{p.version ?? '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{p.requiredCore ?? '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{p.minimumJavaVersion ?? '—'}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">{formatBytes(p.size)}</TableCell>
-                      <TableCell>{downloadStateCell(p)}</TableCell>
+            {report.transitivePlugins.length > 0 ? (
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Plugin</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Needs core</TableHead>
+                      <TableHead>Min Java</TableHead>
+                      <TableHead className="text-right">Size</TableHead>
+                      <TableHead>Download</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {report.transitivePlugins.map((p) => (
+                      <TableRow key={p.name}>
+                        <TableCell className="font-mono text-xs">{p.name}</TableCell>
+                        <TableCell>{statusBadge(p.status)}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.version ?? '—'}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.requiredCore ?? '—'}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.minimumJavaVersion ?? '—'}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatBytes(p.size)}</TableCell>
+                        <TableCell>{downloadStateCell(p)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                No required dependencies will be added for this plugin list.
+              </p>
+            )}
           </div>
         )}
       </CardContent>

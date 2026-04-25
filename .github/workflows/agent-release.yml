@@ -166,10 +166,11 @@ jobs:
           set -euo pipefail
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
-          mkdir -p dist/ct-ops
+          mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
+          cp deploy/nginx/nginx.conf          dist/ct-ops/deploy/nginx/nginx.conf
           echo "$VERSION" > dist/ct-ops/VERSION
 
           # The customer start.sh is generated here rather than checked into
@@ -436,6 +437,10 @@ jobs:
           esac
           CUSTOMER_START_SH
 
+          # Keep the generated release artifact aligned with the checked-in
+          # customer bundle script. The inline heredoc above is retained only
+          # for compatibility with older workflow history.
+          cp deploy/customer-bundle/start.sh dist/ct-ops/start.sh
           chmod +x dist/ct-ops/start.sh
           bash -n dist/ct-ops/start.sh
 
@@ -521,6 +526,7 @@ jobs:
           echo "Transfer it to your air-gapped target host, unzip, and run ./start.sh"
           CUSTOMER_OFFLINE_SH
 
+          cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
           chmod +x dist/ct-ops/build-offline-installer.sh
           bash -n dist/ct-ops/build-offline-installer.sh
 

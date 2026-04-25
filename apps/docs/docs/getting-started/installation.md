@@ -43,9 +43,19 @@ CT_OPS_VERSION=v0.3.0 curl -fsSL ... | bash
 - The browser TLS cert at `deploy/tls/server.{crt,key}` — served by the bundled nginx on port 443.
 - `BETTER_AUTH_SECRET` and `POSTGRES_PASSWORD` if blank.
 
-It then pulls images from GHCR and starts the stack. Database migrations run inside the web container automatically on startup.
+It then pulls images from GHCR and starts the stack. Database migrations run in a one-shot migration container before web and ingest start.
 
 When all containers show `healthy` in `docker compose ps`, continue to [Create your account](#create-your-account).
+
+If ports 80 or 443 are already in use, set `NGINX_HTTP_PORT` and
+`NGINX_HTTPS_PORT` in `.env` before the second `./start.sh` run. Include the
+external HTTPS port in `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, and
+`AGENT_DOWNLOAD_BASE_URL`, for example `https://ct-ops.example.com:8443`.
+
+If you are installing inside a VM, LXC, or Incus instance behind a NAT or
+private bridge, forward the external HTTPS port and `9443` to the instance.
+Agents must be able to reach both the web URL and gRPC port from their own
+network.
 
 ---
 

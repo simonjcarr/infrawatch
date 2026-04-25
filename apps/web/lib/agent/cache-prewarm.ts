@@ -4,6 +4,7 @@ import { REQUIRED_AGENT_VERSION } from './version'
 import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from './repo'
 
 const AGENT_DIST_DIR = process.env.AGENT_DIST_DIR ?? './data/agent-dist'
+const BAKED_AGENT_DIST_DIR = path.join(process.cwd(), 'data/agent-dist')
 
 const PLATFORMS = [
   { os: 'linux', arch: 'amd64' },
@@ -33,6 +34,14 @@ interface GitHubRelease {
  * prewarm failure must never prevent the server from starting.
  */
 export async function prewarmAgentCache(): Promise<void> {
+  const missingBaked = PLATFORMS.filter(
+    ({ os, arch }) => !fs.existsSync(path.join(BAKED_AGENT_DIST_DIR, binaryBaseName(os, arch)))
+  )
+  if (missingBaked.length === 0) {
+    console.log(`[agent-cache] Baked agent ${REQUIRED_AGENT_VERSION} binaries are available`)
+    return
+  }
+
   const tag = `agent/${REQUIRED_AGENT_VERSION}`
   let release: GitHubRelease | null = null
 
@@ -50,8 +59,9 @@ export async function prewarmAgentCache(): Promise<void> {
       }
     )
     if (res.status === 404) {
+      const missingPlatforms = missingBaked.map(({ os, arch }) => `${os}/${arch}`).join(', ')
       console.log(
-        `[agent-cache] Release ${tag} not found on GitHub — binaries must be built manually via \`make agent\``
+        `[agent-cache] Release ${tag} not found on GitHub and baked binaries are incomplete — missing ${missingPlatforms}`
       )
       return
     }
@@ -71,6 +81,11 @@ export async function prewarmAgentCache(): Promise<void> {
   await Promise.allSettled(
     PLATFORMS.map(({ os, arch }) => downloadIfMissing(release!, REQUIRED_AGENT_VERSION, os, arch))
   )
+}
+
+function binaryBaseName(os: string, arch: string): string {
+  const suffix = os === 'windows' ? '.exe' : ''
+  return `ct-ops-agent-${os}-${arch}${suffix}`
 }
 
 async function downloadIfMissing(

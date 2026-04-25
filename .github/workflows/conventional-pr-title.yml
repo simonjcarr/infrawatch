@@ -1,0 +1,32 @@
+name: Conventional PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+jobs:
+  conventional-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            cat >&2 <<EOF
+          PR title must be a Conventional Commit because squash merges use it
+          as the release-please input.
+
+          Current title:
+            $PR_TITLE
+
+          Expected examples:
+            fix(web): repair customer installer bundle
+            ci(release): add Docker image smoke test
+            docs(install): document custom HTTPS ports
+          EOF
+            exit 1
+          fi

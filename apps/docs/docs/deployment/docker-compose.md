@@ -31,6 +31,11 @@ nano .env
 
 When `docker compose ps` shows all containers as `healthy`, open the web UI at `https://<your-server>`. The bundle ships a self-signed certificate — your browser will warn on first visit. To replace it with a certificate from your own CA, see [Replacing the TLS certificate](#replacing-the-tls-certificate) below.
 
+If ports 80 or 443 are already in use on the host, set `NGINX_HTTP_PORT` and
+`NGINX_HTTPS_PORT` in `.env` before the second `./start.sh` run. Include the
+external HTTPS port in `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, and
+`AGENT_DOWNLOAD_BASE_URL`, for example `https://ct-ops.example.com:8443`.
+
 ---
 
 ## Manual Deploy
@@ -89,7 +94,7 @@ docker compose -f docker-compose.single.yml up -d
 docker compose -f docker-compose.single.yml logs -f web
 ```
 
-The web container runs database migrations automatically on first start. Once you see `Ready on http://0.0.0.0:3000`, the stack is up.
+The one-shot `migrate` container applies database migrations before web and ingest start. Once you see `Ready on http://0.0.0.0:3000`, the stack is up.
 
 ---
 
@@ -108,6 +113,11 @@ Only `443`, `80`, and `9443` are published on all host interfaces:
 - `9443` — agent gRPC with mTLS. Agents connect direct to the ingest container; the proxy is intentionally skipped so client-cert verification is never terminated mid-hop.
 
 The remaining ports are bound to `127.0.0.1` only, so `web:3000`, `ingest:8080`, and Postgres are reachable from the host (for debugging over SSH tunnels) but not from the network. Override the nginx ports with `NGINX_HTTPS_PORT` / `NGINX_HTTP_PORT` in `.env` if 80/443 are already in use.
+
+When installing inside a VM, LXC, or Incus instance that sits behind a NAT or
+private bridge, forward the external HTTPS port and `9443` to the instance.
+Agents must be able to reach `AGENT_DOWNLOAD_BASE_URL` and `host:9443` from
+their own network, not just from the container host.
 
 ---
 

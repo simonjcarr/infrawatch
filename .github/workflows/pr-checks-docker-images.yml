@@ -1,0 +1,80 @@
+name: PR Checks (Docker images)
+
+on:
+  pull_request:
+    paths:
+      - "agent/**"
+      - "apps/ingest/**"
+      - "apps/web/**"
+      - "proto/**"
+      - ".dockerignore"
+      - ".release-please-manifest.json"
+      - "docker-compose.single.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "go.work"
+      - "go.work.sum"
+      - ".github/workflows/pr-checks-docker-images.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "agent/**"
+      - "apps/ingest/**"
+      - "apps/web/**"
+      - "proto/**"
+      - ".dockerignore"
+      - ".release-please-manifest.json"
+      - "docker-compose.single.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "go.work"
+      - "go.work.sum"
+      - ".github/workflows/pr-checks-docker-images.yml"
+
+concurrency:
+  group: docker-image-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-image:
+    name: Web Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: false
+          cache-from: type=gha,scope=pr-web-image-amd64
+          cache-to: type=gha,mode=max,scope=pr-web-image-amd64
+
+  ingest-image:
+    name: Ingest Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build ingest image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./apps/ingest/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: false
+          cache-from: type=gha,scope=pr-ingest-image-amd64
+          cache-to: type=gha,mode=max,scope=pr-ingest-image-amd64

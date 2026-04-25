@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.66.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.65.2...web/v0.66.0) (2026-04-25)
+
+
+### Features
+
+* **web:** drop Java compat check, add offline-script Jenkins bundle ([87477aa](https://github.com/carrtech-dev/ct-ops/commit/87477aaa92b869358dcae973a0fd0a813b142ead))
+
 ## [0.65.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.65.1...web/v0.65.2) (2026-04-25)
 
 

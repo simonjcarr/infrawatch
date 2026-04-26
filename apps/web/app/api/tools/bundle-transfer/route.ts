@@ -14,6 +14,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { hosts, taskRunHosts, taskRuns, users } from '@/lib/db/schema'
 import { resolveWarUrl } from '@/lib/jenkins/update-center'
+import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 
 export const runtime = 'nodejs'
 export const maxDuration = 900
@@ -693,6 +694,12 @@ async function serveBundleDownload(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   cleanupOldJobs()
+  try {
+    assertTrustedMutationOrigin(request.headers)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const user = await getAuthorisedUser(request)
   if (!user?.organisationId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })

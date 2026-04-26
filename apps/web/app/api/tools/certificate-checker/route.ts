@@ -13,6 +13,7 @@ import {
 } from '@/lib/certificates/fetch'
 import { assertAllowedCertificateCheckerPort } from '@/lib/net/certificate-checker-policy'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
+import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 
 export type { ParsedCertificate, ParsedSAN, ChainEntry } from '@/lib/certificates/fetch'
 
@@ -58,6 +59,12 @@ const BodySchema = z.discriminatedUnion('action', [
 ])
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    assertTrustedMutationOrigin(req.headers)
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Forbidden' } satisfies CertCheckerResponse, { status: 403 })
+  }
+
   const session = await auth.api.getSession({ headers: req.headers })
   if (!session) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' } satisfies CertCheckerResponse, { status: 401 })

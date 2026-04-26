@@ -16,6 +16,7 @@ import {
 import { buildInstallBundle } from '@/lib/agent/bundle'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 import { readFile } from 'node:fs/promises'
+import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 
 const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/server.crt'
 const WEB_TLS_CERT_PATH = process.env['WEB_TLS_CERT'] ?? '/var/lib/ct-ops/server-tls/server.crt'
@@ -65,6 +66,12 @@ const requestSchema = z.object({
  * Gated on org_admin / super_admin. Scoped by organisationId.
  */
 export async function POST(request: NextRequest) {
+  try {
+    assertTrustedMutationOrigin(request.headers)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })

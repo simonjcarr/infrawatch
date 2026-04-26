@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { getTrustedOriginHosts } from './lib/security/trusted-origins'
 
 const securityHeaders = [
   // Prevent clickjacking
@@ -31,6 +32,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    serverActions: {
+      allowedOrigins: getTrustedOriginHosts(),
+    },
+  },
 
   async headers() {
     return [

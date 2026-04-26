@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.30.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.2...agent/v0.30.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **agent:** disable unsigned self-update ([7fc1101](https://github.com/carrtech-dev/ct-ops/commit/7fc11012a5f3dddd806c18fc0194f13ed88e0888))
+* **agent:** disable unsigned self-update ([fea0879](https://github.com/carrtech-dev/ct-ops/commit/fea0879080a08da58bb98d7d4c95c2936c2d0a12))
+
 ## [0.30.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.1...agent/v0.30.2) (2026-04-26)
 
 

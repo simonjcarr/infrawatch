@@ -41,12 +41,14 @@ import type {
 
 type PluginRow = ResolvedPlugin & {
   downloaded: boolean
+  downloading?: boolean
   downloadError?: string
   downloadedBytes?: number
 }
 
 type PluginNodeRow = ResolvedPluginNode & {
   downloaded?: boolean
+  downloading?: boolean
   downloadError?: string
   downloadedBytes?: number
 }
@@ -144,6 +146,21 @@ function statusBadge(status: ResolvedPlugin['status']) {
     case 'not-found':
       return <Badge variant="secondary">Not found</Badge>
   }
+}
+
+function byPluginName<T extends { name: string }>(a: T, b: T) {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+}
+
+function sortPlugins<T extends { name: string }>(plugins: T[]): T[] {
+  return [...plugins].sort(byPluginName)
+}
+
+function sortPluginNodes(nodes: ResolvedPluginNode[]): ResolvedPluginNode[] {
+  return sortPlugins(nodes).map((node) => ({
+    ...node,
+    dependencies: node.dependencies ? sortPluginNodes(node.dependencies) : node.dependencies,
+  }))
 }
 
 // Bash script bundled into the offline-script zip. Reads manifest.tsv and
@@ -354,6 +371,8 @@ export function JenkinsBundler() {
         return
       }
       const resolved = data as ResolveResponse
+      const plugins = sortPluginNodes(resolved.plugins)
+      const transitivePlugins = sortPlugins(resolved.transitivePlugins)
       setReport({
         core: {
           version: resolved.coreVersion,
@@ -362,14 +381,14 @@ export function JenkinsBundler() {
           javaCompatible: resolved.javaCompatible,
           warUrl: resolved.warUrl,
         },
-        plugins: resolved.plugins,
-        transitivePlugins: resolved.transitivePlugins.map((p) => ({ ...p, downloaded: false })),
+        plugins,
+        transitivePlugins: transitivePlugins.map((p) => ({ ...p, downloaded: false })),
         includesTransitive: includeTransitiveDeps,
         generatedAt: new Date().toISOString(),
       })
       // Pre-expand top-level plugins so the tree opens to its first level by
       // default — saves a click and makes it obvious deps are there.
-      setExpanded(new Set(resolved.plugins.map((p) => `/${p.name}`)))
+      setExpanded(new Set(plugins.map((p) => `/${p.name}`)))
     } catch (e) {
       setResolveError(e instanceof Error ? e.message : 'Failed to resolve plugins')
     } finally {
@@ -389,8 +408,30 @@ export function JenkinsBundler() {
 
     const zip = new JSZip()
     const pluginsFolder = zip.folder('plugins')!
-    const updatedTop: PluginNodeRow[] = report.plugins.map((p) => ({ ...p }))
-    const updatedTransitive: PluginRow[] = report.transitivePlugins.map((p) => ({ ...p }))
+    const updatedTop: PluginNodeRow[] = report.plugins.map((p) => ({
+      ...p,
+      downloaded: false,
+      downloading: false,
+      downloadError: undefined,
+      downloadedBytes: undefined,
+    }))
+    const updatedTransitive: PluginRow[] = report.transitivePlugins.map((p) => ({
+      ...p,
+      downloaded: false,
+      downloading: false,
+      downloadError: undefined,
+      downloadedBytes: undefined,
+    }))
+
+    const commitDownloadState = () => {
+      setReport({
+        ...report,
+        plugins: updatedTop.map((p) => ({ ...p })),
+        transitivePlugins: updatedTransitive.map((p) => ({ ...p })),
+      })
+    }
+
+    commitDownloadState()
 
     try {
       if (report.core.warUrl) {
@@ -406,8 +447,8 @@ export function JenkinsBundler() {
         setDoneCount((c) => c + 1)
       }
 
-      // Single combined download list. Top-level requested plugins first, then
-      // resolved transitive deps. Defensive dedup by lowercased name in case a
+      // Single alphabetised download list across top-level requested plugins
+      // and transitive deps. Defensive dedup by lowercased name in case a
       // requested plugin was also reachable transitively (the API contract
       // already excludes that, but the cost of a Set guard is trivial).
       const seen = new Set<string>()
@@ -435,12 +476,31 @@ export function JenkinsBundler() {
         seen.add(key)
         downloadList.push({ kind: 'transitive', index: i, name: p.name, version: p.version, size: p.size ?? null })
       }
+      downloadList.sort(byPluginName)
 
       for (const item of downloadList) {
         const filename = `${item.name}.hpi`
         setCurrentFile(`plugins/${filename}`)
         setCurrentLoaded(0)
         setCurrentTotal(item.size)
+        if (item.kind === 'top') {
+          updatedTop[item.index] = {
+            ...updatedTop[item.index]!,
+            downloading: true,
+            downloaded: false,
+            downloadError: undefined,
+            downloadedBytes: undefined,
+          }
+        } else {
+          updatedTransitive[item.index] = {
+            ...updatedTransitive[item.index]!,
+            downloading: true,
+            downloaded: false,
+            downloadError: undefined,
+            downloadedBytes: undefined,
+          }
+        }
+        commitDownloadState()
         try {
           const bytes = await fetchWithProgress(
             { kind: 'plugin', name: item.name, version: item.version },
@@ -454,12 +514,14 @@ export function JenkinsBundler() {
             updatedTop[item.index] = {
               ...updatedTop[item.index]!,
               downloaded: true,
+              downloading: false,
               downloadedBytes: bytes.byteLength,
             }
           } else {
             updatedTransitive[item.index] = {
               ...updatedTransitive[item.index]!,
               downloaded: true,
+              downloading: false,
               downloadedBytes: bytes.byteLength,
             }
           }
@@ -469,16 +531,19 @@ export function JenkinsBundler() {
             updatedTop[item.index] = {
               ...updatedTop[item.index]!,
               downloaded: false,
+              downloading: false,
               downloadError: msg,
             }
           } else {
             updatedTransitive[item.index] = {
               ...updatedTransitive[item.index]!,
               downloaded: false,
+              downloading: false,
               downloadError: msg,
             }
           }
         }
+        commitDownloadState()
         setDoneCount((c) => c + 1)
       }
 
@@ -524,7 +589,7 @@ export function JenkinsBundler() {
       a.remove()
       URL.revokeObjectURL(url)
 
-      setReport({ ...report, plugins: updatedTop, transitivePlugins: updatedTransitive })
+      commitDownloadState()
     } catch (e) {
       setDownloadError(e instanceof Error ? e.message : 'Download failed')
     } finally {
@@ -549,7 +614,7 @@ export function JenkinsBundler() {
       }
 
       const seen = new Set<string>()
-      for (const p of [...report.plugins, ...report.transitivePlugins]) {
+      for (const p of sortPlugins([...report.plugins, ...report.transitivePlugins])) {
         if (p.status !== 'compatible' || !p.url) continue
         const key = p.name.toLowerCase()
         if (seen.has(key)) continue
@@ -843,6 +908,13 @@ function ReportCard({
   toggleExpanded: (key: string) => void
 }) {
   const javaOk = report.core.javaCompatible
+  const downloadStateByName = useMemo(() => {
+    const state = new Map<string, PluginNodeRow | PluginRow>()
+    for (const plugin of report.transitivePlugins) state.set(plugin.name.toLowerCase(), plugin)
+    for (const plugin of report.plugins) state.set(plugin.name.toLowerCase(), plugin)
+    return state
+  }, [report.plugins, report.transitivePlugins])
+
   return (
     <Card>
       <CardHeader>
@@ -952,6 +1024,7 @@ function ReportCard({
                     <TableHead>Needs core</TableHead>
                     <TableHead>Min Java</TableHead>
                     <TableHead className="text-right">Size</TableHead>
+                    <TableHead>Download</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -963,6 +1036,7 @@ function ReportCard({
                       parentPath=""
                       expanded={expanded}
                       toggle={toggleExpanded}
+                      downloadStateByName={downloadStateByName}
                     />
                   ))}
                 </TableBody>
@@ -1058,7 +1132,14 @@ function FlatPluginsTable({ plugins }: { plugins: PluginNodeRow[] }) {
   )
 }
 
-function downloadStateCell(p: { downloaded?: boolean; downloadError?: string; reason?: string }) {
+function downloadStateCell(p: { downloaded?: boolean; downloading?: boolean; downloadError?: string; reason?: string }) {
+  if (p.downloading) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" /> Downloading
+      </span>
+    )
+  }
   if (p.downloaded) {
     return (
       <span className="flex items-center gap-1 text-xs text-emerald-600">
@@ -1097,16 +1178,20 @@ function PluginTreeRow({
   parentPath,
   expanded,
   toggle,
+  downloadStateByName,
 }: {
   node: ResolvedPluginNode
   depth: number
   parentPath: string
   expanded: Set<string>
   toggle: (key: string) => void
+  downloadStateByName: Map<string, PluginNodeRow | PluginRow>
 }) {
   const path = `${parentPath}/${node.name}`
   const hasChildren = !!node.dependencies && node.dependencies.length > 0
   const isOpen = hasChildren && expanded.has(path)
+  const downloadState = downloadStateByName.get(node.name.toLowerCase())
+    ?? (node.origin === 'optional-dep' ? { ...node, reason: node.reason ?? 'Optional dependency is not pulled into the bundle' } : node)
 
   return (
     <>
@@ -1156,6 +1241,7 @@ function PluginTreeRow({
         <TableCell className="font-mono text-xs">{node.requiredCore ?? '—'}</TableCell>
         <TableCell className="font-mono text-xs">{node.minimumJavaVersion ?? '—'}</TableCell>
         <TableCell className="text-right font-mono text-xs">{formatBytes(node.size)}</TableCell>
+        <TableCell>{downloadStateCell(downloadState)}</TableCell>
       </TableRow>
       {isOpen
         && node.dependencies?.map((child) => (
@@ -1166,6 +1252,7 @@ function PluginTreeRow({
             parentPath={path}
             expanded={expanded}
             toggle={toggle}
+            downloadStateByName={downloadStateByName}
           />
         ))}
     </>

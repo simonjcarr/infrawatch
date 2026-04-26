@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.10...web/v0.70.11) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** validate trusted origins for mutations ([2bf5662](https://github.com/carrtech-dev/ct-ops/commit/2bf5662fd141d1719d8252fba8f789ec62ca490c))
+* **web:** validate trusted origins for mutations ([a7cb750](https://github.com/carrtech-dev/ct-ops/commit/a7cb7507435211493461189f6d3018abdceeb6b7))
+
 ## [0.70.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.9...web/v0.70.10) (2026-04-26)
 
 

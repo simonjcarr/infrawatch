@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.1...ingest/v0.1.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** require SSH credentials for terminal access ([#566](https://github.com/carrtech-dev/ct-ops/issues/566)) ([c0616dc](https://github.com/carrtech-dev/ct-ops/commit/c0616dc8a4aae98dea26eea49b8df22be89cc23e))
+
 ## [0.1.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.0...ingest/v0.1.1) (2026-04-25)
 
 

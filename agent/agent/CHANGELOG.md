@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.0...agent/v0.30.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** require SSH credentials for terminal access ([#566](https://github.com/carrtech-dev/ct-ops/issues/566)) ([c0616dc](https://github.com/carrtech-dev/ct-ops/commit/c0616dc8a4aae98dea26eea49b8df22be89cc23e))
+
 ## [0.30.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.29.0...agent/v0.30.0) (2026-04-23)
 
 

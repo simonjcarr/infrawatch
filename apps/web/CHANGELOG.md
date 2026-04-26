@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.4...web/v0.70.5) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** require SSH credentials for terminal access ([#566](https://github.com/carrtech-dev/ct-ops/issues/566)) ([c0616dc](https://github.com/carrtech-dev/ct-ops/commit/c0616dc8a4aae98dea26eea49b8df22be89cc23e))
+
 ## [0.70.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.3...web/v0.70.4) (2026-04-26)
 
 

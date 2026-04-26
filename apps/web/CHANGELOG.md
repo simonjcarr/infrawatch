@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.68.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.2...web/v0.68.0) (2026-04-26)
+
+
+### Features
+
+* **web:** add GitLab air-gap bundler ([c6ba334](https://github.com/carrtech-dev/ct-ops/commit/c6ba334f1f87c3a5e18ca6580e8dce62261c8a42))
+
 ## [0.67.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.1...web/v0.67.2) (2026-04-26)
 
 

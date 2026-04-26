@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.1...web/v0.70.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** stream bundle transfers server-side ([#559](https://github.com/carrtech-dev/ct-ops/issues/559)) ([b74e194](https://github.com/carrtech-dev/ct-ops/commit/b74e1949b50fcf938016df73dfd7b963a3806133))
+
 ## [0.70.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.0...web/v0.70.1) (2026-04-26)
 
 

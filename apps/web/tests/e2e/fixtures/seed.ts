@@ -46,6 +46,7 @@ export async function seedOrgAndUser(request: APIRequestContext): Promise<void> 
   await sql`
     UPDATE "user"
     SET organisation_id = (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+        email_verified = true,
         role = 'org_admin',
         is_active = true
     WHERE email = ${TEST_USER.email}

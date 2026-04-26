@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.30.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.1...agent/v0.30.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **agent:** send JWT on initial heartbeat ([#575](https://github.com/carrtech-dev/ct-ops/issues/575)) ([6eeb024](https://github.com/carrtech-dev/ct-ops/commit/6eeb0243df57e7b82f7c98d1f3a9d0f13b7f900e))
+* Codex/ssh backed terminal access ([#577](https://github.com/carrtech-dev/ct-ops/issues/577)) ([2a121a0](https://github.com/carrtech-dev/ct-ops/commit/2a121a0f8885b57f7cd2f569ad63c70ff35c1408))
+
 ## [0.30.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.0...agent/v0.30.1) (2026-04-26)
 
 

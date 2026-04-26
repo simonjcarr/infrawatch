@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.6...web/v0.70.7) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** block private notification test targets ([#573](https://github.com/carrtech-dev/ct-ops/issues/573)) ([043a5a7](https://github.com/carrtech-dev/ct-ops/commit/043a5a70fe1fff96bc04ddd5f8d602ceae4d10ac))
+
 ## [0.70.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.5...web/v0.70.6) (2026-04-26)
 
 

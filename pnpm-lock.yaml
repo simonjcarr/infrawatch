@@ -282,9 +282,6 @@ importers:
       shadcn:
         specifier: ^4.3.0
         version: 4.3.0(@types/node@20.19.37)(typescript@5.9.3)
-      ssh2:
-        specifier: ^1.17.0
-        version: 1.17.0
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -316,9 +313,6 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.2.3(@types/react@19.2.14)
-      '@types/ssh2':
-        specifier: ^1.15.5
-        version: 1.15.5
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2

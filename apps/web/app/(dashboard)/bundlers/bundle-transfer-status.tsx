@@ -114,6 +114,9 @@ export function BundleTransferStatus({
           </div>
           <div className="rounded-md border bg-muted/30 p-3 text-xs">
             <div className="break-all font-mono">{job.path}</div>
+            {job.currentFile && transferring && (
+              <div className="mt-2 text-muted-foreground">{job.currentFile}</div>
+            )}
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full bg-emerald-600 transition-[width] duration-150"

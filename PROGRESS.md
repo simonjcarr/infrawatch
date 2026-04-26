@@ -9,11 +9,26 @@
 **Phase 5 — Tooling (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — two new Tooling utilities shipped (Directory User Lookup for live LDAP/AD queries, SSL Certificate Checker for parse/fetch/validate/convert of X.509 certs); offline agent install bundle (zip) for air-gapped enrolment; ingest-side host deduplication by hostname / IP overlap; repo/image rename to `carrtech-dev` and enrolment-URL env-var plumbing; plus the established VuePress docs, networks (CIDR + graph view), and split-pane terminal workspace.
+🟢 Phase 5 progressing — two new Tooling utilities shipped (Directory User Lookup for live LDAP/AD queries, SSL Certificate Checker for parse/fetch/validate/convert of X.509 certs); offline agent install bundle (zip) for air-gapped enrolment; GitLab/Jenkins bundle transfer now routes through the existing agent task connection instead of direct SSH; ingest-side host deduplication by hostname / IP overlap; repo/image rename to `carrtech-dev` and enrolment-URL env-var plumbing; plus the established VuePress docs, networks (CIDR + graph view), and split-pane terminal workspace.
 
 ---
 
 ## What Has Been Built
+
+### Session 54 — Bundler transfer via agent task channel
+
+**GitLab/Jenkins bundle transfer** (`apps/web/app/api/tools/bundle-transfer/route.ts`, `apps/web/app/(dashboard)/bundlers/`)
+- Removed the direct SSH/SFTP transfer path from the web container; transfers now prepare the zip server-side and dispatch a `custom_script` task to the selected online host.
+- The host receives the task through the existing agent heartbeat/task channel, creates the destination directory, downloads the prepared zip with a short-lived per-job token, and writes it to the requested path.
+- Transfer modal is now single-step: select host, optional owner, and destination directory. No SSH password is requested or sent from the browser.
+- Status panel keeps the existing download phase and then shows the separate host transfer phase while the agent task is pending/running/completed/failed.
+- Removed the direct `ssh2` dependency from the web package; remaining `ssh2` lockfile entries are transitive dev dependencies of `testcontainers`.
+
+**Build state**
+- `pnpm --filter web type-check` — zero errors ✅
+- `pnpm --filter web lint -- app/api/tools/bundle-transfer/route.ts 'app/(dashboard)/bundlers/bundle-transfer-dialog.tsx' 'app/(dashboard)/bundlers/bundle-transfer-status.tsx'` — zero errors ✅
+
+---
 
 ### Session 53 — SSL Certificate Checker tool
 

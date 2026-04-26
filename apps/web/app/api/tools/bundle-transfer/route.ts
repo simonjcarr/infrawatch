@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import archiver from 'archiver'
-import { Client, type SFTPWrapper } from 'ssh2'
 import { z } from 'zod'
 import { and, eq, isNull } from 'drizzle-orm'
 import { Readable } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { pipeline } from 'node:stream/promises'
-import { createWriteStream } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { mkdtemp, rm, stat as fsStat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { hosts, users } from '@/lib/db/schema'
+import { hosts, taskRunHosts, taskRuns, users } from '@/lib/db/schema'
 import { resolveWarUrl } from '@/lib/jenkins/update-center'
 
 export const runtime = 'nodejs'
@@ -113,8 +112,13 @@ const JenkinsBundleSchema = z.object({
 
 const TransferRequestSchema = z.object({
   hostId: z.string().min(1),
-  username: z.string().min(1).max(128).regex(/^[^\s:]+$/, 'Username cannot contain whitespace or ":"'),
-  password: z.string().min(1).max(4096),
+  username: z
+    .string()
+    .trim()
+    .max(128)
+    .regex(/^[^\s:]*$/, 'Username cannot contain whitespace or ":"')
+    .optional()
+    .default(''),
   directory: z
     .string()
     .min(1)
@@ -157,12 +161,35 @@ type TransferJob = {
   currentFile: string | null
   currentLoaded: number
   currentTotal: number | null
+  tempDir: string | null
+  archivePath: string | null
+  downloadToken: string | null
+  taskRunId: string | null
   error: string | null
   createdAt: number
   updatedAt: number
 }
 
 const transferJobs = new Map<string, TransferJob>()
+
+function publicJob(job: TransferJob) {
+  return {
+    id: job.id,
+    phase: job.phase,
+    fileName: job.fileName,
+    host: job.host,
+    path: job.path,
+    filesTotal: job.filesTotal,
+    filesDone: job.filesDone,
+    currentFile: job.currentFile,
+    currentLoaded: job.currentLoaded,
+    currentTotal: job.currentTotal,
+    taskRunId: job.taskRunId,
+    error: job.error,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  }
+}
 
 function publishJob(job: TransferJob, patch: Partial<Omit<TransferJob, 'id' | 'userId' | 'organisationId' | 'createdAt'>>) {
   Object.assign(job, patch, { updatedAt: Date.now() })
@@ -171,7 +198,11 @@ function publishJob(job: TransferJob, patch: Partial<Omit<TransferJob, 'id' | 'u
 function cleanupOldJobs() {
   const cutoff = Date.now() - 60 * 60 * 1000
   for (const [id, job] of transferJobs.entries()) {
-    if (job.updatedAt < cutoff) transferJobs.delete(id)
+    if (job.updatedAt < cutoff) {
+      const tempDir = job.tempDir
+      transferJobs.delete(id)
+      if (tempDir) void rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+    }
   }
 }
 
@@ -202,96 +233,6 @@ function gitLabPackageFilename(
   const name = gitLabPackageName(edition)
   if (target.kind === 'deb') return `${name}_${version}-${edition}.0_${arch}.deb`
   return `${name}-${version}-${edition}.0.${target.distro}${target.release}.${arch}.rpm`
-}
-
-function connectSsh(options: { host: string; username: string; password: string }): Promise<Client> {
-  return new Promise((resolve, reject) => {
-    const client = new Client()
-    const cleanup = () => {
-      client.off('ready', onReady)
-      client.off('error', onError)
-    }
-    const onReady = () => {
-      cleanup()
-      resolve(client)
-    }
-    const onError = (err: Error) => {
-      cleanup()
-      reject(err)
-    }
-    client.once('ready', onReady)
-    client.once('error', onError)
-    client.connect({
-      host: options.host,
-      port: 22,
-      username: options.username,
-      password: options.password,
-      readyTimeout: 30_000,
-      keepaliveInterval: 10_000,
-    })
-  })
-}
-
-function openSftp(client: Client): Promise<SFTPWrapper> {
-  return new Promise((resolve, reject) => {
-    client.sftp((err: Error | undefined, sftp: SFTPWrapper | undefined) => {
-      if (err) reject(err)
-      else if (sftp) resolve(sftp)
-      else reject(new Error('Failed to open SFTP session'))
-    })
-  })
-}
-
-function isMissingSftpError(err: unknown): boolean {
-  const code = (err as NodeJS.ErrnoException | { code?: number } | null)?.code
-  return code === 'ENOENT' || code === 2
-}
-
-function stat(sftp: SFTPWrapper, remotePath: string): Promise<{ isDirectory: () => boolean } | null> {
-  return new Promise((resolve, reject) => {
-    sftp.stat(remotePath, (err: Error | undefined, stats: { isDirectory: () => boolean } | undefined) => {
-      if (!err) {
-        resolve(stats ?? null)
-        return
-      }
-      if (isMissingSftpError(err)) {
-        resolve(null)
-        return
-      }
-      reject(err)
-    })
-  })
-}
-
-function mkdir(sftp: SFTPWrapper, remotePath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    sftp.mkdir(remotePath, async (err: Error | null | undefined) => {
-      if (!err) {
-        resolve()
-        return
-      }
-      try {
-        const stats = await stat(sftp, remotePath)
-        if (stats?.isDirectory()) resolve()
-        else reject(err)
-      } catch {
-        reject(err)
-      }
-    })
-  })
-}
-
-async function ensureRemoteDirectory(sftp: SFTPWrapper, directory: string) {
-  const normalized = path.posix.normalize(directory)
-  const parts = normalized.split('/').filter(Boolean)
-  let current = normalized.startsWith('/') ? '/' : ''
-
-  for (const part of parts) {
-    current = current === '/' ? `/${part}` : path.posix.join(current, part)
-    const stats = await stat(sftp, current)
-    if (!stats) await mkdir(sftp, current)
-    else if (!stats.isDirectory()) throw new Error(`${current} exists but is not a directory`)
-  }
 }
 
 function buildGitLabArchive(bundle: z.infer<typeof GitLabBundleSchema>): ArchiveSpec {
@@ -422,9 +363,8 @@ async function downloadEntryToTemp(entry: ArchiveEntry, localPath: string, job: 
   await pipeline(source, createWriteStream(localPath))
 }
 
-async function streamLocalArchiveToSftp(params: {
-  sftp: SFTPWrapper
-  remotePath: string
+async function writeLocalArchive(params: {
+  archivePath: string
   entries: LocalArchiveEntry[]
   manifest: unknown
   readme?: string
@@ -432,7 +372,7 @@ async function streamLocalArchiveToSftp(params: {
 }) {
   await new Promise<void>(async (resolve, reject) => {
     const archive = archiver('zip', { zlib: { level: 0 } })
-    const out = params.sftp.createWriteStream(params.remotePath)
+    const out = createWriteStream(params.archivePath)
     let settled = false
     const settle = (err?: Error) => {
       if (settled) return
@@ -468,10 +408,152 @@ async function streamLocalArchiveToSftp(params: {
   })
 }
 
-async function runTransferJob(job: TransferJob, request: TransferRequest) {
-  const directory = path.posix.normalize(request.directory)
-  const remotePath = path.posix.join(directory, request.fileName)
-  let client: Client | null = null
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+function buildHostDownloadScript(params: {
+  downloadUrl: string
+  directory: string
+  fileName: string
+  owner: string
+}) {
+  const destination = path.posix.join(params.directory, params.fileName)
+  return [
+    'set -eu',
+    `DEST_DIR=${shellQuote(params.directory)}`,
+    `DEST_FILE=${shellQuote(params.fileName)}`,
+    `DEST_PATH=${shellQuote(destination)}`,
+    `DOWNLOAD_URL=${shellQuote(params.downloadUrl)}`,
+    `OWNER=${shellQuote(params.owner)}`,
+    'TMP_PATH="${DEST_DIR}/.${DEST_FILE}.ct-ops-transfer.$$"',
+    'cleanup() { rm -f "$TMP_PATH"; }',
+    'trap cleanup INT TERM EXIT',
+    'mkdir -p "$DEST_DIR"',
+    'echo "Downloading bundle to ${DEST_PATH}"',
+    'if command -v curl >/dev/null 2>&1; then',
+    '  curl -fLk --retry 3 --connect-timeout 20 --output "$TMP_PATH" "$DOWNLOAD_URL"',
+    'elif command -v wget >/dev/null 2>&1; then',
+    '  wget --no-check-certificate --tries=3 --timeout=20 -O "$TMP_PATH" "$DOWNLOAD_URL"',
+    'else',
+    '  echo "Neither curl nor wget is installed on this host" >&2',
+    '  exit 127',
+    'fi',
+    'mv -f "$TMP_PATH" "$DEST_PATH"',
+    'trap - INT TERM EXIT',
+    'if [ -n "$OWNER" ] && command -v chown >/dev/null 2>&1 && id "$OWNER" >/dev/null 2>&1; then',
+    '  chown "$OWNER" "$DEST_PATH" || true',
+    'fi',
+    'echo "Bundle transferred to ${DEST_PATH}"',
+  ].join('\n')
+}
+
+async function createBundleTransferTask(job: TransferJob, request: TransferRequest, downloadUrl: string) {
+  const script = buildHostDownloadScript({
+    downloadUrl,
+    directory: path.posix.normalize(request.directory),
+    fileName: request.fileName,
+    owner: request.username.trim(),
+  })
+
+  return db.transaction(async (tx) => {
+    const [run] = await tx
+      .insert(taskRuns)
+      .values({
+        organisationId: job.organisationId,
+        triggeredBy: job.userId,
+        targetType: 'host',
+        targetId: request.hostId,
+        taskType: 'custom_script',
+        config: {
+          script,
+          interpreter: 'sh',
+          timeout_seconds: 3600,
+        },
+        maxParallel: 1,
+        metadata: {
+          source: 'bundle-transfer',
+          bundleTransferJobId: job.id,
+          destinationPath: job.path,
+        },
+      })
+      .returning({ id: taskRuns.id })
+
+    if (!run) throw new Error('Failed to create host transfer task')
+
+    await tx.insert(taskRunHosts).values({
+      organisationId: job.organisationId,
+      taskRunId: run.id,
+      hostId: request.hostId,
+      status: 'pending',
+      metadata: {
+        source: 'bundle-transfer',
+        bundleTransferJobId: job.id,
+      },
+    })
+
+    return run.id
+  })
+}
+
+function getTransferErrorFromOutput(output: string | null, fallback: string) {
+  const lines = (output ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  return lines.slice(-6).join('\n') || fallback
+}
+
+async function refreshTransferTaskStatus(job: TransferJob) {
+  if (!job.taskRunId || job.phase !== 'transferring') return
+
+  const hostRow = await db.query.taskRunHosts.findFirst({
+    where: and(
+      eq(taskRunHosts.taskRunId, job.taskRunId),
+      eq(taskRunHosts.organisationId, job.organisationId),
+      isNull(taskRunHosts.deletedAt),
+    ),
+  })
+  if (!hostRow) {
+    publishJob(job, { phase: 'failed', error: 'Host transfer task was not found' })
+    return
+  }
+
+  if (hostRow.status === 'pending') {
+    publishJob(job, { currentFile: 'Waiting for the agent to pick up the transfer task' })
+    return
+  }
+  if (hostRow.status === 'running' || hostRow.status === 'cancelling') {
+    publishJob(job, { currentFile: 'Agent is transferring the bundle to the host' })
+    return
+  }
+  if (hostRow.status === 'success') {
+    const tempDir = job.tempDir
+    publishJob(job, {
+      phase: 'completed',
+      currentFile: job.fileName,
+      currentLoaded: 0,
+      currentTotal: null,
+      tempDir: null,
+      archivePath: null,
+      downloadToken: null,
+    })
+    if (tempDir) void rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+    return
+  }
+
+  const tempDir = job.tempDir
+  publishJob(job, {
+    phase: 'failed',
+    error: hostRow.skipReason ?? getTransferErrorFromOutput(hostRow.rawOutput, `Host transfer task ${hostRow.status}`),
+    tempDir: null,
+    archivePath: null,
+    downloadToken: null,
+  })
+  if (tempDir) void rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+}
+
+async function runTransferJob(job: TransferJob, request: TransferRequest, baseUrl: string) {
   let tempDir: string | null = null
 
   try {
@@ -489,6 +571,7 @@ async function runTransferJob(job: TransferJob, request: TransferRequest) {
     })
 
     tempDir = await mkdtemp(path.join(tmpdir(), 'ct-ops-bundle-transfer-'))
+    publishJob(job, { tempDir })
     const localEntries: LocalArchiveEntry[] = []
 
     for (const [index, entry] of archive.entries.entries()) {
@@ -514,38 +597,46 @@ async function runTransferJob(job: TransferJob, request: TransferRequest) {
       currentTotal: null,
     })
 
-    client = await connectSsh({
-      host: job.host,
-      username: request.username,
-      password: request.password,
-    })
-    const sftp = await openSftp(client)
-    await ensureRemoteDirectory(sftp, directory)
-    await streamLocalArchiveToSftp({
-      sftp,
-      remotePath,
+    const archivePath = path.join(tempDir, request.fileName)
+    await writeLocalArchive({
+      archivePath,
       entries: localEntries,
       manifest: archive.manifest,
       readme: archive.readme,
       job,
     })
 
+    const downloadToken = randomBytes(32).toString('base64url')
+    const downloadUrl = new URL('/api/tools/bundle-transfer', baseUrl)
+    downloadUrl.searchParams.set('download', '1')
+    downloadUrl.searchParams.set('jobId', job.id)
+    downloadUrl.searchParams.set('token', downloadToken)
+
     publishJob(job, {
-      phase: 'completed',
-      filesDone: archive.entries.length,
-      currentFile: request.fileName,
+      archivePath,
+      downloadToken,
+      currentFile: 'Waiting for the agent to pick up the transfer task',
       currentLoaded: 0,
       currentTotal: null,
     })
+
+    const taskRunId = await createBundleTransferTask(job, request, downloadUrl.toString())
+    publishJob(job, { taskRunId })
+
+    await refreshTransferTaskStatus(job)
   } catch (err) {
     console.error('Bundle transfer failed:', err)
+    const cleanupDir = job.tempDir
     publishJob(job, {
       phase: 'failed',
       error: err instanceof Error && err.message ? err.message : 'Transfer failed',
+      tempDir: null,
+      archivePath: null,
+      downloadToken: null,
     })
+    if (cleanupDir) void rm(cleanupDir, { recursive: true, force: true }).catch(() => undefined)
   } finally {
-    client?.end()
-    if (tempDir) {
+    if (tempDir && !job.tempDir) {
       await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
     }
   }
@@ -558,6 +649,46 @@ async function getAuthorisedUser(request: NextRequest) {
     where: eq(users.id, session.user.id),
   })
   return user?.organisationId ? user : null
+}
+
+function getRequestOrigin(request: NextRequest) {
+  const configuredBaseUrl = process.env.AGENT_DOWNLOAD_BASE_URL?.trim()
+  if (configuredBaseUrl) return configuredBaseUrl.replace(/\/+$/, '')
+  const origin = request.headers.get('origin')
+  if (origin) return origin
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+  if (forwardedProto && forwardedHost) return `${forwardedProto.split(',')[0]}://${forwardedHost.split(',')[0]}`
+  return request.nextUrl.origin
+}
+
+async function serveBundleDownload(request: NextRequest) {
+  cleanupOldJobs()
+  const jobId = request.nextUrl.searchParams.get('jobId')
+  const token = request.nextUrl.searchParams.get('token')
+  if (!jobId || !token) {
+    return NextResponse.json({ error: 'Missing download token' }, { status: 400 })
+  }
+
+  const job = transferJobs.get(jobId)
+  if (!job || job.downloadToken !== token || !job.archivePath || job.phase !== 'transferring') {
+    return NextResponse.json({ error: 'Bundle download not found' }, { status: 404 })
+  }
+
+  const stats = await fsStat(job.archivePath).catch(() => null)
+  if (!stats?.isFile()) {
+    return NextResponse.json({ error: 'Bundle archive is unavailable' }, { status: 410 })
+  }
+
+  const stream = Readable.toWeb(createReadStream(job.archivePath)) as unknown as ReadableStream<Uint8Array>
+  return new NextResponse(stream, {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${job.fileName.replace(/"/g, '')}"`,
+      'Content-Length': String(stats.size),
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -586,6 +717,9 @@ export async function POST(request: NextRequest) {
   if (!host) {
     return NextResponse.json({ error: 'Host not found' }, { status: 404 })
   }
+  if (!host.agentId || host.status !== 'online') {
+    return NextResponse.json({ error: 'Host must be online with an active agent before a bundle can be transferred' }, { status: 409 })
+  }
 
   const directory = path.posix.normalize(parsed.data.directory)
   const remotePath = path.posix.join(directory, parsed.data.fileName)
@@ -602,21 +736,29 @@ export async function POST(request: NextRequest) {
     currentFile: null,
     currentLoaded: 0,
     currentTotal: null,
+    tempDir: null,
+    archivePath: null,
+    downloadToken: null,
+    taskRunId: null,
     error: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
   transferJobs.set(job.id, job)
-  void runTransferJob(job, parsed.data)
+  void runTransferJob(job, parsed.data, getRequestOrigin(request))
 
   return NextResponse.json({
     ok: true,
     jobId: job.id,
-    job,
+    job: publicJob(job),
   })
 }
 
 export async function GET(request: NextRequest) {
+  if (request.nextUrl.searchParams.get('download') === '1') {
+    return serveBundleDownload(request)
+  }
+
   cleanupOldJobs()
   const user = await getAuthorisedUser(request)
   if (!user?.organisationId) {
@@ -630,5 +772,6 @@ export async function GET(request: NextRequest) {
   if (!job || job.userId !== user.id || job.organisationId !== user.organisationId) {
     return NextResponse.json({ error: 'Transfer job not found' }, { status: 404 })
   }
-  return NextResponse.json({ ok: true, job })
+  await refreshTransferTaskStatus(job)
+  return NextResponse.json({ ok: true, job: publicJob(job) })
 }

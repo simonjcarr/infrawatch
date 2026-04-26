@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { signUp } from '@/lib/auth/client'
-import { getInviteByToken, acceptInvite } from '@/lib/actions/auth'
+import { getInviteByToken } from '@/lib/actions/auth'
 
 const registerSchema = z
   .object({
@@ -64,10 +64,14 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterValues) {
     setServerError(null)
+    const callbackURL = inviteToken
+      ? `/accept-invite?token=${encodeURIComponent(inviteToken)}`
+      : '/onboarding'
     const result = await signUp.email({
       name: values.name,
       email: values.email,
       password: values.password,
+      callbackURL,
     })
 
     if (result.error) {
@@ -75,15 +79,7 @@ export function RegisterForm() {
       return
     }
 
-    if (inviteToken) {
-      const userId = (result.data as { user?: { id?: string } } | null)?.user?.id
-      if (userId) {
-        await acceptInvite(inviteToken, userId)
-      }
-      router.push('/dashboard')
-    } else {
-      router.push('/onboarding')
-    }
+    router.push(`/check-email?email=${encodeURIComponent(values.email)}`)
   }
 
   return (

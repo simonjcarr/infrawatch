@@ -9,6 +9,7 @@
 // with a missing env var. This wrapper inverts the order.
 
 import { spawn } from 'node:child_process'
+import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { GenericContainer, Wait } from 'testcontainers'
@@ -20,6 +21,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const webDir = path.resolve(here, '..', '..')
 const port = Number(process.env.E2E_PORT ?? 3100)
 const appUrl = `http://localhost:${port}`
+const authEmailCaptureFile = path.join(webDir, 'tests', 'e2e', '.tmp', 'auth-emails.ndjson')
 
 async function main() {
   console.log('[e2e] starting TimescaleDB container (tmpfs)')
@@ -45,6 +47,10 @@ async function main() {
     process.env.BETTER_AUTH_URL = appUrl
     process.env.BETTER_AUTH_TRUSTED_ORIGINS = appUrl
     process.env.E2E_PORT = String(port)
+    process.env.AUTH_EMAIL_CAPTURE_FILE = authEmailCaptureFile
+
+    await mkdir(path.dirname(authEmailCaptureFile), { recursive: true })
+    await rm(authEmailCaptureFile, { force: true })
 
     console.log('[e2e] running migrations')
     const migrationClient = postgres(databaseUrl, { prepare: false, max: 1 })

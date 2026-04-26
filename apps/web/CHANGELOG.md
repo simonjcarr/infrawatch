@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.2...web/v0.70.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** derive team management actor from session ([#562](https://github.com/carrtech-dev/ct-ops/issues/562)) ([8aad96b](https://github.com/carrtech-dev/ct-ops/commit/8aad96b07863998490a1dc635d5523497baa3547))
+* **web:** transfer bundles via agent connection ([#561](https://github.com/carrtech-dev/ct-ops/issues/561)) ([48fc4a0](https://github.com/carrtech-dev/ct-ops/commit/48fc4a0440e603808c0a2509c23541fd4765f4b2))
+
 ## [0.70.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.1...web/v0.70.2) (2026-04-26)
 
 

@@ -69,9 +69,10 @@ function connectSsh(options: { host: string; username: string; password: string 
 
 function openSftp(client: Client): Promise<SFTPWrapper> {
   return new Promise((resolve, reject) => {
-    client.sftp((err, sftp) => {
+    client.sftp((err: Error | undefined, sftp: SFTPWrapper | undefined) => {
       if (err) reject(err)
-      else resolve(sftp)
+      else if (sftp) resolve(sftp)
+      else reject(new Error('Failed to open SFTP session'))
     })
   })
 }
@@ -83,9 +84,9 @@ function isMissingSftpError(err: unknown): boolean {
 
 function stat(sftp: SFTPWrapper, remotePath: string): Promise<{ isDirectory: () => boolean } | null> {
   return new Promise((resolve, reject) => {
-    sftp.stat(remotePath, (err, stats) => {
+    sftp.stat(remotePath, (err: Error | undefined, stats: { isDirectory: () => boolean } | undefined) => {
       if (!err) {
-        resolve(stats)
+        resolve(stats ?? null)
         return
       }
       if (isMissingSftpError(err)) {
@@ -99,7 +100,7 @@ function stat(sftp: SFTPWrapper, remotePath: string): Promise<{ isDirectory: () 
 
 function mkdir(sftp: SFTPWrapper, remotePath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    sftp.mkdir(remotePath, async (err) => {
+    sftp.mkdir(remotePath, async (err: Error | null | undefined) => {
       if (!err) {
         resolve()
         return
@@ -130,7 +131,7 @@ async function ensureRemoteDirectory(sftp: SFTPWrapper, directory: string) {
 
 function writeFile(sftp: SFTPWrapper, remotePath: string, data: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
-    sftp.writeFile(remotePath, data, (err) => {
+    sftp.writeFile(remotePath, data, (err: Error | null | undefined) => {
       if (err) reject(err)
       else resolve()
     })

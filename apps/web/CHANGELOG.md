@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.69.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.68.1...web/v0.69.0) (2026-04-26)
+
+
+### Features
+
+* **web:** fetch latest GitLab target version ([#553](https://github.com/carrtech-dev/ct-ops/issues/553)) ([322b11f](https://github.com/carrtech-dev/ct-ops/commit/322b11f9619673ea71c5e5175c4ad582d9186464))
+
 ## [0.68.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.68.0...web/v0.68.1) (2026-04-26)
 
 

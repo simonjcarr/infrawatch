@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as crypto from 'crypto'
 import * as forge from 'node-forge'
 import { z } from 'zod'
+import { auth } from '@/lib/auth'
 import {
   type ParsedCertificate,
   checkKeyMatch,
@@ -10,6 +11,7 @@ import {
   pemToForgeCert,
   resolveUrlTarget,
 } from '@/lib/certificates/fetch'
+import { assertAllowedCertificateCheckerPort } from '@/lib/net/certificate-checker-policy'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
 
 export type { ParsedCertificate, ParsedSAN, ChainEntry } from '@/lib/certificates/fetch'
@@ -56,6 +58,11 @@ const BodySchema = z.discriminatedUnion('action', [
 ])
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const session = await auth.api.getSession({ headers: req.headers })
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' } satisfies CertCheckerResponse, { status: 401 })
+  }
+
   let body: unknown
   try {
     body = await req.json()
@@ -81,7 +88,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (data.action === 'fetch-url') {
-      const { host } = resolveUrlTarget(data.url, data.port)
+      const { host, port } = resolveUrlTarget(data.url, data.port)
+      assertAllowedCertificateCheckerPort(port)
       await assertPublicHost(host)
       const { certificate } = await fetchCertificateFromUrl(data.url, data.port, data.servername)
       const keyMatch = data.keyPem ? checkKeyMatch(data.keyPem, certificate.pem) : undefined

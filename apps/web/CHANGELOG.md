@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.69.0...web/v0.70.0) (2026-04-26)
+
+
+### Features
+
+* **web:** transfer bundler archives to hosts ([#555](https://github.com/carrtech-dev/ct-ops/issues/555)) ([cb21cff](https://github.com/carrtech-dev/ct-ops/commit/cb21cffbb3468abe237238b4939107de58d26b2a))
+
 ## [0.69.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.68.1...web/v0.69.0) (2026-04-26)
 
 

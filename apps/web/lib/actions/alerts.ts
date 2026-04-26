@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createHmac } from 'crypto'
 import nodemailer from 'nodemailer'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { assertPublicHost, assertPublicUrl } from '@/lib/net/ssrf-guard'
 
 const testNotificationLimiter = createRateLimiter(60_000, 5)
 import { db } from '@/lib/db'
@@ -710,6 +711,7 @@ export async function sendTestNotification(
 
   if (existing.type === 'webhook') {
     const cfg = existing.config as WebhookChannelConfig
+    await assertPublicUrl(cfg.url)
     const payload = JSON.stringify({
       event: 'alert.test',
       severity: 'info',
@@ -745,6 +747,7 @@ export async function sendTestNotification(
     }
   } else if (existing.type === 'smtp') {
     const cfg = normaliseSmtpConfig(existing.config)
+    await assertPublicHost(cfg.host)
     const transporter = nodemailer.createTransport({
       host: cfg.host,
       port: cfg.port,
@@ -767,6 +770,7 @@ export async function sendTestNotification(
     }
   } else if (existing.type === 'slack') {
     const cfg = existing.config as SlackChannelConfig
+    await assertPublicUrl(cfg.webhookUrl)
     const payload = JSON.stringify({
       blocks: [
         {

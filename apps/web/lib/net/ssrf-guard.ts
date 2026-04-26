@@ -1,7 +1,7 @@
 import * as dns from 'dns'
 import * as net from 'net'
 
-function isPrivateIp(ip: string): boolean {
+export function isPrivateIp(ip: string): boolean {
   if (net.isIPv4(ip)) {
     const parts = ip.split('.').map(Number)
     const [a = 0, b = 0] = parts
@@ -39,11 +39,13 @@ function isPrivateIp(ip: string): boolean {
  * prevent DNS-rebinding between the check and the actual connection.
  */
 export async function assertPublicHost(hostname: string): Promise<string> {
+  const normalizedHostname =
+    hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
   let resolvedIp: string
-  if (net.isIPv4(hostname) || net.isIPv6(hostname)) {
-    resolvedIp = hostname
+  if (net.isIPv4(normalizedHostname) || net.isIPv6(normalizedHostname)) {
+    resolvedIp = normalizedHostname
   } else {
-    const { address } = await dns.promises.lookup(hostname)
+    const { address } = await dns.promises.lookup(normalizedHostname)
     resolvedIp = address
   }
   if (isPrivateIp(resolvedIp)) {
@@ -53,4 +55,10 @@ export async function assertPublicHost(hostname: string): Promise<string> {
     )
   }
   return resolvedIp
+}
+
+export async function assertPublicUrl(url: string): Promise<URL> {
+  const parsed = new URL(url)
+  await assertPublicHost(parsed.hostname)
+  return parsed
 }

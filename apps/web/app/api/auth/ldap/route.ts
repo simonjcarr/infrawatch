@@ -85,18 +85,25 @@ export async function POST(request: NextRequest) {
     const ldapUser = result.user
     const ldapDn = ldapUser.dn
 
-    // Find existing account linked to this LDAP DN
-    const existingAccount = await db.query.accounts.findFirst({
-      where: and(
-        eq(accounts.providerId, 'ldap'),
-        eq(accounts.accountId, ldapDn),
-      ),
-    })
-
+    // Find existing account linked to this LDAP DN for this LDAP config's org.
     let userId: string
+    const [linkedAccount] = await db
+      .select({ user: users })
+      .from(accounts)
+      .innerJoin(users, eq(accounts.userId, users.id))
+      .where(
+        and(
+          eq(accounts.providerId, 'ldap'),
+          eq(accounts.accountId, ldapDn),
+          eq(users.organisationId, config.organisationId),
+          isNull(users.deletedAt),
+        ),
+      )
+      .limit(1)
+    const linkedUser = linkedAccount?.user ?? null
 
-    if (existingAccount) {
-      userId = existingAccount.userId
+    if (linkedUser) {
+      userId = linkedUser.id
 
       // Update user info from LDAP
       await db
@@ -108,10 +115,14 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(users.id, userId))
     } else {
-      // Check if a user with this email already exists (merge case)
+      // Check if a user with this email already exists in this LDAP config's org.
       const existingUser = ldapUser.email
         ? await db.query.users.findFirst({
-            where: eq(users.email, ldapUser.email),
+            where: and(
+              eq(users.email, ldapUser.email),
+              eq(users.organisationId, config.organisationId),
+              isNull(users.deletedAt),
+            ),
           })
         : null
 

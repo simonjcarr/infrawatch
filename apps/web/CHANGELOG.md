@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.67.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.1...web/v0.67.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** improve Jenkins plugin download status ([78b127c](https://github.com/carrtech-dev/ct-ops/commit/78b127ca0166f84b102715765120fb87faae4fc5))
+* **web:** improve Jenkins plugin download status ([f6747f6](https://github.com/carrtech-dev/ct-ops/commit/f6747f6189374733e22bd51be4755f861ef9e5b3))
+
 ## [0.67.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.0...web/v0.67.1) (2026-04-25)
 
 

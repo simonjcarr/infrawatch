@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.5...web/v0.70.6) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** lock down certificate checker SSRF surface ([#570](https://github.com/carrtech-dev/ct-ops/issues/570)) ([824bfb9](https://github.com/carrtech-dev/ct-ops/commit/824bfb990c14f244b2cda16635293cb569bb7e41))
+
 ## [0.70.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.4...web/v0.70.5) (2026-04-26)
 
 

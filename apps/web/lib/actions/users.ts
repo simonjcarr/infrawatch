@@ -5,6 +5,8 @@ import { db } from '@/lib/db'
 import { users, invitations } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
+import { getRequiredSession, type RequiredSession } from '@/lib/auth/session'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -15,9 +17,35 @@ const updateRoleSchema = z.object({
   role: z.enum(['super_admin', 'org_admin', 'engineer', 'read_only']),
 })
 
+async function requireOrgSession(orgId: string): Promise<RequiredSession> {
+  const session = await getRequiredSession()
+
+  if (!session.user.isActive || session.user.deletedAt) {
+    throw new Error('forbidden: inactive user')
+  }
+
+  if (session.user.organisationId !== orgId) {
+    throw new Error('forbidden: organisation mismatch')
+  }
+
+  return session
+}
+
+async function requireOrgAdmin(orgId: string): Promise<RequiredSession> {
+  const session = await requireOrgSession(orgId)
+
+  if (!ADMIN_ROLES.includes(session.user.role)) {
+    throw new Error('forbidden: admin role required')
+  }
+
+  return session
+}
+
 export async function getOrgUsers(
   orgId: string,
 ): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
+  await requireOrgSession(orgId)
+
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({
       where: and(eq(users.organisationId, orgId), isNull(users.deletedAt)),
@@ -36,7 +64,6 @@ export async function getOrgUsers(
 
 export async function inviteUser(
   orgId: string,
-  invitedById: string,
   input: { email: string; role: string },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
   const parsed = inviteSchema.safeParse(input)
@@ -45,6 +72,8 @@ export async function inviteUser(
   }
 
   try {
+    const session = await requireOrgAdmin(orgId)
+
     // Check for a previously removed user — restore them rather than re-registering,
     // since their account (and email) still exist in the database.
     const removedUser = await db.query.users.findFirst({
@@ -95,7 +124,7 @@ export async function inviteUser(
         email: parsed.data.email,
         role: parsed.data.role,
         organisationId: orgId,
-        invitedById,
+        invitedById: session.user.id,
         expiresAt,
       })
       .returning()
@@ -121,6 +150,8 @@ export async function updateUserRole(
   }
 
   try {
+    await requireOrgAdmin(orgId)
+
     if (parsed.data.role !== 'super_admin') {
       const superAdmins = await db.query.users.findMany({
         where: and(
@@ -148,14 +179,15 @@ export async function updateUserRole(
 
 export async function deactivateUser(
   orgId: string,
-  requesterId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
-  if (requesterId === targetUserId) {
-    return { error: 'You cannot deactivate your own account' }
-  }
-
   try {
+    const session = await requireOrgAdmin(orgId)
+
+    if (session.user.id === targetUserId) {
+      return { error: 'You cannot deactivate your own account' }
+    }
+
     const activeSuperAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
@@ -185,6 +217,8 @@ export async function reactivateUser(
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
   try {
+    await requireOrgAdmin(orgId)
+
     await db
       .update(users)
       .set({ isActive: true, updatedAt: new Date() })
@@ -199,14 +233,15 @@ export async function reactivateUser(
 
 export async function removeUser(
   orgId: string,
-  requesterId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
-  if (requesterId === targetUserId) {
-    return { error: 'You cannot remove your own account' }
-  }
-
   try {
+    const session = await requireOrgAdmin(orgId)
+
+    if (session.user.id === targetUserId) {
+      return { error: 'You cannot remove your own account' }
+    }
+
     const superAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
@@ -236,6 +271,8 @@ export async function cancelInvite(
   inviteId: string,
 ): Promise<{ success: true } | { error: string }> {
   try {
+    await requireOrgAdmin(orgId)
+
     await db
       .update(invitations)
       .set({ deletedAt: new Date(), updatedAt: new Date() })

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.8...web/v0.70.9) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** require org auth for server actions ([#578](https://github.com/carrtech-dev/ct-ops/issues/578)) ([bdfacb9](https://github.com/carrtech-dev/ct-ops/commit/bdfacb9a8bb7198a463e879789672bebd81da413))
+
 ## [0.70.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.7...web/v0.70.8) (2026-04-26)
 
 

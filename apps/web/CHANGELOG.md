@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.9...web/v0.70.10) (2026-04-26)
+
+
+### Bug Fixes
+
+* **auth:** add per-account login lockout (H-01) ([#582](https://github.com/carrtech-dev/ct-ops/issues/582)) ([1c15c9e](https://github.com/carrtech-dev/ct-ops/commit/1c15c9e9554f23a11062dd645e9475d799430819))
+
 ## [0.70.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.8...web/v0.70.9) (2026-04-26)
 
 

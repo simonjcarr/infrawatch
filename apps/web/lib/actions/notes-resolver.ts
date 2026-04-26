@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
 import { getRequiredSession } from '@/lib/auth/session'
@@ -37,6 +39,7 @@ export async function resolveNotesForHost(
   hostId: string,
   opts: { includePrivate?: boolean; categories?: NoteCategory[] } = {},
 ): Promise<ResolvedNote[]> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return []
 

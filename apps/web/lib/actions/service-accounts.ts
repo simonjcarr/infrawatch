@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { serviceAccounts, sshKeys, identityEvents, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
@@ -47,6 +49,7 @@ export async function getServiceAccounts(
   orgId: string,
   filters: ServiceAccountListFilters = {},
 ): Promise<ServiceAccountWithHost[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const {
     accountType,
@@ -135,6 +138,7 @@ export async function getServiceAccount(
   events: IdentityEvent[]
   host: Host | null
 } | null> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const account = await db.query.serviceAccounts.findFirst({
     where: and(
@@ -175,6 +179,7 @@ export async function getServiceAccount(
 export async function getServiceAccountCounts(
   orgId: string,
 ): Promise<ServiceAccountCounts> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const [typeRows, statusRows] = await Promise.all([
     db
@@ -223,6 +228,7 @@ export async function getSshKeysByFingerprint(
   orgId: string,
   fingerprint: string,
 ): Promise<(SshKey & { hostHostname?: string })[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'sshKeyInventory')
   const keys = await db.query.sshKeys.findMany({
     where: and(

@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { users, invitations } from '@/lib/db/schema'
@@ -44,6 +46,7 @@ async function requireOrgAdmin(orgId: string): Promise<RequiredSession> {
 export async function getOrgUsers(
   orgId: string,
 ): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
+  await requireOrgAccess(orgId)
   await requireOrgSession(orgId)
 
   const [members, pendingInvites] = await Promise.all([
@@ -66,6 +69,7 @@ export async function inviteUser(
   orgId: string,
   input: { email: string; role: string },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = inviteSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -144,6 +148,7 @@ export async function updateUserRole(
   targetUserId: string,
   role: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = updateRoleSchema.safeParse({ role })
   if (!parsed.success) {
     return { error: 'Invalid role' }
@@ -181,6 +186,7 @@ export async function deactivateUser(
   orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const session = await requireOrgAdmin(orgId)
 
@@ -216,6 +222,7 @@ export async function reactivateUser(
   orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await requireOrgAdmin(orgId)
 
@@ -235,6 +242,7 @@ export async function removeUser(
   orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const session = await requireOrgAdmin(orgId)
 
@@ -270,6 +278,7 @@ export async function cancelInvite(
   orgId: string,
   inviteId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await requireOrgAdmin(orgId)
 

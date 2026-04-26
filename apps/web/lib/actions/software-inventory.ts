@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import {
@@ -42,6 +44,7 @@ const softwareInventorySettingsSchema = z.object({
 export async function getSoftwareInventorySettings(
   orgId: string,
 ): Promise<SoftwareInventorySettings> {
+  await requireOrgAccess(orgId)
   const org = await db.query.organisations.findFirst({
     where: and(eq(organisations.id, orgId), isNull(organisations.deletedAt)),
     columns: { metadata: true },
@@ -58,6 +61,7 @@ export async function updateSoftwareInventorySettings(
   orgId: string,
   settings: SoftwareInventorySettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -94,6 +98,7 @@ export async function triggerSoftwareScan(
   orgId: string,
   hostId: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -155,6 +160,7 @@ export async function getHostSoftwareInventory(
   hostId: string,
   includeRemoved = false,
 ): Promise<HostSoftwareInventory> {
+  await requireOrgAccess(orgId)
   const [packages, scans, settings, activeTaskRows, failedTaskRows] = await Promise.all([
     db.query.softwarePackages.findMany({
       where: and(
@@ -242,6 +248,7 @@ export async function searchPackageNames(
   orgId: string,
   q: string,
 ): Promise<PackageNameSuggestion[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   if (!q || q.length < 2 || q.length > 100) return []
 
@@ -305,6 +312,7 @@ export async function getSoftwareReport(
   orgId: string,
   filters: SoftwareReportFilters = {},
 ): Promise<SoftwareReportResult> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   if (!softwareReportLimiter.check(orgId)) {
     throw new Error('Too many requests — please wait before generating another report.')
@@ -442,6 +450,7 @@ export async function getNewPackages(
   orgId: string,
   windowDays: 7 | 30 = 7,
 ): Promise<NewPackageRow[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - windowDays)
@@ -494,6 +503,7 @@ export interface DriftRow {
 }
 
 export async function getPackageDrift(orgId: string): Promise<DriftRow[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const rows = await db
     .select({
@@ -584,6 +594,7 @@ export async function getPackageDetails(
   packageName: string,
   osFamily?: string,
 ): Promise<PackageDetailsResult> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const packages = await db
     .select({
@@ -657,6 +668,7 @@ export async function getPackageVersions(
   orgId: string,
   packageName: string,
 ): Promise<string[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const rows = await db
     .select({ version: softwarePackages.version })
@@ -688,6 +700,7 @@ export async function compareHosts(
   hostIdA: string,
   hostIdB: string,
 ): Promise<HostCompareResult> {
+  await requireOrgAccess(orgId)
   const [pkgsA, pkgsB] = await Promise.all([
     db.query.softwarePackages.findMany({
       where: and(
@@ -750,6 +763,7 @@ const saveReportSchema = z.object({
 })
 
 export async function listSavedReports(orgId: string): Promise<SavedSoftwareReport[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const session = await getRequiredSession()
   return db.query.savedSoftwareReports.findMany({
@@ -767,6 +781,7 @@ export async function saveSoftwareReport(
   name: string,
   filters: SoftwareReportFilters,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const session = await getRequiredSession()
   const parsed = saveReportSchema.safeParse({ name, filters })
@@ -795,6 +810,7 @@ export async function deleteSavedReport(
   orgId: string,
   reportId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
   const session = await getRequiredSession()
   try {

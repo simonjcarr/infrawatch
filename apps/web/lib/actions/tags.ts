@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { tags, resourceTags, organisations } from '@/lib/db/schema'
@@ -43,6 +45,7 @@ export async function searchTags(
   query: string,
   opts?: { key?: string; limit?: number },
 ): Promise<Tag[]> {
+  await requireOrgAccess(orgId)
   const q = (query ?? '').trim()
   const limit = Math.min(Math.max(opts?.limit ?? 10, 1), 50)
 
@@ -122,6 +125,7 @@ export async function assignTagsToResource(
   resourceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
@@ -158,6 +162,7 @@ export async function removeTagFromResource(
   orgId: string,
   resourceTagId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const row = await db.query.resourceTags.findFirst({
       where: and(eq(resourceTags.id, resourceTagId), eq(resourceTags.organisationId, orgId)),
@@ -186,6 +191,7 @@ export async function replaceResourceTags(
   resourceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
@@ -263,6 +269,7 @@ export async function listResourceTags(
   resourceType: string,
   resourceId: string,
 ): Promise<TagAssignment[]> {
+  await requireOrgAccess(orgId)
   const rows = await db
     .select({
       resourceTagId: resourceTags.id,
@@ -284,6 +291,7 @@ export async function listResourceTags(
 }
 
 export async function getOrgDefaultTags(orgId: string): Promise<TagPair[]> {
+  await requireOrgAccess(orgId)
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
@@ -296,6 +304,7 @@ export async function updateOrgDefaultTags(
   orgId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }

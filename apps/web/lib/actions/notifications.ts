@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { notifications } from '@/lib/db/schema'
 import { eq, and, desc, count, inArray, gte, sql, isNull } from 'drizzle-orm'
@@ -11,6 +13,7 @@ export async function getNotifications(
   limit = 20,
   offset = 0,
 ): Promise<Notification[]> {
+  await requireOrgAccess(orgId)
   return db.query.notifications.findMany({
     where: and(
       eq(notifications.organisationId, orgId),
@@ -24,6 +27,7 @@ export async function getNotifications(
 }
 
 export async function getUnreadCount(orgId: string, userId: string): Promise<number> {
+  await requireOrgAccess(orgId)
   const [result] = await db
     .select({ value: count() })
     .from(notifications)
@@ -43,6 +47,7 @@ export async function markAsRead(
   userId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await db
       .update(notifications)
@@ -65,6 +70,7 @@ export async function markAllAsRead(
   orgId: string,
   userId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await db
       .update(notifications)
@@ -88,6 +94,7 @@ export async function deleteNotification(
   userId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await db
       .update(notifications)
@@ -111,6 +118,7 @@ export async function deleteNotifications(
   userId: string,
   ids: string[],
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -136,6 +144,7 @@ export async function markBatchReadStatus(
   ids: string[],
   read: boolean,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -165,6 +174,7 @@ export async function getNotificationStats(
   userId: string,
   hostId?: string,
 ): Promise<NotificationSeverityStat[]> {
+  await requireOrgAccess(orgId)
   const results = await db
     .select({
       severity: notifications.severity,
@@ -209,6 +219,7 @@ export async function getNotificationsOverTime(
   range: TrendRange = '30d',
   hostId?: string,
 ): Promise<NotificationTimeSeriesPoint[]> {
+  await requireOrgAccess(orgId)
   // Intentionally does NOT filter on deletedAt so that deleting notifications
   // from the inbox does not affect the historical trend.
   const config = TREND_RANGE_CONFIG[range]

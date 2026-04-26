@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { createHmac } from 'crypto'
 import nodemailer from 'nodemailer'
@@ -126,6 +128,7 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
 // ─── Alert Rules ──────────────────────────────────────────────────────────────
 
 export async function getAlertRules(orgId: string, hostId?: string): Promise<AlertRule[]> {
+  await requireOrgAccess(orgId)
   return db.query.alertRules.findMany({
     where: and(
       eq(alertRules.organisationId, orgId),
@@ -138,6 +141,7 @@ export async function getAlertRules(orgId: string, hostId?: string): Promise<Ale
 }
 
 export async function getGlobalAlertDefaults(orgId: string): Promise<AlertRule[]> {
+  await requireOrgAccess(orgId)
   return db.query.alertRules.findMany({
     where: and(
       eq(alertRules.organisationId, orgId),
@@ -158,6 +162,7 @@ export async function createGlobalAlertDefault(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = createGlobalAlertDefaultSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -189,6 +194,7 @@ export async function deleteGlobalAlertDefault(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
@@ -211,6 +217,7 @@ export async function applyGlobalDefaultsToHost(
   orgId: string,
   hostId: string,
 ): Promise<void> {
+  await requireOrgAccess(orgId)
   const defaults = await getGlobalAlertDefaults(orgId)
   if (defaults.length === 0) return
 
@@ -232,6 +239,7 @@ export async function createAlertRule(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = createAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -263,6 +271,7 @@ export async function updateAlertRule(
   ruleId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = updateAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -296,6 +305,7 @@ export async function deleteAlertRule(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
@@ -329,6 +339,7 @@ export async function getAlertInstances(
   orgId: string,
   filters: AlertHistoryFilters = {},
 ): Promise<AlertInstanceWithRule[]> {
+  await requireOrgAccess(orgId)
   const limit = filters.limit ?? 50
   const offset = filters.offset ?? 0
 
@@ -378,6 +389,7 @@ export async function getAlertInstanceCount(
   orgId: string,
   filters: Omit<AlertHistoryFilters, 'limit' | 'offset'> = {},
 ): Promise<number> {
+  await requireOrgAccess(orgId)
   const rows = await db
     .select({ total: count() })
     .from(alertInstances)
@@ -401,6 +413,7 @@ export async function acknowledgeAlert(
   instanceId: string,
   userId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.alertInstances.findFirst({
     where: and(
       eq(alertInstances.id, instanceId),
@@ -426,6 +439,7 @@ export async function getActiveAlertCountsForHosts(
   orgId: string,
   hostIds: string[],
 ): Promise<Record<string, number>> {
+  await requireOrgAccess(orgId)
   if (hostIds.length === 0) return {}
 
   const rows = await db
@@ -478,6 +492,7 @@ function normaliseSmtpConfig(raw: unknown): SmtpChannelConfig {
 }
 
 export async function getNotificationChannels(orgId: string): Promise<NotificationChannelSafe[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.notificationChannels.findMany({
     where: and(
       eq(notificationChannels.organisationId, orgId),
@@ -536,6 +551,7 @@ export async function createNotificationChannel(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = createNotificationChannelSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -564,6 +580,7 @@ export async function deleteNotificationChannel(
   orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
@@ -622,6 +639,7 @@ export async function updateNotificationChannel(
   channelId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
@@ -697,6 +715,7 @@ export async function sendTestNotification(
   orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   if (!testNotificationLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before sending another test notification.' }
   }
@@ -838,6 +857,7 @@ const createSilenceSchema = z.object({
 })
 
 export async function getSilences(orgId: string): Promise<AlertSilenceWithHost[]> {
+  await requireOrgAccess(orgId)
   const rows = await db
     .select({
       id: alertSilences.id,
@@ -871,6 +891,7 @@ export async function getActiveSilencesForHost(
   orgId: string,
   hostId: string,
 ): Promise<AlertSilence[]> {
+  await requireOrgAccess(orgId)
   const now = new Date()
   return db.query.alertSilences.findMany({
     where: and(
@@ -890,6 +911,7 @@ export async function createSilence(
   userId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = createSilenceSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -921,6 +943,7 @@ export async function deleteSilence(
   orgId: string,
   silenceId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.alertSilences.findFirst({
     where: and(
       eq(alertSilences.id, silenceId),

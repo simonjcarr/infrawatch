@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
 import { db } from '@/lib/db'
@@ -20,6 +22,7 @@ export async function updateOrgName(
   orgId: string,
   name: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -51,6 +54,7 @@ export async function updateMetricRetention(
   orgId: string,
   days: number,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -105,6 +109,7 @@ export async function saveLicenceKey(
   orgId: string,
   key: string,
 ): Promise<{ success: true; tier: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -139,6 +144,7 @@ export async function saveLicenceKey(
 export async function generateActivationToken(
   orgId: string,
 ): Promise<{ success: true; token: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }

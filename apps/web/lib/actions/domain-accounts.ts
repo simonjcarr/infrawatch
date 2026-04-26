@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { domainAccounts } from '@/lib/db/schema'
@@ -49,6 +51,7 @@ export async function getDomainAccounts(
   orgId: string,
   filters: DomainAccountListFilters = {},
 ): Promise<DomainAccount[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const {
     status,
@@ -89,6 +92,7 @@ export async function getDomainAccount(
   orgId: string,
   accountId: string,
 ): Promise<DomainAccount | null> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const result = await db.query.domainAccounts.findFirst({
     where: and(
@@ -103,6 +107,7 @@ export async function getDomainAccount(
 export async function getDomainAccountCounts(
   orgId: string,
 ): Promise<DomainAccountCounts> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const statusRows = await db
     .select({
@@ -138,6 +143,7 @@ export async function createDomainAccount(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const parsed = createDomainAccountSchema.safeParse(input)
   if (!parsed.success) {
@@ -175,6 +181,7 @@ export async function updateDomainAccount(
   accountId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const parsed = updateDomainAccountSchema.safeParse(input)
   if (!parsed.success) {
@@ -212,6 +219,7 @@ export async function deleteDomainAccount(
   orgId: string,
   accountId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'serviceAccountTracker')
   const existing = await db.query.domainAccounts.findFirst({
     where: and(

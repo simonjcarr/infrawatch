@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
@@ -25,6 +27,7 @@ export interface OrgNotificationSettingsFull {
 export async function getOrgNotificationSettings(
   orgId: string,
 ): Promise<OrgNotificationSettingsFull> {
+  await requireOrgAccess(orgId)
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
@@ -42,6 +45,7 @@ export async function updateOrgNotificationSettings(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
 
   if (!ADMIN_ROLES.includes(session.user.role)) {

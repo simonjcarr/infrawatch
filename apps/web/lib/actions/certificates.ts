@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { certificates, certificateEvents } from '@/lib/db/schema'
@@ -44,6 +46,7 @@ export async function getCertificates(
   orgId: string,
   filters: CertificateListFilters = {},
 ): Promise<Certificate[]> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
   const {
     status,
@@ -84,6 +87,7 @@ export async function getCertificate(
   orgId: string,
   certId: string,
 ): Promise<{ certificate: Certificate; events: CertificateEvent[] } | null> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
   const certificate = await db.query.certificates.findFirst({
     where: and(
@@ -106,6 +110,7 @@ export async function getCertificate(
 }
 
 export async function getCertificateCounts(orgId: string): Promise<CertificateCounts> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
   const rows = await db
     .select({
@@ -131,6 +136,7 @@ export async function deleteCertificate(
   orgId: string,
   certId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) {
     return { error: 'Organisation mismatch' }
@@ -235,6 +241,7 @@ export async function trackCertificateFromUrl(
   orgId: string,
   input: unknown,
 ): Promise<TrackCertificateResult> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) {
@@ -324,6 +331,7 @@ export async function trackCertificateFromUpload(
   orgId: string,
   input: unknown,
 ): Promise<TrackCertificateResult> {
+  await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) {

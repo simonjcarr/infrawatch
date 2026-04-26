@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import {
   notes,
@@ -105,6 +107,7 @@ export async function listNotesForHost(
   hostId: string,
   filter?: { categories?: NoteCategory[]; includePrivate?: boolean },
 ): Promise<ResolvedNote[]> {
+  await requireOrgAccess(orgId)
   return resolveNotesForHost(orgId, hostId, filter)
 }
 
@@ -116,6 +119,7 @@ export async function listNotes(
     mineOnly?: boolean
   } = {},
 ): Promise<Note[]> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return []
 
@@ -151,6 +155,7 @@ export async function listNotes(
 // truly malformed input — the ILIKE fallback means a user's search box always
 // returns something sensible even if they paste an unbalanced quote.
 export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return []
   const trimmed = q.trim()
@@ -195,6 +200,7 @@ export async function getNote(
   orgId: string,
   noteId: string,
 ): Promise<{ note: Note; targets: NoteTarget[] } | null> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return null
 
@@ -221,6 +227,7 @@ export async function createNote(
   orgId: string,
   input: z.input<typeof createNoteSchema>,
 ): Promise<{ success: true; note: Note } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
   if (!canCreateNote(session.user)) {
@@ -285,6 +292,7 @@ export async function updateNote(
   noteId: string,
   input: z.input<typeof updateNoteSchema>,
 ): Promise<{ success: true; note: Note } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
 
@@ -367,6 +375,7 @@ export async function deleteNote(
   orgId: string,
   noteId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
 
@@ -403,6 +412,7 @@ export async function setNoteTargets(
   noteId: string,
   targets: z.input<typeof targetSchema>[],
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
 
@@ -463,6 +473,7 @@ export async function toggleNotePin(
   noteTargetId: string,
   pinned: boolean,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
 
@@ -533,6 +544,7 @@ export async function toggleNotePrivate(
   noteId: string,
   isPrivate: boolean,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
 
@@ -568,6 +580,7 @@ export async function addNoteReaction(
   noteId: string,
   reaction: NoteReactionType,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
   if (!NOTE_REACTIONS.includes(reaction)) return { error: 'Invalid reaction' }
@@ -609,6 +622,7 @@ export async function removeNoteReaction(
   noteId: string,
   reaction: NoteReactionType,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Not found' }
 
@@ -634,6 +648,7 @@ export async function listNoteReactions(
   orgId: string,
   noteId: string,
 ): Promise<NoteReaction[]> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return []
 
@@ -648,6 +663,7 @@ export async function listNoteRevisions(
   orgId: string,
   noteId: string,
 ): Promise<NoteRevision[]> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return []
 

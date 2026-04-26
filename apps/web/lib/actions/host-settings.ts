@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { hosts, organisations, checks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
@@ -12,6 +14,7 @@ export async function getHostCollectionSettings(
   orgId: string,
   hostId: string,
 ): Promise<HostCollectionSettings> {
+  await requireOrgAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
     columns: { metadata: true },
@@ -30,6 +33,7 @@ export async function updateHostCollectionSettings(
   hostId: string,
   settings: HostCollectionSettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
@@ -61,6 +65,7 @@ export async function updateHostCollectionSettings(
 export async function getOrgDefaultCollectionSettings(
   orgId: string,
 ): Promise<HostCollectionSettings> {
+  await requireOrgAccess(orgId)
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
@@ -78,6 +83,7 @@ export async function updateOrgDefaultCollectionSettings(
   orgId: string,
   settings: HostCollectionSettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const org = await db.query.organisations.findFirst({
       where: eq(organisations.id, orgId),

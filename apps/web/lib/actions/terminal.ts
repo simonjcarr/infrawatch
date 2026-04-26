@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { organisations, hosts, terminalSessions } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
@@ -27,6 +29,7 @@ export async function checkTerminalAccess(
   orgId: string,
   hostId: string,
 ): Promise<TerminalAccessResult | TerminalAccessDenied> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   const { user } = session
 
@@ -82,6 +85,7 @@ export async function createTerminalSession(
   hostId: string,
   username?: string,
 ): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const access = await checkTerminalAccess(orgId, hostId)
   if (!access.allowed) {
     return { error: access.reason }
@@ -155,6 +159,7 @@ export interface OrgTerminalSettings {
 export async function getOrgTerminalSettings(
   orgId: string,
 ): Promise<OrgTerminalSettings> {
+  await requireOrgAccess(orgId)
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
@@ -171,6 +176,7 @@ export async function updateOrgTerminalSettings(
   orgId: string,
   settings: OrgTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -214,6 +220,7 @@ export async function getHostTerminalSettings(
   orgId: string,
   hostId: string,
 ): Promise<HostTerminalSettings> {
+  await requireOrgAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
     columns: { metadata: true },
@@ -230,6 +237,7 @@ export async function updateHostTerminalSettings(
   hostId: string,
   settings: HostTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }

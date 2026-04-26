@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { networks, hostNetworkMemberships, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, sql } from 'drizzle-orm'
@@ -25,6 +27,7 @@ const networkSchema = z.object({
 // ── Network CRUD ──────────────────────────────────────────────────────────────
 
 export async function listNetworks(orgId: string): Promise<NetworkWithCount[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.networks.findMany({
     where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
     orderBy: (n, { asc }) => [asc(n.name)],
@@ -48,6 +51,7 @@ export async function getNetwork(
   orgId: string,
   networkId: string,
 ): Promise<(Network & { members: Host[] }) | null> {
+  await requireOrgAccess(orgId)
   const network = await db.query.networks.findFirst({
     where: and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
   })
@@ -61,6 +65,7 @@ export async function createNetwork(
   orgId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true; network: Network } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -95,6 +100,7 @@ export async function updateNetwork(
   networkId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -129,6 +135,7 @@ export async function deleteNetwork(
   orgId: string,
   networkId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -169,6 +176,7 @@ export async function addHostToNetwork(
   networkId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!MEMBERSHIP_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -211,6 +219,7 @@ export async function removeHostFromNetwork(
   networkId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!MEMBERSHIP_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -239,6 +248,7 @@ export async function removeHostFromNetwork(
 }
 
 export async function listHostsInNetwork(orgId: string, networkId: string): Promise<Host[]> {
+  await requireOrgAccess(orgId)
   const members = await db.query.hostNetworkMemberships.findMany({
     where: and(
       eq(hostNetworkMemberships.networkId, networkId),
@@ -268,6 +278,7 @@ export async function listMembershipsForNetwork(
   orgId: string,
   networkId: string,
 ): Promise<NetworkMembershipEntry[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.hostNetworkMemberships.findMany({
     where: and(
       eq(hostNetworkMemberships.networkId, networkId),
@@ -282,6 +293,7 @@ export async function listMembershipsForNetwork(
 export type NetworkWithHosts = Network & { hosts: Host[] }
 
 export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithHosts[]> {
+  await requireOrgAccess(orgId)
   const networkRows = await db.query.networks.findMany({
     where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
     orderBy: (n, { asc }) => [asc(n.name)],
@@ -318,6 +330,7 @@ export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithH
 }
 
 export async function listNetworksForHost(orgId: string, hostId: string): Promise<NetworkWithMembership[]> {
+  await requireOrgAccess(orgId)
   const members = await db.query.hostNetworkMemberships.findMany({
     where: and(
       eq(hostNetworkMemberships.hostId, hostId),

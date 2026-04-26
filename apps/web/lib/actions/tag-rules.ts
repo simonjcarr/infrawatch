@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { tagRules, hosts } from '@/lib/db/schema'
@@ -39,6 +41,7 @@ export async function previewHostFilter(
   orgId: string,
   filter: HostFilter,
 ): Promise<HostFilterResult[]> {
+  await requireOrgAccess(orgId)
   const parsed = hostFilterSchema.safeParse(filter)
   if (!parsed.success) return []
   if (isEmptyFilter(parsed.data)) return []
@@ -69,6 +72,7 @@ export async function bulkAssignTags(
   filter: HostFilter,
   pairs: TagPair[],
 ): Promise<{ success: true; applied: number } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const parsedFilter = hostFilterSchema.safeParse(filter)
     if (!parsedFilter.success) return { error: 'Invalid filter' }
@@ -90,6 +94,7 @@ export async function bulkAssignTags(
 }
 
 export async function listTagRules(orgId: string): Promise<TagRule[]> {
+  await requireOrgAccess(orgId)
   return db.query.tagRules.findMany({
     where: and(eq(tagRules.organisationId, orgId), isNull(tagRules.deletedAt)),
     orderBy: (r, { desc }) => [desc(r.createdAt)],
@@ -100,6 +105,7 @@ export async function createTagRule(
   orgId: string,
   input: { name: string; filter: HostFilter; tags: TagPair[]; enabled?: boolean },
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const parsed = createRuleSchema.safeParse(input)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -127,6 +133,7 @@ export async function updateTagRule(
   ruleId: string,
   input: Partial<{ name: string; filter: HostFilter; tags: TagPair[]; enabled: boolean }>,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const existing = await db.query.tagRules.findFirst({
       where: and(
@@ -167,6 +174,7 @@ export async function deleteTagRule(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await db
       .update(tagRules)
@@ -186,6 +194,7 @@ export async function runTagRule(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true; applied: number } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const rule = await db.query.tagRules.findFirst({
       where: and(
@@ -211,6 +220,7 @@ export async function runMatchingTagRules(
   orgId: string,
   hostId: string,
 ): Promise<void> {
+  await requireOrgAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })

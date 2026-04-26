@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { hostGroups, hostGroupMembers, hosts } from '@/lib/db/schema'
@@ -21,6 +23,7 @@ export async function createGroup(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; group: HostGroup } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = groupSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -48,6 +51,7 @@ export async function updateGroup(
   groupId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = groupSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -71,6 +75,7 @@ export async function deleteGroup(
   orgId: string,
   groupId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     // Soft-delete the group
     const result = await db
@@ -95,6 +100,7 @@ export async function deleteGroup(
 }
 
 export async function listGroups(orgId: string): Promise<HostGroupWithCount[]> {
+  await requireOrgAccess(orgId)
   const groups = await db.query.hostGroups.findMany({
     where: and(eq(hostGroups.organisationId, orgId), isNull(hostGroups.deletedAt)),
     orderBy: (g, { asc }) => [asc(g.name)],
@@ -116,6 +122,7 @@ export async function listGroups(orgId: string): Promise<HostGroupWithCount[]> {
 }
 
 export async function getGroup(orgId: string, groupId: string): Promise<HostGroupWithMembers | null> {
+  await requireOrgAccess(orgId)
   const group = await db.query.hostGroups.findFirst({
     where: and(eq(hostGroups.id, groupId), eq(hostGroups.organisationId, orgId), isNull(hostGroups.deletedAt)),
   })
@@ -132,6 +139,7 @@ export async function addHostToGroup(
   groupId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     // Check if already a member (including soft-deleted — restore if so)
     const existing = await db.query.hostGroupMembers.findFirst({
@@ -169,6 +177,7 @@ export async function removeHostFromGroup(
   groupId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const result = await db
       .update(hostGroupMembers)
@@ -192,6 +201,7 @@ export async function removeHostFromGroup(
 }
 
 export async function listHostsInGroup(orgId: string, groupId: string): Promise<Host[]> {
+  await requireOrgAccess(orgId)
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),
@@ -213,6 +223,7 @@ export async function listHostsInGroup(orgId: string, groupId: string): Promise<
 }
 
 export async function listGroupsForHost(orgId: string, hostId: string): Promise<HostGroup[]> {
+  await requireOrgAccess(orgId)
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.hostId, hostId),

@@ -175,7 +175,7 @@ install -m 0600 /path/to/your.key deploy/tls/server.key
 docker compose restart nginx
 ```
 
-No rebuild is required. On the next heartbeat, every connected agent's pinned fingerprint will mismatch the new cert, and the ingest service pushes the new cert down the mTLS-protected heartbeat stream. The agent persists it to its data dir and uses it as an additional trust anchor for self-update downloads. This means operators can rotate the browser cert without touching any agent host, even on Linux VMs where the internal CA is not installed in the system trust store.
+No rebuild is required. On the next heartbeat, every connected agent's pinned fingerprint will mismatch the new cert, and the ingest service pushes the new cert down the mTLS-protected heartbeat stream. The agent persists it to its data dir so the latest trust material stays aligned across restarts while signed self-update support is reworked. This means operators can rotate the browser cert without touching any agent host, even on Linux VMs where the internal CA is not installed in the system trust store.
 
 ## Fronting with your own reverse proxy
 

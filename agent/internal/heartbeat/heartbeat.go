@@ -21,7 +21,6 @@ import (
 	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
 	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 	"github.com/carrtech-dev/ct-ops/agent/internal/tasks"
-	"github.com/carrtech-dev/ct-ops/agent/internal/updater"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
@@ -101,12 +100,16 @@ type Runner struct {
 	lastKnownDefs []*agentv1.CheckDefinition
 
 	// pinnedServerCertMu guards pinnedServerCertPEM and pinnedServerCertFpr.
-	// These hold the nginx-facing server cert that agent self-update trusts in
-	// addition to the system CA pool. Values are persisted to disk whenever
-	// they change so a process restart picks up the same pin.
+	// These hold the nginx-facing server cert fingerprint and PEM pushed by
+	// ingest so the agent can preserve that trust material on disk while the
+	// signed self-update flow is redesigned.
 	pinnedServerCertMu  sync.Mutex
 	pinnedServerCertPEM []byte
 	pinnedServerCertFpr string
+
+	// lastSkippedUpdateVersion suppresses duplicate warnings when the server
+	// repeatedly advertises the same release while auto-update is disabled.
+	lastSkippedUpdateVersion string
 }
 
 // New creates a new heartbeat Runner. dialFunc is called once per stream
@@ -128,9 +131,8 @@ func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version s
 		dataDir:      dataDir,
 		keypair:      keypair,
 	}
-	// Prime the pinned server cert from disk so the first heartbeat sends
-	// the correct fingerprint and a pre-re-exec self-update can trust the
-	// same PEM that was bundled at enrolment time.
+	// Prime the pinned server cert from disk so the first heartbeat sends the
+	// correct fingerprint and preserves any previously pushed trust material.
 	if dataDir != "" {
 		if pem, fpr, err := identity.LoadPinnedServerCert(dataDir); err == nil {
 			r.pinnedServerCertPEM = pem
@@ -373,15 +375,19 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 		}
 	}
 	if resp.UpdateAvailable && resp.DownloadUrl != "" {
-		slog.Info("agent update available, downloading",
-			"current", r.version,
-			"latest", resp.LatestVersion,
-		)
-		if err := updater.Update(resp.LatestVersion, resp.DownloadUrl, r.pinnedServerCertBytes()); err != nil {
-			slog.Warn("self-update failed, continuing with current version", "err", err)
-		}
-		// If Update succeeds it re-execs and never returns.
+		r.noteSkippedSelfUpdate(resp.LatestVersion)
 	}
+}
+
+func (r *Runner) noteSkippedSelfUpdate(latestVersion string) {
+	if latestVersion == "" || latestVersion == r.lastSkippedUpdateVersion {
+		return
+	}
+	r.lastSkippedUpdateVersion = latestVersion
+	slog.Warn("agent update available, but automatic self-update is disabled until release signature verification is implemented",
+		"current", r.version,
+		"latest", latestVersion,
+	)
 }
 
 // maybeRenewCert checks the on-disk leaf cert's expiry. If it's within the
@@ -608,30 +614,16 @@ func (r *Runner) sendHeartbeatWithAgentID(stream agentv1.IngestService_Heartbeat
 }
 
 // currentPinnedFingerprint returns the fingerprint of the pinned server cert
-// the agent currently trusts for self-update downloads. Empty when no cert
-// is pinned (e.g. freshly enrolled agent before the first server push).
+// last pushed by ingest. Empty when no cert is pinned yet.
 func (r *Runner) currentPinnedFingerprint() string {
 	r.pinnedServerCertMu.Lock()
 	defer r.pinnedServerCertMu.Unlock()
 	return r.pinnedServerCertFpr
 }
 
-// pinnedServerCertBytes returns a copy of the pinned cert PEM for callers
-// that need trust material (e.g. the self-update HTTP client).
-func (r *Runner) pinnedServerCertBytes() []byte {
-	r.pinnedServerCertMu.Lock()
-	defer r.pinnedServerCertMu.Unlock()
-	if len(r.pinnedServerCertPEM) == 0 {
-		return nil
-	}
-	out := make([]byte, len(r.pinnedServerCertPEM))
-	copy(out, r.pinnedServerCertPEM)
-	return out
-}
-
 // applyServerCertRotation persists the pushed PEM to disk and updates the
-// in-memory pin so the next heartbeat advertises the new fingerprint and
-// the next self-update trusts the new chain.
+// in-memory pin so the next heartbeat advertises the new fingerprint and the
+// agent preserves the latest trust material on disk.
 func (r *Runner) applyServerCertRotation(certPEM string) {
 	if certPEM == "" || r.dataDir == "" {
 		return

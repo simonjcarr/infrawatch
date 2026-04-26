@@ -39,7 +39,8 @@ import type {
   ResolvedPluginNode,
   ResolveResponse,
 } from '@/app/api/tools/jenkins-bundler/route'
-import { BundleTransferDialog, type BuiltBundle } from './bundle-transfer-dialog'
+import { BundleTransferDialog, type TransferBundle, type TransferJobStatus } from './bundle-transfer-dialog'
+import { BundleTransferStatus } from './bundle-transfer-status'
 
 type PluginRow = ResolvedPlugin & {
   downloaded: boolean
@@ -297,6 +298,7 @@ export function JenkinsBundler({ orgId }: { orgId: string }) {
   const [doneCount, setDoneCount] = useState(0)
   const [scriptBundling, setScriptBundling] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [transferJob, setTransferJob] = useState<TransferJobStatus | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function toggleExpanded(key: string) {
@@ -411,7 +413,7 @@ export function JenkinsBundler({ orgId }: { orgId: string }) {
     }
   }
 
-  async function buildJenkinsBundle(): Promise<BuiltBundle> {
+  async function buildJenkinsBundle(): Promise<{ blob: Blob; fileName: string }> {
     if (!report) throw new Error('Resolve a bundle before transferring')
     setDownloadError(null)
     setDownloading(true)
@@ -616,6 +618,42 @@ export function JenkinsBundler({ orgId }: { orgId: string }) {
       downloadBlob(bundle.blob, bundle.fileName)
     } catch {
       // buildJenkinsBundle already surfaced the error in the bundler panel.
+    }
+  }
+
+  function buildTransferBundle(): TransferBundle {
+    if (!report) throw new Error('Resolve a bundle before transferring')
+    return {
+      fileName: `jenkins-${report.core.version}-bundle.zip`,
+      payload: {
+        kind: 'jenkins',
+        generatedAt: report.generatedAt,
+        core: report.core,
+        includesTransitive: report.includesTransitive,
+        plugins: report.plugins.map((plugin) => ({
+          name: plugin.name,
+          requested: plugin.requested,
+          status: plugin.status,
+          version: plugin.version,
+          requiredCore: plugin.requiredCore,
+          minimumJavaVersion: plugin.minimumJavaVersion,
+          size: plugin.size,
+          sha256: plugin.sha256,
+          reason: plugin.reason,
+        })),
+        transitivePlugins: report.transitivePlugins.map((plugin) => ({
+          name: plugin.name,
+          requested: plugin.requested,
+          status: plugin.status,
+          version: plugin.version,
+          requiredCore: plugin.requiredCore,
+          minimumJavaVersion: plugin.minimumJavaVersion,
+          size: plugin.size,
+          sha256: plugin.sha256,
+          reason: plugin.reason,
+        })),
+        dependencyTree: report.plugins,
+      },
     }
   }
 
@@ -913,6 +951,7 @@ export function JenkinsBundler({ orgId }: { orgId: string }) {
             toggleExpanded={toggleExpanded}
           />
         )}
+        <BundleTransferStatus job={transferJob} onJobChange={setTransferJob} />
       </div>
 
       <div className="space-y-6">
@@ -922,7 +961,8 @@ export function JenkinsBundler({ orgId }: { orgId: string }) {
         open={transferOpen}
         onOpenChange={setTransferOpen}
         orgId={orgId}
-        buildBundle={buildJenkinsBundle}
+        buildBundle={buildTransferBundle}
+        onTransferStarted={setTransferJob}
       />
     </div>
   )

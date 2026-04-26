@@ -35,7 +35,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { GitLabBundleStep, GitLabBundlerResponse, GitLabLatestVersionResponse } from '@/app/api/tools/gitlab-bundler/route'
-import { BundleTransferDialog, type BuiltBundle } from './bundle-transfer-dialog'
+import { BundleTransferDialog, type TransferBundle, type TransferJobStatus } from './bundle-transfer-dialog'
+import { BundleTransferStatus } from './bundle-transfer-status'
 
 const OS_OPTIONS = [
   { value: 'ubuntu-noble', label: 'Ubuntu 24.04 Noble', kind: 'deb', arches: ['amd64', 'arm64'] },
@@ -142,6 +143,7 @@ export function GitLabBundler({ orgId }: { orgId: string }) {
   const [doneCount, setDoneCount] = useState(0)
   const [downloadTotal, setDownloadTotal] = useState(0)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [transferJob, setTransferJob] = useState<TransferJobStatus | null>(null)
 
   const availableSteps = useMemo(
     () => report?.steps.filter((step) => step.status === 'available' && step.filename) ?? [],
@@ -220,7 +222,7 @@ export function GitLabBundler({ orgId }: { orgId: string }) {
     }
   }
 
-  async function buildStepsBundle(steps: GitLabBundleStep[], label: string): Promise<BuiltBundle> {
+  async function buildStepsBundle(steps: GitLabBundleStep[], label: string): Promise<{ blob: Blob; fileName: string }> {
     if (!report || steps.length === 0) throw new Error('No packages available to bundle')
     setDownloadError(null)
     setDownloading(true)
@@ -303,6 +305,36 @@ export function GitLabBundler({ orgId }: { orgId: string }) {
       downloadBlob(bundle.blob, bundle.fileName)
     } catch {
       // buildStepsBundle already surfaced the error in the bundler panel.
+    }
+  }
+
+  function buildTransferBundle(): TransferBundle {
+    if (!report || availableSteps.length === 0) throw new Error('No packages available to transfer')
+    return {
+      fileName: `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-all.zip`,
+      payload: {
+        kind: 'gitlab',
+        generatedAt: report.generatedAt,
+        currentVersion: report.currentVersion,
+        targetVersion: report.targetVersion,
+        edition: report.edition,
+        packageTarget: report.packageTarget,
+        sources: report.sources,
+        steps: availableSteps.map((step) => ({
+          id: step.id,
+          role: step.role,
+          version: step.version,
+          majorMinor: step.majorMinor,
+          sourceVersion: step.sourceVersion,
+          conditional: step.conditional,
+          note: step.note,
+          packageName: step.packageName,
+          filename: step.filename!,
+          sizeBytes: step.sizeBytes,
+          sizeLabel: step.sizeLabel,
+          status: 'available',
+        })),
+      },
     }
   }
 
@@ -513,6 +545,7 @@ export function GitLabBundler({ orgId }: { orgId: string }) {
             </CardContent>
           </Card>
         )}
+        <BundleTransferStatus job={transferJob} onJobChange={setTransferJob} />
       </div>
 
       <Card className="h-fit">
@@ -541,7 +574,8 @@ export function GitLabBundler({ orgId }: { orgId: string }) {
         open={transferOpen}
         onOpenChange={setTransferOpen}
         orgId={orgId}
-        buildBundle={() => buildStepsBundle(availableSteps, 'all')}
+        buildBundle={buildTransferBundle}
+        onTransferStarted={setTransferJob}
       />
     </div>
   )

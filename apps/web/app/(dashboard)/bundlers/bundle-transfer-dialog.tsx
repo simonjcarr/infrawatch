@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
-  CheckCircle2,
   KeyRound,
   Loader2,
   Search,
@@ -25,21 +24,36 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { listHosts, type HostWithAgent } from '@/lib/actions/agents'
 
-export type BuiltBundle = {
-  blob: Blob
+export type TransferBundle = {
   fileName: string
+  payload: unknown
+}
+
+export type TransferJobStatus = {
+  id: string
+  phase: 'queued' | 'downloading' | 'transferring' | 'completed' | 'failed'
+  fileName: string
+  host: string
+  path: string
+  filesTotal: number
+  filesDone: number
+  currentFile: string | null
+  currentLoaded: number
+  currentTotal: number | null
+  error: string | null
 }
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   orgId: string
-  buildBundle: () => Promise<BuiltBundle>
+  buildBundle: () => TransferBundle
+  onTransferStarted: (job: TransferJobStatus) => void
 }
 
 type Step = 'details' | 'password'
 
-export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle }: Props) {
+export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle, onTransferStarted }: Props) {
   const [hosts, setHosts] = useState<HostWithAgent[]>([])
   const [loadingHosts, setLoadingHosts] = useState(false)
   const [search, setSearch] = useState('')
@@ -50,7 +64,6 @@ export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle }:
   const [step, setStep] = useState<Step>('details')
   const [transferring, setTransferring] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<{ path: string; host: string } | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -103,7 +116,6 @@ export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle }:
     setStep('details')
     setTransferring(false)
     setError(null)
-    setSuccess(null)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -133,27 +145,29 @@ export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle }:
     if (!selectedHost || !password) return
     setTransferring(true)
     setError(null)
-    setSuccess(null)
     try {
-      const bundle = await buildBundle()
-      const form = new FormData()
-      form.set('hostId', selectedHost.id)
-      form.set('username', username.trim())
-      form.set('password', password)
-      form.set('directory', directory.trim())
-      form.set('fileName', bundle.fileName)
-      form.set('bundle', bundle.blob, bundle.fileName)
-
+      const bundle = buildBundle()
       const res = await fetch('/api/tools/bundle-transfer', {
         method: 'POST',
-        body: form,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          hostId: selectedHost.id,
+          username: username.trim(),
+          password,
+          directory: directory.trim(),
+          fileName: bundle.fileName,
+          bundle: bundle.payload,
+        }),
       })
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; path?: string; host?: string } | null
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; job?: TransferJobStatus } | null
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error ?? `Transfer failed (${res.status})`)
       }
+      if (!data.job) throw new Error('Transfer job was not created')
+      onTransferStarted(data.job)
       setPassword('')
-      setSuccess({ path: data.path ?? `${directory.trim()}/${bundle.fileName}`, host: data.host ?? selectedHost.hostname })
+      reset()
+      onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transfer failed')
     } finally {
@@ -295,16 +309,6 @@ export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle }:
             {error}
           </div>
         )}
-        {success && (
-          <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-            <span>
-              Transferred to <span className="font-medium">{success.host}</span>
-              <span className="block break-all font-mono text-xs">{success.path}</span>
-            </span>
-          </div>
-        )}
-
         <DialogFooter>
           {step === 'password' && (
             <Button type="button" variant="outline" onClick={() => setStep('details')} disabled={transferring} className="mr-auto">

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "type-check": "tsc --noEmit",
+    "test:unit": "node --experimental-strip-types --test \"lib/**/*.test.mjs\"",
     "build": "node scripts/validate-migrations.js && next build",
     "start": "next start",
     "lint": "eslint",

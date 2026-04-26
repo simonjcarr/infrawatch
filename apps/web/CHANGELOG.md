@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.7...web/v0.70.8) (2026-04-26)
+
+
+### Bug Fixes
+
+* Codex/ssh backed terminal access ([#577](https://github.com/carrtech-dev/ct-ops/issues/577)) ([2a121a0](https://github.com/carrtech-dev/ct-ops/commit/2a121a0f8885b57f7cd2f569ad63c70ff35c1408))
+
 ## [0.70.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.6...web/v0.70.7) (2026-04-26)
 
 

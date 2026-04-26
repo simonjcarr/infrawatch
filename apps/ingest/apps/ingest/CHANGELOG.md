@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.3...ingest/v0.1.4) (2026-04-26)
+
+
+### Bug Fixes
+
+* Codex/ssh backed terminal access ([#577](https://github.com/carrtech-dev/ct-ops/issues/577)) ([2a121a0](https://github.com/carrtech-dev/ct-ops/commit/2a121a0f8885b57f7cd2f569ad63c70ff35c1408))
+
 ## [0.1.3](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.2...ingest/v0.1.3) (2026-04-26)
 
 

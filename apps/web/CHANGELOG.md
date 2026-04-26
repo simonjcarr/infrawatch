@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.0...web/v0.70.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** align bundle transfer route with ssh2 types ([#557](https://github.com/carrtech-dev/ct-ops/issues/557)) ([1d29c21](https://github.com/carrtech-dev/ct-ops/commit/1d29c214ef63149129f57e720533ad544e8bc0a3))
+
 ## [0.70.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.69.0...web/v0.70.0) (2026-04-26)
 
 

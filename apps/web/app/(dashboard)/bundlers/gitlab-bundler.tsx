@@ -11,6 +11,7 @@ import {
   Package,
   RefreshCw,
   Search,
+  Send,
 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +35,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { GitLabBundleStep, GitLabBundlerResponse, GitLabLatestVersionResponse } from '@/app/api/tools/gitlab-bundler/route'
+import { BundleTransferDialog, type TransferBundle, type TransferJobStatus } from './bundle-transfer-dialog'
+import { BundleTransferStatus } from './bundle-transfer-status'
 
 const OS_OPTIONS = [
   { value: 'ubuntu-noble', label: 'Ubuntu 24.04 Noble', kind: 'deb', arches: ['amd64', 'arm64'] },
@@ -110,7 +113,18 @@ function safeVersion(value: string): boolean {
   return /^\d+\.\d+(\.\d+)?$/.test(value)
 }
 
-export function GitLabBundler() {
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+export function GitLabBundler({ orgId }: { orgId: string }) {
   const [currentVersion, setCurrentVersion] = useState('')
   const [targetVersion, setTargetVersion] = useState('')
   const [edition, setEdition] = useState<'ee' | 'ce'>('ee')
@@ -128,6 +142,8 @@ export function GitLabBundler() {
   const [currentTotal, setCurrentTotal] = useState<number | null>(null)
   const [doneCount, setDoneCount] = useState(0)
   const [downloadTotal, setDownloadTotal] = useState(0)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferJob, setTransferJob] = useState<TransferJobStatus | null>(null)
 
   const availableSteps = useMemo(
     () => report?.steps.filter((step) => step.status === 'available' && step.filename) ?? [],
@@ -206,8 +222,8 @@ export function GitLabBundler() {
     }
   }
 
-  async function downloadSteps(steps: GitLabBundleStep[], label: string) {
-    if (!report || steps.length === 0) return
+  async function buildStepsBundle(steps: GitLabBundleStep[], label: string): Promise<{ blob: Blob; fileName: string }> {
+    if (!report || steps.length === 0) throw new Error('No packages available to bundle')
     setDownloadError(null)
     setDownloading(true)
     setDoneCount(0)
@@ -269,19 +285,56 @@ export function GitLabBundler() {
       )
 
       const blob = await zip.generateAsync({ type: 'blob' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-${label}.zip`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      return {
+        blob,
+        fileName: `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-${label}.zip`,
+      }
     } catch (err) {
-      setDownloadError(err instanceof Error ? err.message : 'Download failed')
+      const message = err instanceof Error ? err.message : 'Download failed'
+      setDownloadError(message)
+      throw new Error(message)
     } finally {
       setDownloading(false)
       setCurrentFile(null)
+    }
+  }
+
+  async function downloadSteps(steps: GitLabBundleStep[], label: string) {
+    try {
+      const bundle = await buildStepsBundle(steps, label)
+      downloadBlob(bundle.blob, bundle.fileName)
+    } catch {
+      // buildStepsBundle already surfaced the error in the bundler panel.
+    }
+  }
+
+  function buildTransferBundle(): TransferBundle {
+    if (!report || availableSteps.length === 0) throw new Error('No packages available to transfer')
+    return {
+      fileName: `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-all.zip`,
+      payload: {
+        kind: 'gitlab',
+        generatedAt: report.generatedAt,
+        currentVersion: report.currentVersion,
+        targetVersion: report.targetVersion,
+        edition: report.edition,
+        packageTarget: report.packageTarget,
+        sources: report.sources,
+        steps: availableSteps.map((step) => ({
+          id: step.id,
+          role: step.role,
+          version: step.version,
+          majorMinor: step.majorMinor,
+          sourceVersion: step.sourceVersion,
+          conditional: step.conditional,
+          note: step.note,
+          packageName: step.packageName,
+          filename: step.filename!,
+          sizeBytes: step.sizeBytes,
+          sizeLabel: step.sizeLabel,
+          status: 'available',
+        })),
+      },
     }
   }
 
@@ -387,6 +440,14 @@ export function GitLabBundler() {
                 {downloading ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
                 Download all
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => setTransferOpen(true)}
+                disabled={!report || availableSteps.length === 0 || downloading || resolving}
+              >
+                <Send className="size-4" />
+                Transfer all
+              </Button>
             </div>
 
             {resolveError && (
@@ -484,6 +545,7 @@ export function GitLabBundler() {
             </CardContent>
           </Card>
         )}
+        <BundleTransferStatus job={transferJob} onJobChange={setTransferJob} />
       </div>
 
       <Card className="h-fit">
@@ -508,6 +570,13 @@ export function GitLabBundler() {
           )}
         </CardContent>
       </Card>
+      <BundleTransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        orgId={orgId}
+        buildBundle={buildTransferBundle}
+        onTransferStarted={setTransferJob}
+      />
     </div>
   )
 }

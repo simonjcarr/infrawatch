@@ -1,11 +1,15 @@
 import type { Metadata } from 'next'
+import { getRequiredSession } from '@/lib/auth/session'
 import { BundlersClient } from './bundlers-client'
 
 export const metadata: Metadata = {
   title: 'Air-gap Bundlers',
 }
 
-export default function BundlersPage() {
+export default async function BundlersPage() {
+  const session = await getRequiredSession()
+  const orgId = session.user.organisationId!
+
   return (
     <div className="space-y-6">
       <div>
@@ -14,7 +18,7 @@ export default function BundlersPage() {
           Build self-contained bundles of upstream software for installation into air-gapped networks.
         </p>
       </div>
-      <BundlersClient />
+      <BundlersClient orgId={orgId} />
     </div>
   )
 }

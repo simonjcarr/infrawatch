@@ -15,6 +15,23 @@
 
 ## What Has Been Built
 
+### Session 54 — Agent guidance and E2E harness documentation
+
+**Agent operating rules** (`AGENTS.md`)
+- Added a Testing section that points agents to `apps/docs/docs/development/testing.md` as the source of truth for the web E2E harness, avoiding duplicated setup details that can drift
+- Added rules requiring the database-backed harness when tests depend on real SQL, migrations, constraints, auth/session rows, organisation scoping, cascades, or persisted state
+- Added rules requiring explicit, relevant seed data for tests instead of relying on leaked state
+- Added Progress Tracking guidance: when new feature work satisfies all or part of a requirement, update `PROGRESS.md` and state what is complete versus outstanding
+- Added Completion Cleanup guidance: remove temporary worktrees only after commit, push, release, and any relevant image/artifact publication, and never delete worktrees with uncommitted user work
+
+**E2E harness docs** (`apps/docs/docs/development/testing.md`)
+- Expanded the Playwright/Testcontainers documentation with agent-ready detail on how the tmpfs TimescaleDB/Postgres database is created, how `DATABASE_URL` is injected before Next.js starts, and how migrations run
+- Documented `getTestDb()` for direct SQL seeding, when to seed through SQL versus UI/API paths, and how the baseline `seedOrgAndUser()` fixture works
+- Added guidance for feature-specific seed helpers, isolation maintenance, updating `APP_TABLES` for new app tables, single-spec runs, and common troubleshooting
+
+**Build state**
+- Documentation-only change; tests not run
+
 ### Session 53 — SSL Certificate Checker tool
 
 **New tooling page** (`apps/web/app/(dashboard)/certificate-checker/`, `apps/web/app/api/tools/certificate-checker/route.ts`)

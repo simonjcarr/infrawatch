@@ -38,6 +38,7 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in your .env file}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://localhost}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-https://localhost}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       NODE_ENV: production
       AGENT_DIST_DIR: /var/lib/ct-ops/agent-dist
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-https://localhost}

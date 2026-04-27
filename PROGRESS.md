@@ -6,14 +6,113 @@
 ---
 
 ## Current Phase
-**Phase 5 — Tooling (in progress)**
+**Phase 5 — Tooling + release hardening (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — two new Tooling utilities shipped (Directory User Lookup for live LDAP/AD queries, SSL Certificate Checker for parse/fetch/validate/convert of X.509 certs); offline agent install bundle (zip) for air-gapped enrolment; GitLab/Jenkins bundle transfer now routes through the existing agent task connection instead of direct SSH; ingest-side host deduplication by hostname / IP overlap; repo/image rename to `carrtech-dev` and enrolment-URL env-var plumbing; plus the established VuePress docs, networks (CIDR + graph view), and split-pane terminal workspace.
+🟢 Phase 5 progressing — tooling has expanded beyond Directory User Lookup and SSL Certificate Checker into Jenkins/GitLab air-gap bundle generation, recursive plugin dependency resolution, offline install bundles, host-mediated bundle transfer, and better transfer/download status. Since the last update the platform has also had a substantial release-hardening pass: local auth email verification, login lockout, trusted-origin mutation checks, org-authenticated server actions, enrolment-token limits, certificate-checker SSRF and parsing hardening, signed-update enforcement, terminal SSH credential enforcement, heartbeat/JWT tightening, agent script limits, ingest gRPC caps, config-file permission validation, digest-pinned customer bundles, installer checksum verification, and broader E2E/process coverage.
 
 ---
 
 ## What Has Been Built
+
+### Session 60 — Configurable local email verification + TLS deployment docs
+
+**Email verification policy** (`apps/web/lib/auth/env.ts`, `apps/web/lib/auth/index.ts`, `apps/web/app/(auth)/register/`)
+- Local email/password sign-up now reads `REQUIRE_EMAIL_VERIFICATION`, defaulting to `true` for the secure deployment posture.
+- When verification is disabled intentionally (`REQUIRE_EMAIL_VERIFICATION=false`), registration signs the new user in and continues to the callback/onboarding flow instead of routing through the verification email gate.
+- Invalid boolean values are rejected early by the shared auth env helper.
+- Root `.env.example`, `apps/web/.env.example`, `docker-compose.single.yml`, customer-bundle README, and VuePress install/configuration/deployment docs now expose the variable and explain the default.
+
+**Test coverage**
+- `apps/web/lib/auth/env.test.mjs` covers the default, explicit `true`/`false`/`1`/`0`, and invalid values.
+- `apps/web/tests/e2e/auth/register.spec.ts` now verifies both modes: default verification-required behaviour and the no-verification opt-out path.
+- New npm script: `pnpm --filter web test:e2e:no-email-verification`.
+
+---
+
+### Session 59 — Security, auth, and tenant-bound action hardening
+
+**Authentication and account controls** (`apps/web/lib/auth/`, `apps/web/app/(auth)/`)
+- Local email/password sign-ups require email verification before dashboard access by default.
+- Per-account login lockout added for repeated failed password attempts.
+- Production auth config is now validated via `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and trusted origins instead of silently accepting unsafe defaults.
+- LDAP login links are scoped to organisation context; team-management mutations derive the actor from the session.
+
+**Mutation and tenancy boundaries** (`apps/web/lib/actions/`, `apps/web/lib/security/trusted-origins.ts`)
+- Server actions now require an authenticated organisation context across agents, alerts, certificates, checks, host groups/settings, LDAP, networks, notes, notifications, service accounts, settings, software inventory, tag rules, tasks, terminal, and users.
+- Trusted-origin validation added for mutation routes such as agent bundles, host queries, bundle transfer, and certificate checker calls.
+- Notification test targets block private/internal addresses.
+
+**Agent, ingest, and tool security**
+- Terminal access now requires explicit SSH credentials and no longer depends on the agent-side terminal implementation.
+- Heartbeat JWT handling tightened: initial heartbeat sends JWT, invalid fallback is rejected, and unsigned agent self-update is disabled.
+- Enrolment tokens now enforce expiry and usage caps, with policy tests and migration support.
+- Certificate checker surface hardened against SSRF and untrusted certificate parsing now uses Node's `X509Certificate`.
+
+**Build/test coverage added**
+- Unit tests added around auth env validation, login attempts, trusted origins, enrolment token policy, certificate fetch/policy, heartbeat JWT handling, and agent update policy.
+- E2E coverage expanded for login, registration, authenticated redirects, settings, and activation-token flows.
+
+---
+
+### Session 58 — Agent, ingest, and task runtime hardening
+
+**Agent task execution** (`agent/internal/tasks/`)
+- Custom script tasks are constrained with OS-specific process-limit helpers and kill handling.
+- Script timeout behaviour now preserves inherited/default limits instead of accidentally dropping them.
+- Patch/task execution tests cover the new boundaries.
+
+**Agent config safety** (`agent/internal/config/`, `agent/internal/install/install.go`)
+- Agent config loading validates file ownership and permissions on Unix, with Windows-specific fallback handling.
+- Installer writes config files with stricter mode expectations and tests verify the new guardrails.
+
+**Ingest transport limits** (`apps/ingest/internal/grpc/server.go`)
+- gRPC server now caps message and stream limits, backed by a new server test suite.
+- JWKS/health HTTP server has a `ReadHeaderTimeout` to remove slowloris exposure.
+
+---
+
+### Session 57 — Release packaging and customer-bundle hardening
+
+**Customer release artifacts** (`.github/workflows/`, `docker-compose.single.yml`, `deploy/`)
+- Customer compose bundles now ship digest-pinned image references instead of mutable tags.
+- Release workflow exports customer-bundle image references and the bundle check workflow validates them.
+- Installer bundle checksums are generated and verified by release checks; `deploy/scripts/test-install.sh` exercises install output integrity.
+- Web image startup no longer runs as root; Docker build reliability improved with retry handling for flaky `pnpm install`.
+
+**Dependency and CI upkeep**
+- BuildKit image pinned for Docker builds.
+- Go, GitHub Actions, production npm dependencies, dev dependencies, and `@types/archiver` were bumped through Dependabot/release PRs.
+- Release-please continued producing web/agent/ingest tags through the hardening work.
+
+---
+
+### Session 56 — Jenkins and GitLab air-gap bundler expansion
+
+**Jenkins bundler** (`apps/web/app/(dashboard)/bundlers/jenkins-bundler.tsx`, `apps/web/app/api/tools/jenkins-bundler/route.ts`, `apps/web/lib/jenkins/update-center.ts`)
+- Jenkins LTS metadata is queried instead of relying on hard-coded Java compatibility baselines.
+- Offline-script bundle flow added for air-gap installation.
+- Recursive plugin dependency traversal added so required plugin dependencies are pulled into the archive.
+- A dependency pull action and clearer plugin download status make long bundle generation easier to monitor.
+
+**GitLab bundler** (`apps/web/app/(dashboard)/bundlers/gitlab-bundler.tsx`, `apps/web/app/api/tools/gitlab-bundler/route.ts`)
+- GitLab air-gap bundler added alongside Jenkins.
+- Target GitLab version can be fetched from upstream metadata instead of typed manually.
+- Bundle archives can be streamed server-side and transferred to selected hosts through the existing agent/task path.
+
+---
+
+### Session 55 — Engineering process and release-gate rules
+
+**Repository operating rules** (`CLAUDE.md` / agent instructions)
+- Security and PR workflow rules added to keep future changes aligned with the hardening work.
+- Conventional PR title requirements documented.
+- Completion criteria now require relevant tests to pass before a task is considered done.
+
+**Verification posture**
+- The project now has broader E2E coverage around auth/settings, more focused unit coverage for security-sensitive helpers, and CI/release checks for customer bundle integrity.
+
+---
 
 ### Session 54 — Bundler transfer via agent task channel
 

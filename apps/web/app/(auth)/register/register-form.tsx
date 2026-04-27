@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { signUp } from '@/lib/auth/client'
+import { signIn, signUp } from '@/lib/auth/client'
 import { getInviteByToken } from '@/lib/actions/auth'
 
 const registerSchema = z
@@ -35,7 +35,11 @@ const registerSchema = z
 
 type RegisterValues = z.infer<typeof registerSchema>
 
-export function RegisterForm() {
+type RegisterFormProps = {
+  requireEmailVerification: boolean
+}
+
+export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteToken = searchParams.get('invite')
@@ -79,7 +83,22 @@ export function RegisterForm() {
       return
     }
 
-    router.push(`/check-email?email=${encodeURIComponent(values.email)}`)
+    if (requireEmailVerification) {
+      router.push(`/check-email?email=${encodeURIComponent(values.email)}`)
+      return
+    }
+
+    const signInResult = await signIn.email({
+      email: values.email,
+      password: values.password,
+    })
+
+    if (signInResult.error) {
+      setServerError(signInResult.error.message ?? 'Registration succeeded, but sign in failed.')
+      return
+    }
+
+    router.push(callbackURL)
   }
 
   return (

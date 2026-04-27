@@ -61,6 +61,7 @@ POSTGRES_DB=ct-ops
 BETTER_AUTH_SECRET=change-me-to-a-long-random-string
 BETTER_AUTH_URL=https://ct-ops.example.com
 BETTER_AUTH_TRUSTED_ORIGINS=https://ct-ops.example.com
+REQUIRE_EMAIL_VERIFICATION=true
 AGENT_DOWNLOAD_BASE_URL=https://ct-ops.example.com
 EOF
 ```
@@ -68,6 +69,8 @@ EOF
 :::danger
 Change `BETTER_AUTH_SECRET` before going to production. Use at least 32 random characters.
 :::
+
+`REQUIRE_EMAIL_VERIFICATION` defaults to `true` when unset, which requires local email/password users to verify their email before sign-in. Set it to `false` only for deployments where unverified local accounts should be allowed to continue into CT-Ops.
 
 ### 3. Generate TLS certificates
 

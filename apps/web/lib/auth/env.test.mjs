@@ -6,6 +6,7 @@ import {
   getBetterAuthOrigin,
   getBetterAuthSecret,
   getBetterAuthUrl,
+  getRequireEmailVerification,
 } from './env.ts'
 
 test('getBetterAuthSecret rejects missing values', () => {
@@ -24,6 +25,24 @@ test('getBetterAuthOrigin normalises BETTER_AUTH_URL to an origin', () => {
   assert.equal(
     getBetterAuthOrigin({ BETTER_AUTH_URL: 'https://ct-ops.example.com/login?next=%2Fdashboard' }),
     'https://ct-ops.example.com',
+  )
+})
+
+test('getRequireEmailVerification defaults to requiring verification', () => {
+  assert.equal(getRequireEmailVerification({}), true)
+})
+
+test('getRequireEmailVerification parses explicit boolean values', () => {
+  assert.equal(getRequireEmailVerification({ REQUIRE_EMAIL_VERIFICATION: 'true' }), true)
+  assert.equal(getRequireEmailVerification({ REQUIRE_EMAIL_VERIFICATION: '1' }), true)
+  assert.equal(getRequireEmailVerification({ REQUIRE_EMAIL_VERIFICATION: 'false' }), false)
+  assert.equal(getRequireEmailVerification({ REQUIRE_EMAIL_VERIFICATION: '0' }), false)
+})
+
+test('getRequireEmailVerification rejects invalid values', () => {
+  assert.throws(
+    () => getRequireEmailVerification({ REQUIRE_EMAIL_VERIFICATION: 'sometimes' }),
+    /REQUIRE_EMAIL_VERIFICATION must be either true or false/,
   )
 })
 

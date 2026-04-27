@@ -15,6 +15,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "test:e2e": "node tests/e2e/runner.mjs",
+    "test:e2e:no-email-verification": "REQUIRE_EMAIL_VERIFICATION=false node tests/e2e/runner.mjs tests/e2e/auth/register.spec.ts",
     "test:e2e:ui": "node tests/e2e/runner.mjs --ui",
     "test:e2e:report": "playwright show-report"
   },

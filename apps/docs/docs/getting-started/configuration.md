@@ -14,6 +14,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `BETTER_AUTH_SECRET` | ✓ 🔒 | — | Secret used to sign session cookies AND for LDAP bind-password decryption (min 32 chars, never reuse across environments) |
 | `BETTER_AUTH_URL` | ✓ 🔒 | — | Public URL of the web app (e.g. `https://ct-ops.corp.example.com`). Use `https://` — `http://` disables cookie Secure flag |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | ✓ 🔒 | — | Comma-separated list of allowed origins. Auth flows from origins not in this list are rejected |
+| `REQUIRE_EMAIL_VERIFICATION` | — 🔒 | `true` | Require local email/password users to verify their email before sign-in. Set to `false` only when email verification should be optional |
 | `CT_OPS_LOADTEST_ADMIN_KEY` | — 🔒 | — | Bearer credential for `/api/admin/hosts/bulk-delete`. Endpoint returns 503 when unset. Set only on environments running load tests |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |
@@ -38,6 +39,7 @@ DATABASE_URL=postgresql://ct-ops:ct-ops@localhost:5432/ct-ops
 BETTER_AUTH_SECRET=change-me-to-something-long-and-random-in-production
 BETTER_AUTH_URL=https://localhost
 BETTER_AUTH_TRUSTED_ORIGINS=https://localhost
+REQUIRE_EMAIL_VERIFICATION=true
 AGENT_DOWNLOAD_BASE_URL=https://localhost
 NEXT_PUBLIC_APP_URL=https://localhost
 INGEST_WS_URL=

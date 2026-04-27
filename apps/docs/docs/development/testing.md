@@ -24,7 +24,10 @@ Useful variants:
 ```bash
 pnpm --filter web test:e2e:ui        # Playwright UI mode
 pnpm --filter web test:e2e:report    # Open the last HTML report
+pnpm --filter web test:e2e:no-email-verification
 ```
+
+The default E2E run leaves `REQUIRE_EMAIL_VERIFICATION` unset, so it exercises the safe default (`true`). `test:e2e:no-email-verification` runs the auth registration spec with `REQUIRE_EMAIL_VERIFICATION=false` to verify unverified local users can sign up, sign in, and continue without the email verification gate.
 
 ### Requirements
 

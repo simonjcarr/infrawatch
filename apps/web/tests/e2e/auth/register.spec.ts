@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test'
-import { waitForVerificationUrl } from '../fixtures/email'
+import { countVerificationEmails, waitForVerificationUrl } from '../fixtures/email'
 import { getTestDb } from '../fixtures/db'
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false'
@@ -28,7 +28,23 @@ test('email sign-up requires verification before dashboard access', async ({ pag
   await page.getByTestId('login-password').fill(password)
   await page.getByTestId('login-submit').click()
   await expect(page.getByTestId('login-error')).toBeVisible()
-  await expect(page).toHaveURL(/\/login$/)
+  await page.getByTestId('manage-email-verification').click()
+  await page.waitForURL('**/check-email*')
+  await expect(page.getByTestId('verification-email')).toHaveValue(email)
+
+  const emailsBeforeInvalidResend = await countVerificationEmails(email)
+  const invalidResend = await page.request.post('/api/auth/resend-verification-email', {
+    data: {
+      email,
+      password: 'WrongPassword123!',
+    },
+  })
+  expect(invalidResend.status()).toBe(401)
+  await expect.poll(() => countVerificationEmails(email)).toBe(emailsBeforeInvalidResend)
+
+  await page.getByTestId('verification-password').fill(password)
+  await page.getByTestId('resend-verification-email').click()
+  await expect(page.getByTestId('resend-verification-message')).toContainText('Verification email sent')
 
   const verificationUrl = await waitForVerificationUrl(email)
   await page.goto(verificationUrl)

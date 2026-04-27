@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { VerificationResendForm } from './verification-resend-form'
 
 export const metadata: Metadata = {
   title: 'Check your email',
@@ -28,8 +29,15 @@ export default async function CheckEmailPage({ searchParams }: CheckEmailPagePro
           address before CT-Ops will sign you in.
         </CardDescription>
       </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
-        After you open the link, CT-Ops will continue to the next step automatically.
+      <CardContent className="space-y-4">
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>After you open the link, CT-Ops will continue to the next step automatically.</p>
+          <p>
+            If the link has expired or you cannot find the email, confirm your password to send a
+            new verification link.
+          </p>
+        </div>
+        <VerificationResendForm initialEmail={email} />
       </CardContent>
       <CardFooter>
         <Link href="/login" className="text-sm text-foreground underline underline-offset-4">

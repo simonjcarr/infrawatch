@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -28,6 +29,16 @@ import (
 // NotFound or PermissionDenied, signalling that the local state should be
 // cleared and the agent should re-register from scratch.
 var ErrAgentDeregistered = errors.New("agent deregistered by server — re-registration required")
+
+const (
+	maxBufferedTaskProgressBytesPerTask     = 64 * 1024
+	maxBufferedTaskProgressBytesPerInterval = 256 * 1024
+	maxBufferedTaskResultBytesPerTask       = 16 * 1024
+	maxBufferedTaskResultBytesPerInterval   = 64 * 1024
+
+	taskProgressTruncatedMarker = "\n[ct-ops] output truncated before next heartbeat\n"
+	taskResultTruncatedMarker   = "task result truncated before next heartbeat"
+)
 
 // Runner manages the bidirectional heartbeat stream with the ingest service.
 type Runner struct {
@@ -59,10 +70,13 @@ type Runner struct {
 	queryResults   []*agentv1.AgentQueryResult
 
 	// Buffered agent task progress chunks and results, drained on each heartbeat send.
-	taskProgressMu sync.Mutex
-	taskProgress   []*agentv1.AgentTaskProgress
-	taskResultsMu  sync.Mutex
-	taskResults    []*agentv1.AgentTaskResult
+	taskProgressMu            sync.Mutex
+	taskProgress              []*agentv1.AgentTaskProgress
+	taskProgressBytes         int
+	taskProgressBytesByTask   map[string]int
+	taskProgressTruncatedTask map[string]bool
+	taskResultsMu             sync.Mutex
+	taskResults               []*agentv1.AgentTaskResult
 
 	// Dedupes server-pushed queries: the ingest handler may re-push the same
 	// query on consecutive 2s poll ticks while the agent is still executing it.
@@ -493,12 +507,7 @@ func (r *Runner) executeTask(ctx context.Context, task *agentv1.AgentTask) {
 	}()
 
 	progressFn := func(chunk string) {
-		r.taskProgressMu.Lock()
-		r.taskProgress = append(r.taskProgress, &agentv1.AgentTaskProgress{
-			TaskId:      task.TaskId,
-			OutputChunk: chunk,
-		})
-		r.taskProgressMu.Unlock()
+		r.bufferTaskProgress(task.TaskId, chunk)
 		// Nudge the send loop so progress is reported promptly.
 		select {
 		case r.resultsReady <- struct{}{}:
@@ -508,9 +517,7 @@ func (r *Runner) executeTask(ctx context.Context, task *agentv1.AgentTask) {
 
 	result := tasks.Dispatch(taskCtx, task, progressFn)
 
-	r.taskResultsMu.Lock()
-	r.taskResults = append(r.taskResults, result)
-	r.taskResultsMu.Unlock()
+	r.bufferTaskResult(result)
 
 	select {
 	case r.resultsReady <- struct{}{}:
@@ -540,6 +547,9 @@ func (r *Runner) drainTaskProgress() []*agentv1.AgentTaskProgress {
 	defer r.taskProgressMu.Unlock()
 	p := r.taskProgress
 	r.taskProgress = nil
+	r.taskProgressBytes = 0
+	r.taskProgressBytesByTask = make(map[string]int)
+	r.taskProgressTruncatedTask = make(map[string]bool)
 	return p
 }
 
@@ -547,9 +557,180 @@ func (r *Runner) drainTaskProgress() []*agentv1.AgentTaskProgress {
 func (r *Runner) drainTaskResults() []*agentv1.AgentTaskResult {
 	r.taskResultsMu.Lock()
 	defer r.taskResultsMu.Unlock()
-	results := r.taskResults
-	r.taskResults = nil
+	if len(r.taskResults) == 0 {
+		return nil
+	}
+
+	used := 0
+	n := 0
+	for n < len(r.taskResults) {
+		size := taskResultSize(r.taskResults[n])
+		if n > 0 && used+size > maxBufferedTaskResultBytesPerInterval {
+			break
+		}
+		used += size
+		n++
+		if used >= maxBufferedTaskResultBytesPerInterval {
+			break
+		}
+	}
+
+	results := append([]*agentv1.AgentTaskResult(nil), r.taskResults[:n]...)
+	r.taskResults = append([]*agentv1.AgentTaskResult(nil), r.taskResults[n:]...)
 	return results
+}
+
+func (r *Runner) bufferTaskProgress(taskID, chunk string) {
+	if chunk == "" {
+		return
+	}
+
+	r.taskProgressMu.Lock()
+	defer r.taskProgressMu.Unlock()
+
+	if r.taskProgressBytesByTask == nil {
+		r.taskProgressBytesByTask = make(map[string]int)
+	}
+	if r.taskProgressTruncatedTask == nil {
+		r.taskProgressTruncatedTask = make(map[string]bool)
+	}
+	if r.taskProgressTruncatedTask[taskID] {
+		return
+	}
+
+	perTaskBudget := maxBufferedTaskProgressBytesPerTask - r.taskProgressBytesByTask[taskID]
+	intervalBudget := maxBufferedTaskProgressBytesPerInterval - r.taskProgressBytes
+	budget := minInt(perTaskBudget, intervalBudget)
+	if budget <= 0 {
+		r.appendTaskProgressTruncationLocked(taskID, "")
+		return
+	}
+	if len(chunk) <= budget {
+		r.appendTaskProgressLocked(taskID, chunk)
+		return
+	}
+
+	r.appendTaskProgressTruncationLocked(taskID, chunk[:budget])
+}
+
+func (r *Runner) appendTaskProgressLocked(taskID, chunk string) {
+	if chunk == "" {
+		return
+	}
+	r.taskProgress = append(r.taskProgress, &agentv1.AgentTaskProgress{
+		TaskId:      taskID,
+		OutputChunk: chunk,
+	})
+	r.taskProgressBytes += len(chunk)
+	r.taskProgressBytesByTask[taskID] += len(chunk)
+}
+
+func (r *Runner) appendTaskProgressTruncationLocked(taskID, prefix string) {
+	if r.taskProgressTruncatedTask[taskID] {
+		return
+	}
+
+	perTaskBudget := maxBufferedTaskProgressBytesPerTask - r.taskProgressBytesByTask[taskID]
+	intervalBudget := maxBufferedTaskProgressBytesPerInterval - r.taskProgressBytes
+	budget := minInt(perTaskBudget, intervalBudget)
+	if budget <= 0 {
+		return
+	}
+
+	markerBytes := len(taskProgressTruncatedMarker)
+	chunk := prefix
+	if len(chunk) >= budget {
+		if budget > markerBytes {
+			chunk = truncateUTF8(chunk, budget-markerBytes)
+		} else {
+			chunk = ""
+		}
+	}
+
+	if markerBytes > budget-len(chunk) {
+		marker := truncateUTF8(taskProgressTruncatedMarker, budget-len(chunk))
+		r.appendTaskProgressLocked(taskID, chunk+marker)
+	} else {
+		r.appendTaskProgressLocked(taskID, chunk+taskProgressTruncatedMarker)
+	}
+
+	r.taskProgressTruncatedTask[taskID] = true
+}
+
+func (r *Runner) bufferTaskResult(result *agentv1.AgentTaskResult) {
+	if result == nil {
+		return
+	}
+
+	r.taskResultsMu.Lock()
+	defer r.taskResultsMu.Unlock()
+	r.taskResults = append(r.taskResults, clampTaskResult(result, maxBufferedTaskResultBytesPerTask))
+}
+
+func clampTaskResult(result *agentv1.AgentTaskResult, maxBytes int) *agentv1.AgentTaskResult {
+	clamped := *result
+	if taskResultSize(&clamped) <= maxBytes {
+		return &clamped
+	}
+
+	clamped.ResultJson = `{"truncated":true}`
+	clamped.Error = clampTaskResultError(clamped.Error, maxBytes-taskResultStaticSize(&clamped)-len(clamped.ResultJson))
+	if taskResultSize(&clamped) > maxBytes {
+		clamped.ResultJson = ""
+		clamped.Error = clampTaskResultError(clamped.Error, maxBytes-taskResultStaticSize(&clamped))
+	}
+	return &clamped
+}
+
+func clampTaskResultError(existing string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if existing == "" {
+		return truncateUTF8(taskResultTruncatedMarker, maxBytes)
+	}
+
+	suffix := " (" + taskResultTruncatedMarker + ")"
+	if maxBytes <= len(suffix) {
+		return truncateUTF8(taskResultTruncatedMarker, maxBytes)
+	}
+	return truncateUTF8(existing, maxBytes-len(suffix)) + suffix
+}
+
+func taskResultSize(result *agentv1.AgentTaskResult) int {
+	if result == nil {
+		return 0
+	}
+	return taskResultStaticSize(result) + len(result.ResultJson) + len(result.Error)
+}
+
+func taskResultStaticSize(result *agentv1.AgentTaskResult) int {
+	if result == nil {
+		return 0
+	}
+	return len(result.TaskId) + len(result.TaskType)
+}
+
+func truncateUTF8(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	s = s[:maxBytes]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // hostMetricsSnapshot holds a point-in-time snapshot of system metrics.

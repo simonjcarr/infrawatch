@@ -56,6 +56,11 @@ export function resolveLicencePublicKeyPem(): string {
 
 const LICENCE_ISSUER = 'licence.carrtech.dev'
 const LICENCE_AUDIENCE = 'install.carrtech.dev'
+const LICENCE_REVOCATION_AUDIENCE = 'install.carrtech.dev/licence-revocations'
+const DEFAULT_REVOCATION_URL = `https://${LICENCE_ISSUER}/.well-known/ct-ops-licence-revocations.jwt`
+const REVOCATION_REFRESH_MS = 15 * 60 * 1000
+const REVOCATION_RETRY_MS = 5 * 60 * 1000
+const REVOCATION_FETCH_TIMEOUT_MS = 2_000
 
 export type PaidTier = Exclude<LicenceTier, 'community'>
 
@@ -82,6 +87,21 @@ export type LicenceValidationResult =
   | { valid: true; payload: LicencePayload }
   | { valid: false; error: string }
 
+type RevocationBundlePayload = {
+  iss: string
+  aud: string
+  exp: number
+  revoked: string[]
+}
+
+type CachedRevocationBundle = {
+  revoked: Set<string>
+  refreshAfter: number
+}
+
+let revocationCache: CachedRevocationBundle | null = null
+let revocationInflight: Promise<CachedRevocationBundle | null> | null = null
+
 function isPaidTier(v: unknown): v is PaidTier {
   return v === 'pro' || v === 'enterprise'
 }
@@ -94,6 +114,129 @@ function isCustomer(v: unknown): v is LicenceCustomer {
   if (!v || typeof v !== 'object') return false
   const c = v as Record<string, unknown>
   return typeof c.name === 'string' && typeof c.email === 'string'
+}
+
+function resolveRevocationUrl(env: NodeJS.ProcessEnv = process.env): string | null {
+  const configured = env.LICENCE_REVOCATION_URL?.trim()
+  if (configured === '') {
+    return null
+  }
+  if (configured) {
+    return configured
+  }
+  return env.NODE_ENV === 'production' ? DEFAULT_REVOCATION_URL : null
+}
+
+function isRevocationBundlePayload(payload: unknown): payload is RevocationBundlePayload {
+  if (!payload || typeof payload !== 'object') {
+    return false
+  }
+
+  const bundle = payload as Record<string, unknown>
+  return (
+    bundle.iss === LICENCE_ISSUER &&
+    bundle.aud === LICENCE_REVOCATION_AUDIENCE &&
+    typeof bundle.exp === 'number' &&
+    isStringArray(bundle.revoked)
+  )
+}
+
+async function fetchRevocationBundle(now: number): Promise<CachedRevocationBundle | null> {
+  const revocationUrl = resolveRevocationUrl()
+  if (!revocationUrl) {
+    return null
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REVOCATION_FETCH_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(revocationUrl, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        accept: 'application/jwt, text/plain;q=0.9',
+      },
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Revocation list request failed with status ${response.status}`)
+    }
+
+    const bundleToken = (await response.text()).trim()
+    if (!bundleToken) {
+      throw new Error('Revocation list response was empty')
+    }
+
+    const publicKey = await importSPKI(resolveLicencePublicKeyPem(), 'RS256')
+    const { payload } = await jwtVerify(bundleToken, publicKey, {
+      algorithms: ['RS256'],
+      issuer: LICENCE_ISSUER,
+      audience: LICENCE_REVOCATION_AUDIENCE,
+      typ: 'JWT',
+    })
+
+    if (!isRevocationBundlePayload(payload)) {
+      throw new Error('Revocation list payload is invalid')
+    }
+
+    return {
+      revoked: new Set(payload.revoked),
+      refreshAfter: Math.min(now + REVOCATION_REFRESH_MS, payload.exp * 1000),
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function loadRevocationBundle(now = Date.now()): Promise<CachedRevocationBundle | null> {
+  if (revocationCache && revocationCache.refreshAfter > now) {
+    return revocationCache
+  }
+
+  if (!revocationInflight) {
+    revocationInflight = fetchRevocationBundle(now)
+      .then((bundle) => {
+        revocationCache = bundle
+          ? bundle
+          : {
+              revoked: new Set(),
+              refreshAfter: now + REVOCATION_RETRY_MS,
+            }
+        return revocationCache
+      })
+      .catch(() => {
+        if (revocationCache) {
+          revocationCache = {
+            ...revocationCache,
+            refreshAfter: now + REVOCATION_RETRY_MS,
+          }
+          return revocationCache
+        }
+
+        revocationCache = {
+          revoked: new Set(),
+          refreshAfter: now + REVOCATION_RETRY_MS,
+        }
+        return revocationCache
+      })
+      .finally(() => {
+        revocationInflight = null
+      })
+  }
+
+  return revocationInflight
+}
+
+async function isLicenceRevoked(jti: string): Promise<boolean> {
+  const bundle = await loadRevocationBundle()
+  return bundle?.revoked.has(jti) ?? false
+}
+
+export function resetLicenceValidationStateForTests(): void {
+  revocationCache = null
+  revocationInflight = null
 }
 
 export async function validateLicenceKey(key: string): Promise<LicenceValidationResult> {
@@ -131,6 +274,10 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
 
     const rawMaxHosts = payload['maxHosts']
     const maxHosts = typeof rawMaxHosts === 'number' && rawMaxHosts > 0 ? rawMaxHosts : undefined
+
+    if (await isLicenceRevoked(payload.jti)) {
+      return { valid: false, error: 'Licence key has been revoked' }
+    }
 
     return {
       valid: true,

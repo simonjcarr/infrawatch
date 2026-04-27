@@ -94,6 +94,8 @@ Licences are time-limited via the `exp` claim. When a licence expires, CT-Ops si
 
 Connected installs may opportunistically check a signed revocation list published by the issuance service. Air-gapped installs rely exclusively on the `exp` claim — licence terms are therefore sized short enough (typically one year) for revocation-by-expiry to be acceptable.
 
+When `LICENCE_REVOCATION_URL` is unset, CT-Ops defaults to `https://licence.carrtech.dev/.well-known/ct-ops-licence-revocations.jwt` and refreshes that signed bundle periodically. If the install is offline or the endpoint is unreachable, the last known list is reused; if no list has ever been fetched, validation falls back to the JWT `exp` claim only.
+
 ### Seat limits
 
 If a licence includes a `maxHosts` cap, agent approval is blocked once that count is reached. Remove or archive decommissioned hosts to free up seats.

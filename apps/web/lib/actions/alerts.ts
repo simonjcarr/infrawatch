@@ -7,6 +7,8 @@ import { createHmac } from 'crypto'
 import nodemailer from 'nodemailer'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { assertPublicHost, assertPublicUrl } from '@/lib/net/ssrf-guard'
+import { getRequiredSession } from '@/lib/auth/session'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 const testNotificationLimiter = createRateLimiter(60_000, 5)
 import { db } from '@/lib/db'
@@ -195,6 +197,7 @@ export async function deleteGlobalAlertDefault(
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
@@ -209,6 +212,21 @@ export async function deleteGlobalAlertDefault(
     .update(alertRules)
     .set({ deletedAt: new Date() })
     .where(and(eq(alertRules.id, ruleId), eq(alertRules.organisationId, orgId)))
+
+  await writeAuditEvent(db, {
+    organisationId: orgId,
+    actorUserId: session.user.id,
+    action: 'alert_rule.deleted',
+    targetType: 'alert_rule',
+    targetId: existing.id,
+    summary: `Deleted global alert default ${existing.name}`,
+    metadata: {
+      hostId: existing.hostId,
+      isGlobalDefault: existing.isGlobalDefault,
+      name: existing.name,
+      conditionType: existing.conditionType,
+    },
+  })
 
   return { success: true }
 }
@@ -306,6 +324,7 @@ export async function deleteAlertRule(
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
@@ -319,6 +338,21 @@ export async function deleteAlertRule(
     .update(alertRules)
     .set({ deletedAt: new Date() })
     .where(and(eq(alertRules.id, ruleId), eq(alertRules.organisationId, orgId)))
+
+  await writeAuditEvent(db, {
+    organisationId: orgId,
+    actorUserId: session.user.id,
+    action: 'alert_rule.deleted',
+    targetType: 'alert_rule',
+    targetId: existing.id,
+    summary: `Deleted alert rule ${existing.name}`,
+    metadata: {
+      hostId: existing.hostId,
+      isGlobalDefault: existing.isGlobalDefault,
+      name: existing.name,
+      conditionType: existing.conditionType,
+    },
+  })
 
   return { success: true }
 }
@@ -552,6 +586,7 @@ export async function createNotificationChannel(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
   await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
   const parsed = createNotificationChannelSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -570,6 +605,18 @@ export async function createNotificationChannel(
       .returning({ id: notificationChannels.id })
 
     if (!row) return { error: 'Insert failed' }
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'notification_channel.created',
+      targetType: 'notification_channel',
+      targetId: row.id,
+      summary: `Created ${data.type} notification channel ${data.name}`,
+      metadata: {
+        name: data.name,
+        type: data.type,
+      },
+    })
     return { success: true, id: row.id }
   } catch {
     return { error: 'Failed to create notification channel' }
@@ -581,6 +628,7 @@ export async function deleteNotificationChannel(
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
@@ -596,6 +644,19 @@ export async function deleteNotificationChannel(
     .where(
       and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)),
     )
+
+  await writeAuditEvent(db, {
+    organisationId: orgId,
+    actorUserId: session.user.id,
+    action: 'notification_channel.deleted',
+    targetType: 'notification_channel',
+    targetId: existing.id,
+    summary: `Deleted ${existing.type} notification channel ${existing.name}`,
+    metadata: {
+      name: existing.name,
+      type: existing.type,
+    },
+  })
 
   return { success: true }
 }
@@ -640,6 +701,7 @@ export async function updateNotificationChannel(
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
@@ -650,10 +712,13 @@ export async function updateNotificationChannel(
   if (!existing) return { error: 'Notification channel not found' }
 
   try {
+    let nextName = existing.name
+
     if (existing.type === 'webhook') {
       const parsed = updateWebhookChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, url, secret } = parsed.data
+      nextName = name
       const existingConfig = existing.config as WebhookChannelConfig
       const newConfig: WebhookChannelConfig = {
         url,
@@ -667,6 +732,7 @@ export async function updateNotificationChannel(
       const parsed = updateSmtpChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, host, port, encryption, username, password, fromAddress, fromName, toAddresses } = parsed.data
+      nextName = name
       const existingConfig = normaliseSmtpConfig(existing.config)
       const newConfig: SmtpChannelConfig = {
         host,
@@ -686,6 +752,7 @@ export async function updateNotificationChannel(
       const parsed = updateSlackChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, webhookUrl } = parsed.data
+      nextName = name
       const newConfig: SlackChannelConfig = { webhookUrl }
       await db
         .update(notificationChannels)
@@ -695,6 +762,7 @@ export async function updateNotificationChannel(
       const parsed = updateTelegramChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, botToken, chatId } = parsed.data
+      nextName = name
       const existingConfig = existing.config as TelegramChannelConfig
       const newConfig: TelegramChannelConfig = {
         botToken: botToken || existingConfig.botToken,
@@ -705,6 +773,21 @@ export async function updateNotificationChannel(
         .set({ name, config: newConfig, updatedAt: new Date() })
         .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
     }
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'notification_channel.updated',
+      targetType: 'notification_channel',
+      targetId: existing.id,
+      summary: `Updated ${existing.type} notification channel ${nextName}`,
+      metadata: {
+        previousName: existing.name,
+        nextName,
+        type: existing.type,
+      },
+    })
+
     return { success: true }
   } catch {
     return { error: 'Failed to update notification channel' }
@@ -933,6 +1016,21 @@ export async function createSilence(
       .returning({ id: alertSilences.id })
 
     if (!row) return { error: 'Insert failed' }
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: userId,
+      action: 'alert_silence.created',
+      targetType: 'alert_silence',
+      targetId: row.id,
+      summary: `Created alert silence${data.hostId ? ` for host ${data.hostId}` : ''}`,
+      metadata: {
+        hostId: data.hostId ?? null,
+        ruleId: data.ruleId ?? null,
+        reason: data.reason,
+        startsAt: new Date(data.startsAt),
+        endsAt: new Date(data.endsAt),
+      },
+    })
     return { success: true, id: row.id }
   } catch {
     return { error: 'Failed to create silence' }

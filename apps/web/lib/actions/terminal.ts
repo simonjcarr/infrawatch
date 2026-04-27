@@ -11,6 +11,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 export interface TerminalAccessResult {
   allowed: true
@@ -203,6 +204,23 @@ export async function updateOrgTerminalSettings(
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
       .where(eq(organisations.id, orgId))
 
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'terminal.org_settings.updated',
+      targetType: 'organisation',
+      targetId: orgId,
+      summary: 'Updated organisation terminal settings',
+      metadata: {
+        previous: {
+          terminalEnabled: currentMetadata.terminalEnabled !== false,
+          terminalLoggingEnabled: currentMetadata.terminalLoggingEnabled === true,
+          terminalDirectAccess: false,
+        },
+        next: updatedMetadata,
+      },
+    })
+
     return { success: true }
   } catch (err) {
     console.error('Failed to update org terminal settings:', err)
@@ -262,6 +280,22 @@ export async function updateHostTerminalSettings(
       .update(hosts)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
       .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'terminal.host_settings.updated',
+      targetType: 'host',
+      targetId: hostId,
+      summary: 'Updated host terminal settings',
+      metadata: {
+        previous: {
+          terminalEnabled: currentMetadata.terminalEnabled !== false,
+          terminalAllowedUsers: currentMetadata.terminalAllowedUsers ?? [],
+        },
+        next: updatedMetadata,
+      },
+    })
 
     return { success: true }
   } catch (err) {

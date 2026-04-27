@@ -21,6 +21,10 @@ on:
         description: Release tag (e.g. ingest/v0.1.0). Used as the checkout ref and stripped of its `ingest/` prefix to tag the image.
         required: true
         type: string
+    outputs:
+      image_ref:
+        description: Digest-pinned multi-arch ingest image reference.
+        value: ${{ jobs.merge-ingest.outputs.image_ref }}
   workflow_dispatch:
     inputs:
       tag_name:
@@ -147,6 +151,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_ref: ${{ steps.final-image.outputs.ref }}
 
     steps:
       - name: Log in to GHCR
@@ -188,3 +194,10 @@ jobs:
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.IMAGE_PREFIX }}/ingest@sha256:%s ' *)
+
+      - name: Capture manifest digest
+        id: final-image
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect "${{ env.IMAGE_PREFIX }}/ingest:${{ steps.version.outputs.value }}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "ref=${{ env.IMAGE_PREFIX }}/ingest@${digest}" >> "$GITHUB_OUTPUT"

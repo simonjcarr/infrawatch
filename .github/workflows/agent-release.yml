@@ -148,8 +148,11 @@ jobs:
   # `push: tags` would never fire because release-please uses GITHUB_TOKEN).
   bundle-web:
     name: Customer bundle (web)
-    needs: release-please
-    if: needs.release-please.outputs.web_release_created == 'true'
+    needs:
+      - release-please
+      - build-web-image
+      - build-ingest-image
+    if: always() && needs.release-please.outputs.web_release_created == 'true'
     runs-on: self-hosted
     steps:
       - name: Reset workspace ownership
@@ -166,12 +169,25 @@ jobs:
           set -euo pipefail
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
+          WEB_IMAGE_REF="${{ needs.build-web-image.outputs.image_ref }}"
+          if [ -z "${WEB_IMAGE_REF}" ]; then
+            echo "ERROR: missing web image digest output from build-web-image" >&2
+            exit 1
+          fi
+          INGEST_IMAGE_REF="${{ needs.build-ingest-image.outputs.image_ref }}"
+          if [ -z "${INGEST_IMAGE_REF}" ]; then
+            INGEST_IMAGE_REF="$(docker buildx imagetools inspect ghcr.io/carrtech-dev/ct-ops/ingest:latest --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@${INGEST_IMAGE_REF}"
+          fi
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
           cp deploy/nginx/nginx.conf          dist/ct-ops/deploy/nginx/nginx.conf
           echo "$VERSION" > dist/ct-ops/VERSION
+
+          perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
+          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
 
           # The customer start.sh is generated here rather than checked into
           # the repo so the only source of truth lives next to the workflow
@@ -549,6 +565,26 @@ jobs:
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
           echo "versioned=ct-ops-single-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          echo "compose_versioned=docker-compose.single-${VERSION}.yml" >> "$GITHUB_OUTPUT"
+          cp dist/ct-ops/docker-compose.yml "docker-compose.single-${VERSION}.yml"
+          cp dist/ct-ops/docker-compose.yml docker-compose.single.yml
+
+      - name: Verify bundled compose pins image digests
+        run: |
+          set -euo pipefail
+          export BETTER_AUTH_SECRET=verify-placeholder
+          export POSTGRES_PASSWORD=verify-placeholder
+          refs="$(docker compose -f dist/ct-ops/docker-compose.yml --env-file dist/ct-ops/.env.example config --images)"
+          echo "$refs"
+          while IFS= read -r ref; do
+            case "$ref" in
+              *@sha256:*) ;;
+              *)
+                echo "ERROR: unpinned image reference in bundled compose: $ref" >&2
+                exit 1
+                ;;
+            esac
+          done <<< "$refs"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
@@ -557,6 +593,8 @@ jobs:
           files: |
             ${{ steps.bundle.outputs.versioned }}
             ct-ops-single.zip
+            ${{ steps.bundle.outputs.compose_versioned }}
+            docker-compose.single.yml
             ct-ops-web.spdx.json
 
       - name: Clean up runner disk

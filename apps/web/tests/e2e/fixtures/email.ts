@@ -41,3 +41,19 @@ export async function waitForVerificationUrl(to: string, timeoutMs = 10_000): Pr
 
   throw new Error(`Timed out waiting for verification email for ${to}`)
 }
+
+export async function countVerificationEmails(to: string): Promise<number> {
+  try {
+    const raw = await readFile(getCaptureFile(), 'utf8')
+    return raw
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as CapturedEmail)
+      .filter((message) => message.to === to && message.metadata?.verificationUrl)
+      .length
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0
+    throw error
+  }
+}

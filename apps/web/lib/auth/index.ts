@@ -11,6 +11,11 @@ import {
   getBetterAuthUrl,
   getRequireEmailVerification,
 } from './env'
+import {
+  EMAIL_VERIFICATION_RESEND_THROTTLED_MESSAGE,
+  emailVerificationResendPolicy,
+} from './email-verification-rate-limit'
+import { getVerificationResendClientIp } from './email-verification-resend'
 import { passwordLoginAttemptGuard } from './login-attempts'
 
 const LOGIN_THROTTLED_MESSAGE = 'Too many login attempts — please wait before trying again.'
@@ -53,6 +58,21 @@ export const auth = betterAuth({
   ],
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/send-verification-email') {
+        const email = typeof ctx.body?.email === 'string' ? ctx.body.email : ''
+        const request = ctx.request
+        const ip = request ? getVerificationResendClientIp(request) : 'unknown'
+        if (!emailVerificationResendPolicy.check({ email, ip })) {
+          throw new APIError('TOO_MANY_REQUESTS', {
+            message: EMAIL_VERIFICATION_RESEND_THROTTLED_MESSAGE,
+          })
+        }
+
+        throw new APIError('FORBIDDEN', {
+          message: 'Verification email resend requires password confirmation.',
+        })
+      }
+
       if (ctx.path !== '/sign-in/email') return
 
       const email = typeof ctx.body?.email === 'string' ? ctx.body.email : ''

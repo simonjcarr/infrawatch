@@ -29,9 +29,15 @@ interface LoginFormProps {
   ldapLoginEnabled?: boolean
 }
 
+function isEmailNotVerifiedError(message: string, code?: string): boolean {
+  return code === 'EMAIL_NOT_VERIFIED' || message.toLowerCase().includes('email not verified')
+}
+
 export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [canResendVerification, setCanResendVerification] = useState(false)
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
   const [loginMode, setLoginMode] = useState<'local' | 'domain'>('local')
 
   const localForm = useForm<LocalLoginValues>({
@@ -44,13 +50,19 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
 
   async function onLocalSubmit(values: LocalLoginValues) {
     setServerError(null)
+    setCanResendVerification(false)
+    setVerificationEmail(null)
     const result = await signIn.email({
       email: values.email,
       password: values.password,
     })
 
     if (result.error) {
-      setServerError(result.error.message ?? 'Sign in failed. Check your credentials.')
+      const message = result.error.message ?? 'Sign in failed. Check your credentials.'
+      const isUnverifiedEmail = isEmailNotVerifiedError(message, result.error.code)
+      setServerError(message)
+      setCanResendVerification(isUnverifiedEmail)
+      setVerificationEmail(isUnverifiedEmail ? values.email : null)
       return
     }
 
@@ -59,6 +71,8 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
 
   async function onDomainSubmit(values: DomainLoginValues) {
     setServerError(null)
+    setCanResendVerification(false)
+    setVerificationEmail(null)
     try {
       const res = await fetch('/api/auth/ldap', {
         method: 'POST',
@@ -107,6 +121,8 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
               onClick={() => {
                 setLoginMode('local')
                 setServerError(null)
+                setCanResendVerification(false)
+                setVerificationEmail(null)
               }}
             >
               Local Account
@@ -121,6 +137,8 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
               onClick={() => {
                 setLoginMode('domain')
                 setServerError(null)
+                setCanResendVerification(false)
+                setVerificationEmail(null)
               }}
             >
               Domain Account
@@ -134,6 +152,26 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
           <CardContent className="space-y-4">
             {serverError && (
               <p className="text-sm text-destructive" data-testid="login-error">{serverError}</p>
+            )}
+            {canResendVerification && (
+              <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
+                <p className="text-muted-foreground">
+                  Your account needs email verification before you can sign in. Use the link in
+                  your verification email, or manage verification if the previous link expired.
+                </p>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                >
+                  <Link
+                    href={`/check-email${verificationEmail ? `?email=${encodeURIComponent(verificationEmail)}` : ''}`}
+                    data-testid="manage-email-verification"
+                  >
+                    Manage email verification
+                  </Link>
+                </Button>
+              </div>
             )}
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>

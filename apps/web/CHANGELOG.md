@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.12](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.11...web/v0.70.12) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** enforce enrolment token expiry and usage caps ([5a3ef14](https://github.com/carrtech-dev/ct-ops/commit/5a3ef14e2d6b1bade290da24523484d25b8a127a))
+* **agent:** enforce enrolment token expiry and usage caps ([a783c2c](https://github.com/carrtech-dev/ct-ops/commit/a783c2cb22146bcd624bc2e122f8fbc8e7924316))
+
 ## [0.70.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.10...web/v0.70.11) (2026-04-26)
 
 

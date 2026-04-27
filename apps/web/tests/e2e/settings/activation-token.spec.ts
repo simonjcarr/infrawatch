@@ -10,4 +10,8 @@ test('admin can generate an activation token from settings', async ({ authentica
   await expect(activationToken).toBeVisible()
   await expect(activationToken).not.toBeEmpty()
   await expect(page.getByTestId('activation-token-generate')).toHaveText('Generate a new token')
+
+  const firstToken = await activationToken.textContent()
+  await page.getByTestId('activation-token-generate').click()
+  await expect(activationToken).not.toHaveText(firstToken ?? '')
 })

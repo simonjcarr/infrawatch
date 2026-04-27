@@ -9,16 +9,8 @@ export const STORAGE_STATE_PATH = path.resolve(
   'user.json',
 )
 
-let cachedPromise: Promise<string> | null = null
-
 export async function getStorageStatePath(baseURL: string): Promise<string> {
-  if (!cachedPromise) {
-    cachedPromise = signInAndCacheStorageState(baseURL).catch((err) => {
-      cachedPromise = null
-      throw err
-    })
-  }
-  return cachedPromise
+  return signInAndCacheStorageState(baseURL)
 }
 
 async function signInAndCacheStorageState(baseURL: string): Promise<string> {

@@ -34,6 +34,21 @@ For forms and other user-controlled inputs:
 These examples are not exhaustive. Consider the broader security implications of
 the feature, its failure modes, and how it could be abused before shipping.
 
+## Testing Expectations
+
+Use test-driven development for new features and meaningful behavior changes.
+Before writing implementation code, write the relevant tests first. Include unit
+tests and end-to-end tests where appropriate for the scope and risk of the
+change.
+
+Run the new tests before implementation and confirm they fail for the expected
+reason. Then implement the code needed to make those tests pass. This helps
+confirm the implementation does what was intended and ensures new behavior has
+test coverage.
+
+If a test-first workflow is not practical for a specific change, document why in
+the PR and describe the alternative validation that was performed.
+
 ## Pull Requests
 
 After finishing a task, commit the work, push it to GitHub, and create a pull

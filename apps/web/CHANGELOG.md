@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.18](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.17...web/v0.70.18) (2026-04-27)
+
+
+### Bug Fixes
+
+* **security:** validate jsonb metadata at runtime ([#620](https://github.com/carrtech-dev/ct-ops/issues/620)) ([8e2adaf](https://github.com/carrtech-dev/ct-ops/commit/8e2adafa91f6c7a25dd83aafe4024359889092c3))
+
 ## [0.70.17](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.16...web/v0.70.17) (2026-04-27)
 
 

@@ -1,5 +1,20 @@
 # Agent Instructions
 
+## Required Agent Workflow
+
+For every task that changes files, agents must complete this checklist unless
+the user explicitly says not to:
+
+1. Create a dedicated Git worktree before editing files.
+2. Make all edits inside that worktree.
+3. Run relevant validation.
+4. Commit the changes with a Conventional Commit message.
+5. Push the branch to GitHub.
+6. Open a pull request with a Conventional Commit title.
+
+Do not stop after local edits. A file-changing task is not complete until the
+pull request exists, unless the user explicitly asked for local-only changes.
+
 ## Security Expectations
 
 When planning and implementing a feature, ensure the feature would pass an

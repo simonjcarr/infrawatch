@@ -37,7 +37,15 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copy only the web package.json to leverage Docker layer caching
 COPY apps/web/package.json ./apps/web/
-RUN pnpm install --frozen-lockfile
+RUN for attempt in 1 2 3; do \
+      if pnpm install --frozen-lockfile; then \
+        exit 0; \
+      fi; \
+      if [ "$attempt" -eq 3 ]; then \
+        exit 1; \
+      fi; \
+      sleep $((attempt * 5)); \
+    done
 # Resolve pnpm virtual-store symlinks for drizzle-orm and postgres so they can be
 # copied as real files into the runner stage (migrate.js needs the full package.json
 # exports map, which the Next.js standalone trace does not include).

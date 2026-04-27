@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.2.1...ingest/v0.3.0) (2026-04-27)
+
+
+### Features
+
+* **web:** centralize SMTP relay settings ([#641](https://github.com/carrtech-dev/ct-ops/issues/641)) ([c2fafe4](https://github.com/carrtech-dev/ct-ops/commit/c2fafe456b74dedec7b4876930fd5ef9cc1bfc66))
+
 ## [0.2.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.2.0...ingest/v0.2.1) (2026-04-27)
 
 

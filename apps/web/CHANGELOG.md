@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.72.0...web/v0.73.0) (2026-04-27)
+
+
+### Features
+
+* **web:** centralize SMTP relay settings ([#641](https://github.com/carrtech-dev/ct-ops/issues/641)) ([c2fafe4](https://github.com/carrtech-dev/ct-ops/commit/c2fafe456b74dedec7b4876930fd5ef9cc1bfc66))
+
 ## [0.72.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.71.0...web/v0.72.0) (2026-04-27)
 
 

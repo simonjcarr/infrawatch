@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.4](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.3...agent/v0.30.4) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** constrain custom script tasks ([#604](https://github.com/carrtech-dev/ct-ops/issues/604)) ([5580168](https://github.com/carrtech-dev/ct-ops/commit/5580168a84d788392cc6baf3faa0a8bdeb9bac4e))
+
 ## [0.30.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.2...agent/v0.30.3) (2026-04-26)
 
 

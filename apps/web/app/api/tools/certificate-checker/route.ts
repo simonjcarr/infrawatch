@@ -8,7 +8,6 @@ import {
   checkKeyMatch,
   fetchCertificateFromUrl,
   parseCertificateBuffer,
-  pemToForgeCert,
   resolveUrlTarget,
 } from '@/lib/certificates/fetch'
 import { assertAllowedCertificateCheckerPort } from '@/lib/net/certificate-checker-policy'
@@ -123,7 +122,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (data.action === 'download') {
-      const forgeCert = pemToForgeCert(data.certPem)
+      const x509 = new crypto.X509Certificate(data.certPem)
 
       if (data.format === 'pem') {
         return new NextResponse(data.certPem, {
@@ -132,15 +131,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
 
       if (data.format === 'der') {
-        const asn1 = forge.pki.certificateToAsn1(forgeCert)
-        const der = forge.asn1.toDer(asn1).getBytes()
-        const buf = Buffer.from(der, 'binary')
-        return new NextResponse(buf, {
+        return new NextResponse(x509.raw, {
           headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="certificate.der"' },
         })
       }
 
       if (data.format === 'pkcs7') {
+        const forgeCert = forge.pki.certificateFromPem(x509.toString())
         const p7 = forge.pkcs7.createSignedData()
         p7.addCertificate(forgeCert)
         const asn1 = (p7 as unknown as { toAsn1: () => forge.asn1.Asn1 }).toAsn1()

@@ -36,20 +36,23 @@ func Run(orgToken, ingestAddress string, tlsSkipVerify bool, tags []string) erro
 // any explicitly provided flag values on top. This preserves fields like
 // ca_cert_file and tls_skip_verify across reinstalls.
 // orgToken is always applied. ingestAddress and tlsSkipVerify are only applied if non-zero.
-func mergeConfig(cfgPath, orgToken, ingestAddress, defaultDataDir string, tlsSkipVerify bool, tags []string) *agentconfig.Config {
-	cfg, err := agentconfig.Load(cfgPath)
-	if err != nil {
-		// File missing or unparseable — start from scratch with caller-supplied defaults.
-		cfg = &agentconfig.Config{
-			Ingest: agentconfig.IngestConfig{
-				Address: "localhost:9443",
-			},
-			Agent: agentconfig.AgentConfig{
-				DataDir:               defaultDataDir,
-				HeartbeatIntervalSecs: 30,
-			},
+func mergeConfig(cfgPath, orgToken, ingestAddress, defaultDataDir string, tlsSkipVerify bool, tags []string) (*agentconfig.Config, error) {
+	cfg := &agentconfig.Config{
+		Ingest: agentconfig.IngestConfig{
+			Address: "localhost:9443",
+		},
+		Agent: agentconfig.AgentConfig{
+			DataDir:               defaultDataDir,
+			HeartbeatIntervalSecs: 30,
+		},
+	}
+
+	if _, err := os.Stat(cfgPath); err == nil {
+		loaded, err := agentconfig.Load(cfgPath)
+		if err != nil {
+			return nil, err
 		}
-	} else {
+		cfg = loaded
 		slog.Info("existing config found, preserving settings", "path", cfgPath)
 		backupConfig(cfgPath)
 	}
@@ -65,7 +68,7 @@ func mergeConfig(cfgPath, orgToken, ingestAddress, defaultDataDir string, tlsSki
 		cfg.Agent.Tags = tags
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 // backupConfig copies cfgPath to cfgPath.<timestamp>.bak so the user can recover it.
@@ -103,7 +106,10 @@ func installLinux(orgToken, ingestAddress string, tlsSkipVerify bool, tags []str
 	if err := mkdirs("/etc/ct-ops", dataDir); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
-	cfg := mergeConfig(cfgPath, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
+	cfg, err := mergeConfig(cfgPath, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
+	if err != nil {
+		return fmt.Errorf("loading existing config: %w", err)
+	}
 	if err := writeConfig(cfgPath, cfg); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
@@ -161,7 +167,10 @@ func installDarwin(orgToken, ingestAddress string, tlsSkipVerify bool, tags []st
 	if err := mkdirs("/etc/ct-ops", dataDir, "/var/log"); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
-	cfg := mergeConfig(cfgPath, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
+	cfg, err := mergeConfig(cfgPath, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
+	if err != nil {
+		return fmt.Errorf("loading existing config: %w", err)
+	}
 	if err := writeConfig(cfgPath, cfg); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
@@ -235,7 +244,10 @@ func installWindows(orgToken, ingestAddress string, tlsSkipVerify bool, tags []s
 	if err := copyBinary(dest); err != nil {
 		return fmt.Errorf("copying binary: %w", err)
 	}
-	cfg := mergeConfig(cfgFile, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
+	cfg, err := mergeConfig(cfgFile, orgToken, ingestAddress, dataDir, tlsSkipVerify, tags)
+	if err != nil {
+		return fmt.Errorf("loading existing config: %w", err)
+	}
 	if err := writeConfig(cfgFile, cfg); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}

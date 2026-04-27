@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, jsonb, boolean, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
+import { z } from 'zod'
 import { organisations } from './organisations'
 import { users } from './auth'
 
@@ -8,6 +9,26 @@ export interface AgentEnrolmentTokenMetadata {
   source?: string
   os?: string
   arch?: string
+}
+
+const tagPairSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+}).strip()
+
+export const agentEnrolmentTokenMetadataSchema = z.object({
+  tags: z.array(tagPairSchema).catch([]).optional(),
+  source: z.string().optional().catch(undefined),
+  os: z.string().optional().catch(undefined),
+  arch: z.string().optional().catch(undefined),
+}).strip()
+
+export function parseAgentEnrolmentTokenMetadata(input: unknown): AgentEnrolmentTokenMetadata {
+  const parsed = agentEnrolmentTokenMetadataSchema.safeParse(input)
+  if (!parsed.success) {
+    return {}
+  }
+  return parsed.data
 }
 
 export const agentEnrolmentTokens = pgTable('agent_enrolment_tokens', {

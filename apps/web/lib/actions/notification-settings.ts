@@ -6,7 +6,8 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import type { OrgMetadata, OrgNotificationSettings } from '@/lib/db/schema/organisations'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import type { OrgNotificationSettings } from '@/lib/db/schema/organisations'
 import { getRequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES, DEFAULT_NOTIFICATION_ROLES } from '@/lib/auth/roles'
 
@@ -32,7 +33,7 @@ export async function getOrgNotificationSettings(
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const meta = (org?.metadata ?? {}) as OrgMetadata
+  const meta = parseOrgMetadata(org?.metadata)
   const ns = meta.notificationSettings ?? {}
   return {
     inAppEnabled: ns.inAppEnabled !== false,
@@ -69,8 +70,8 @@ export async function updateOrgNotificationSettings(
   })
   if (!org) return { error: 'Organisation not found' }
 
-  const currentMetadata = (org.metadata ?? {}) as OrgMetadata
-  const updatedMetadata: OrgMetadata = {
+  const currentMetadata = parseOrgMetadata(org.metadata)
+  const updatedMetadata = {
     ...currentMetadata,
     notificationSettings: {
       inAppEnabled,

@@ -5,8 +5,8 @@ import { db } from '@/lib/db'
 import { users, organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { headers, cookies } from 'next/headers'
-import type { OrgMetadata } from '@/lib/db/schema/organisations'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 
 const updateNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -112,7 +112,7 @@ export async function updateNotificationPreference(
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const meta = (org?.metadata ?? {}) as OrgMetadata
+  const meta = parseOrgMetadata(org?.metadata)
   const allowOptOut = meta.notificationSettings?.allowUserOptOut !== false
 
   if (!allowOptOut && !enabled) {

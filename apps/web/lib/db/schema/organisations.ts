@@ -1,5 +1,7 @@
 import { pgTable, text, timestamp, jsonb, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
+import { z } from 'zod'
+import { DEFAULT_NOTIFICATION_ROLES } from '../../auth/roles'
 import type { HostCollectionSettings } from './hosts'
 
 export interface OrgNotificationSettings {
@@ -23,6 +25,53 @@ export interface OrgMetadata {
   terminalDirectAccess?: boolean
   notificationSettings?: OrgNotificationSettings
   softwareInventorySettings?: SoftwareInventorySettings
+}
+
+const tagPairSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+}).strip()
+
+const hostCollectionSettingsSchema = z.object({
+  cpu: z.boolean().catch(true),
+  memory: z.boolean().catch(true),
+  disk: z.boolean().catch(true),
+  localUsers: z.boolean().catch(false),
+  localUserConfig: z.object({
+    mode: z.enum(['all', 'selected']).catch('all'),
+    selectedUsernames: z.array(z.string()).catch([]).optional(),
+  }).strip().optional().catch(undefined),
+}).strip()
+
+const orgNotificationSettingsSchema = z.object({
+  inAppEnabled: z.boolean().optional().catch(undefined),
+  inAppRoles: z.array(z.string()).catch([...DEFAULT_NOTIFICATION_ROLES]).optional(),
+  allowUserOptOut: z.boolean().optional().catch(undefined),
+}).strip()
+
+const softwareInventorySettingsSchema = z.object({
+  enabled: z.boolean(),
+  intervalHours: z.number().int(),
+  includeSnapFlatpak: z.boolean().optional().catch(undefined),
+  includeWindowsStore: z.boolean().optional().catch(undefined),
+}).strip()
+
+export const orgMetadataSchema = z.object({
+  defaultCollectionSettings: hostCollectionSettingsSchema.optional().catch(undefined),
+  defaultTags: z.array(tagPairSchema).catch([]).optional(),
+  terminalEnabled: z.boolean().optional().catch(undefined),
+  terminalLoggingEnabled: z.boolean().optional().catch(undefined),
+  terminalDirectAccess: z.boolean().optional().catch(undefined),
+  notificationSettings: orgNotificationSettingsSchema.optional().catch(undefined),
+  softwareInventorySettings: softwareInventorySettingsSchema.optional().catch(undefined),
+}).strip()
+
+export function parseOrgMetadata(input: unknown): OrgMetadata {
+  const parsed = orgMetadataSchema.safeParse(input)
+  if (!parsed.success) {
+    return {}
+  }
+  return parsed.data
 }
 
 export const organisations = pgTable('organisations', {

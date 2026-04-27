@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { tags, resourceTags, organisations } from '@/lib/db/schema'
 import type { Tag, TagPair, OrgMetadata } from '@/lib/db/schema'
 import { and, eq, sql, inArray, desc, asc } from 'drizzle-orm'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 
 export type TagAssignment = {
   resourceTagId: string
@@ -296,7 +297,7 @@ export async function getOrgDefaultTags(orgId: string): Promise<TagPair[]> {
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const meta = org?.metadata as OrgMetadata | null
+  const meta = parseOrgMetadata(org?.metadata)
   return meta?.defaultTags ?? []
 }
 
@@ -316,7 +317,7 @@ export async function updateOrgDefaultTags(
     })
     if (!org) return { error: 'Organisation not found' }
 
-    const currentMetadata = (org.metadata ?? {}) as OrgMetadata
+    const currentMetadata = parseOrgMetadata(org.metadata)
     const updatedMetadata: OrgMetadata = {
       ...currentMetadata,
       defaultTags: deduped,

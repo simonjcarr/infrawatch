@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.17](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.16...web/v0.70.17) (2026-04-27)
+
+
+### Bug Fixes
+
+* **auth:** require BETTER_AUTH env configuration ([#612](https://github.com/carrtech-dev/ct-ops/issues/612)) ([a09e9ea](https://github.com/carrtech-dev/ct-ops/commit/a09e9eac915ecb302e1b408025e4c9ef98b432dd))
+
 ## [0.70.16](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.15...web/v0.70.16) (2026-04-27)
 
 

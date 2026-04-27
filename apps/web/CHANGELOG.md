@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.16](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.15...web/v0.70.16) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** retry pnpm install in docker build ([#590](https://github.com/carrtech-dev/ct-ops/issues/590)) ([6778770](https://github.com/carrtech-dev/ct-ops/commit/67787703613b3f02b5956939e9b3251d227c558d))
+
 ## [0.70.15](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.14...web/v0.70.15) (2026-04-27)
 
 

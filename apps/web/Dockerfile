@@ -81,8 +81,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache su-exec && \
-    addgroup --system --gid 1001 nodejs && \
+RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # In a pnpm monorepo, Next.js standalone mirrors the full workspace structure.
@@ -118,9 +117,10 @@ COPY --chown=nextjs:nodejs apps/web/lib/db/migrations ./apps/web/lib/db/migratio
 COPY --from=deps --chown=nextjs:nodejs /migrate-deps/drizzle-orm ./node_modules/drizzle-orm
 COPY --from=deps --chown=nextjs:nodejs /migrate-deps/postgres ./node_modules/postgres
 
-# Entrypoint: runs as root, fixes agent-dist volume ownership, then drops to nextjs
+# Entrypoint: runs entirely as nextjs. Any external AGENT_DIST_DIR mount must
+# already be writable by uid/gid 1001.
 COPY apps/web/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown nextjs:nodejs /entrypoint.sh
 
 EXPOSE 3000
 
@@ -129,4 +129,5 @@ ENV HOSTNAME="0.0.0.0"
 
 # server.js is at /app/apps/web/server.js after the standalone copy
 WORKDIR /app/apps/web
+USER nextjs:nodejs
 CMD ["/entrypoint.sh"]

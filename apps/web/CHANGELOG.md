@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.13](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.12...web/v0.70.13) (2026-04-27)
+
+
+### Bug Fixes
+
+* **certificates:** use X509Certificate for untrusted parsing ([a889dd6](https://github.com/carrtech-dev/ct-ops/commit/a889dd6112f3c50f6b0e92e566adae15ab9b9b5b))
+* **certificates:** use X509Certificate for untrusted parsing ([bd65122](https://github.com/carrtech-dev/ct-ops/commit/bd6512208bf4de752dbf2221837cd684e05331ca))
+
 ## [0.70.12](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.11...web/v0.70.12) (2026-04-27)
 
 

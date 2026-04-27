@@ -31,6 +31,7 @@ CT-Ops is an open-source monitoring and operations platform designed to run **en
 
 ```bash
 # Download and unpack the latest release
+# The installer verifies the published SHA-256 checksum before unpacking.
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
 
 cd ct-ops

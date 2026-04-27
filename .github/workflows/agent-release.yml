@@ -565,9 +565,12 @@ jobs:
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
           echo "versioned=ct-ops-single-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          echo "versioned_checksum=ct-ops-single-${VERSION}.zip.sha256" >> "$GITHUB_OUTPUT"
           echo "compose_versioned=docker-compose.single-${VERSION}.yml" >> "$GITHUB_OUTPUT"
           cp dist/ct-ops/docker-compose.yml "docker-compose.single-${VERSION}.yml"
           cp dist/ct-ops/docker-compose.yml docker-compose.single.yml
+          sha256sum "ct-ops-single-${VERSION}.zip" > "ct-ops-single-${VERSION}.zip.sha256"
+          sha256sum ct-ops-single.zip > ct-ops-single.zip.sha256
 
       - name: Verify bundled compose pins image digests
         run: |
@@ -592,7 +595,9 @@ jobs:
           tag_name: ${{ needs.release-please.outputs.web_tag_name }}
           files: |
             ${{ steps.bundle.outputs.versioned }}
+            ${{ steps.bundle.outputs.versioned_checksum }}
             ct-ops-single.zip
+            ct-ops-single.zip.sha256
             ${{ steps.bundle.outputs.compose_versioned }}
             docker-compose.single.yml
             ct-ops-web.spdx.json

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.71.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.20...web/v0.71.0) (2026-04-27)
+
+
+### Features
+
+* **auth:** make email verification optional ([#626](https://github.com/carrtech-dev/ct-ops/issues/626)) ([755f3f3](https://github.com/carrtech-dev/ct-ops/commit/755f3f3079e293581abd1bd60b5a216fe679d62a))
+
 ## [0.70.20](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.19...web/v0.70.20) (2026-04-27)
 
 

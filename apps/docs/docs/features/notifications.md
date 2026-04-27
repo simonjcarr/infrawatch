@@ -96,4 +96,4 @@ These help identify whether noise is increasing or decreasing and which rules ar
 
 ## Notification Retention
 
-Notifications are soft-deleted (marked with `deleted_at`) rather than permanently removed. A background purge job runs periodically to clean up old soft-deleted records. The retention period is configurable in **Settings → System**.
+Notifications are soft-deleted (marked with `deleted_at`) when users delete them. The ingest service permanently purges soft-deleted notifications after 90 days so notification history remains available for short-term review without unbounded table growth.

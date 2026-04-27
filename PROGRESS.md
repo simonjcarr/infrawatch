@@ -489,6 +489,26 @@
 
 ---
 
+### Session 38 — Notification purge hygiene
+
+**Ingest** (`apps/ingest/internal/handlers/notification_purge_sweeper.go`, `apps/ingest/internal/db/queries/notifications.go`)
+- New notification purge sweeper starts with ingest, runs immediately, then repeats daily
+- Permanently deletes notifications whose `deleted_at` is older than 90 days
+- Query is covered by a focused unit test using a fake pgx executor
+
+**Database / docs**
+- Added partial `notifications_deleted_at_idx` index for efficient purge scans
+- Notification retention docs now describe the fixed 90-day soft-delete purge window
+
+**Build state**
+- `go test ./...` from `apps/ingest` — pass
+- `pnpm --filter web db:validate` — pass
+- `pnpm --filter web type-check` — pass
+- `pnpm --filter web lint` — exits 0 with existing warnings outside this change
+- `BETTER_AUTH_URL=http://localhost:3000 DATABASE_URL=postgres://postgres:postgres@localhost:5432/ct_ops BETTER_AUTH_SECRET=<32-char-local-build-secret> pnpm --filter web build` — pass, with existing Turbopack trace warning
+
+---
+
 ### Session 37 — Remote agent uninstall on host deletion
 
 **Agent** (`agent/internal/tasks/uninstall.go`, `uninstall_unix.go`, `uninstall_windows.go`)
@@ -1654,6 +1674,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - The `go.work.sum` file is gitignored — developers must run `go work sync` after cloning
 - CPU % on first heartbeat is always 0 — by design (two-sample baseline); accurate from second heartbeat onward
 - Metric retention `add_retention_policy` not wired dynamically ✅ Resolved — `updateMetricRetention` server action already calls `drop_retention_policy` + `add_retention_policy` via `db.execute(sql\`...\`)`
+- Soft-deleted notifications accumulate indefinitely ✅ Resolved — ingest now hard-purges notifications soft-deleted for more than 90 days
 
 ---
 
@@ -1665,20 +1686,18 @@ _None._
 
 ## What The Next Session Should Build
 
-**Session 36 — Notification UX polish and Phase 4 start**
+**Session 39 — Phase 4 Service Accounts & Identity**
 
-Notification work is feature-complete. Suggested next steps:
+Notification data hygiene is complete. Suggested next steps:
 
-1. **Notification data hygiene** — periodic hard-purge of soft-deleted notifications older than 90 days (background job or pg_cron rule) to prevent unbounded table growth
-2. **Phase 4: Service Accounts & Identity** — schema (`service_accounts` table with name, type, owner, expiry); list UI with expiry countdown badges; soft delete
-3. **SSH key inventory** — track SSH public keys linked to service accounts; fingerprint, last-used-at, expiry
-4. **Expiry tracking + alerting** — new alert condition type `service_account_expiry`; ingest evaluator + sweeper (mirrors cert_expiry pattern)
-5. **LDAP/AD integration** — community-tier LDAP sync; imports users and service accounts from directory
+1. **Phase 4: Service Accounts & Identity** — schema (`service_accounts` table with name, type, owner, expiry); list UI with expiry countdown badges; soft delete
+2. **SSH key inventory** — track SSH public keys linked to service accounts; fingerprint, last-used-at, expiry
+3. **Expiry tracking + alerting** — new alert condition type `service_account_expiry`; ingest evaluator + sweeper (mirrors cert_expiry pattern)
+4. **LDAP/AD integration** — community-tier LDAP sync; imports users and service accounts from directory
 
 **Outstanding technical debt (carry forward):**
 - mTLS client certificates deferred — TLS builder is structured for it
 - `go.work.sum` is gitignored — developers must run `go work sync` after cloning
-- Soft-deleted notifications accumulate indefinitely — purge job not yet implemented
 
 ---
 
@@ -1732,6 +1751,7 @@ Notification work is feature-complete. Suggested next steps:
 - [x] Notification severity pie chart + trend line chart on /notifications page
 - [x] Notification charts on host detail Metrics tab (host-scoped)
 - [x] Soft-delete on notifications (preserves trend history through deletions)
+- [x] Hard-purge soft-deleted notifications after 90 days
 - [x] Trend chart time-range selector (1h → 3 months, hourly/daily auto-granularity)
 - [x] Alert silencing
 - [x] Alert acknowledgement

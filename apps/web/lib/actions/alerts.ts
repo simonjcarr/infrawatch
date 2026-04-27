@@ -4,11 +4,13 @@ import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { createHmac } from 'crypto'
-import nodemailer from 'nodemailer'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { assertPublicHost, assertPublicUrl } from '@/lib/net/ssrf-guard'
 import { getRequiredSession } from '@/lib/auth/session'
 import { writeAuditEvent } from '@/lib/audit/events'
+import { decrypt } from '@/lib/crypto/encrypt'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { sendSmtpMessage } from '@/lib/notifications/smtp-send'
 
 const testNotificationLimiter = createRateLimiter(60_000, 5)
 import { db } from '@/lib/db'
@@ -23,11 +25,12 @@ import type {
   NotificationChannel,
   WebhookChannelConfig,
   SmtpChannelConfig,
-  SmtpEncryption,
   SlackChannelConfig,
   TelegramChannelConfig,
   AlertSilence,
 } from '@/lib/db/schema'
+import { organisations } from '@/lib/db/schema'
+import type { SmtpEncryption } from '@/lib/notifications/smtp-settings'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,12 +74,6 @@ const updateAlertRuleSchema = z.object({
   config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema]).optional(),
 })
 
-const smtpEncryptionSchema = z.enum(['none', 'starttls', 'tls'])
-
-// Standard SMTP submission ports. Port 25 (server-to-server relay) is included
-// for self-hosted mail servers; 465 (SMTPS), 587 (submission), 2525 (alt).
-const SMTP_ALLOWED_PORTS = [25, 465, 587, 2525] as const
-
 const httpsUrl = z
   .string()
   .url()
@@ -95,18 +92,6 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
     name: z.string().min(1).max(100),
     type: z.literal('smtp'),
     config: z.object({
-      host: z.string().min(1),
-      port: z
-        .number()
-        .int()
-        .refine((p) => (SMTP_ALLOWED_PORTS as readonly number[]).includes(p), {
-          message: `SMTP port must be one of: ${SMTP_ALLOWED_PORTS.join(', ')}`,
-        }),
-      encryption: smtpEncryptionSchema,
-      username: z.string().optional(),
-      password: z.string().optional(),
-      fromAddress: z.string().email(),
-      fromName: z.string().optional(),
       toAddresses: z.array(z.string().email()).min(1),
     }),
   }),
@@ -501,14 +486,7 @@ export type NotificationChannelSafe = Omit<NotificationChannel, 'config' | 'type
   | {
       type: 'smtp'
       config: {
-        host: string
-        port: number
-        encryption: SmtpEncryption
-        username?: string
-        fromAddress: string
-        fromName?: string
         toAddresses: string[]
-        hasPassword: boolean
       }
     }
   | { type: 'slack'; config: { webhookUrl: string } }
@@ -521,7 +499,8 @@ function normaliseSmtpConfig(raw: unknown): SmtpChannelConfig {
   if (obj.encryption !== undefined) return obj as unknown as SmtpChannelConfig
   // Rows written with the old `secure: boolean` field
   const encryption: SmtpEncryption = obj.secure ? 'tls' : 'starttls'
-  const { secure: _removed, ...rest } = obj
+  const rest = { ...obj }
+  delete rest.secure
   return { ...rest, encryption } as unknown as SmtpChannelConfig
 }
 
@@ -542,14 +521,7 @@ export async function getNotificationChannels(orgId: string): Promise<Notificati
         ...ch,
         type: 'smtp' as const,
         config: {
-          host: cfg.host,
-          port: cfg.port,
-          encryption: cfg.encryption,
-          username: cfg.username,
-          fromAddress: cfg.fromAddress,
-          fromName: cfg.fromName,
           toAddresses: cfg.toAddresses,
-          hasPassword: !!(cfg.password),
         },
       }
     }
@@ -600,7 +572,7 @@ export async function createNotificationChannel(
         organisationId: orgId,
         name: data.name,
         type: data.type,
-        config: data.config as WebhookChannelConfig | SmtpChannelConfig,
+        config: data.config as WebhookChannelConfig | SmtpChannelConfig | SlackChannelConfig | TelegramChannelConfig,
       })
       .returning({ id: notificationChannels.id })
 
@@ -669,18 +641,6 @@ const updateWebhookChannelSchema = z.object({
 
 const updateSmtpChannelSchema = z.object({
   name: z.string().min(1).max(100),
-  host: z.string().min(1),
-  port: z
-    .number()
-    .int()
-    .refine((p) => (SMTP_ALLOWED_PORTS as readonly number[]).includes(p), {
-      message: `SMTP port must be one of: ${SMTP_ALLOWED_PORTS.join(', ')}`,
-    }),
-  encryption: smtpEncryptionSchema,
-  username: z.string().optional(),
-  password: z.string().optional(),
-  fromAddress: z.string().email(),
-  fromName: z.string().optional(),
   toAddresses: z.array(z.string().email()).min(1),
 })
 
@@ -731,17 +691,9 @@ export async function updateNotificationChannel(
     } else if (existing.type === 'smtp') {
       const parsed = updateSmtpChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
-      const { name, host, port, encryption, username, password, fromAddress, fromName, toAddresses } = parsed.data
+      const { name, toAddresses } = parsed.data
       nextName = name
-      const existingConfig = normaliseSmtpConfig(existing.config)
       const newConfig: SmtpChannelConfig = {
-        host,
-        port,
-        encryption,
-        username: username || undefined,
-        password: password || existingConfig.password,
-        fromAddress,
-        fromName: fromName || undefined,
         toAddresses,
       }
       await db
@@ -848,20 +800,33 @@ export async function sendTestNotification(
       return { error: err instanceof Error ? err.message : 'Request failed' }
     }
   } else if (existing.type === 'smtp') {
-    const cfg = normaliseSmtpConfig(existing.config)
-    await assertPublicHost(cfg.host)
-    const transporter = nodemailer.createTransport({
-      host: cfg.host,
-      port: cfg.port,
-      secure: cfg.encryption === 'tls',
-      requireTLS: cfg.encryption === 'starttls',
-      auth: cfg.username ? { user: cfg.username, pass: cfg.password ?? '' } : undefined,
+    const channelCfg = normaliseSmtpConfig(existing.config)
+    const org = await db.query.organisations.findFirst({
+      where: eq(organisations.id, orgId),
+      columns: { metadata: true },
     })
-
+    const relay = parseOrgMetadata(org?.metadata).notificationSettings?.smtpRelay
+    if (!relay?.enabled) return { error: 'Central SMTP relay is not enabled' }
+    await assertPublicHost(relay.host)
+    let password = ''
+    if (relay.passwordEncrypted) {
+      try {
+        password = decrypt(relay.passwordEncrypted)
+      } catch {
+        return { error: 'Stored SMTP password could not be decrypted' }
+      }
+    }
     try {
-      await transporter.sendMail({
-        from: cfg.fromName ? `"${cfg.fromName}" <${cfg.fromAddress}>` : cfg.fromAddress,
-        to: cfg.toAddresses.join(', '),
+      await sendSmtpMessage({
+        host: relay.host,
+        port: relay.port,
+        encryption: relay.encryption,
+        username: relay.username,
+        password,
+        fromAddress: relay.fromAddress,
+        fromName: relay.fromName,
+      }, {
+        to: channelCfg.toAddresses,
         subject: 'CT-Ops Test Notification',
         text: 'This is a test notification from CT-Ops. Your SMTP channel is configured correctly.',
         html: '<p>This is a test notification from <strong>CT-Ops</strong>. Your SMTP channel is configured correctly.</p>',

@@ -2,6 +2,7 @@ import { pgTable, text, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
+import type { SmtpEncryption } from '../../notifications/smtp-settings'
 import { hosts } from './hosts'
 import { users } from './auth'
 
@@ -34,18 +35,18 @@ export interface WebhookChannelConfig {
   secret?: string
 }
 
-export type SmtpEncryption = 'none' | 'starttls' | 'tls'
-
 export interface SmtpChannelConfig {
-  host: string
-  port: number
-  /** 'none' = plain, 'starttls' = STARTTLS on connect, 'tls' = direct SSL/TLS */
-  encryption: SmtpEncryption
+  /** Recipient routing for SMTP alert delivery. Relay settings live in organisation metadata. */
+  toAddresses: string[]
+  /** Legacy relay fields kept only so existing rows can be read and migrated in-place. */
+  host?: string
+  port?: number
+  encryption?: SmtpEncryption
+  secure?: boolean
   username?: string
   password?: string
-  fromAddress: string
+  fromAddress?: string
   fromName?: string
-  toAddresses: string[]
 }
 
 export interface SlackChannelConfig {

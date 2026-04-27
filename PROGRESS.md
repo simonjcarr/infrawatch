@@ -15,6 +15,22 @@
 
 ## What Has Been Built
 
+### Session 62 — Central SMTP relay settings
+
+**Notification email delivery** (`apps/web/lib/actions/notification-settings.ts`, `apps/web/app/(dashboard)/settings/settings-client.tsx`, `apps/web/lib/notifications/`)
+- Moved SMTP relay configuration out of per-alert channels and into organisation Settings as a central SMTP relay.
+- Added admin-only save/test actions for the relay; SMTP passwords are encrypted before storage and redacted from client responses.
+- Backend validation now restricts SMTP ports and rejects private/reserved relay hosts when the relay is enabled.
+- Alert email channels now store only channel name and recipient addresses; relay host, credentials, encryption, and sender identity come from central settings.
+
+**Alert dispatch** (`apps/web/lib/actions/alerts.ts`, `apps/ingest/internal/handlers/notify.go`, `apps/ingest/internal/db/queries/alerts.sql.go`)
+- Web test notifications and ingest alert delivery now combine central relay settings with each email channel's recipients.
+- Ingest keeps backward-compatible fallback support for legacy SMTP channel rows that still contain relay details.
+
+**Test coverage**
+- Added web unit coverage for SMTP recipient normalisation, relay redaction, and delivery through an in-process mock SMTP server.
+- Added ingest Go coverage for SMTP delivery through an in-process mock SMTP server.
+
 ### Session 61 — Agent guidance and E2E harness documentation
 
 **Agent operating rules** (`AGENTS.md`)

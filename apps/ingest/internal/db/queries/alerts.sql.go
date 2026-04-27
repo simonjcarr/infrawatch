@@ -152,20 +152,24 @@ func GetRecentCheckResults(ctx context.Context, pool *pgxpool.Pool, checkID stri
 
 // SmtpChannelRow is a row from notification_channels where type = 'smtp'.
 type SmtpChannelRow struct {
-	ID         string
-	ConfigJSON string // raw JSONB as text
+	ID              string
+	ConfigJSON      string // raw notification_channels.config JSONB as text
+	RelayConfigJSON string // raw organisations.metadata.notificationSettings.smtpRelay JSONB as text; may be empty
 }
 
 // GetEnabledSmtpChannels returns all enabled, non-deleted SMTP notification
 // channels for the given organisation.
 func GetEnabledSmtpChannels(ctx context.Context, pool *pgxpool.Pool, orgID string) ([]SmtpChannelRow, error) {
 	const q = `
-		SELECT id, config::text
-		FROM notification_channels
-		WHERE organisation_id = $1
-		  AND type = 'smtp'
-		  AND enabled = true
-		  AND deleted_at IS NULL
+		SELECT c.id,
+		       c.config::text,
+		       COALESCE(o.metadata->'notificationSettings'->'smtpRelay', '{}'::jsonb)::text
+		FROM notification_channels c
+		JOIN organisations o ON o.id = c.organisation_id
+		WHERE c.organisation_id = $1
+		  AND c.type = 'smtp'
+		  AND c.enabled = true
+		  AND c.deleted_at IS NULL
 	`
 	rows, err := pool.Query(ctx, q, orgID)
 	if err != nil {
@@ -176,7 +180,7 @@ func GetEnabledSmtpChannels(ctx context.Context, pool *pgxpool.Pool, orgID strin
 	var result []SmtpChannelRow
 	for rows.Next() {
 		var r SmtpChannelRow
-		if err := rows.Scan(&r.ID, &r.ConfigJSON); err != nil {
+		if err := rows.Scan(&r.ID, &r.ConfigJSON, &r.RelayConfigJSON); err != nil {
 			return nil, err
 		}
 		result = append(result, r)
@@ -299,8 +303,8 @@ func GetEnabledTelegramChannels(ctx context.Context, pool *pgxpool.Pool, orgID s
 
 // OrgNotificationSettingsRow holds the notification settings from org metadata.
 type OrgNotificationSettingsRow struct {
-	InAppEnabled   bool
-	InAppRoles     []string
+	InAppEnabled    bool
+	InAppRoles      []string
 	AllowUserOptOut bool
 }
 

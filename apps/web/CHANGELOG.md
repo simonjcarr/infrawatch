@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.20](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.19...web/v0.70.20) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** validate licence revocation bundles ([#624](https://github.com/carrtech-dev/ct-ops/issues/624)) ([20507d2](https://github.com/carrtech-dev/ct-ops/commit/20507d2065aaf8014ea1c6910d59ca2955d49a5b))
+
 ## [0.70.19](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.18...web/v0.70.19) (2026-04-27)
 
 

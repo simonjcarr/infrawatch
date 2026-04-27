@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.7](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.6...agent/v0.30.7) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** reject symlinked cert files ([#618](https://github.com/carrtech-dev/ct-ops/issues/618)) ([70ed604](https://github.com/carrtech-dev/ct-ops/commit/70ed6049c54754ec862e2ac0ecb496055fa3b196))
+
 ## [0.30.6](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.5...agent/v0.30.6) (2026-04-27)
 
 

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, ShieldAlert, Bell, ScanLine, Tag as TagIcon, Copy, Check } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, Bell, ScanLine, Tag as TagIcon, Copy, Check } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -273,7 +273,12 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+        <h1
+          className="text-2xl font-semibold text-foreground"
+          data-testid="settings-heading"
+        >
+          Settings
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your organisation settings</p>
       </div>
 
@@ -585,29 +590,6 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                       }
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <ShieldAlert className="size-4 text-muted-foreground" />
-                      <div>
-                        <Label className="text-sm">Direct Access (Legacy)</Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          When enabled, terminal sessions run as the agent system user (typically root).
-                          When disabled, users must authenticate with their own host credentials.
-                        </p>
-                        {currentTerminalSettings.terminalDirectAccess && (
-                          <p className="text-xs text-destructive mt-1">
-                            All authorised users will have agent-level (root) access to hosts.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Switch
-                      checked={currentTerminalSettings.terminalDirectAccess}
-                      onCheckedChange={(checked) =>
-                        setLocalTerminalSettings({ ...currentTerminalSettings, terminalDirectAccess: checked })
-                      }
-                    />
-                  </div>
                 </>
               )}
               <div className="flex items-center gap-3 pt-2 border-t">
@@ -632,7 +614,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
               {currentTerminalSettings.terminalEnabled && (
                 <>
                   <p>Session Logging: {currentTerminalSettings.terminalLoggingEnabled ? 'Enabled' : 'Disabled'}</p>
-                  <p>Direct Access (Legacy): {currentTerminalSettings.terminalDirectAccess ? 'Enabled' : 'Disabled'}</p>
+                  <p>Host Authentication: SSH username and password required</p>
                 </>
               )}
             </div>
@@ -940,6 +922,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 variant={activationToken ? 'outline' : 'default'}
                 onClick={() => activationMutation.mutate()}
                 disabled={activationMutation.isPending}
+                data-testid="activation-token-generate"
               >
                 {activationMutation.isPending
                   ? 'Generating…'

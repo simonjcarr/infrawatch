@@ -13,6 +13,8 @@ export const terminalSessions = pgTable('terminal_sessions', {
   userId: text('user_id').notNull().references(() => users.id),
   sessionId: text('session_id').notNull().unique(),
   username: text('username'),
+  websocketTokenHash: text('websocket_token_hash'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
   status: text('status').notNull().default('pending').$type<TerminalSessionStatus>(),
   startedAt: timestamp('started_at', { withTimezone: true }),
   endedAt: timestamp('ended_at', { withTimezone: true }),

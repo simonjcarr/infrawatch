@@ -9,7 +9,9 @@ import {
   Download,
   Loader2,
   Package,
+  RefreshCw,
   Search,
+  Send,
 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +34,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import type { GitLabBundleStep, GitLabBundlerResponse } from '@/app/api/tools/gitlab-bundler/route'
+import type { GitLabBundleStep, GitLabBundlerResponse, GitLabLatestVersionResponse } from '@/app/api/tools/gitlab-bundler/route'
+import { BundleTransferDialog, type TransferBundle, type TransferJobStatus } from './bundle-transfer-dialog'
+import { BundleTransferStatus } from './bundle-transfer-status'
 
 const OS_OPTIONS = [
   { value: 'ubuntu-noble', label: 'Ubuntu 24.04 Noble', kind: 'deb', arches: ['amd64', 'arm64'] },
@@ -109,7 +113,18 @@ function safeVersion(value: string): boolean {
   return /^\d+\.\d+(\.\d+)?$/.test(value)
 }
 
-export function GitLabBundler() {
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+export function GitLabBundler({ orgId }: { orgId: string }) {
   const [currentVersion, setCurrentVersion] = useState('')
   const [targetVersion, setTargetVersion] = useState('')
   const [edition, setEdition] = useState<'ee' | 'ce'>('ee')
@@ -117,6 +132,7 @@ export function GitLabBundler() {
   const selectedOs = OS_OPTIONS.find((option) => option.value === packageTarget) ?? OS_OPTIONS[1]!
   const [arch, setArch] = useState<string>(selectedOs.arches[0])
   const [resolving, setResolving] = useState(false)
+  const [fetchingLatest, setFetchingLatest] = useState(false)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [report, setReport] = useState<Report | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -126,6 +142,8 @@ export function GitLabBundler() {
   const [currentTotal, setCurrentTotal] = useState<number | null>(null)
   const [doneCount, setDoneCount] = useState(0)
   const [downloadTotal, setDownloadTotal] = useState(0)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferJob, setTransferJob] = useState<TransferJobStatus | null>(null)
 
   const availableSteps = useMemo(
     () => report?.steps.filter((step) => step.status === 'available' && step.filename) ?? [],
@@ -180,8 +198,32 @@ export function GitLabBundler() {
     }
   }
 
-  async function downloadSteps(steps: GitLabBundleStep[], label: string) {
-    if (!report || steps.length === 0) return
+  async function fetchLatestTargetVersion() {
+    setResolveError(null)
+    setDownloadError(null)
+    setFetchingLatest(true)
+    try {
+      const data = await postJson<GitLabLatestVersionResponse>({
+        action: 'latest',
+        edition,
+        packageTarget,
+        arch,
+      })
+      if (!data.ok) {
+        setResolveError(data.error)
+        return
+      }
+      setTargetVersion(data.version)
+      setReport(null)
+    } catch (err) {
+      setResolveError(err instanceof Error ? err.message : 'Failed to fetch latest GitLab version')
+    } finally {
+      setFetchingLatest(false)
+    }
+  }
+
+  async function buildStepsBundle(steps: GitLabBundleStep[], label: string): Promise<{ blob: Blob; fileName: string }> {
+    if (!report || steps.length === 0) throw new Error('No packages available to bundle')
     setDownloadError(null)
     setDownloading(true)
     setDoneCount(0)
@@ -243,19 +285,56 @@ export function GitLabBundler() {
       )
 
       const blob = await zip.generateAsync({ type: 'blob' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-${label}.zip`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      return {
+        blob,
+        fileName: `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-${label}.zip`,
+      }
     } catch (err) {
-      setDownloadError(err instanceof Error ? err.message : 'Download failed')
+      const message = err instanceof Error ? err.message : 'Download failed'
+      setDownloadError(message)
+      throw new Error(message)
     } finally {
       setDownloading(false)
       setCurrentFile(null)
+    }
+  }
+
+  async function downloadSteps(steps: GitLabBundleStep[], label: string) {
+    try {
+      const bundle = await buildStepsBundle(steps, label)
+      downloadBlob(bundle.blob, bundle.fileName)
+    } catch {
+      // buildStepsBundle already surfaced the error in the bundler panel.
+    }
+  }
+
+  function buildTransferBundle(): TransferBundle {
+    if (!report || availableSteps.length === 0) throw new Error('No packages available to transfer')
+    return {
+      fileName: `gitlab-${report.edition}-${report.currentVersion}-to-${report.targetVersion}-all.zip`,
+      payload: {
+        kind: 'gitlab',
+        generatedAt: report.generatedAt,
+        currentVersion: report.currentVersion,
+        targetVersion: report.targetVersion,
+        edition: report.edition,
+        packageTarget: report.packageTarget,
+        sources: report.sources,
+        steps: availableSteps.map((step) => ({
+          id: step.id,
+          role: step.role,
+          version: step.version,
+          majorMinor: step.majorMinor,
+          sourceVersion: step.sourceVersion,
+          conditional: step.conditional,
+          note: step.note,
+          packageName: step.packageName,
+          filename: step.filename!,
+          sizeBytes: step.sizeBytes,
+          sizeLabel: step.sizeLabel,
+          status: 'available',
+        })),
+      },
     }
   }
 
@@ -282,20 +361,31 @@ export function GitLabBundler() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="gitlab-target">Target GitLab version</Label>
-                <Input
-                  id="gitlab-target"
-                  placeholder="e.g. 18.6.6"
-                  value={targetVersion}
-                  onChange={(event) => setTargetVersion(event.target.value)}
-                  disabled={resolving || downloading}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="gitlab-target"
+                    placeholder="e.g. 18.6.6"
+                    value={targetVersion}
+                    onChange={(event) => setTargetVersion(event.target.value)}
+                    disabled={resolving || downloading || fetchingLatest}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={fetchLatestTargetVersion}
+                    disabled={resolving || downloading || fetchingLatest}
+                  >
+                    {fetchingLatest ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                    Use latest
+                  </Button>
+                </div>
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-1.5">
                 <Label>Edition</Label>
-                <Select value={edition} onValueChange={(value) => setEdition(value as 'ee' | 'ce')} disabled={resolving || downloading}>
+                <Select value={edition} onValueChange={(value) => setEdition(value as 'ee' | 'ce')} disabled={resolving || downloading || fetchingLatest}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -307,7 +397,7 @@ export function GitLabBundler() {
               </div>
               <div className="space-y-1.5">
                 <Label>OS package target</Label>
-                <Select value={packageTarget} onValueChange={onOsChange} disabled={resolving || downloading}>
+                <Select value={packageTarget} onValueChange={onOsChange} disabled={resolving || downloading || fetchingLatest}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -322,7 +412,7 @@ export function GitLabBundler() {
               </div>
               <div className="space-y-1.5">
                 <Label>Architecture</Label>
-                <Select value={arch} onValueChange={setArch} disabled={resolving || downloading}>
+                <Select value={arch} onValueChange={setArch} disabled={resolving || downloading || fetchingLatest}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -338,7 +428,7 @@ export function GitLabBundler() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={resolve} disabled={resolving || downloading}>
+              <Button onClick={resolve} disabled={resolving || downloading || fetchingLatest}>
                 {resolving ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
                 Find upgrade packages
               </Button>
@@ -349,6 +439,14 @@ export function GitLabBundler() {
               >
                 {downloading ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
                 Download all
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setTransferOpen(true)}
+                disabled={!report || availableSteps.length === 0 || downloading || resolving}
+              >
+                <Send className="size-4" />
+                Transfer all
               </Button>
             </div>
 
@@ -447,6 +545,7 @@ export function GitLabBundler() {
             </CardContent>
           </Card>
         )}
+        <BundleTransferStatus job={transferJob} onJobChange={setTransferJob} />
       </div>
 
       <Card className="h-fit">
@@ -471,6 +570,13 @@ export function GitLabBundler() {
           )}
         </CardContent>
       </Card>
+      <BundleTransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        orgId={orgId}
+        buildBundle={buildTransferBundle}
+        onTransferStarted={setTransferJob}
+      />
     </div>
   )
 }

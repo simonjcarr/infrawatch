@@ -40,6 +40,9 @@ func Load(path string) (*Config, error) {
 	cfg := defaults()
 
 	if _, err := os.Stat(path); err == nil {
+		if err := validateFileSecurity(path); err != nil {
+			return nil, err
+		}
 		if _, err := toml.DecodeFile(path, cfg); err != nil {
 			return nil, fmt.Errorf("parsing config %s: %w", path, err)
 		}
@@ -47,6 +50,23 @@ func Load(path string) (*Config, error) {
 
 	applyEnv(cfg)
 	return cfg, nil
+}
+
+func validateFileSecurity(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("stat config %s: %w", path, err)
+	}
+
+	if info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("config %s must not grant group/other access (mode %04o)", path, info.Mode().Perm())
+	}
+
+	if err := validateConfigOwner(path, info); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func defaults() *Config {

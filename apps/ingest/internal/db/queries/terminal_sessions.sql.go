@@ -4,79 +4,99 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
 // TerminalSessionInfo is returned after validating and activating a terminal session.
 type TerminalSessionInfo struct {
 	OrganisationID string
 	HostID         string
+	Host           string
+	Username       string
 	LoggingEnabled bool
 }
 
-// ValidateAndActivateTerminalSession looks up a terminal session by session_id,
-// verifies it is 'pending' and was created within the last 5 minutes, and
-// transitions it to 'active'. Returns org/host IDs and whether logging is enabled.
-func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool, sessionID string) (*TerminalSessionInfo, error) {
+// ValidateAndActivateTerminalSession looks up a terminal session by session_id
+// and a one-time WebSocket token hash, verifies it is pending and unexpired,
+// and transitions it to active. Returns the SSH target and host username.
+func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool, sessionID string, tokenHash string) (*TerminalSessionInfo, error) {
 	const q = `
 		UPDATE terminal_sessions ts
 		SET status     = 'active',
 		    started_at = NOW(),
 		    updated_at = NOW()
-		FROM organisations o
+		FROM organisations o, hosts h
 		WHERE ts.session_id       = $1
+		  AND ts.websocket_token_hash = $2
 		  AND ts.status           = 'pending'
-		  AND ts.created_at       > NOW() - INTERVAL '5 minutes'
+		  AND COALESCE(ts.expires_at, ts.created_at + INTERVAL '5 minutes') > NOW()
 		  AND o.id                = ts.organisation_id
+		  AND h.id                = ts.host_id
+		  AND h.organisation_id   = ts.organisation_id
+		  AND h.deleted_at        IS NULL
 		RETURNING ts.organisation_id, ts.host_id,
+		          COALESCE(NULLIF(h.hostname, ''), h.ip_addresses->>0) AS host,
+		          COALESCE(ts.username, '') AS username,
 		          COALESCE((o.metadata->>'terminalLoggingEnabled')::boolean, false) AS logging_enabled
 	`
 	var info TerminalSessionInfo
-	err := pool.QueryRow(ctx, q, sessionID).Scan(&info.OrganisationID, &info.HostID, &info.LoggingEnabled)
+	err := pool.QueryRow(ctx, q, sessionID, tokenHash).Scan(
+		&info.OrganisationID,
+		&info.HostID,
+		&info.Host,
+		&info.Username,
+		&info.LoggingEnabled,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("terminal session not found or expired: %w", err)
 	}
 	return &info, nil
 }
 
-// GetPendingTerminalSessionsForHost returns terminal sessions that are 'active'
-// (validated by the WebSocket handler) but not yet picked up by the agent.
-// Sessions older than 30 seconds are considered stale and skipped.
-// Includes username and direct_access mode from the organisation settings.
-func GetPendingTerminalSessionsForHost(ctx context.Context, pool *pgxpool.Pool, hostID string) ([]*agentv1.TerminalSessionRequest, error) {
-	const q = `
-		SELECT ts.session_id,
-		       COALESCE(ts.username, '') AS username,
-		       COALESCE((o.metadata->>'terminalDirectAccess')::boolean, false) AS direct_access
-		FROM terminal_sessions ts
-		JOIN organisations o ON o.id = ts.organisation_id
-		WHERE ts.host_id    = $1
-		  AND ts.status     = 'active'
-		  AND ts.started_at > NOW() - INTERVAL '30 seconds'
-	`
-	rows, err := pool.Query(ctx, q, hostID)
+func VerifyOrTrustSSHHostKey(ctx context.Context, pool *pgxpool.Pool, hostID string, fingerprint string) error {
+	tx, err := pool.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
+	defer tx.Rollback(ctx)
 
-	var result []*agentv1.TerminalSessionRequest
-	for rows.Next() {
-		var sessionID, username string
-		var directAccess bool
-		if err := rows.Scan(&sessionID, &username, &directAccess); err != nil {
-			return nil, err
+	const selectQ = `
+		SELECT metadata->>'sshHostKeySha256'
+		FROM hosts
+		WHERE id = $1
+		  AND deleted_at IS NULL
+		FOR UPDATE
+	`
+	var current *string
+	if err := tx.QueryRow(ctx, selectQ, hostID).Scan(&current); err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("host not found")
 		}
-		result = append(result, &agentv1.TerminalSessionRequest{
-			SessionId:    sessionID,
-			Cols:         80,
-			Rows:         24,
-			Username:     username,
-			DirectAccess: directAccess,
-		})
+		return err
 	}
-	return result, rows.Err()
+	if current != nil && *current != "" {
+		if *current != fingerprint {
+			return fmt.Errorf("SSH host key mismatch")
+		}
+		return tx.Commit(ctx)
+	}
+
+	const updateQ = `
+		UPDATE hosts
+		SET metadata = jsonb_set(
+		      COALESCE(metadata, '{}'::jsonb),
+		      '{sshHostKeySha256}',
+		      to_jsonb($2::text),
+		      true
+		    ),
+		    updated_at = NOW()
+		WHERE id = $1
+	`
+	if _, err := tx.Exec(ctx, updateQ, hostID, fingerprint); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // SetTerminalSessionEnded marks a terminal session as 'ended' with duration and

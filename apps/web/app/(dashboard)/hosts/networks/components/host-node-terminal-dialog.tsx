@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Terminal } from 'lucide-react'
+import { KeyRound, Terminal } from 'lucide-react'
 import { useTerminalPanel } from '@/components/terminal'
 import {
   Dialog,
@@ -37,6 +37,7 @@ function TerminalConnectForm({
       return ''
     }
   })
+  const [password, setPassword] = useState('')
 
   const handleConnect = useCallback(() => {
     try {
@@ -49,12 +50,14 @@ function TerminalConnectForm({
     openTerminal({
       hostId: data.hostId,
       hostname: data.name,
-      username: username.trim() || null,
+      username: username.trim(),
+      password,
       orgId: data.orgId,
       directAccess: false,
     })
+    setPassword('')
     onOpenChange(false)
-  }, [data, username, openTerminal, onOpenChange])
+  }, [data, username, password, openTerminal, onOpenChange])
 
   return (
     <>
@@ -70,7 +73,23 @@ function TerminalConnectForm({
           placeholder="e.g. jsmith"
           autoFocus
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && username.trim()) handleConnect()
+            if (e.key === 'Enter' && username.trim() && password) handleConnect()
+          }}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="host-graph-password" className="flex items-center gap-1.5">
+          <KeyRound className="size-3.5" />
+          Password
+        </Label>
+        <Input
+          id="host-graph-password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && username.trim() && password) handleConnect()
           }}
         />
       </div>
@@ -78,7 +97,7 @@ function TerminalConnectForm({
         <Button variant="outline" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button onClick={handleConnect} disabled={!username.trim()}>
+        <Button onClick={handleConnect} disabled={!username.trim() || !password}>
           <Terminal className="size-4 mr-1.5" />
           Connect
         </Button>

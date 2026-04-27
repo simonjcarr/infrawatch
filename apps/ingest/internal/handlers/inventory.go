@@ -24,6 +24,8 @@ type InventoryHandler struct {
 	issuer *auth.JWTIssuer
 }
 
+const maxInventoryPackagesPerChunk = 1000
+
 // NewInventoryHandler creates an InventoryHandler.
 func NewInventoryHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer) *InventoryHandler {
 	return &InventoryHandler{pool: pool, issuer: issuer}
@@ -64,6 +66,9 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 	source := strings.TrimSpace(first.Source)
 	if source == "" {
 		source = "other"
+	}
+	if err := validateInventoryChunk(first); err != nil {
+		return err
 	}
 
 	// ── Validate scan_id belongs to this agent ────────────────────────────────
@@ -152,6 +157,10 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 			_ = queries.FailSoftwareScan(ctx, h.pool, softwareScanID, chunkErr.Error())
 			return status.Errorf(codes.Internal, "receiving chunk: %v", chunkErr)
 		}
+		if err := validateInventoryChunk(chunk); err != nil {
+			_ = queries.FailSoftwareScan(ctx, h.pool, softwareScanID, err.Error())
+			return err
+		}
 
 		if err := processChunk(chunk); err != nil {
 			slog.Error("inventory: upserting chunk", "scan_id", scanID, "chunk", chunk.ChunkIndex, "err", err)
@@ -214,6 +223,18 @@ func (h *InventoryHandler) finalise(
 	)
 
 	return stream.SendAndClose(&agentv1.SoftwareInventoryAck{Received: int32(totalReceived)})
+}
+
+func validateInventoryChunk(chunk *agentv1.SoftwareInventoryChunk) error {
+	if len(chunk.Packages) > maxInventoryPackagesPerChunk {
+		return status.Errorf(
+			codes.InvalidArgument,
+			"inventory chunk %d exceeds maximum of %d packages",
+			chunk.ChunkIndex,
+			maxInventoryPackagesPerChunk,
+		)
+	}
+	return nil
 }
 
 // authenticateStream validates the agent JWT from gRPC metadata and returns

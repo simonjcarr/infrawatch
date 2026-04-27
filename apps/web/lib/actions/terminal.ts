@@ -1,16 +1,21 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { organisations, hosts, terminalSessions } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
+import { createHash, randomBytes } from 'node:crypto'
 import { getRequiredSession } from '@/lib/auth/session'
-import type { OrgMetadata, HostMetadata } from '@/lib/db/schema'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 export interface TerminalAccessResult {
   allowed: true
-  directAccess: boolean
+  directAccess: false
 }
 
 export interface TerminalAccessDenied {
@@ -26,6 +31,7 @@ export async function checkTerminalAccess(
   orgId: string,
   hostId: string,
 ): Promise<TerminalAccessResult | TerminalAccessDenied> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   const { user } = session
 
@@ -39,7 +45,7 @@ export async function checkTerminalAccess(
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const orgMeta = (org?.metadata ?? {}) as OrgMetadata
+  const orgMeta = parseOrgMetadata(org?.metadata)
   if (orgMeta.terminalEnabled === false) {
     return { allowed: false, reason: 'Terminal access is disabled for this organisation' }
   }
@@ -52,7 +58,7 @@ export async function checkTerminalAccess(
   if (!host) {
     return { allowed: false, reason: 'Host not found' }
   }
-  const hostMeta = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+  const hostMeta = parseHostMetadata(host.metadata)
   if (hostMeta.terminalEnabled === false) {
     return { allowed: false, reason: 'Terminal access is disabled for this host' }
   }
@@ -63,10 +69,9 @@ export async function checkTerminalAccess(
     return { allowed: false, reason: 'You are not authorised to access this host terminal' }
   }
 
-  // directAccess (shell runs as agent user/root) is restricted to admins only.
-  // Non-admin engineers can open a terminal but must supply a username (H-21).
-  const isAdmin = ADMIN_ROLES.includes(user.role)
-  return { allowed: true, directAccess: isAdmin && orgMeta.terminalDirectAccess === true }
+  // Terminal access is always SSH-backed. CTOps never opens a shell through
+  // the agent or as the agent/root user.
+  return { allowed: true, directAccess: false }
 }
 
 // POSIX-compliant: starts with letter or underscore, contains only [a-zA-Z0-9_-], max 32 chars
@@ -81,37 +86,40 @@ export async function createTerminalSession(
   orgId: string,
   hostId: string,
   username?: string,
-): Promise<{ sessionId: string; ingestWsUrl: string } | { error: string }> {
+): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const access = await checkTerminalAccess(orgId, hostId)
   if (!access.allowed) {
     return { error: access.reason }
   }
 
-  // Validate username when not in direct access mode
   const trimmedUsername = username?.trim()
-  if (!access.directAccess) {
-    if (!trimmedUsername) {
-      return { error: 'Username is required for terminal access' }
-    }
-    if (trimmedUsername.length > 256) {
-      return { error: 'Username is too long' }
-    }
-    if (!VALID_USERNAME_RE.test(trimmedUsername)) {
-      return { error: 'Username contains invalid characters' }
-    }
+  if (!trimmedUsername) {
+    return { error: 'Username is required for SSH terminal access' }
+  }
+  if (trimmedUsername.length > 256) {
+    return { error: 'Username is too long' }
+  }
+  if (!VALID_USERNAME_RE.test(trimmedUsername)) {
+    return { error: 'Username contains invalid characters' }
   }
 
   const session = await getRequiredSession()
 
   try {
     const sessionId = createId()
+    const websocketToken = randomBytes(32).toString('base64url')
+    const websocketTokenHash = createHash('sha256').update(websocketToken).digest('hex')
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
 
     await db.insert(terminalSessions).values({
       organisationId: orgId,
       hostId,
       userId: session.user.id,
       sessionId,
-      username: access.directAccess ? null : (trimmedUsername ?? null),
+      username: trimmedUsername,
+      websocketTokenHash,
+      expiresAt,
       status: 'pending',
     })
 
@@ -134,6 +142,7 @@ export async function createTerminalSession(
     return {
       sessionId,
       ingestWsUrl,
+      websocketToken,
     }
   } catch (err) {
     console.error('Failed to create terminal session:', err)
@@ -152,15 +161,16 @@ export interface OrgTerminalSettings {
 export async function getOrgTerminalSettings(
   orgId: string,
 ): Promise<OrgTerminalSettings> {
+  await requireOrgAccess(orgId)
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const meta = (org?.metadata ?? {}) as OrgMetadata
+  const meta = parseOrgMetadata(org?.metadata)
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalLoggingEnabled: meta.terminalLoggingEnabled === true,
-    terminalDirectAccess: meta.terminalDirectAccess === true,
+    terminalDirectAccess: false,
   }
 }
 
@@ -168,6 +178,7 @@ export async function updateOrgTerminalSettings(
   orgId: string,
   settings: OrgTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -180,18 +191,35 @@ export async function updateOrgTerminalSettings(
     })
     if (!org) return { error: 'Organisation not found' }
 
-    const currentMetadata = (org.metadata ?? {}) as OrgMetadata
-    const updatedMetadata: OrgMetadata = {
+    const currentMetadata = parseOrgMetadata(org.metadata)
+    const updatedMetadata = {
       ...currentMetadata,
       terminalEnabled: settings.terminalEnabled,
       terminalLoggingEnabled: settings.terminalLoggingEnabled,
-      terminalDirectAccess: settings.terminalDirectAccess,
+      terminalDirectAccess: false,
     }
 
     await db
       .update(organisations)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
       .where(eq(organisations.id, orgId))
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'terminal.org_settings.updated',
+      targetType: 'organisation',
+      targetId: orgId,
+      summary: 'Updated organisation terminal settings',
+      metadata: {
+        previous: {
+          terminalEnabled: currentMetadata.terminalEnabled !== false,
+          terminalLoggingEnabled: currentMetadata.terminalLoggingEnabled === true,
+          terminalDirectAccess: false,
+        },
+        next: updatedMetadata,
+      },
+    })
 
     return { success: true }
   } catch (err) {
@@ -211,11 +239,12 @@ export async function getHostTerminalSettings(
   orgId: string,
   hostId: string,
 ): Promise<HostTerminalSettings> {
+  await requireOrgAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
     columns: { metadata: true },
   })
-  const meta = (host?.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+  const meta = parseHostMetadata(host?.metadata)
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalAllowedUsers: meta.terminalAllowedUsers ?? [],
@@ -227,6 +256,7 @@ export async function updateHostTerminalSettings(
   hostId: string,
   settings: HostTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
@@ -239,8 +269,8 @@ export async function updateHostTerminalSettings(
     })
     if (!host) return { error: 'Host not found' }
 
-    const currentMetadata = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
-    const updatedMetadata: HostMetadata = {
+    const currentMetadata = parseHostMetadata(host.metadata)
+    const updatedMetadata = {
       ...currentMetadata,
       terminalEnabled: settings.terminalEnabled,
       terminalAllowedUsers: settings.terminalAllowedUsers,
@@ -250,6 +280,22 @@ export async function updateHostTerminalSettings(
       .update(hosts)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
       .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'terminal.host_settings.updated',
+      targetType: 'host',
+      targetId: hostId,
+      summary: 'Updated host terminal settings',
+      metadata: {
+        previous: {
+          terminalEnabled: currentMetadata.terminalEnabled !== false,
+          terminalAllowedUsers: currentMetadata.terminalAllowedUsers ?? [],
+        },
+        next: updatedMetadata,
+      },
+    })
 
     return { success: true }
   } catch (err) {

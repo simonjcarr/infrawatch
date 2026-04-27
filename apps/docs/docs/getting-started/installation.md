@@ -21,13 +21,13 @@ That's it. No local Go, Node.js, or pnpm required.
 
 ## Option A — Pre-built images from GHCR
 
-The fastest way to get CT-Ops running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release:
+The fastest way to get CT-Ops running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release and verifies the published SHA-256 checksum before unpacking:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash
 cd ct-ops
 ./start.sh        # first run: creates .env from the example, then exits
-$EDITOR .env      # set BETTER_AUTH_URL, AGENT_DOWNLOAD_BASE_URL, etc.
+$EDITOR .env      # set BETTER_AUTH_URL, REQUIRE_EMAIL_VERIFICATION, AGENT_DOWNLOAD_BASE_URL, etc.
 ./start.sh        # second run: generates secret, certs, pulls images, boots
 ```
 
@@ -88,6 +88,7 @@ Edit `apps/web/.env.local` and set at minimum:
 DATABASE_URL=postgresql://ct-ops:ct-ops@localhost:5432/ct-ops
 BETTER_AUTH_SECRET=a-long-random-string-change-this
 BETTER_AUTH_URL=http://localhost:3000
+REQUIRE_EMAIL_VERIFICATION=true
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 

@@ -6,9 +6,11 @@ on:
       - ".github/workflows/agent-release.yml"
       - ".github/workflows/customer-bundle-check.yml"
       - "deploy/customer-bundle/**"
+      - "deploy/scripts/test-install.sh"
       - "deploy/nginx/nginx.conf"
       - "docker-compose.single.yml"
       - ".env.example"
+      - "install.sh"
   workflow_dispatch:
 
 jobs:
@@ -20,6 +22,9 @@ jobs:
       - name: Stage customer bundle
         run: |
           set -euo pipefail
+          WEB_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/web@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          export WEB_IMAGE_REF INGEST_IMAGE_REF
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml dist/ct-ops/docker-compose.yml
           cp .env.example dist/ct-ops/.env.example
@@ -28,6 +33,8 @@ jobs:
           cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
           cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
           echo "test" > dist/ct-ops/VERSION
+          perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
+          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
           chmod +x dist/ct-ops/start.sh dist/ct-ops/build-offline-installer.sh
 
       - name: Validate scripts and required files
@@ -40,9 +47,27 @@ jobs:
           bash -n start.sh
           bash -n build-offline-installer.sh
 
+      - name: Validate installer script
+        run: |
+          set -euo pipefail
+          bash -n install.sh
+          bash deploy/scripts/test-install.sh
+
       - name: Render compose config
         working-directory: dist/ct-ops
         env:
           BETTER_AUTH_SECRET: build-time-placeholder
           POSTGRES_PASSWORD: build-time-placeholder
-        run: docker compose config --quiet
+        run: |
+          set -euo pipefail
+          refs="$(docker compose config --images)"
+          echo "$refs"
+          while IFS= read -r ref; do
+            case "$ref" in
+              *@sha256:*) ;;
+              *)
+                echo "ERROR: unpinned image reference in bundled compose: $ref" >&2
+                exit 1
+                ;;
+            esac
+          done <<< "$refs"

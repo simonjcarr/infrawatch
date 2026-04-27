@@ -92,7 +92,7 @@ export function TeamClient({
   const [inviteError, setInviteError] = useState<string | null>(null)
 
   const inviteMutation = useMutation({
-    mutationFn: (values: InviteValues) => inviteUser(orgId, currentUserId, values),
+    mutationFn: (values: InviteValues) => inviteUser(orgId, values),
     onSuccess: (result) => {
       if ('error' in result) {
         setInviteError(result.error)
@@ -116,7 +116,7 @@ export function TeamClient({
   })
 
   const deactivateMutation = useMutation({
-    mutationFn: (targetId: string) => deactivateUser(orgId, currentUserId, targetId),
+    mutationFn: (targetId: string) => deactivateUser(orgId, targetId),
     onSuccess: invalidate,
   })
 
@@ -126,7 +126,7 @@ export function TeamClient({
   })
 
   const removeMutation = useMutation({
-    mutationFn: (targetId: string) => removeUser(orgId, currentUserId, targetId),
+    mutationFn: (targetId: string) => removeUser(orgId, targetId),
     onSuccess: invalidate,
   })
 

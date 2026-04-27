@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { users, hosts, agentQueries } from '@/lib/db/schema'
 import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
+import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    assertTrustedMutationOrigin(request.headers)
+  } catch {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })

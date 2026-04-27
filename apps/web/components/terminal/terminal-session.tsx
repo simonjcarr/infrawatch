@@ -156,15 +156,18 @@ export function TerminalSession({
         updateStatus('connecting')
         term.clear()
 
-        const connectMsg = binding.directAccess
-          ? `Connecting to ${binding.hostname}...`
-          : `Connecting to ${binding.hostname} as ${binding.username}...`
-        term.writeln(`\x1b[90m${connectMsg}\x1b[0m`)
+        if (!binding.password) {
+          term.writeln('\x1b[31mError: host password is required. Open a new terminal session.\x1b[0m')
+          updateStatus('error')
+          return
+        }
+
+        term.writeln(`\x1b[90mConnecting to ${binding.hostname} as ${binding.username} over SSH...\x1b[0m`)
 
         const result = await createTerminalSession(
           binding.orgId,
           binding.hostId,
-          binding.directAccess ? undefined : (binding.username ?? undefined),
+          binding.username,
         )
 
         if (cancelled) return
@@ -189,11 +192,11 @@ export function TerminalSession({
         const ws = new WebSocket(wsUrl)
         wsRef.current = ws
 
-        let agentDidConnect = false
+        let sshDidConnect = false
         let sessionEnded = false
         const waitingTimer = setTimeout(() => {
-          if (!agentDidConnect) {
-            term.writeln('\x1b[33mWaiting for agent to start shell...\x1b[0m')
+          if (!sshDidConnect) {
+            term.writeln('\x1b[33mWaiting for SSH authentication...\x1b[0m')
           }
         }, 5000)
 
@@ -208,10 +211,14 @@ export function TerminalSession({
         }
 
         ws.onopen = () => {
-          updateStatus('connected')
-          term.writeln('\x1b[32mConnected to ingest. Waiting for agent...\x1b[0m')
+          term.writeln('\x1b[32mConnected to CTOps. Opening SSH session...\x1b[0m')
           fitAddon.fit()
           if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'auth',
+              token: result.websocketToken,
+              password: binding.password,
+            }))
             ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
           }
           term.focus()
@@ -220,14 +227,16 @@ export function TerminalSession({
         ws.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data)
-            if (msg.type === 'agent_connected') {
-              agentDidConnect = true
+            if (msg.type === 'ssh_connected' || msg.type === 'agent_connected') {
+              sshDidConnect = true
               clearTimeout(waitingTimer)
-              term.writeln('\x1b[32mAgent connected. Starting shell...\x1b[0m\r\n')
+              updateStatus('connected')
+              term.writeln('\x1b[32mSSH connected. Starting shell...\x1b[0m\r\n')
             } else if (msg.type === 'output' && msg.data) {
-              if (!agentDidConnect) {
-                agentDidConnect = true
+              if (!sshDidConnect) {
+                sshDidConnect = true
                 clearTimeout(waitingTimer)
+                updateStatus('connected')
               }
               term.write(atob(msg.data))
             } else if (msg.type === 'closed') {
@@ -235,8 +244,6 @@ export function TerminalSession({
               term.writeln('\r\n\x1b[90mSession ended.\x1b[0m')
               updateStatus('closed')
               promptReconnect()
-            } else if (msg.type === 'diagnostic' && msg.message) {
-              term.writeln(`\x1b[90m[diag] ${msg.message}\x1b[0m`)
             } else if (msg.type === 'error' && msg.message) {
               clearTimeout(waitingTimer)
               term.writeln(`\r\n\x1b[31mError: ${msg.message}\x1b[0m`)

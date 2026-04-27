@@ -9,7 +9,7 @@ RUN corepack enable && corepack prepare pnpm@10 --activate
 # missing baked agent binaries.
 # The download route falls back to these baked binaries when the operator-managed
 # volume is empty and GitHub is unreachable (air-gap installs).
-FROM golang:1.25-alpine AS agent-builder
+FROM golang:1.26-alpine AS agent-builder
 RUN apk add --no-cache jq
 WORKDIR /src
 # `replace github.com/carrtech-dev/ct-ops/proto => ../proto/gen/go` in agent/go.mod
@@ -37,7 +37,15 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copy only the web package.json to leverage Docker layer caching
 COPY apps/web/package.json ./apps/web/
-RUN pnpm install --frozen-lockfile
+RUN for attempt in 1 2 3; do \
+      if pnpm install --frozen-lockfile; then \
+        exit 0; \
+      fi; \
+      if [ "$attempt" -eq 3 ]; then \
+        exit 1; \
+      fi; \
+      sleep $((attempt * 5)); \
+    done
 # Resolve pnpm virtual-store symlinks for drizzle-orm and postgres so they can be
 # copied as real files into the runner stage (migrate.js needs the full package.json
 # exports map, which the Next.js standalone trace does not include).
@@ -81,8 +89,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache su-exec && \
-    addgroup --system --gid 1001 nodejs && \
+RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # In a pnpm monorepo, Next.js standalone mirrors the full workspace structure.
@@ -96,7 +103,9 @@ RUN mkdir -p apps/web/.next && chown nextjs:nodejs apps/web/.next
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
-# Release-please manifest — read at runtime to determine the required agent version
+# Release-please manifest — read at runtime to determine the required agent
+# version. Customer release bundles now pin the published web image by digest,
+# so the image itself must carry the manifest that identifies that release.
 COPY --from=builder --chown=nextjs:nodejs /app/.release-please-manifest.json /app/.release-please-manifest.json
 
 # Agent binaries — built fresh in the agent-builder stage so every web image is
@@ -118,9 +127,10 @@ COPY --chown=nextjs:nodejs apps/web/lib/db/migrations ./apps/web/lib/db/migratio
 COPY --from=deps --chown=nextjs:nodejs /migrate-deps/drizzle-orm ./node_modules/drizzle-orm
 COPY --from=deps --chown=nextjs:nodejs /migrate-deps/postgres ./node_modules/postgres
 
-# Entrypoint: runs as root, fixes agent-dist volume ownership, then drops to nextjs
+# Entrypoint: runs entirely as nextjs. Any external AGENT_DIST_DIR mount must
+# already be writable by uid/gid 1001.
 COPY apps/web/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown nextjs:nodejs /entrypoint.sh
 
 EXPOSE 3000
 
@@ -129,4 +139,5 @@ ENV HOSTNAME="0.0.0.0"
 
 # server.js is at /app/apps/web/server.js after the standalone copy
 WORKDIR /app/apps/web
+USER nextjs:nodejs
 CMD ["/entrypoint.sh"]

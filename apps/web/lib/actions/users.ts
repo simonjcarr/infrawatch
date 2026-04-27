@@ -1,10 +1,16 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { users, invitations } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
+import { getBetterAuthOrigin } from '@/lib/auth/env'
+import { getRequiredSession, type RequiredSession } from '@/lib/auth/session'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -15,9 +21,36 @@ const updateRoleSchema = z.object({
   role: z.enum(['super_admin', 'org_admin', 'engineer', 'read_only']),
 })
 
+async function requireOrgSession(orgId: string): Promise<RequiredSession> {
+  const session = await getRequiredSession()
+
+  if (!session.user.isActive || session.user.deletedAt) {
+    throw new Error('forbidden: inactive user')
+  }
+
+  if (session.user.organisationId !== orgId) {
+    throw new Error('forbidden: organisation mismatch')
+  }
+
+  return session
+}
+
+async function requireOrgAdmin(orgId: string): Promise<RequiredSession> {
+  const session = await requireOrgSession(orgId)
+
+  if (!ADMIN_ROLES.includes(session.user.role)) {
+    throw new Error('forbidden: admin role required')
+  }
+
+  return session
+}
+
 export async function getOrgUsers(
   orgId: string,
 ): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
+  await requireOrgAccess(orgId)
+  await requireOrgSession(orgId)
+
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({
       where: and(eq(users.organisationId, orgId), isNull(users.deletedAt)),
@@ -36,15 +69,17 @@ export async function getOrgUsers(
 
 export async function inviteUser(
   orgId: string,
-  invitedById: string,
   input: { email: string; role: string },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = inviteSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }
 
   try {
+    const session = await requireOrgAdmin(orgId)
+
     // Check for a previously removed user — restore them rather than re-registering,
     // since their account (and email) still exist in the database.
     const removedUser = await db.query.users.findFirst({
@@ -95,14 +130,14 @@ export async function inviteUser(
         email: parsed.data.email,
         role: parsed.data.role,
         organisationId: orgId,
-        invitedById,
+        invitedById: session.user.id,
         expiresAt,
       })
       .returning()
 
     if (!invite) return { error: 'Failed to create invitation' }
 
-    const baseUrl = process.env['BETTER_AUTH_URL'] ?? 'http://localhost:3000'
+    const baseUrl = getBetterAuthOrigin()
     return { inviteLink: `${baseUrl}/register?invite=${invite.token}` }
   } catch (err) {
     console.error('Failed to invite user:', err)
@@ -115,12 +150,22 @@ export async function updateUserRole(
   targetUserId: string,
   role: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = updateRoleSchema.safeParse({ role })
   if (!parsed.success) {
     return { error: 'Invalid role' }
   }
 
   try {
+    const session = await requireOrgAdmin(orgId)
+    const targetUser = await db.query.users.findFirst({
+      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId)),
+      columns: { id: true, email: true, role: true },
+    })
+    if (!targetUser) {
+      return { error: 'User not found' }
+    }
+
     if (parsed.data.role !== 'super_admin') {
       const superAdmins = await db.query.users.findMany({
         where: and(
@@ -134,10 +179,26 @@ export async function updateUserRole(
       }
     }
 
-    await db
-      .update(users)
-      .set({ role: parsed.data.role, updatedAt: new Date() })
-      .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ role: parsed.data.role, updatedAt: new Date() })
+        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'user.role.updated',
+        targetType: 'user',
+        targetId: targetUser.id,
+        summary: `Changed ${targetUser.email} role from ${targetUser.role} to ${parsed.data.role}`,
+        metadata: {
+          targetEmail: targetUser.email,
+          previousRole: targetUser.role,
+          nextRole: parsed.data.role,
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {
@@ -148,14 +209,16 @@ export async function updateUserRole(
 
 export async function deactivateUser(
   orgId: string,
-  requesterId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
-  if (requesterId === targetUserId) {
-    return { error: 'You cannot deactivate your own account' }
-  }
-
+  await requireOrgAccess(orgId)
   try {
+    const session = await requireOrgAdmin(orgId)
+
+    if (session.user.id === targetUserId) {
+      return { error: 'You cannot deactivate your own account' }
+    }
+
     const activeSuperAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
@@ -184,7 +247,10 @@ export async function reactivateUser(
   orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
+    await requireOrgAdmin(orgId)
+
     await db
       .update(users)
       .set({ isActive: true, updatedAt: new Date() })
@@ -199,14 +265,16 @@ export async function reactivateUser(
 
 export async function removeUser(
   orgId: string,
-  requesterId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
-  if (requesterId === targetUserId) {
-    return { error: 'You cannot remove your own account' }
-  }
-
+  await requireOrgAccess(orgId)
   try {
+    const session = await requireOrgAdmin(orgId)
+
+    if (session.user.id === targetUserId) {
+      return { error: 'You cannot remove your own account' }
+    }
+
     const superAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
@@ -219,10 +287,33 @@ export async function removeUser(
       return { error: 'Cannot remove the last super admin' }
     }
 
-    await db
-      .update(users)
-      .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
-      .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+    const targetUser = await db.query.users.findFirst({
+      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      columns: { id: true, email: true, role: true },
+    })
+    if (!targetUser) {
+      return { error: 'User not found' }
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
+        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'user.removed',
+        targetType: 'user',
+        targetId: targetUser.id,
+        summary: `Removed ${targetUser.email} from the organisation`,
+        metadata: {
+          targetEmail: targetUser.email,
+          role: targetUser.role,
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {
@@ -235,7 +326,10 @@ export async function cancelInvite(
   orgId: string,
   inviteId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
+    await requireOrgAdmin(orgId)
+
     await db
       .update(invitations)
       .set({ deletedAt: new Date(), updatedAt: new Date() })

@@ -19,9 +19,10 @@ export type TerminalTabColor =
 export interface TerminalSessionBinding {
   hostId: string
   hostname: string
-  username: string | null
+  username: string
+  password?: string
   orgId: string
-  directAccess: boolean
+  directAccess: false
 }
 
 export type TerminalPaneNode =
@@ -56,9 +57,10 @@ interface TerminalPanelActions {
   openTerminal: (params: {
     hostId: string
     hostname: string
-    username: string | null
+    username: string
+    password: string
     orgId: string
-    directAccess: boolean
+    directAccess: false
   }) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
@@ -189,9 +191,9 @@ function isValidBinding(value: unknown): value is TerminalSessionBinding {
   return (
     typeof b.hostId === 'string' &&
     typeof b.hostname === 'string' &&
-    (b.username === null || typeof b.username === 'string') &&
+    typeof b.username === 'string' &&
     typeof b.orgId === 'string' &&
-    typeof b.directAccess === 'boolean'
+    b.directAccess === false
   )
 }
 
@@ -265,13 +267,16 @@ function persistState(state: TerminalPanelState): void {
       return
     }
     const toPersist: PersistedTerminalState = {
-      tabs: state.tabs.map((t) => ({
-        binding: t.binding,
-        color: t.color,
-        label: t.label,
-        paneTree: t.paneTree,
-        fontSize: t.fontSize,
-      })),
+      tabs: state.tabs.map((t) => {
+        const { password: _password, ...binding } = t.binding
+        return {
+          binding,
+          color: t.color,
+          label: t.label,
+          paneTree: t.paneTree,
+          fontSize: t.fontSize,
+        }
+      }),
       activeTabIndex: state.activeTabId
         ? state.tabs.findIndex((t) => t.id === state.activeTabId)
         : null,
@@ -321,9 +326,10 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
     (params: {
       hostId: string
       hostname: string
-      username: string | null
+      username: string
+      password: string
       orgId: string
-      directAccess: boolean
+      directAccess: false
     }) => {
       const tabId = createId()
       const paneId = createId()

@@ -78,7 +78,7 @@ func runCmd(args []string) error {
 	fs.StringVar(&cfg.OutputJSON, "output-json", "", "optional path to write final summary as JSON")
 	fs.BoolVar(&cfg.SimulateTasks, "simulate-tasks", true, "respond to server-pushed AgentTasks with fake progress + exit-0 result")
 	fs.BoolVar(&cfg.SimulateChecks, "simulate-checks", true, "return fake CheckResults for pushed CheckDefinitions")
-	fs.BoolVar(&cfg.SimulateTerminal, "simulate-terminal", true, "open Terminal streams for pushed TerminalSessionRequests")
+	fs.BoolVar(&cfg.SimulateTerminal, "simulate-terminal", false, "deprecated; agent-mediated terminal streams are disabled")
 	fs.BoolVar(&cfg.SimulateInventory, "simulate-inventory", true, "upload fake software inventory on software_inventory_scan tasks")
 	fs.Float64Var(&cfg.CheckFailureRate, "check-failure-rate", 0.05, "fraction of simulated check results that report 'fail'")
 	fs.Usage = func() {

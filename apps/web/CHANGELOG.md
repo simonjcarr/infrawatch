@@ -1,5 +1,178 @@
 # Changelog
 
+## [0.71.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.20...web/v0.71.0) (2026-04-27)
+
+
+### Features
+
+* **auth:** make email verification optional ([#626](https://github.com/carrtech-dev/ct-ops/issues/626)) ([755f3f3](https://github.com/carrtech-dev/ct-ops/commit/755f3f3079e293581abd1bd60b5a216fe679d62a))
+
+## [0.70.20](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.19...web/v0.70.20) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** validate licence revocation bundles ([#624](https://github.com/carrtech-dev/ct-ops/issues/624)) ([20507d2](https://github.com/carrtech-dev/ct-ops/commit/20507d2065aaf8014ea1c6910d59ca2955d49a5b))
+
+## [0.70.19](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.18...web/v0.70.19) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** audit sensitive mutations ([#622](https://github.com/carrtech-dev/ct-ops/issues/622)) ([0eda649](https://github.com/carrtech-dev/ct-ops/commit/0eda64922798a769121c84f40c9e7d9564199756))
+
+## [0.70.18](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.17...web/v0.70.18) (2026-04-27)
+
+
+### Bug Fixes
+
+* **security:** validate jsonb metadata at runtime ([#620](https://github.com/carrtech-dev/ct-ops/issues/620)) ([8e2adaf](https://github.com/carrtech-dev/ct-ops/commit/8e2adafa91f6c7a25dd83aafe4024359889092c3))
+
+## [0.70.17](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.16...web/v0.70.17) (2026-04-27)
+
+
+### Bug Fixes
+
+* **auth:** require BETTER_AUTH env configuration ([#612](https://github.com/carrtech-dev/ct-ops/issues/612)) ([a09e9ea](https://github.com/carrtech-dev/ct-ops/commit/a09e9eac915ecb302e1b408025e4c9ef98b432dd))
+
+## [0.70.16](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.15...web/v0.70.16) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** retry pnpm install in docker build ([#590](https://github.com/carrtech-dev/ct-ops/issues/590)) ([6778770](https://github.com/carrtech-dev/ct-ops/commit/67787703613b3f02b5956939e9b3251d227c558d))
+
+## [0.70.15](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.14...web/v0.70.15) (2026-04-27)
+
+
+### Bug Fixes
+
+* **release:** ship digest-pinned compose bundle ([e42347c](https://github.com/carrtech-dev/ct-ops/commit/e42347ccb28b505aefd49c1f9fcb4197784d4fc4))
+* **release:** ship digest-pinned compose bundle ([a292b49](https://github.com/carrtech-dev/ct-ops/commit/a292b49e8d7d775ed31bdfadec12b49cb1653523))
+
+## [0.70.14](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.13...web/v0.70.14) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** remove root startup from web image ([#591](https://github.com/carrtech-dev/ct-ops/issues/591)) ([e1aa368](https://github.com/carrtech-dev/ct-ops/commit/e1aa36872f0c114554f47505f8f6332bffcd6752))
+
+## [0.70.13](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.12...web/v0.70.13) (2026-04-27)
+
+
+### Bug Fixes
+
+* **certificates:** use X509Certificate for untrusted parsing ([a889dd6](https://github.com/carrtech-dev/ct-ops/commit/a889dd6112f3c50f6b0e92e566adae15ab9b9b5b))
+* **certificates:** use X509Certificate for untrusted parsing ([bd65122](https://github.com/carrtech-dev/ct-ops/commit/bd6512208bf4de752dbf2221837cd684e05331ca))
+
+## [0.70.12](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.11...web/v0.70.12) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** enforce enrolment token expiry and usage caps ([5a3ef14](https://github.com/carrtech-dev/ct-ops/commit/5a3ef14e2d6b1bade290da24523484d25b8a127a))
+* **agent:** enforce enrolment token expiry and usage caps ([a783c2c](https://github.com/carrtech-dev/ct-ops/commit/a783c2cb22146bcd624bc2e122f8fbc8e7924316))
+
+## [0.70.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.10...web/v0.70.11) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** validate trusted origins for mutations ([2bf5662](https://github.com/carrtech-dev/ct-ops/commit/2bf5662fd141d1719d8252fba8f789ec62ca490c))
+* **web:** validate trusted origins for mutations ([a7cb750](https://github.com/carrtech-dev/ct-ops/commit/a7cb7507435211493461189f6d3018abdceeb6b7))
+
+## [0.70.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.9...web/v0.70.10) (2026-04-26)
+
+
+### Bug Fixes
+
+* **auth:** add per-account login lockout (H-01) ([#582](https://github.com/carrtech-dev/ct-ops/issues/582)) ([1c15c9e](https://github.com/carrtech-dev/ct-ops/commit/1c15c9e9554f23a11062dd645e9475d799430819))
+
+## [0.70.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.8...web/v0.70.9) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** require org auth for server actions ([#578](https://github.com/carrtech-dev/ct-ops/issues/578)) ([bdfacb9](https://github.com/carrtech-dev/ct-ops/commit/bdfacb9a8bb7198a463e879789672bebd81da413))
+
+## [0.70.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.7...web/v0.70.8) (2026-04-26)
+
+
+### Bug Fixes
+
+* Codex/ssh backed terminal access ([#577](https://github.com/carrtech-dev/ct-ops/issues/577)) ([2a121a0](https://github.com/carrtech-dev/ct-ops/commit/2a121a0f8885b57f7cd2f569ad63c70ff35c1408))
+
+## [0.70.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.6...web/v0.70.7) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** block private notification test targets ([#573](https://github.com/carrtech-dev/ct-ops/issues/573)) ([043a5a7](https://github.com/carrtech-dev/ct-ops/commit/043a5a70fe1fff96bc04ddd5f8d602ceae4d10ac))
+
+## [0.70.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.5...web/v0.70.6) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** lock down certificate checker SSRF surface ([#570](https://github.com/carrtech-dev/ct-ops/issues/570)) ([824bfb9](https://github.com/carrtech-dev/ct-ops/commit/824bfb990c14f244b2cda16635293cb569bb7e41))
+
+## [0.70.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.4...web/v0.70.5) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** require SSH credentials for terminal access ([#566](https://github.com/carrtech-dev/ct-ops/issues/566)) ([c0616dc](https://github.com/carrtech-dev/ct-ops/commit/c0616dc8a4aae98dea26eea49b8df22be89cc23e))
+
+## [0.70.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.3...web/v0.70.4) (2026-04-26)
+
+
+### Bug Fixes
+
+* **auth:** require email verification for local sign-ups ([#564](https://github.com/carrtech-dev/ct-ops/issues/564)) ([e10d30a](https://github.com/carrtech-dev/ct-ops/commit/e10d30a6708667a7b3107da09bd6ffe91a859e1f))
+
+## [0.70.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.2...web/v0.70.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** derive team management actor from session ([#562](https://github.com/carrtech-dev/ct-ops/issues/562)) ([8aad96b](https://github.com/carrtech-dev/ct-ops/commit/8aad96b07863998490a1dc635d5523497baa3547))
+* **web:** transfer bundles via agent connection ([#561](https://github.com/carrtech-dev/ct-ops/issues/561)) ([48fc4a0](https://github.com/carrtech-dev/ct-ops/commit/48fc4a0440e603808c0a2509c23541fd4765f4b2))
+
+## [0.70.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.1...web/v0.70.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** stream bundle transfers server-side ([#559](https://github.com/carrtech-dev/ct-ops/issues/559)) ([b74e194](https://github.com/carrtech-dev/ct-ops/commit/b74e1949b50fcf938016df73dfd7b963a3806133))
+
+## [0.70.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.0...web/v0.70.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **web:** align bundle transfer route with ssh2 types ([#557](https://github.com/carrtech-dev/ct-ops/issues/557)) ([1d29c21](https://github.com/carrtech-dev/ct-ops/commit/1d29c214ef63149129f57e720533ad544e8bc0a3))
+
+## [0.70.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.69.0...web/v0.70.0) (2026-04-26)
+
+
+### Features
+
+* **web:** transfer bundler archives to hosts ([#555](https://github.com/carrtech-dev/ct-ops/issues/555)) ([cb21cff](https://github.com/carrtech-dev/ct-ops/commit/cb21cffbb3468abe237238b4939107de58d26b2a))
+
+## [0.69.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.68.1...web/v0.69.0) (2026-04-26)
+
+
+### Features
+
+* **web:** fetch latest GitLab target version ([#553](https://github.com/carrtech-dev/ct-ops/issues/553)) ([322b11f](https://github.com/carrtech-dev/ct-ops/commit/322b11f9619673ea71c5e5175c4ad582d9186464))
+
+## [0.68.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.68.0...web/v0.68.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **auth:** scope LDAP login links to organisation ([96d28df](https://github.com/carrtech-dev/ct-ops/commit/96d28df206a7548ef5b1e07e6237585bf8f15cb8)), closes [#273](https://github.com/carrtech-dev/ct-ops/issues/273)
+
 ## [0.68.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.2...web/v0.68.0) (2026-04-26)
 
 

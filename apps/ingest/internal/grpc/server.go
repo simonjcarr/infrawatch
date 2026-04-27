@@ -15,14 +15,18 @@ import (
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
+const (
+	maxMessageSizeBytes  = 50 * 1024 * 1024
+	maxConcurrentStreams = 1000
+)
+
 // ingestService implements agentv1.IngestServiceServer.
 type ingestService struct {
 	agentv1.UnimplementedIngestServiceServer
-	reg      *handlers.RegisterHandler
-	hb       *handlers.HeartbeatHandler
-	terminal *handlers.TerminalHandler
-	inv      *handlers.InventoryHandler
-	renew    *handlers.RenewCertHandler
+	reg   *handlers.RegisterHandler
+	hb    *handlers.HeartbeatHandler
+	inv   *handlers.InventoryHandler
+	renew *handlers.RenewCertHandler
 }
 
 func (s *ingestService) Register(ctx context.Context, req *agentv1.RegisterRequest) (*agentv1.RegisterResponse, error) {
@@ -33,10 +37,6 @@ func (s *ingestService) Heartbeat(stream agentv1.IngestService_HeartbeatServer) 
 	return s.hb.Heartbeat(stream)
 }
 
-func (s *ingestService) Terminal(stream agentv1.IngestService_TerminalServer) error {
-	return s.terminal.Terminal(stream)
-}
-
 func (s *ingestService) SubmitSoftwareInventory(stream agentv1.IngestService_SubmitSoftwareInventoryServer) error {
 	return s.inv.SubmitSoftwareInventory(stream)
 }
@@ -45,18 +45,7 @@ func (s *ingestService) RenewCertificate(ctx context.Context, req *agentv1.Renew
 	return s.renew.Renew(ctx, req)
 }
 
-// Serve starts the gRPC server on the given port with TLS credentials.
-// Blocks until the server stops. When ctx is cancelled (e.g. SIGTERM), Serve
-// sends a gRPC GOAWAY to all connected agents so they reconnect immediately
-// rather than hitting exponential backoff. If streams don't drain within 30s,
-// the server is force-stopped — this covers the case where a container is
-// killed before context cancellation can propagate.
-func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, terminal *handlers.TerminalHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		return fmt.Errorf("listening on :%d: %w", port, err)
-	}
-
+func serverOptions(creds credentials.TransportCredentials) []grpc.ServerOption {
 	// Permit the agent's 30s client pings (with safety margin) and proactively
 	// ping idle agents from the server side too, so a dead peer is detected
 	// within ~80s instead of waiting for the OS TCP timeout.
@@ -70,16 +59,40 @@ func Serve(ctx context.Context, port int, creds credentials.TransportCredentials
 	}
 
 	opts := []grpc.ServerOption{
-		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(enforcement),
 		grpc.KeepaliveParams(serverKp),
+		grpc.MaxRecvMsgSize(maxMessageSizeBytes),
+		grpc.MaxSendMsgSize(maxMessageSizeBytes),
+		grpc.MaxConcurrentStreams(maxConcurrentStreams),
 		grpc.ChainUnaryInterceptor(RecoveryUnaryInterceptor, LoggingUnaryInterceptor, NewMTLSUnaryInterceptor()),
 		grpc.ChainStreamInterceptor(RecoveryStreamInterceptor, LoggingStreamInterceptor, NewMTLSStreamInterceptor()),
 	}
-	grpcServer := grpc.NewServer(opts...)
+	if creds != nil {
+		opts = append([]grpc.ServerOption{grpc.Creds(creds)}, opts...)
+	}
+	return opts
+}
 
-	svc := &ingestService{reg: reg, hb: hb, terminal: terminal, inv: inv, renew: renew}
+func newServer(creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler) *grpc.Server {
+	grpcServer := grpc.NewServer(serverOptions(creds)...)
+	svc := &ingestService{reg: reg, hb: hb, inv: inv, renew: renew}
 	agentv1.RegisterIngestServiceServer(grpcServer, svc)
+	return grpcServer
+}
+
+// Serve starts the gRPC server on the given port with TLS credentials.
+// Blocks until the server stops. When ctx is cancelled (e.g. SIGTERM), Serve
+// sends a gRPC GOAWAY to all connected agents so they reconnect immediately
+// rather than hitting exponential backoff. If streams don't drain within 30s,
+// the server is force-stopped — this covers the case where a container is
+// killed before context cancellation can propagate.
+func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler) error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return fmt.Errorf("listening on :%d: %w", port, err)
+	}
+
+	grpcServer := newServer(creds, reg, hb, inv, renew)
 
 	// Graceful shutdown on context cancellation. GracefulStop sends GOAWAY
 	// so agents reconnect immediately; Stop is the hard fallback if streams

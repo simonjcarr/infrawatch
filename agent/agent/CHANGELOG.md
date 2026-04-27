@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.30.8](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.7...agent/v0.30.8) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** cap buffered heartbeat task output ([cc5384b](https://github.com/carrtech-dev/ct-ops/commit/cc5384b703c6bb21e9d4d76be9d900fb7f789436))
+* **agent:** cap buffered heartbeat task output ([ae69da9](https://github.com/carrtech-dev/ct-ops/commit/ae69da9d78ee1086380b9b1e874868faebe6ae39))
+
+## [0.30.7](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.6...agent/v0.30.7) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** reject symlinked cert files ([#618](https://github.com/carrtech-dev/ct-ops/issues/618)) ([70ed604](https://github.com/carrtech-dev/ct-ops/commit/70ed6049c54754ec862e2ac0ecb496055fa3b196))
+
+## [0.30.6](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.5...agent/v0.30.6) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** validate config file ownership and mode ([#614](https://github.com/carrtech-dev/ct-ops/issues/614)) ([8451d1f](https://github.com/carrtech-dev/ct-ops/commit/8451d1f3ca70213e0d77d0134c1a2fe476182e18))
+
+## [0.30.5](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.4...agent/v0.30.5) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** preserve inherited script timeouts ([c2643c5](https://github.com/carrtech-dev/ct-ops/commit/c2643c5bdc593106dd2518282a334ca854572075))
+* **agent:** preserve inherited script timeouts ([6e52742](https://github.com/carrtech-dev/ct-ops/commit/6e5274239a94e8462d874ba6794b782b9a4363c1))
+
+## [0.30.4](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.3...agent/v0.30.4) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** constrain custom script tasks ([#604](https://github.com/carrtech-dev/ct-ops/issues/604)) ([5580168](https://github.com/carrtech-dev/ct-ops/commit/5580168a84d788392cc6baf3faa0a8bdeb9bac4e))
+
+## [0.30.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.2...agent/v0.30.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **agent:** disable unsigned self-update ([7fc1101](https://github.com/carrtech-dev/ct-ops/commit/7fc11012a5f3dddd806c18fc0194f13ed88e0888))
+* **agent:** disable unsigned self-update ([fea0879](https://github.com/carrtech-dev/ct-ops/commit/fea0879080a08da58bb98d7d4c95c2936c2d0a12))
+
+## [0.30.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.1...agent/v0.30.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **agent:** send JWT on initial heartbeat ([#575](https://github.com/carrtech-dev/ct-ops/issues/575)) ([6eeb024](https://github.com/carrtech-dev/ct-ops/commit/6eeb0243df57e7b82f7c98d1f3a9d0f13b7f900e))
+* Codex/ssh backed terminal access ([#577](https://github.com/carrtech-dev/ct-ops/issues/577)) ([2a121a0](https://github.com/carrtech-dev/ct-ops/commit/2a121a0f8885b57f7cd2f569ad63c70ff35c1408))
+
+## [0.30.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.0...agent/v0.30.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** require SSH credentials for terminal access ([#566](https://github.com/carrtech-dev/ct-ops/issues/566)) ([c0616dc](https://github.com/carrtech-dev/ct-ops/commit/c0616dc8a4aae98dea26eea49b8df22be89cc23e))
+
 ## [0.30.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.29.0...agent/v0.30.0) (2026-04-23)
 
 

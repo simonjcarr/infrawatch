@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as crypto from 'crypto'
 import * as forge from 'node-forge'
 import { z } from 'zod'
+import { auth } from '@/lib/auth'
 import {
   type ParsedCertificate,
   checkKeyMatch,
   fetchCertificateFromUrl,
   parseCertificateBuffer,
-  pemToForgeCert,
   resolveUrlTarget,
 } from '@/lib/certificates/fetch'
+import { assertAllowedCertificateCheckerPort } from '@/lib/net/certificate-checker-policy'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
+import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 
 export type { ParsedCertificate, ParsedSAN, ChainEntry } from '@/lib/certificates/fetch'
 
@@ -56,6 +58,17 @@ const BodySchema = z.discriminatedUnion('action', [
 ])
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    assertTrustedMutationOrigin(req.headers)
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Forbidden' } satisfies CertCheckerResponse, { status: 403 })
+  }
+
+  const session = await auth.api.getSession({ headers: req.headers })
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' } satisfies CertCheckerResponse, { status: 401 })
+  }
+
   let body: unknown
   try {
     body = await req.json()
@@ -81,7 +94,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (data.action === 'fetch-url') {
-      const { host } = resolveUrlTarget(data.url, data.port)
+      const { host, port } = resolveUrlTarget(data.url, data.port)
+      assertAllowedCertificateCheckerPort(port)
       await assertPublicHost(host)
       const { certificate } = await fetchCertificateFromUrl(data.url, data.port, data.servername)
       const keyMatch = data.keyPem ? checkKeyMatch(data.keyPem, certificate.pem) : undefined
@@ -108,7 +122,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (data.action === 'download') {
-      const forgeCert = pemToForgeCert(data.certPem)
+      const x509 = new crypto.X509Certificate(data.certPem)
 
       if (data.format === 'pem') {
         return new NextResponse(data.certPem, {
@@ -117,15 +131,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
 
       if (data.format === 'der') {
-        const asn1 = forge.pki.certificateToAsn1(forgeCert)
-        const der = forge.asn1.toDer(asn1).getBytes()
-        const buf = Buffer.from(der, 'binary')
-        return new NextResponse(buf, {
+        return new NextResponse(x509.raw, {
           headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="certificate.der"' },
         })
       }
 
       if (data.format === 'pkcs7') {
+        const forgeCert = forge.pki.certificateFromPem(x509.toString())
         const p7 = forge.pkcs7.createSignedData()
         p7.addCertificate(forgeCert)
         const asn1 = (p7 as unknown as { toAsn1: () => forge.asn1.Asn1 }).toAsn1()

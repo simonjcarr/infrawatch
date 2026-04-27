@@ -1,6 +1,6 @@
 # Docker Compose Deployment
 
-The recommended way to run CT-Ops in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database) on a single host using pre-built images from GHCR.
+The recommended way to run CT-Ops in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database) on a single host using digest-pinned images from GHCR.
 
 ---
 
@@ -61,6 +61,7 @@ POSTGRES_DB=ct-ops
 BETTER_AUTH_SECRET=change-me-to-a-long-random-string
 BETTER_AUTH_URL=https://ct-ops.example.com
 BETTER_AUTH_TRUSTED_ORIGINS=https://ct-ops.example.com
+REQUIRE_EMAIL_VERIFICATION=true
 AGENT_DOWNLOAD_BASE_URL=https://ct-ops.example.com
 EOF
 ```
@@ -68,6 +69,8 @@ EOF
 :::danger
 Change `BETTER_AUTH_SECRET` before going to production. Use at least 32 random characters.
 :::
+
+`REQUIRE_EMAIL_VERIFICATION` defaults to `true` when unset, which requires local email/password users to verify their email before sign-in. Set it to `false` only for deployments where unverified local accounts should be allowed to continue into CT-Ops.
 
 ### 3. Generate TLS certificates
 
@@ -102,10 +105,10 @@ The one-shot `migrate` container applies database migrations before web and inge
 
 | Service | Image | Host ports | Description |
 |---|---|---|---|
-| `nginx` | `nginx:1.27-alpine` | **443**, **80** | TLS terminator for browser traffic |
-| `db` | `timescale/timescaledb:latest-pg16` | 127.0.0.1:5432 | PostgreSQL + TimescaleDB |
-| `web` | `ghcr.io/carrtech-dev/ct-ops/web:latest` | 127.0.0.1:3000 | Next.js web app (reached via nginx) |
-| `ingest` | `ghcr.io/carrtech-dev/ct-ops/ingest:latest` | **9443**, 127.0.0.1:8080 | Agent gRPC (:9443 direct, bypasses nginx) + JWKS on loopback |
+| `nginx` | `nginx@sha256:...` | **443**, **80** | TLS terminator for browser traffic |
+| `db` | `timescale/timescaledb@sha256:...` | 127.0.0.1:5432 | PostgreSQL + TimescaleDB |
+| `web` | `ghcr.io/carrtech-dev/ct-ops/web@sha256:...` | 127.0.0.1:3000 | Next.js web app (reached via nginx) |
+| `ingest` | `ghcr.io/carrtech-dev/ct-ops/ingest@sha256:...` | **9443**, 127.0.0.1:8080 | Agent gRPC (:9443 direct, bypasses nginx) + JWKS on loopback |
 
 Only `443`, `80`, and `9443` are published on all host interfaces:
 
@@ -123,14 +126,14 @@ their own network, not just from the container host.
 
 ## Updating
 
-To update to the latest image versions:
+To update to newer image versions:
 
 ```bash
 docker compose -f docker-compose.single.yml pull
 docker compose -f docker-compose.single.yml up -d
 ```
 
-Migrations run automatically on container start.
+Migrations run automatically on container start. Release bundles ship with digest-pinned `WEB_IMAGE` and `INGEST_IMAGE` values in `.env.example`; when a new CT-Ops release is published, update both values to the new release digests before pulling.
 
 ---
 
@@ -175,7 +178,7 @@ install -m 0600 /path/to/your.key deploy/tls/server.key
 docker compose restart nginx
 ```
 
-No rebuild is required. On the next heartbeat, every connected agent's pinned fingerprint will mismatch the new cert, and the ingest service pushes the new cert down the mTLS-protected heartbeat stream. The agent persists it to its data dir and uses it as an additional trust anchor for self-update downloads. This means operators can rotate the browser cert without touching any agent host, even on Linux VMs where the internal CA is not installed in the system trust store.
+No rebuild is required. On the next heartbeat, every connected agent's pinned fingerprint will mismatch the new cert, and the ingest service pushes the new cert down the mTLS-protected heartbeat stream. The agent persists it to its data dir so the latest trust material stays aligned across restarts while signed self-update support is reworked. This means operators can rotate the browser cert without touching any agent host, even on Linux VMs where the internal CA is not installed in the system trust store.
 
 ## Fronting with your own reverse proxy
 

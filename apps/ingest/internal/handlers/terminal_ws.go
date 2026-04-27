@@ -2,49 +2,48 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
-// TerminalWSHandler serves WebSocket connections for interactive terminal sessions.
+// TerminalWSHandler serves browser WebSocket connections for SSH-backed
+// terminal sessions. It never asks the agent to open a shell.
 type TerminalWSHandler struct {
-	pool  *pgxpool.Pool
-	store *TerminalStore
+	pool *pgxpool.Pool
 }
 
-// NewTerminalWSHandler creates a new WebSocket handler for terminal sessions.
-func NewTerminalWSHandler(pool *pgxpool.Pool, store *TerminalStore) *TerminalWSHandler {
-	return &TerminalWSHandler{pool: pool, store: store}
+func NewTerminalWSHandler(pool *pgxpool.Pool) *TerminalWSHandler {
+	return &TerminalWSHandler{pool: pool}
 }
 
-// wsMessage is the JSON envelope for browser ↔ ingest WebSocket messages.
 type wsMessage struct {
-	Type string `json:"type"`           // "input" | "resize" | "close" | "output" | "closed" | "error"
-	Data string `json:"data,omitempty"` // base64-encoded for input/output
-	Cols uint32 `json:"cols,omitempty"`
-	Rows uint32 `json:"rows,omitempty"`
-	Msg  string `json:"message,omitempty"`
-	Code int32  `json:"exit_code,omitempty"`
+	Type     string `json:"type"`
+	Data     string `json:"data,omitempty"`
+	Cols     uint32 `json:"cols,omitempty"`
+	Rows     uint32 `json:"rows,omitempty"`
+	Msg      string `json:"message,omitempty"`
+	Code     int32  `json:"exit_code,omitempty"`
+	Token    string `json:"token,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
-// resizeFrame is a control frame sent on fromBrowser to signal a resize.
-// The first byte is 0x01 to distinguish it from regular input (0x00 prefix).
-const resizePrefix = 0x01
-const closePrefix = 0x02
-
-// ServeHTTP handles the /ws/terminal/{sessionId} endpoint.
 func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Extract session ID from URL path: /ws/terminal/{sessionId}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/ws/terminal/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
 		http.Error(w, "missing session ID", http.StatusBadRequest)
@@ -52,9 +51,8 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID := parts[0]
 
-	// Accept WebSocket upgrade
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // allow cross-origin for dev; production uses reverse proxy
+		InsecureSkipVerify: true,
 	})
 	if err != nil {
 		slog.Warn("terminal ws: accept failed", "err", err)
@@ -63,118 +61,104 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.CloseNow()
 
 	ctx := r.Context()
-
-	// Validate and activate session in DB
-	info, err := queries.ValidateAndActivateTerminalSession(ctx, h.pool, sessionID)
+	authCtx, cancelAuth := context.WithTimeout(ctx, 20*time.Second)
+	_, rawAuth, err := conn.Read(authCtx)
+	cancelAuth()
 	if err != nil {
-		slog.Warn("terminal ws: invalid session", "session_id", sessionID, "err", err)
-		msg, _ := json.Marshal(wsMessage{Type: "error", Msg: "Invalid or expired terminal session"})
-		conn.Write(ctx, websocket.MessageText, msg)
-		conn.Close(websocket.StatusPolicyViolation, "invalid session")
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "SSH credentials were not received"})
+		conn.Close(websocket.StatusPolicyViolation, "missing credentials")
 		return
 	}
 
-	slog.Info("terminal ws: session activated", "session_id", sessionID, "host_id", info.HostID, "org_id", info.OrganisationID)
+	var authMsg wsMessage
+	if err := json.Unmarshal(rawAuth, &authMsg); err != nil || authMsg.Type != "auth" || authMsg.Token == "" || authMsg.Password == "" {
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "Invalid SSH authentication request"})
+		conn.Close(websocket.StatusPolicyViolation, "invalid authentication")
+		return
+	}
 
-	// Register in terminal store so the gRPC Terminal handler can find us
-	sess, sessCtx := h.store.Register(sessionID, info.LoggingEnabled)
+	tokenSum := sha256.Sum256([]byte(authMsg.Token))
+	info, err := queries.ValidateAndActivateTerminalSession(ctx, h.pool, sessionID, hex.EncodeToString(tokenSum[:]))
+	if err != nil {
+		slog.Warn("terminal ws: invalid session", "session_id", sessionID, "err", err)
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "Invalid or expired terminal session"})
+		conn.Close(websocket.StatusPolicyViolation, "invalid session")
+		return
+	}
+	if info.Host == "" || info.Username == "" {
+		_ = queries.SetTerminalSessionError(context.Background(), h.pool, sessionID, "missing SSH target")
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "Host SSH target is unavailable"})
+		return
+	}
 
-	// Clean up on exit
+	slog.Info("terminal ws: opening SSH session", "session_id", sessionID, "host_id", info.HostID, "username", info.Username)
+	sshClient, sshSession, stdin, stdout, err := h.openSSHSession(ctx, info.HostID, info.Host, info.Username, authMsg.Password)
+	authMsg.Password = ""
+	if err != nil {
+		slog.Warn("terminal ws: SSH connection failed", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
+		_ = queries.SetTerminalSessionError(context.Background(), h.pool, sessionID, "ssh authentication failed")
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "SSH authentication failed"})
+		return
+	}
+	defer sshClient.Close()
+	defer sshSession.Close()
+
+	startedAt := time.Now()
+	var recording strings.Builder
+	var recordingMu sync.Mutex
 	defer func() {
-		h.store.Remove(sessionID)
-		duration := int(time.Since(sess.startedAt).Seconds())
-		recording := sess.getRecording()
-		if err := queries.SetTerminalSessionEnded(context.Background(), h.pool, sessionID, duration, recording); err != nil {
+		duration := int(time.Since(startedAt).Seconds())
+		recordingText := ""
+		if info.LoggingEnabled {
+			recordingMu.Lock()
+			recordingText = recording.String()
+			recordingMu.Unlock()
+		}
+		if err := queries.SetTerminalSessionEnded(context.Background(), h.pool, sessionID, duration, recordingText); err != nil {
 			slog.Warn("terminal ws: failed to record session end", "session_id", sessionID, "err", err)
 		}
-		slog.Info("terminal ws: session ended", "session_id", sessionID, "duration_seconds", duration)
+		slog.Info("terminal ws: SSH session ended", "session_id", sessionID, "duration_seconds", duration)
 	}()
 
-	// Goroutine: notify browser when agent connects, then relay PTY output
-	done := make(chan struct{})
+	if err := writeWS(ctx, conn, wsMessage{Type: "ssh_connected"}); err != nil {
+		return
+	}
+
+	outputDone := make(chan struct{})
 	go func() {
-		defer close(done)
-
-		// Poll DB status every 3s and report to browser while waiting for agent.
-		// This helps diagnose whether the heartbeat finds and pushes the session.
-		diagTicker := time.NewTicker(3 * time.Second)
-		defer diagTicker.Stop()
-
+		defer close(outputDone)
+		buf := make([]byte, 4096)
 		for {
-			select {
-			case <-sess.agentConnected:
-				slog.Info("terminal ws: agent connected, bridge is up", "session_id", sessionID)
-				agentMsg, _ := json.Marshal(wsMessage{Type: "agent_connected"})
-				if err := conn.Write(ctx, websocket.MessageText, agentMsg); err != nil {
-					return
+			n, readErr := stdout.Read(buf)
+			if n > 0 {
+				chunk := append([]byte(nil), buf[:n]...)
+				if info.LoggingEnabled {
+					recordingMu.Lock()
+					recording.Write(chunk)
+					recordingMu.Unlock()
 				}
-				goto relayOutput
-			case <-sessCtx.Done():
-				return
-			case <-diagTicker.C:
-				dbStatus, err := queries.GetTerminalSessionStatus(ctx, h.pool, sessionID)
-				if err != nil {
-					slog.Warn("terminal ws: diag status query failed", "session_id", sessionID, "err", err)
-					continue
-				}
-				// Run the same query the heartbeat uses to find pending sessions
-				pendingSessions, _ := queries.GetPendingTerminalSessionsForHost(ctx, h.pool, info.HostID)
-				// Check if the store has this session registered and how many times pushed
-				storeSess, inStore := h.store.Get(sessionID)
-				var pushCount int64
-				if storeSess != nil {
-					pushCount = storeSess.getPushCount()
-				}
-				// Check agent status and verify host_id reverse-lookup
-				agentID, agentStatus, _ := queries.GetHostAgentStatus(ctx, h.pool, info.HostID)
-				reverseHostID := ""
-				if agentID != "" {
-					reverseHostID, _ = queries.GetHostByAgentID(ctx, h.pool, agentID)
-				}
-				hostMatch := reverseHostID == info.HostID
-				diagMsg, _ := json.Marshal(wsMessage{
-					Type: "diagnostic",
-					Msg: fmt.Sprintf("status=%s host_id=%s poll_would_find=%d in_store=%v pushed=%d agent=%s(%s) host_match=%v",
-						dbStatus, info.HostID, len(pendingSessions), inStore, pushCount, agentStatus, agentID, hostMatch),
-				})
-				if err := conn.Write(ctx, websocket.MessageText, diagMsg); err != nil {
+				if err := writeWS(ctx, conn, wsMessage{
+					Type: "output",
+					Data: base64.StdEncoding.EncodeToString(chunk),
+				}); err != nil {
 					return
 				}
 			}
-		}
-
-	relayOutput:
-
-		// Relay PTY output from the gRPC handler to the browser.
-		for {
-			select {
-			case <-sessCtx.Done():
+			if readErr != nil {
+				if readErr != io.EOF {
+					slog.Debug("terminal ws: SSH stdout read failed", "session_id", sessionID, "err", readErr)
+				}
 				return
-			case data, ok := <-sess.toBrowser:
-				if !ok {
-					return
-				}
-				sess.appendRecording(data)
-				msg, _ := json.Marshal(wsMessage{
-					Type: "output",
-					Data: base64.StdEncoding.EncodeToString(data),
-				})
-				if err := conn.Write(ctx, websocket.MessageText, msg); err != nil {
-					return
-				}
 			}
 		}
 	}()
 
-	// Main loop: read from WebSocket → parse → write to fromBrowser channel
 	for {
 		select {
-		case <-sessCtx.Done():
+		case <-ctx.Done():
 			return
-		case <-done:
-			// Agent closed the PTY, send closed message to browser
-			msg, _ := json.Marshal(wsMessage{Type: "closed"})
-			conn.Write(ctx, websocket.MessageText, msg)
+		case <-outputDone:
+			writeWS(ctx, conn, wsMessage{Type: "closed"})
 			conn.Close(websocket.StatusNormalClosure, "session ended")
 			return
 		default:
@@ -182,8 +166,6 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		_, rawMsg, err := conn.Read(ctx)
 		if err != nil {
-			// Browser disconnected
-			slog.Debug("terminal ws: read error", "session_id", sessionID, "err", err)
 			return
 		}
 
@@ -198,35 +180,103 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			// Prefix with 0x00 to mark as input data
-			frame := append([]byte{0x00}, decoded...)
-			select {
-			case sess.fromBrowser <- frame:
-			case <-sessCtx.Done():
+			if _, err := stdin.Write(decoded); err != nil {
 				return
 			}
-
 		case "resize":
-			// Encode resize as a control frame: [0x01, cols_hi, cols_lo, rows_hi, rows_lo]
-			frame := []byte{
-				resizePrefix,
-				byte(msg.Cols >> 8), byte(msg.Cols & 0xff),
-				byte(msg.Rows >> 8), byte(msg.Rows & 0xff),
+			if msg.Cols > 0 && msg.Rows > 0 {
+				_ = sshSession.WindowChange(int(msg.Rows), int(msg.Cols))
 			}
-			select {
-			case sess.fromBrowser <- frame:
-			case <-sessCtx.Done():
-				return
-			}
-
 		case "close":
-			frame := []byte{closePrefix}
-			select {
-			case sess.fromBrowser <- frame:
-			case <-sessCtx.Done():
-				return
-			}
+			_ = sshSession.Signal(ssh.SIGTERM)
 			return
 		}
 	}
+}
+
+func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, username, password string) (*ssh.Client, *ssh.Session, io.WriteCloser, io.Reader, error) {
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+			ssh.KeyboardInteractive(func(_ string, _ string, questions []string, _ []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
+		},
+		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			return queries.VerifyOrTrustSSHHostKey(ctx, h.pool, hostID, ssh.FingerprintSHA256(key))
+		},
+		Timeout: 30 * time.Second,
+	}
+
+	address := net.JoinHostPort(host, "22")
+	type dialResult struct {
+		client *ssh.Client
+		err    error
+	}
+	resultCh := make(chan dialResult, 1)
+	go func() {
+		client, err := ssh.Dial("tcp", address, config)
+		resultCh <- dialResult{client: client, err: err}
+	}()
+
+	var client *ssh.Client
+	select {
+	case <-ctx.Done():
+		return nil, nil, nil, nil, ctx.Err()
+	case result := <-resultCh:
+		if result.err != nil {
+			return nil, nil, nil, nil, result.err
+		}
+		client = result.client
+	}
+
+	session, err := client.NewSession()
+	if err != nil {
+		client.Close()
+		return nil, nil, nil, nil, err
+	}
+
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		session.Close()
+		client.Close()
+		return nil, nil, nil, nil, err
+	}
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		session.Close()
+		client.Close()
+		return nil, nil, nil, nil, err
+	}
+
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
+	}
+	if err := session.RequestPty("xterm-256color", 24, 80, modes); err != nil {
+		session.Close()
+		client.Close()
+		return nil, nil, nil, nil, err
+	}
+	if err := session.Shell(); err != nil {
+		session.Close()
+		client.Close()
+		return nil, nil, nil, nil, err
+	}
+
+	return client, session, stdin, stdout, nil
+}
+
+func writeWS(ctx context.Context, conn *websocket.Conn, msg wsMessage) error {
+	raw, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("marshal websocket message: %w", err)
+	}
+	return conn.Write(ctx, websocket.MessageText, raw)
 }

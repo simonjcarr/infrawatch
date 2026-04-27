@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { truncateAppTables } from './db'
 import { getStorageStatePath } from './auth'
+import { seedOrgAndUser } from './seed'
 
 type Fixtures = {
   autoTruncate: void
@@ -16,8 +17,9 @@ export const test = base.extend<Fixtures>({
     { auto: true },
   ],
 
-  authenticatedPage: async ({ browser, baseURL }, use) => {
+  authenticatedPage: async ({ browser, baseURL, request }, use) => {
     if (!baseURL) throw new Error('baseURL must be configured')
+    await seedOrgAndUser(request)
     const storageState = await getStorageStatePath(baseURL)
     const context = await browser.newContext({ storageState })
     const page = await context.newPage()

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -21,8 +22,6 @@ import (
 	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
 	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 	"github.com/carrtech-dev/ct-ops/agent/internal/tasks"
-	"github.com/carrtech-dev/ct-ops/agent/internal/terminal"
-	"github.com/carrtech-dev/ct-ops/agent/internal/updater"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
@@ -30,6 +29,16 @@ import (
 // NotFound or PermissionDenied, signalling that the local state should be
 // cleared and the agent should re-register from scratch.
 var ErrAgentDeregistered = errors.New("agent deregistered by server — re-registration required")
+
+const (
+	maxBufferedTaskProgressBytesPerTask     = 64 * 1024
+	maxBufferedTaskProgressBytesPerInterval = 256 * 1024
+	maxBufferedTaskResultBytesPerTask       = 16 * 1024
+	maxBufferedTaskResultBytesPerInterval   = 64 * 1024
+
+	taskProgressTruncatedMarker = "\n[ct-ops] output truncated before next heartbeat\n"
+	taskResultTruncatedMarker   = "task result truncated before next heartbeat"
+)
 
 // Runner manages the bidirectional heartbeat stream with the ingest service.
 type Runner struct {
@@ -61,10 +70,13 @@ type Runner struct {
 	queryResults   []*agentv1.AgentQueryResult
 
 	// Buffered agent task progress chunks and results, drained on each heartbeat send.
-	taskProgressMu sync.Mutex
-	taskProgress   []*agentv1.AgentTaskProgress
-	taskResultsMu  sync.Mutex
-	taskResults    []*agentv1.AgentTaskResult
+	taskProgressMu            sync.Mutex
+	taskProgress              []*agentv1.AgentTaskProgress
+	taskProgressBytes         int
+	taskProgressBytesByTask   map[string]int
+	taskProgressTruncatedTask map[string]bool
+	taskResultsMu             sync.Mutex
+	taskResults               []*agentv1.AgentTaskResult
 
 	// Dedupes server-pushed queries: the ingest handler may re-push the same
 	// query on consecutive 2s poll ticks while the agent is still executing it.
@@ -78,13 +90,6 @@ type Runner struct {
 	// taskCancelFuncs maps task_run_host_id → context.CancelFunc for every
 	// task currently running on this agent. Used to stop tasks on server request.
 	taskCancelFuncs sync.Map
-
-	// Dedupes server-pushed terminal sessions.
-	seenTerminalIDs map[string]struct{}
-
-	// terminalCancelFuncs maps session_id → context.CancelFunc for active
-	// terminal sessions. Used to close terminals on server request.
-	terminalCancelFuncs sync.Map
 
 	// Signalled when new query results are ready so the send loop can fire
 	// an immediate heartbeat rather than waiting for the next 30s tick.
@@ -109,12 +114,16 @@ type Runner struct {
 	lastKnownDefs []*agentv1.CheckDefinition
 
 	// pinnedServerCertMu guards pinnedServerCertPEM and pinnedServerCertFpr.
-	// These hold the nginx-facing server cert that agent self-update trusts in
-	// addition to the system CA pool. Values are persisted to disk whenever
-	// they change so a process restart picks up the same pin.
+	// These hold the nginx-facing server cert fingerprint and PEM pushed by
+	// ingest so the agent can preserve that trust material on disk while the
+	// signed self-update flow is redesigned.
 	pinnedServerCertMu  sync.Mutex
 	pinnedServerCertPEM []byte
 	pinnedServerCertFpr string
+
+	// lastSkippedUpdateVersion suppresses duplicate warnings when the server
+	// repeatedly advertises the same release while auto-update is disabled.
+	lastSkippedUpdateVersion string
 }
 
 // New creates a new heartbeat Runner. dialFunc is called once per stream
@@ -129,17 +138,15 @@ func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version s
 		version:      version,
 		interval:     time.Duration(intervalSecs) * time.Second,
 		executor:     executor,
-		seenQueryIDs:    make(map[string]struct{}),
-		seenTaskIDs:     make(map[string]struct{}),
-		seenTerminalIDs: make(map[string]struct{}),
-		resultsReady:    make(chan struct{}, 1),
-		certRotated:     make(chan struct{}, 1),
-		dataDir:         dataDir,
-		keypair:         keypair,
+		seenQueryIDs: make(map[string]struct{}),
+		seenTaskIDs:  make(map[string]struct{}),
+		resultsReady: make(chan struct{}, 1),
+		certRotated:  make(chan struct{}, 1),
+		dataDir:      dataDir,
+		keypair:      keypair,
 	}
-	// Prime the pinned server cert from disk so the first heartbeat sends
-	// the correct fingerprint and a pre-re-exec self-update can trust the
-	// same PEM that was bundled at enrolment time.
+	// Prime the pinned server cert from disk so the first heartbeat sends the
+	// correct fingerprint and preserves any previously pushed trust material.
 	if dataDir != "" {
 		if pem, fpr, err := identity.LoadPinnedServerCert(dataDir); err == nil {
 			r.pinnedServerCertPEM = pem
@@ -226,7 +233,6 @@ func (r *Runner) runStream(ctx context.Context) error {
 	r.seenMu.Lock()
 	r.seenQueryIDs = make(map[string]struct{})
 	r.seenTaskIDs = make(map[string]struct{})
-	r.seenTerminalIDs = make(map[string]struct{})
 	r.seenMu.Unlock()
 
 	slog.Info("heartbeat stream opened", "agent_id", r.agentID)
@@ -243,9 +249,10 @@ func (r *Runner) runStream(ctx context.Context) error {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 
-	// Collect metrics and send first heartbeat immediately.
+	// Collect metrics and send first heartbeat immediately. The first message
+	// authenticates the stream, so agent_id carries the JWT for that one send.
 	r.refreshMetrics()
-	if err := r.sendHeartbeat(stream); err != nil {
+	if err := r.sendHeartbeatWithAgentID(stream, r.jwtToken); err != nil {
 		return err
 	}
 
@@ -345,7 +352,11 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 		}
 		r.seenMu.Unlock()
 		if !dup {
-			go r.executeTask(ctx, resp.PendingTask)
+			if resp.PendingTask.TaskType == "software_inventory" {
+				go r.executeTask(ctx, resp.PendingTask)
+			} else {
+				go r.rejectHostAccessTask(resp.PendingTask)
+			}
 		}
 	}
 	if len(resp.CancelTaskIds) > 0 {
@@ -355,27 +366,6 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 				fn.(context.CancelFunc)()
 			} else {
 				slog.Debug("cancel request for task not in flight (may have already completed)", "task_id", id)
-			}
-		}
-	}
-	if len(resp.PendingTerminalSessions) > 0 {
-		for _, ts := range resp.PendingTerminalSessions {
-			r.seenMu.Lock()
-			_, dup := r.seenTerminalIDs[ts.SessionId]
-			if !dup {
-				r.seenTerminalIDs[ts.SessionId] = struct{}{}
-			}
-			r.seenMu.Unlock()
-			if !dup {
-				go r.openTerminalSession(ts)
-			}
-		}
-	}
-	if len(resp.CancelTerminalSessions) > 0 {
-		for _, id := range resp.CancelTerminalSessions {
-			if fn, ok := r.terminalCancelFuncs.Load(id); ok {
-				slog.Info("cancelling terminal session on server request", "session_id", id)
-				fn.(context.CancelFunc)()
 			}
 		}
 	}
@@ -399,15 +389,19 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 		}
 	}
 	if resp.UpdateAvailable && resp.DownloadUrl != "" {
-		slog.Info("agent update available, downloading",
-			"current", r.version,
-			"latest", resp.LatestVersion,
-		)
-		if err := updater.Update(resp.LatestVersion, resp.DownloadUrl, r.pinnedServerCertBytes()); err != nil {
-			slog.Warn("self-update failed, continuing with current version", "err", err)
-		}
-		// If Update succeeds it re-execs and never returns.
+		r.noteSkippedSelfUpdate(resp.LatestVersion)
 	}
+}
+
+func (r *Runner) noteSkippedSelfUpdate(latestVersion string) {
+	if latestVersion == "" || latestVersion == r.lastSkippedUpdateVersion {
+		return
+	}
+	r.lastSkippedUpdateVersion = latestVersion
+	slog.Warn("agent update available, but automatic self-update is disabled until release signature verification is implemented",
+		"current", r.version,
+		"latest", latestVersion,
+	)
 }
 
 // maybeRenewCert checks the on-disk leaf cert's expiry. If it's within the
@@ -513,12 +507,7 @@ func (r *Runner) executeTask(ctx context.Context, task *agentv1.AgentTask) {
 	}()
 
 	progressFn := func(chunk string) {
-		r.taskProgressMu.Lock()
-		r.taskProgress = append(r.taskProgress, &agentv1.AgentTaskProgress{
-			TaskId:      task.TaskId,
-			OutputChunk: chunk,
-		})
-		r.taskProgressMu.Unlock()
+		r.bufferTaskProgress(task.TaskId, chunk)
 		// Nudge the send loop so progress is reported promptly.
 		select {
 		case r.resultsReady <- struct{}{}:
@@ -528,9 +517,7 @@ func (r *Runner) executeTask(ctx context.Context, task *agentv1.AgentTask) {
 
 	result := tasks.Dispatch(taskCtx, task, progressFn)
 
-	r.taskResultsMu.Lock()
-	r.taskResults = append(r.taskResults, result)
-	r.taskResultsMu.Unlock()
+	r.bufferTaskResult(result)
 
 	select {
 	case r.resultsReady <- struct{}{}:
@@ -538,18 +525,19 @@ func (r *Runner) executeTask(ctx context.Context, task *agentv1.AgentTask) {
 	}
 }
 
-// openTerminalSession opens a PTY session and bridges it to the ingest service
-// via a dedicated Terminal gRPC stream.
-func (r *Runner) openTerminalSession(req *agentv1.TerminalSessionRequest) {
-	_, cancel := context.WithCancel(context.Background())
-	r.terminalCancelFuncs.Store(req.SessionId, cancel)
-	defer func() {
-		cancel()
-		r.terminalCancelFuncs.Delete(req.SessionId)
-	}()
+func (r *Runner) rejectHostAccessTask(task *agentv1.AgentTask) {
+	r.taskResultsMu.Lock()
+	r.taskResults = append(r.taskResults, &agentv1.AgentTaskResult{
+		TaskId:   task.TaskId,
+		TaskType: task.TaskType,
+		ExitCode: -1,
+		Error:    "agent-mediated host access is disabled; use SSH-backed host access with a host user password",
+	})
+	r.taskResultsMu.Unlock()
 
-	if err := terminal.OpenSession(r.dialFunc, r.jwtToken, req); err != nil {
-		slog.Warn("terminal session error", "session_id", req.SessionId, "err", err)
+	select {
+	case r.resultsReady <- struct{}{}:
+	default:
 	}
 }
 
@@ -559,6 +547,9 @@ func (r *Runner) drainTaskProgress() []*agentv1.AgentTaskProgress {
 	defer r.taskProgressMu.Unlock()
 	p := r.taskProgress
 	r.taskProgress = nil
+	r.taskProgressBytes = 0
+	r.taskProgressBytesByTask = make(map[string]int)
+	r.taskProgressTruncatedTask = make(map[string]bool)
 	return p
 }
 
@@ -566,9 +557,180 @@ func (r *Runner) drainTaskProgress() []*agentv1.AgentTaskProgress {
 func (r *Runner) drainTaskResults() []*agentv1.AgentTaskResult {
 	r.taskResultsMu.Lock()
 	defer r.taskResultsMu.Unlock()
-	results := r.taskResults
-	r.taskResults = nil
+	if len(r.taskResults) == 0 {
+		return nil
+	}
+
+	used := 0
+	n := 0
+	for n < len(r.taskResults) {
+		size := taskResultSize(r.taskResults[n])
+		if n > 0 && used+size > maxBufferedTaskResultBytesPerInterval {
+			break
+		}
+		used += size
+		n++
+		if used >= maxBufferedTaskResultBytesPerInterval {
+			break
+		}
+	}
+
+	results := append([]*agentv1.AgentTaskResult(nil), r.taskResults[:n]...)
+	r.taskResults = append([]*agentv1.AgentTaskResult(nil), r.taskResults[n:]...)
 	return results
+}
+
+func (r *Runner) bufferTaskProgress(taskID, chunk string) {
+	if chunk == "" {
+		return
+	}
+
+	r.taskProgressMu.Lock()
+	defer r.taskProgressMu.Unlock()
+
+	if r.taskProgressBytesByTask == nil {
+		r.taskProgressBytesByTask = make(map[string]int)
+	}
+	if r.taskProgressTruncatedTask == nil {
+		r.taskProgressTruncatedTask = make(map[string]bool)
+	}
+	if r.taskProgressTruncatedTask[taskID] {
+		return
+	}
+
+	perTaskBudget := maxBufferedTaskProgressBytesPerTask - r.taskProgressBytesByTask[taskID]
+	intervalBudget := maxBufferedTaskProgressBytesPerInterval - r.taskProgressBytes
+	budget := minInt(perTaskBudget, intervalBudget)
+	if budget <= 0 {
+		r.appendTaskProgressTruncationLocked(taskID, "")
+		return
+	}
+	if len(chunk) <= budget {
+		r.appendTaskProgressLocked(taskID, chunk)
+		return
+	}
+
+	r.appendTaskProgressTruncationLocked(taskID, chunk[:budget])
+}
+
+func (r *Runner) appendTaskProgressLocked(taskID, chunk string) {
+	if chunk == "" {
+		return
+	}
+	r.taskProgress = append(r.taskProgress, &agentv1.AgentTaskProgress{
+		TaskId:      taskID,
+		OutputChunk: chunk,
+	})
+	r.taskProgressBytes += len(chunk)
+	r.taskProgressBytesByTask[taskID] += len(chunk)
+}
+
+func (r *Runner) appendTaskProgressTruncationLocked(taskID, prefix string) {
+	if r.taskProgressTruncatedTask[taskID] {
+		return
+	}
+
+	perTaskBudget := maxBufferedTaskProgressBytesPerTask - r.taskProgressBytesByTask[taskID]
+	intervalBudget := maxBufferedTaskProgressBytesPerInterval - r.taskProgressBytes
+	budget := minInt(perTaskBudget, intervalBudget)
+	if budget <= 0 {
+		return
+	}
+
+	markerBytes := len(taskProgressTruncatedMarker)
+	chunk := prefix
+	if len(chunk) >= budget {
+		if budget > markerBytes {
+			chunk = truncateUTF8(chunk, budget-markerBytes)
+		} else {
+			chunk = ""
+		}
+	}
+
+	if markerBytes > budget-len(chunk) {
+		marker := truncateUTF8(taskProgressTruncatedMarker, budget-len(chunk))
+		r.appendTaskProgressLocked(taskID, chunk+marker)
+	} else {
+		r.appendTaskProgressLocked(taskID, chunk+taskProgressTruncatedMarker)
+	}
+
+	r.taskProgressTruncatedTask[taskID] = true
+}
+
+func (r *Runner) bufferTaskResult(result *agentv1.AgentTaskResult) {
+	if result == nil {
+		return
+	}
+
+	r.taskResultsMu.Lock()
+	defer r.taskResultsMu.Unlock()
+	r.taskResults = append(r.taskResults, clampTaskResult(result, maxBufferedTaskResultBytesPerTask))
+}
+
+func clampTaskResult(result *agentv1.AgentTaskResult, maxBytes int) *agentv1.AgentTaskResult {
+	clamped := *result
+	if taskResultSize(&clamped) <= maxBytes {
+		return &clamped
+	}
+
+	clamped.ResultJson = `{"truncated":true}`
+	clamped.Error = clampTaskResultError(clamped.Error, maxBytes-taskResultStaticSize(&clamped)-len(clamped.ResultJson))
+	if taskResultSize(&clamped) > maxBytes {
+		clamped.ResultJson = ""
+		clamped.Error = clampTaskResultError(clamped.Error, maxBytes-taskResultStaticSize(&clamped))
+	}
+	return &clamped
+}
+
+func clampTaskResultError(existing string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if existing == "" {
+		return truncateUTF8(taskResultTruncatedMarker, maxBytes)
+	}
+
+	suffix := " (" + taskResultTruncatedMarker + ")"
+	if maxBytes <= len(suffix) {
+		return truncateUTF8(taskResultTruncatedMarker, maxBytes)
+	}
+	return truncateUTF8(existing, maxBytes-len(suffix)) + suffix
+}
+
+func taskResultSize(result *agentv1.AgentTaskResult) int {
+	if result == nil {
+		return 0
+	}
+	return taskResultStaticSize(result) + len(result.ResultJson) + len(result.Error)
+}
+
+func taskResultStaticSize(result *agentv1.AgentTaskResult) int {
+	if result == nil {
+		return 0
+	}
+	return len(result.TaskId) + len(result.TaskType)
+}
+
+func truncateUTF8(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	s = s[:maxBytes]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // hostMetricsSnapshot holds a point-in-time snapshot of system metrics.
@@ -601,9 +763,13 @@ func (r *Runner) refreshMetrics() {
 }
 
 func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) error {
+	return r.sendHeartbeatWithAgentID(stream, r.agentID)
+}
+
+func (r *Runner) sendHeartbeatWithAgentID(stream agentv1.IngestService_HeartbeatClient, agentIDField string) error {
 	m := r.cachedMetrics
 	req := &agentv1.HeartbeatRequest{
-		AgentId:                     r.agentID,
+		AgentId:                     agentIDField,
 		CpuPercent:                  m.cpu,
 		MemoryPercent:               m.memory,
 		DiskPercent:                 m.disk,
@@ -629,30 +795,16 @@ func (r *Runner) sendHeartbeat(stream agentv1.IngestService_HeartbeatClient) err
 }
 
 // currentPinnedFingerprint returns the fingerprint of the pinned server cert
-// the agent currently trusts for self-update downloads. Empty when no cert
-// is pinned (e.g. freshly enrolled agent before the first server push).
+// last pushed by ingest. Empty when no cert is pinned yet.
 func (r *Runner) currentPinnedFingerprint() string {
 	r.pinnedServerCertMu.Lock()
 	defer r.pinnedServerCertMu.Unlock()
 	return r.pinnedServerCertFpr
 }
 
-// pinnedServerCertBytes returns a copy of the pinned cert PEM for callers
-// that need trust material (e.g. the self-update HTTP client).
-func (r *Runner) pinnedServerCertBytes() []byte {
-	r.pinnedServerCertMu.Lock()
-	defer r.pinnedServerCertMu.Unlock()
-	if len(r.pinnedServerCertPEM) == 0 {
-		return nil
-	}
-	out := make([]byte, len(r.pinnedServerCertPEM))
-	copy(out, r.pinnedServerCertPEM)
-	return out
-}
-
 // applyServerCertRotation persists the pushed PEM to disk and updates the
-// in-memory pin so the next heartbeat advertises the new fingerprint and
-// the next self-update trusts the new chain.
+// in-memory pin so the next heartbeat advertises the new fingerprint and the
+// agent preserves the latest trust material on disk.
 func (r *Runner) applyServerCertRotation(certPEM string) {
 	if certPEM == "" || r.dataDir == "" {
 		return
@@ -782,7 +934,6 @@ var pseudoFSTypes = map[string]bool{
 	"mqueue": true, "fusectl": true, "configfs": true, "ramfs": true,
 	"bpf": true, "overlay": true, "squashfs": true, "nsfs": true,
 }
-
 
 // readOsVersion parses /etc/os-release for the PRETTY_NAME field.
 func readOsVersion() string {

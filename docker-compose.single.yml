@@ -1,6 +1,6 @@
 services:
   db:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb@sha256:95a7997408e3295935e4afe8af8c09aae22bd51732131d1e7351c63d6198a71c
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ctops}
@@ -24,6 +24,8 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     depends_on:
+      agent-dist-init:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
     ports:
@@ -36,6 +38,7 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in your .env file}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://localhost}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-https://localhost}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       NODE_ENV: production
       AGENT_DIST_DIR: /var/lib/ct-ops/agent-dist
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-https://localhost}
@@ -55,6 +58,20 @@ services:
       # Read-only mount of the nginx-facing server cert so the enrolment
       # bundle route can embed it in agent downloads.
       - ./deploy/tls:/var/lib/ct-ops/server-tls:ro
+
+  agent-dist-init:
+    image: busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    restart: "no"
+    user: "0:0"
+    volumes:
+      - agent_dist:/var/lib/ct-ops/agent-dist
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /var/lib/ct-ops/agent-dist
+        chown 1001:1001 /var/lib/ct-ops/agent-dist
 
   migrate:
     image: ${WEB_IMAGE:-ghcr.io/carrtech-dev/ct-ops/web:latest}
@@ -121,7 +138,7 @@ services:
       retries: 5
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     restart: unless-stopped
     depends_on:
       tls-init:
@@ -149,7 +166,7 @@ services:
   # nginx starts only after a successful exit (depends_on above). When
   # start.sh has already populated deploy/tls/ this is a no-op.
   tls-init:
-    image: nginx:1.27-alpine
+    image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     restart: "no"
     user: "0:0"
     volumes:

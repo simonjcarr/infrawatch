@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Server, Terminal, User, Loader2, WifiOff } from 'lucide-react'
+import { KeyRound, Search, Server, Terminal, User, Loader2, WifiOff } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
   const { openTerminal } = useTerminalPanel()
   const { data: session } = useSession()
   const [typedUsername, setTypedUsername] = useState<string | null>(null)
+  const [password, setPassword] = useState('')
 
   const { data: hosts = [], isLoading } = useQuery({
     queryKey: ['hosts', orgId],
@@ -73,7 +74,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
     enabled: !!selectedHostId,
   })
 
-  const directAccess = terminalAccess?.allowed === true ? terminalAccess.directAccess : false
+  const directAccess = false
 
   // Read last-used username from localStorage via useSyncExternalStore so
   // the impure read happens inside the store snapshot, not during render.
@@ -109,8 +110,12 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
       return
     }
 
-    if (!directAccess && !username.trim()) {
-      setError('Username is required for terminal access')
+    if (!username.trim()) {
+      setError('Username is required for SSH terminal access')
+      return
+    }
+    if (!password) {
+      setError('Password is required for SSH terminal access')
       return
     }
 
@@ -118,7 +123,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
     setError(null)
 
     // Save last-used username for this host
-    if (!directAccess && username.trim() && session?.user?.id && selectedHostId) {
+    if (username.trim() && session?.user?.id && selectedHostId) {
       try {
         localStorage.setItem(`terminal-username:${session.user.id}:${selectedHostId}`, username.trim())
       } catch {
@@ -129,15 +134,17 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
     openTerminal({
       hostId: selectedHost.id,
       hostname: selectedHost.displayName ?? selectedHost.hostname,
-      username: directAccess ? null : username.trim(),
+      username: username.trim(),
+      password,
       orgId,
-      directAccess,
+      directAccess: false,
     })
 
     // Reset state and close
     setSearch('')
     setSelectedHostId(null)
     setTypedUsername(null)
+    setPassword('')
     setError(null)
     setConnecting(false)
     onOpenChange(false)
@@ -146,6 +153,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
   const handleBack = () => {
     setSelectedHostId(null)
     setTypedUsername(null)
+    setPassword('')
     setError(null)
   }
 
@@ -154,6 +162,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
       setSearch('')
       setSelectedHostId(null)
       setTypedUsername(null)
+      setPassword('')
       setError(null)
     }
     onOpenChange(nextOpen)
@@ -252,34 +261,44 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
               </div>
             ) : (
               <>
-                {directAccess ? (
-                  <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-3 text-sm text-amber-800 dark:text-amber-200">
-                    Direct access mode is enabled. You will connect with agent-level (root) privileges.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="host-selector-username" className="text-sm font-medium">
-                      <User className="size-3.5 inline mr-1.5" />
-                      Username
-                    </Label>
-                    <Input
-                      id="host-selector-username"
-                      value={username}
-                      onChange={(e) => {
-                        setTypedUsername(e.target.value)
-                        setError(null)
-                      }}
-                      placeholder="e.g. jsmith"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && username.trim()) handleConnect()
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the system username to authenticate as on this host.
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="host-selector-username" className="text-sm font-medium">
+                    <User className="size-3.5 inline mr-1.5" />
+                    Username
+                  </Label>
+                  <Input
+                    id="host-selector-username"
+                    value={username}
+                    onChange={(e) => {
+                      setTypedUsername(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="e.g. jsmith"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="host-selector-password" className="text-sm font-medium">
+                    <KeyRound className="size-3.5 inline mr-1.5" />
+                    Password
+                  </Label>
+                  <Input
+                    id="host-selector-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setError(null)
+                    }}
+                    autoComplete="current-password"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && username.trim() && password) handleConnect()
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter a username and password that exist on the selected host.
+                  </p>
+                </div>
 
                 {error && (
                   <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
@@ -300,7 +319,7 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
           {selectedHostId && terminalAccess?.allowed && (
             <Button
               onClick={handleConnect}
-              disabled={connecting || (!directAccess && !username.trim())}
+              disabled={connecting || !username.trim() || !password}
             >
               {connecting ? (
                 <Loader2 className="size-4 mr-1.5 animate-spin" />

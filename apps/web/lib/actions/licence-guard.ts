@@ -3,6 +3,7 @@ import { cache } from 'react'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { requireOrgAccess } from '@/lib/actions/action-auth'
 import { validateLicenceKey } from '@/lib/licence'
 import {
   hasFeature,
@@ -73,10 +74,12 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
 })
 
 export async function getEffectiveLicence(orgId: string): Promise<EffectiveLicence> {
+  await requireOrgAccess(orgId)
   return loadEffectiveLicence(orgId)
 }
 
 export async function hasLicenceFeature(orgId: string, feature: Feature): Promise<boolean> {
+  await requireOrgAccess(orgId)
   const licence = await loadEffectiveLicence(orgId)
   if (hasFeature(licence.tier, feature)) return true
   if (licence.features.includes(feature)) return true
@@ -84,6 +87,7 @@ export async function hasLicenceFeature(orgId: string, feature: Feature): Promis
 }
 
 export async function requireFeature(orgId: string, feature: Feature): Promise<void> {
+  await requireOrgAccess(orgId)
   const licence = await loadEffectiveLicence(orgId)
   if (hasFeature(licence.tier, feature)) return
   if (licence.features.includes(feature)) return
@@ -95,6 +99,7 @@ export async function requireFeature(orgId: string, feature: Feature): Promise<v
 }
 
 export async function clampRetentionDays(orgId: string, days: number): Promise<number> {
+  await requireOrgAccess(orgId)
   const extended = await hasLicenceFeature(orgId, 'metricRetentionExtended')
   if (extended) return days
   return Math.min(days, COMMUNITY_MAX_RETENTION_DAYS)

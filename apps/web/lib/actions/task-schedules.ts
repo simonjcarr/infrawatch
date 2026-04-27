@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { db } from '@/lib/db'
 import { taskSchedules, taskRuns, hostGroups, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, desc, inArray } from 'drizzle-orm'
@@ -108,6 +110,7 @@ async function verifyTargetExists(
 // ── Read queries ──────────────────────────────────────────────────────────────
 
 export async function listSchedules(orgId: string): Promise<ScheduleWithTargetName[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.taskSchedules.findMany({
     where: and(eq(taskSchedules.organisationId, orgId), isNull(taskSchedules.deletedAt)),
     orderBy: [desc(taskSchedules.createdAt)],
@@ -155,6 +158,7 @@ export async function getSchedule(
   orgId: string,
   id: string,
 ): Promise<{ schedule: TaskSchedule; recentRuns: Awaited<ReturnType<typeof recentRunsForSchedule>> } | null> {
+  await requireOrgAccess(orgId)
   const schedule = await db.query.taskSchedules.findFirst({
     where: and(
       eq(taskSchedules.id, id),
@@ -186,6 +190,7 @@ export async function createSchedule(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Organisation mismatch' }
   if (session.user.role === 'read_only') return { error: 'Insufficient permissions' }
@@ -239,6 +244,7 @@ export async function updateSchedule(
   id: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Organisation mismatch' }
   if (session.user.role === 'read_only') return { error: 'Insufficient permissions' }
@@ -301,6 +307,7 @@ export async function setScheduleEnabled(
   id: string,
   enabled: boolean,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Organisation mismatch' }
   if (session.user.role === 'read_only') return { error: 'Insufficient permissions' }
@@ -340,6 +347,7 @@ export async function deleteSchedule(
   orgId: string,
   id: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Organisation mismatch' }
   if (session.user.role === 'read_only') return { error: 'Insufficient permissions' }
@@ -371,6 +379,7 @@ export async function runScheduleNow(
   orgId: string,
   id: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
   if (session.user.organisationId !== orgId) return { error: 'Organisation mismatch' }
   if (session.user.role === 'read_only') return { error: 'Insufficient permissions' }

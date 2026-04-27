@@ -18,8 +18,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { signUp } from '@/lib/auth/client'
-import { getInviteByToken, acceptInvite } from '@/lib/actions/auth'
+import { signIn, signUp } from '@/lib/auth/client'
+import { getInviteByToken } from '@/lib/actions/auth'
 
 const registerSchema = z
   .object({
@@ -35,7 +35,11 @@ const registerSchema = z
 
 type RegisterValues = z.infer<typeof registerSchema>
 
-export function RegisterForm() {
+type RegisterFormProps = {
+  requireEmailVerification: boolean
+}
+
+export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteToken = searchParams.get('invite')
@@ -64,10 +68,14 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterValues) {
     setServerError(null)
+    const callbackURL = inviteToken
+      ? `/accept-invite?token=${encodeURIComponent(inviteToken)}`
+      : '/onboarding'
     const result = await signUp.email({
       name: values.name,
       email: values.email,
       password: values.password,
+      callbackURL,
     })
 
     if (result.error) {
@@ -75,15 +83,22 @@ export function RegisterForm() {
       return
     }
 
-    if (inviteToken) {
-      const userId = (result.data as { user?: { id?: string } } | null)?.user?.id
-      if (userId) {
-        await acceptInvite(inviteToken, userId)
-      }
-      router.push('/dashboard')
-    } else {
-      router.push('/onboarding')
+    if (requireEmailVerification) {
+      router.push(`/check-email?email=${encodeURIComponent(values.email)}`)
+      return
     }
+
+    const signInResult = await signIn.email({
+      email: values.email,
+      password: values.password,
+    })
+
+    if (signInResult.error) {
+      setServerError(signInResult.error.message ?? 'Registration succeeded, but sign in failed.')
+      return
+    }
+
+    router.push(callbackURL)
   }
 
   return (

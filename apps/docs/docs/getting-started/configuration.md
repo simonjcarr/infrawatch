@@ -14,10 +14,11 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `BETTER_AUTH_SECRET` | ✓ 🔒 | — | Secret used to sign session cookies AND for LDAP bind-password decryption (min 32 chars, never reuse across environments) |
 | `BETTER_AUTH_URL` | ✓ 🔒 | — | Public URL of the web app (e.g. `https://ct-ops.corp.example.com`). Use `https://` — `http://` disables cookie Secure flag |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | ✓ 🔒 | — | Comma-separated list of allowed origins. Auth flows from origins not in this list are rejected |
+| `REQUIRE_EMAIL_VERIFICATION` | — 🔒 | `true` | Require local email/password users to verify their email before sign-in. Set to `false` only when email verification should be optional |
 | `CT_OPS_LOADTEST_ADMIN_KEY` | — 🔒 | — | Bearer credential for `/api/admin/hosts/bulk-delete`. Endpoint returns 503 when unset. Set only on environments running load tests |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |
-| `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download |
+| `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download. If you override or mount it, ensure it is writable by uid/gid `1001` (`nextjs:nodejs`) |
 | `AGENT_DOWNLOAD_BASE_URL` | — | `https://localhost` | Public URL agents use to download new binaries. Must be reachable from every agent host |
 | `INGEST_WS_URL` | — | *(empty)* | WebSocket URL of the ingest service. Empty = same-origin via the bundled nginx (recommended). Set to an absolute `wss://` URL only to bypass the bundled proxy |
 | `WEB_TLS_CERT` | — | `/var/lib/ct-ops/server-tls/server.crt` | Path to the nginx-facing server cert. The enrolment bundle route reads this file and embeds it so agents can verify the HTTPS download URL |
@@ -29,6 +30,7 @@ CT-Ops validates licence JWTs using an RSA public key. The production public key
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `LICENCE_PUBLIC_KEY` | — 🔒 | *(baked-in prod key)* | PEM-encoded RSA public key used to verify licence JWTs. **Do not set this in normal deployments.** Reserved for emergency key rotation and internal QA/staging environments using a non-production keypair. In production, the dev key is explicitly rejected even if supplied here. |
+| `LICENCE_REVOCATION_URL` | `https://licence.carrtech.dev/.well-known/ct-ops-licence-revocations.jwt` | same | Signed JWT bundle listing revoked licence ids (`jti`). Connected installs refresh it opportunistically; offline installs fall back to expiry-only validation until the endpoint is reachable again. Set to an empty string to disable remote revocation checks. |
 
 ### Example `.env.local` (development)
 
@@ -37,6 +39,7 @@ DATABASE_URL=postgresql://ct-ops:ct-ops@localhost:5432/ct-ops
 BETTER_AUTH_SECRET=change-me-to-something-long-and-random-in-production
 BETTER_AUTH_URL=https://localhost
 BETTER_AUTH_TRUSTED_ORIGINS=https://localhost
+REQUIRE_EMAIL_VERIFICATION=true
 AGENT_DOWNLOAD_BASE_URL=https://localhost
 NEXT_PUBLIC_APP_URL=https://localhost
 INGEST_WS_URL=

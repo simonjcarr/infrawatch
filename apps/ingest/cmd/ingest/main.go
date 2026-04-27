@@ -15,8 +15,8 @@ import (
 	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/config"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db"
-	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
 	ingestgrpc "github.com/carrtech-dev/ct-ops/ingest/internal/grpc"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/queue/inprocess"
 	ingesttls "github.com/carrtech-dev/ct-ops/ingest/internal/tls"
@@ -107,10 +107,8 @@ func main() {
 	regHandler := handlers.NewRegisterHandler(pool, issuer, agentCA)
 	versionPoller := config.NewVersionPoller(cfg.Agent.LatestVersion, 5*time.Minute)
 	versionPoller.Start(ctx)
-	terminalStore := handlers.NewTerminalStore()
-	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, terminalStore, agentCA, webServerCert)
-	terminalHandler := handlers.NewTerminalHandler(pool, issuer, terminalStore)
-	terminalWSHandler := handlers.NewTerminalWSHandler(pool, terminalStore)
+	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, agentCA, webServerCert)
+	terminalWSHandler := handlers.NewTerminalWSHandler(pool)
 	inventoryHandler := handlers.NewInventoryHandler(pool, issuer)
 	renewHandler := handlers.NewRenewCertHandler(pool, agentCA)
 
@@ -159,7 +157,7 @@ func main() {
 	grpcErr := make(chan error, 1)
 	go func() {
 		slog.Info("gRPC server starting", "port", cfg.GRPCPort)
-		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, terminalHandler, inventoryHandler, renewHandler)
+		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, inventoryHandler, renewHandler)
 	}()
 
 	select {

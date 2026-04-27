@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/table'
 import type { ParsedCertificate, CertCheckerResponse } from '@/app/api/tools/certificate-checker/route'
 import { trackCertificateFromUrl, trackCertificateFromUpload } from '@/lib/actions/certificates'
+import { getAllowedCertificateCheckerPorts } from '@/lib/net/certificate-checker-policy'
 
 // ─── Utility helpers ─────────────────────────────────────────────────────────
 
@@ -771,6 +772,7 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, source: T
 // ─── URL tab ──────────────────────────────────────────────────────────────────
 
 function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: TrackSource, keyMatch?: boolean) => void }) {
+  const allowedPorts = getAllowedCertificateCheckerPorts().join(', ')
   const [url, setUrl] = useState('')
   const [port, setPort] = useState('443')
   const [servername, setServername] = useState('')
@@ -831,6 +833,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
             value={port}
             onChange={(e) => setPort(e.target.value)}
           />
+          <p className="text-xs text-muted-foreground">Allowed TLS ports: {allowedPorts}</p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="cert-sni">SNI Override <span className="text-muted-foreground font-normal">(optional)</span></Label>

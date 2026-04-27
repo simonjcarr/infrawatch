@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { ldapConfigurations } from '@/lib/db/schema'
@@ -65,6 +67,7 @@ const updateLdapConfigSchema = z.object({
 export async function getLdapConfigurations(
   orgId: string,
 ): Promise<LdapConfiguration[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
       eq(ldapConfigurations.organisationId, orgId),
@@ -79,6 +82,7 @@ export async function getLdapConfiguration(
   orgId: string,
   configId: string,
 ): Promise<LdapConfiguration | null> {
+  await requireOrgAccess(orgId)
   const result = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
@@ -93,6 +97,7 @@ export async function createLdapConfiguration(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = createLdapConfigSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -136,6 +141,7 @@ export async function updateLdapConfiguration(
   configId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const parsed = updateLdapConfigSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -184,6 +190,7 @@ export async function deleteLdapConfiguration(
   orgId: string,
   configId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const existing = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
@@ -205,6 +212,7 @@ export async function testLdapConnection(
   orgId: string,
   configId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
@@ -250,6 +258,7 @@ export async function searchLdapDirectory(
   configId: string,
   query: string,
 ): Promise<{ success: true; users: LdapUserResult[] } | { error: string }> {
+  await requireOrgAccess(orgId)
   if (!query.trim()) return { success: true, users: [] }
 
   const config = await db.query.ldapConfigurations.findFirst({
@@ -279,6 +288,7 @@ export type LookupConfigOption = {
 export async function getLookupConfigOptions(
   orgId: string,
 ): Promise<LookupConfigOption[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
       eq(ldapConfigurations.organisationId, orgId),
@@ -300,6 +310,7 @@ export async function lookupDirectoryUser(
   configId: string,
   dn: string,
 ): Promise<{ success: true; user: LdapUserDetailResult } | { error: string }> {
+  await requireOrgAccess(orgId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),

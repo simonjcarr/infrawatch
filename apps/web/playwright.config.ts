@@ -29,7 +29,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm exec next dev --turbopack -p ${PORT}`,
+    // Turbopack rejects pnpm's worktree symlink layout in this E2E setup.
+    command: `pnpm exec next dev --webpack -p ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 180_000,

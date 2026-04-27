@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GitLabBundler } from './gitlab-bundler'
 import { JenkinsBundler } from './jenkins-bundler'
 
-export function BundlersClient() {
+export function BundlersClient({ orgId }: { orgId: string }) {
   return (
     <Tabs defaultValue="jenkins" className="w-full">
       <TabsList>
@@ -12,10 +12,10 @@ export function BundlersClient() {
         <TabsTrigger value="gitlab">GitLab</TabsTrigger>
       </TabsList>
       <TabsContent value="jenkins" className="mt-4">
-        <JenkinsBundler />
+        <JenkinsBundler orgId={orgId} />
       </TabsContent>
       <TabsContent value="gitlab" className="mt-4">
-        <GitLabBundler />
+        <GitLabBundler orgId={orgId} />
       </TabsContent>
     </Tabs>
   )

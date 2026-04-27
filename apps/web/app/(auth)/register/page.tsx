@@ -6,6 +6,7 @@ import { headers } from 'next/headers'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { getRequireEmailVerification } from '@/lib/auth/env'
 import { RegisterForm } from './register-form'
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export default async function RegisterPage() {
 
   return (
     <Suspense>
-      <RegisterForm />
+      <RegisterForm requireEmailVerification={getRequireEmailVerification()} />
     </Suspense>
   )
 }

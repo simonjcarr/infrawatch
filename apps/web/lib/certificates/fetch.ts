@@ -69,226 +69,459 @@ export interface FetchUrlResult {
   serverName: string
 }
 
-function dnFromForgeCert(dn: forge.pki.Certificate['subject']): string {
-  return dn.attributes
-    .map((a) => `${a.shortName ?? a.name ?? a.type}=${a.value}`)
-    .join(', ')
+interface DerNode {
+  tag: number
+  length: number
+  headerLength: number
+  start: number
+  valueStart: number
+  valueEnd: number
+  end: number
 }
 
-function getAttr(dn: forge.pki.Certificate['subject'], name: string): string {
-  return (dn.getField(name)?.value as string | undefined) ?? ''
+interface ParsedDistinguishedName {
+  formatted: string
+  attrs: Record<string, string>
 }
 
 function colonHex(buf: string): string {
   return buf.match(/.{1,2}/g)?.join(':') ?? buf
 }
 
-export function pemToForgeCert(pem: string): forge.pki.Certificate {
-  return forge.pki.certificateFromPem(pem)
+function normalizeHex(value: string): string {
+  return value.replace(/[^a-fA-F0-9]/g, '').toUpperCase()
 }
 
-export function parseForgeCert(forgeCert: forge.pki.Certificate, pemStr: string): ParsedCertificate {
+function formatSerialNumber(value: string): string {
+  return colonHex(normalizeHex(value))
+}
+
+function ensureValidBufferLength(buf: Buffer, context: string): void {
+  if (buf.length === 0) {
+    throw new Error(`Unable to parse certificate — empty ${context}`)
+  }
+  if (buf.length > MAX_CERT_BYTES) {
+    throw new Error(`Unable to parse certificate — ${context} exceeds the ${MAX_CERT_BYTES}-byte size limit`)
+  }
+}
+
+function readDerNode(buf: Buffer, offset: number): DerNode {
+  if (offset >= buf.length) throw new Error('Invalid DER: truncated tag')
+  const tag = buf[offset]!
+  const firstLengthByte = buf[offset + 1]
+  if (firstLengthByte === undefined) throw new Error('Invalid DER: truncated length')
+
+  let length = 0
+  let headerLength = 2
+  if ((firstLengthByte & 0x80) === 0) {
+    length = firstLengthByte
+  } else {
+    const lengthByteCount = firstLengthByte & 0x7f
+    if (lengthByteCount === 0) throw new Error('Invalid DER: indefinite length')
+    if (lengthByteCount > 4) throw new Error('Invalid DER: unsupported length')
+    if (offset + 2 + lengthByteCount > buf.length) throw new Error('Invalid DER: truncated long length')
+    headerLength += lengthByteCount
+    for (let i = 0; i < lengthByteCount; i += 1) {
+      length = (length << 8) | buf[offset + 2 + i]!
+    }
+  }
+
+  const valueStart = offset + headerLength
+  const valueEnd = valueStart + length
+  if (valueEnd > buf.length) throw new Error('Invalid DER: truncated value')
+
+  return {
+    tag,
+    length,
+    headerLength,
+    start: offset,
+    valueStart,
+    valueEnd,
+    end: valueEnd,
+  }
+}
+
+function getDerChildren(buf: Buffer, node: DerNode): DerNode[] {
+  const children: DerNode[] = []
+  let offset = node.valueStart
+  while (offset < node.valueEnd) {
+    const child = readDerNode(buf, offset)
+    children.push(child)
+    offset = child.end
+  }
+  if (offset !== node.valueEnd) throw new Error('Invalid DER: child parsing did not consume parent value')
+  return children
+}
+
+function decodeDerOid(bytes: Buffer): string {
+  if (bytes.length === 0) return ''
+  const first = bytes[0]!
+  const parts = [Math.floor(first / 40), first % 40]
+  let value = 0
+  for (let i = 1; i < bytes.length; i += 1) {
+    const byte = bytes[i]!
+    value = (value << 7) | (byte & 0x7f)
+    if ((byte & 0x80) === 0) {
+      parts.push(value)
+      value = 0
+    }
+  }
+  return parts.join('.')
+}
+
+function decodeDerString(tag: number, bytes: Buffer): string {
+  switch (tag) {
+    case 0x0c:
+    case 0x12:
+    case 0x13:
+    case 0x14:
+    case 0x16:
+    case 0x17:
+    case 0x18:
+    case 0x1a:
+      return bytes.toString('utf8')
+    case 0x1e: {
+      const chars: string[] = []
+      for (let i = 0; i + 1 < bytes.length; i += 2) {
+        chars.push(String.fromCharCode(bytes.readUInt16BE(i)))
+      }
+      return chars.join('')
+    }
+    default:
+      return bytes.toString('utf8')
+  }
+}
+
+function parseDistinguishedName(raw: string): ParsedDistinguishedName {
+  const attrs: Record<string, string> = {}
+  const parts = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  for (const part of parts) {
+    const eq = part.indexOf('=')
+    if (eq <= 0) continue
+    const key = part.slice(0, eq)
+    const value = part.slice(eq + 1)
+    if (!(key in attrs)) attrs[key] = value
+  }
+
+  return {
+    formatted: parts.join(', '),
+    attrs,
+  }
+}
+
+function parseSubjectAltName(raw: string | undefined): ParsedSAN[] {
+  if (!raw) return []
+  const segments = raw
+    .split(/,(?=\s*(?:DNS|IP Address|URI|email|othername|DirName|Registered ID):)/g)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+
+  return segments.flatMap((segment) => {
+    const idx = segment.indexOf(':')
+    if (idx <= 0) return []
+    const type = segment.slice(0, idx).trim()
+    const value = segment.slice(idx + 1).trim()
+    const normalizedType = type === 'IP Address' ? 'IP' : type
+    return [{ type: normalizedType, value }]
+  })
+}
+
+function ipBytesToString(bytes: Buffer): string {
+  if (bytes.length === 4) return Array.from(bytes).join('.')
+  if (bytes.length !== 16) return bytes.toString('hex')
+  const groups: string[] = []
+  for (let i = 0; i < bytes.length; i += 2) {
+    groups.push(bytes.readUInt16BE(i).toString(16))
+  }
+  return groups.join(':').replace(/\b:?(?:0+:){2,}/, '::')
+}
+
+function extractExtensionInfo(rawDer: Buffer): {
+  signatureAlgorithm: string
+  keyUsage: string[]
+  extendedKeyUsage: string[]
+  isCA: boolean
+  pathLength: number | null
+  subjectKeyId: string | null
+  authorityKeyId: string | null
+  ocspUrls: string[]
+  caIssuers: string[]
+  crlUrls: string[]
+  certificatePolicies: string[]
+  sans: ParsedSAN[]
+} {
+  const signatureAlgorithmMap: Record<string, string> = {
+    '1.2.840.113549.1.1.5': 'SHA1withRSA',
+    '1.2.840.113549.1.1.11': 'SHA256withRSA',
+    '1.2.840.113549.1.1.12': 'SHA384withRSA',
+    '1.2.840.113549.1.1.13': 'SHA512withRSA',
+    '1.2.840.10045.4.3.2': 'SHA256withECDSA',
+    '1.2.840.10045.4.3.3': 'SHA384withECDSA',
+    '1.2.840.10045.4.3.4': 'SHA512withECDSA',
+    '1.3.101.112': 'Ed25519',
+    '1.3.101.113': 'Ed448',
+  }
+  const keyUsageLabels = [
+    'Digital Signature',
+    'Non Repudiation',
+    'Key Encipherment',
+    'Data Encipherment',
+    'Key Agreement',
+    'Certificate Sign',
+    'CRL Sign',
+    'Encipher Only',
+    'Decipher Only',
+  ]
+  const extendedKeyUsageMap: Record<string, string> = {
+    '1.3.6.1.5.5.7.3.1': 'TLS Web Server Authentication',
+    '1.3.6.1.5.5.7.3.2': 'TLS Web Client Authentication',
+    '1.3.6.1.5.5.7.3.3': 'Code Signing',
+    '1.3.6.1.5.5.7.3.4': 'Email Protection',
+    '1.3.6.1.5.5.7.3.8': 'Time Stamping',
+    '1.3.6.1.5.5.7.3.9': 'OCSP Signing',
+  }
+
+  const parsed = {
+    signatureAlgorithm: 'Unknown',
+    keyUsage: [] as string[],
+    extendedKeyUsage: [] as string[],
+    isCA: false,
+    pathLength: null as number | null,
+    subjectKeyId: null as string | null,
+    authorityKeyId: null as string | null,
+    ocspUrls: [] as string[],
+    caIssuers: [] as string[],
+    crlUrls: [] as string[],
+    certificatePolicies: [] as string[],
+    sans: [] as ParsedSAN[],
+  }
+
+  const certNode = readDerNode(rawDer, 0)
+  const certChildren = getDerChildren(rawDer, certNode)
+  const signatureNode = certChildren[1]
+  if (signatureNode) {
+    const signatureChildren = getDerChildren(rawDer, signatureNode)
+    const oidNode = signatureChildren[0]
+    if (oidNode?.tag === 0x06) {
+      const signatureOid = decodeDerOid(rawDer.subarray(oidNode.valueStart, oidNode.valueEnd))
+      parsed.signatureAlgorithm = signatureAlgorithmMap[signatureOid] ?? signatureOid
+    }
+  }
+
+  const tbsNode = certChildren[0]
+  if (!tbsNode) return parsed
+  for (const child of getDerChildren(rawDer, tbsNode)) {
+    if (child.tag !== 0xa3) continue
+    const extensionContainer = getDerChildren(rawDer, child)[0]
+    if (!extensionContainer) continue
+    for (const extNode of getDerChildren(rawDer, extensionContainer)) {
+      const extChildren = getDerChildren(rawDer, extNode)
+      const oidNode = extChildren[0]
+      const valueNode = extChildren[extChildren.length - 1]
+      if (!oidNode || !valueNode || oidNode.tag !== 0x06 || valueNode.tag !== 0x04) continue
+      const oid = decodeDerOid(rawDer.subarray(oidNode.valueStart, oidNode.valueEnd))
+      const extValue = rawDer.subarray(valueNode.valueStart, valueNode.valueEnd)
+      if (extValue.length === 0) continue
+      const root = readDerNode(extValue, 0)
+
+      if (oid === '2.5.29.15' && root.tag === 0x03) {
+        const bitString = extValue.subarray(root.valueStart + 1, root.valueEnd)
+        for (let i = 0; i < keyUsageLabels.length; i += 1) {
+          const byteIndex = Math.floor(i / 8)
+          const bitIndex = 7 - (i % 8)
+          if (byteIndex < bitString.length && ((bitString[byteIndex]! >> bitIndex) & 1) === 1) {
+            parsed.keyUsage.push(keyUsageLabels[i]!)
+          }
+        }
+        continue
+      }
+
+      if (oid === '2.5.29.37' && root.tag === 0x30) {
+        for (const usageNode of getDerChildren(extValue, root)) {
+          if (usageNode.tag !== 0x06) continue
+          const usageOid = decodeDerOid(extValue.subarray(usageNode.valueStart, usageNode.valueEnd))
+          parsed.extendedKeyUsage.push(extendedKeyUsageMap[usageOid] ?? usageOid)
+        }
+        continue
+      }
+
+      if (oid === '2.5.29.19' && root.tag === 0x30) {
+        for (const bcNode of getDerChildren(extValue, root)) {
+          if (bcNode.tag === 0x01) {
+            parsed.isCA = extValue[bcNode.valueStart] === 0xff
+          } else if (bcNode.tag === 0x02) {
+            parsed.pathLength = extValue.readUIntBE(bcNode.valueStart, bcNode.length)
+          }
+        }
+        continue
+      }
+
+      if (oid === '2.5.29.14' && root.tag === 0x04) {
+        parsed.subjectKeyId = colonHex(extValue.subarray(root.valueStart, root.valueEnd).toString('hex').toUpperCase())
+        continue
+      }
+
+      if (oid === '2.5.29.35' && root.tag === 0x30) {
+        for (const akiNode of getDerChildren(extValue, root)) {
+          if (akiNode.tag === 0x80) {
+            parsed.authorityKeyId = colonHex(extValue.subarray(akiNode.valueStart, akiNode.valueEnd).toString('hex').toUpperCase())
+          }
+        }
+        continue
+      }
+
+      if (oid === '2.5.29.32' && root.tag === 0x30) {
+        for (const policyNode of getDerChildren(extValue, root)) {
+          const children = getDerChildren(extValue, policyNode)
+          const policyOidNode = children[0]
+          if (policyOidNode?.tag === 0x06) {
+            parsed.certificatePolicies.push(decodeDerOid(extValue.subarray(policyOidNode.valueStart, policyOidNode.valueEnd)))
+          }
+        }
+        continue
+      }
+
+      if (oid === '2.5.29.17' && root.tag === 0x30) {
+        for (const sanNode of getDerChildren(extValue, root)) {
+          if (sanNode.tag === 0x81) {
+            parsed.sans.push({ type: 'email', value: extValue.subarray(sanNode.valueStart, sanNode.valueEnd).toString('utf8') })
+          } else if (sanNode.tag === 0x82) {
+            parsed.sans.push({ type: 'DNS', value: extValue.subarray(sanNode.valueStart, sanNode.valueEnd).toString('utf8') })
+          } else if (sanNode.tag === 0x86) {
+            parsed.sans.push({ type: 'URI', value: extValue.subarray(sanNode.valueStart, sanNode.valueEnd).toString('utf8') })
+          } else if (sanNode.tag === 0x87) {
+            parsed.sans.push({ type: 'IP', value: ipBytesToString(extValue.subarray(sanNode.valueStart, sanNode.valueEnd)) })
+          }
+        }
+        continue
+      }
+
+      if (oid === '1.3.6.1.5.5.7.1.1' && root.tag === 0x30) {
+        for (const accessNode of getDerChildren(extValue, root)) {
+          const children = getDerChildren(extValue, accessNode)
+          const methodNode = children[0]
+          const locationNode = children[1]
+          if (methodNode?.tag !== 0x06 || locationNode?.tag !== 0x86) continue
+          const accessMethod = decodeDerOid(extValue.subarray(methodNode.valueStart, methodNode.valueEnd))
+          const location = extValue.subarray(locationNode.valueStart, locationNode.valueEnd).toString('utf8')
+          if (accessMethod === '1.3.6.1.5.5.7.48.1') parsed.ocspUrls.push(location)
+          if (accessMethod === '1.3.6.1.5.5.7.48.2') parsed.caIssuers.push(location)
+        }
+        continue
+      }
+
+      if (oid === '2.5.29.31' && root.tag === 0x30) {
+        for (const distributionPointNode of getDerChildren(extValue, root)) {
+          for (const dpChild of getDerChildren(extValue, distributionPointNode)) {
+            if (dpChild.tag !== 0xa0) continue
+            for (const nameNode of getDerChildren(extValue, dpChild)) {
+              if (nameNode.tag !== 0xa0) continue
+              for (const generalNameNode of getDerChildren(extValue, nameNode)) {
+                if (generalNameNode.tag === 0x86) {
+                  parsed.crlUrls.push(extValue.subarray(generalNameNode.valueStart, generalNameNode.valueEnd).toString('utf8'))
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return parsed
+}
+
+function parseCertPem(pemStr: string): ParsedCertificate {
+  const x509 = new crypto.X509Certificate(pemStr)
+  ensureValidBufferLength(x509.raw, 'certificate')
   const now = new Date()
-  const notAfter = forgeCert.validity.notAfter
-  const notBefore = forgeCert.validity.notBefore
+  const notAfter = new Date(x509.validTo)
+  const notBefore = new Date(x509.validFrom)
   const msRemaining = notAfter.getTime() - now.getTime()
   const daysRemaining = Math.floor(msRemaining / 86_400_000)
-  const isSelfSigned = forgeCert.isIssuer(forgeCert)
-
-  const derBytes = forge.asn1.toDer(forge.pki.certificateToAsn1(forgeCert)).getBytes()
-  const sha256 = colonHex(
-    forge.md.sha256.create().update(derBytes).digest().toHex()
-  )
-
-  const derBuf = Buffer.from(derBytes, 'binary')
-  const sha512 = crypto.createHash('sha512').update(derBuf).digest('hex')
-    .match(/.{1,2}/g)!.join(':')
+  const isSelfSigned = x509.checkIssued(x509)
+  const subject = parseDistinguishedName(x509.subject)
+  const issuer = parseDistinguishedName(x509.issuer)
+  const extensionInfo = extractExtensionInfo(x509.raw)
+  const sans = extensionInfo.sans.length > 0 ? extensionInfo.sans : parseSubjectAltName(x509.subjectAltName)
 
   let keyAlgorithm = 'Unknown'
   let keySize: number | null = null
   let curve: string | null = null
 
-  const pubKey = forgeCert.publicKey as forge.pki.rsa.PublicKey & { curve?: string; n?: forge.jsbn.BigInteger }
-  if ('n' in pubKey && pubKey.n) {
+  const publicKey = x509.publicKey
+  if (publicKey.asymmetricKeyType === 'rsa') {
     keyAlgorithm = 'RSA'
-    keySize = pubKey.n.bitLength()
-  } else if ('curve' in pubKey) {
+    keySize = publicKey.asymmetricKeyDetails?.modulusLength ?? null
+  } else if (publicKey.asymmetricKeyType === 'ec') {
     keyAlgorithm = 'EC'
-    curve = (pubKey as unknown as { curve: string }).curve ?? null
+    curve = publicKey.asymmetricKeyDetails?.namedCurve ?? null
+    keySize = publicKey.asymmetricKeyDetails?.modulusLength ?? null
+  } else if (publicKey.asymmetricKeyType === 'ed25519') {
+    keyAlgorithm = 'Ed25519'
+  } else if (publicKey.asymmetricKeyType === 'ed448') {
+    keyAlgorithm = 'Ed448'
   } else {
-    const sigAlg = (forgeCert as unknown as { signatureOid: string }).signatureOid
-    if (sigAlg?.startsWith('1.2.840.10045')) {
-      keyAlgorithm = 'EC'
-    } else if (sigAlg?.startsWith('1.3.101')) {
-      keyAlgorithm = 'EdDSA'
-    }
-  }
-
-  const sigAlgName = (forgeCert.siginfo as unknown as { algorithmOid: string })?.algorithmOid ?? ''
-  const sigAlgMap: Record<string, string> = {
-    '1.2.840.113549.1.1.5':  'SHA1withRSA',
-    '1.2.840.113549.1.1.11': 'SHA256withRSA',
-    '1.2.840.113549.1.1.12': 'SHA384withRSA',
-    '1.2.840.113549.1.1.13': 'SHA512withRSA',
-    '1.2.840.10045.4.3.2':   'SHA256withECDSA',
-    '1.2.840.10045.4.3.3':   'SHA384withECDSA',
-    '1.2.840.10045.4.3.4':   'SHA512withECDSA',
-    '1.3.101.112':           'Ed25519',
-  }
-  const signatureAlgorithm = sigAlgMap[sigAlgName] ?? (forgeCert as unknown as { signatureAlgorithm?: string }).signatureAlgorithm ?? sigAlgName
-
-  const sans: ParsedSAN[] = []
-  const sanExt = forgeCert.getExtension('subjectAltName') as
-    | { altNames: Array<{ type: number; value?: string; ip?: string }> }
-    | null
-  if (sanExt) {
-    for (const alt of sanExt.altNames) {
-      const typeMap: Record<number, string> = {
-        1: 'email', 2: 'DNS', 6: 'URI', 7: 'IP',
-      }
-      sans.push({ type: typeMap[alt.type] ?? `type${alt.type}`, value: alt.value ?? alt.ip ?? '' })
-    }
-  }
-
-  const keyUsage: string[] = []
-  const kuExt = forgeCert.getExtension('keyUsage') as Record<string, boolean> | null
-  if (kuExt) {
-    const kuNames: [string, string][] = [
-      ['digitalSignature', 'Digital Signature'],
-      ['nonRepudiation', 'Non Repudiation'],
-      ['keyEncipherment', 'Key Encipherment'],
-      ['dataEncipherment', 'Data Encipherment'],
-      ['keyAgreement', 'Key Agreement'],
-      ['keyCertSign', 'Certificate Sign'],
-      ['cRLSign', 'CRL Sign'],
-      ['encipherOnly', 'Encipher Only'],
-      ['decipherOnly', 'Decipher Only'],
-    ]
-    for (const [key, label] of kuNames) {
-      if (kuExt[key]) keyUsage.push(label)
-    }
-  }
-
-  const extendedKeyUsage: string[] = []
-  const ekuExt = forgeCert.getExtension('extKeyUsage') as Record<string, boolean> | null
-  if (ekuExt) {
-    const ekuNames: [string, string][] = [
-      ['serverAuth', 'TLS Web Server Authentication'],
-      ['clientAuth', 'TLS Web Client Authentication'],
-      ['codeSigning', 'Code Signing'],
-      ['emailProtection', 'Email Protection'],
-      ['timeStamping', 'Time Stamping'],
-      ['OCSPSigning', 'OCSP Signing'],
-    ]
-    for (const [key, label] of ekuNames) {
-      if (ekuExt[key]) extendedKeyUsage.push(label)
-    }
-  }
-
-  let isCA = false
-  let pathLength: number | null = null
-  const bcExt = forgeCert.getExtension('basicConstraints') as
-    | { cA: boolean; pathLenConstraint?: number }
-    | null
-  if (bcExt) {
-    isCA = bcExt.cA ?? false
-    pathLength = bcExt.pathLenConstraint ?? null
-  }
-
-  const skiExt = forgeCert.getExtension('subjectKeyIdentifier') as { subjectKeyIdentifier?: string } | null
-  const akiExt = forgeCert.getExtension('authorityKeyIdentifier') as { keyIdentifier?: string } | null
-  const subjectKeyId = skiExt?.subjectKeyIdentifier
-    ? colonHex(forge.util.bytesToHex(skiExt.subjectKeyIdentifier))
-    : null
-  const authorityKeyId = akiExt?.keyIdentifier
-    ? colonHex(forge.util.bytesToHex(akiExt.keyIdentifier))
-    : null
-
-  const ocspUrls: string[] = []
-  const caIssuers: string[] = []
-  const aiaExt = forgeCert.getExtension('authorityInfoAccessSyntax') as
-    | { accessDescriptions: Array<{ accessMethod: string; accessLocation: { value: string } }> }
-    | null
-  if (aiaExt) {
-    for (const desc of aiaExt.accessDescriptions) {
-      if (desc.accessMethod === '1.3.6.1.5.5.7.48.1') ocspUrls.push(desc.accessLocation.value)
-      if (desc.accessMethod === '1.3.6.1.5.5.7.48.2') caIssuers.push(desc.accessLocation.value)
-    }
-  }
-
-  const crlUrls: string[] = []
-  const crlExt = forgeCert.getExtension('cRLDistributionPoints') as
-    | { distributionPoints?: Array<{ distributionPoint?: { value?: Array<{ value?: string }> } }> }
-    | null
-  if (crlExt?.distributionPoints) {
-    for (const dp of crlExt.distributionPoints) {
-      const uri = dp.distributionPoint?.value?.[0]?.value
-      if (uri) crlUrls.push(uri)
-    }
-  }
-
-  const certificatePolicies: string[] = []
-  const cpExt = forgeCert.getExtension('certificatePolicies') as
-    | { policies?: Array<{ policyIdentifier: string }> }
-    | null
-  if (cpExt?.policies) {
-    for (const policy of cpExt.policies) {
-      certificatePolicies.push(policy.policyIdentifier)
-    }
+    keyAlgorithm = publicKey.asymmetricKeyType ?? 'Unknown'
   }
 
   return {
-    subject: dnFromForgeCert(forgeCert.subject),
-    commonName: getAttr(forgeCert.subject, 'CN'),
-    organization: getAttr(forgeCert.subject, 'O'),
-    organizationalUnit: getAttr(forgeCert.subject, 'OU'),
-    country: getAttr(forgeCert.subject, 'C'),
-    state: getAttr(forgeCert.subject, 'ST'),
-    locality: getAttr(forgeCert.subject, 'L'),
-    issuer: dnFromForgeCert(forgeCert.issuer),
-    issuerCommonName: getAttr(forgeCert.issuer, 'CN'),
-    issuerOrganization: getAttr(forgeCert.issuer, 'O'),
+    subject: subject.formatted,
+    commonName: subject.attrs.CN ?? '',
+    organization: subject.attrs.O ?? '',
+    organizationalUnit: subject.attrs.OU ?? '',
+    country: subject.attrs.C ?? '',
+    state: subject.attrs.ST ?? '',
+    locality: subject.attrs.L ?? '',
+    issuer: issuer.formatted,
+    issuerCommonName: issuer.attrs.CN ?? '',
+    issuerOrganization: issuer.attrs.O ?? '',
     notBefore: notBefore.toISOString(),
     notAfter: notAfter.toISOString(),
     daysRemaining,
     isExpired: daysRemaining < 0,
     isExpiringSoon: daysRemaining >= 0 && daysRemaining <= 30,
-    serialNumber: colonHex(forgeCert.serialNumber),
-    fingerprintSha256: sha256,
-    fingerprintSha512: sha512,
+    serialNumber: formatSerialNumber(x509.serialNumber),
+    fingerprintSha256: x509.fingerprint256,
+    fingerprintSha512: x509.fingerprint512,
     isSelfSigned,
     keyAlgorithm,
     keySize,
     curve,
-    signatureAlgorithm,
+    signatureAlgorithm: extensionInfo.signatureAlgorithm,
     sans,
-    keyUsage,
-    extendedKeyUsage,
-    isCA,
-    pathLength,
-    subjectKeyId,
-    authorityKeyId,
-    ocspUrls,
-    caIssuers,
-    crlUrls,
-    certificatePolicies,
+    keyUsage: extensionInfo.keyUsage,
+    extendedKeyUsage: extensionInfo.extendedKeyUsage,
+    isCA: extensionInfo.isCA || x509.ca,
+    pathLength: extensionInfo.pathLength,
+    subjectKeyId: extensionInfo.subjectKeyId,
+    authorityKeyId: extensionInfo.authorityKeyId,
+    ocspUrls: extensionInfo.ocspUrls,
+    caIssuers: extensionInfo.caIssuers,
+    crlUrls: extensionInfo.crlUrls,
+    certificatePolicies: extensionInfo.certificatePolicies,
     chain: [],
     pem: pemStr,
   }
 }
 
-export function buildChain(forgeCerts: forge.pki.Certificate[]): ChainEntry[] {
-  return forgeCerts.map((c) => {
-    const derBytes = forge.asn1.toDer(forge.pki.certificateToAsn1(c)).getBytes()
-    const sha256 = colonHex(forge.md.sha256.create().update(derBytes).digest().toHex())
-    const bcExt = c.getExtension('basicConstraints') as { cA?: boolean } | null
+export function buildChain(pems: string[]): ChainEntry[] {
+  return pems.map((pem) => {
+    const x509 = new crypto.X509Certificate(pem)
+    const subject = parseDistinguishedName(x509.subject)
+    const issuer = parseDistinguishedName(x509.issuer)
+    const ext = extractExtensionInfo(x509.raw)
     return {
-      subject: dnFromForgeCert(c.subject),
-      issuer: dnFromForgeCert(c.issuer),
-      notBefore: c.validity.notBefore.toISOString(),
-      notAfter: c.validity.notAfter.toISOString(),
-      fingerprintSha256: sha256,
-      isCA: bcExt?.cA ?? false,
+      subject: subject.formatted,
+      issuer: issuer.formatted,
+      notBefore: new Date(x509.validFrom).toISOString(),
+      notAfter: new Date(x509.validTo).toISOString(),
+      fingerprintSha256: x509.fingerprint256,
+      isCA: ext.isCA || x509.ca,
     }
   })
 }
@@ -313,7 +546,13 @@ export function toPemArray(input: Buffer, password?: string): string[] {
   const text = input.toString('utf8')
   if (text.includes('-----BEGIN')) {
     const matches = text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g)
-    if (matches && matches.length > 0) return matches.map((m) => m.trim())
+    if (matches && matches.length > 0) {
+      return matches.map((m) => {
+        const trimmed = m.trim()
+        ensureValidBufferLength(Buffer.from(trimmed, 'utf8'), 'certificate PEM')
+        return trimmed
+      })
+    }
     if (text.includes('BEGIN PKCS7') || text.includes('BEGIN CERTIFICATE REQUEST')) {
       return parsePkcs7Pem(text)
     }
@@ -330,8 +569,9 @@ export function toPemArray(input: Buffer, password?: string): string[] {
         }
       } catch { /* not PKCS#7 */ }
       try {
-        const cert = forge.pki.certificateFromAsn1(asn1)
-        pems.push(forge.pki.certificateToPem(cert))
+        ensureValidBufferLength(input, 'certificate DER')
+        const cert = new crypto.X509Certificate(input)
+        pems.push(cert.toString())
         return pems
       } catch { /* not a certificate */ }
     }
@@ -431,18 +671,16 @@ export async function fetchCertificateFromUrl(
 ): Promise<FetchUrlResult> {
   const { host, port, serverName } = resolveUrlTarget(rawUrl, portOverride, serverNameOverride)
   const pems = await fetchCertPemsFromUrl(host, port, serverName)
-  const forgeCerts = pems.map(pemToForgeCert)
-  const chain = forgeCerts.length > 1 ? buildChain(forgeCerts) : []
-  const certificate = parseForgeCert(forgeCerts[0]!, pems[0]!)
+  const chain = pems.length > 1 ? buildChain(pems) : []
+  const certificate = parseCertPem(pems[0]!)
   certificate.chain = chain
   return { certificate, host, port, serverName }
 }
 
 export function parseCertificateBuffer(input: Buffer, password?: string): ParsedCertificate {
   const pems = toPemArray(input, password)
-  const forgeCerts = pems.map(pemToForgeCert)
-  const chain = forgeCerts.length > 1 ? buildChain(forgeCerts) : []
-  const cert = parseForgeCert(forgeCerts[0]!, pems[0]!)
+  const chain = pems.length > 1 ? buildChain(pems) : []
+  const cert = parseCertPem(pems[0]!)
   cert.chain = chain
   return cert
 }

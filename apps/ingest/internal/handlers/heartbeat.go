@@ -28,20 +28,18 @@ type HeartbeatHandler struct {
 	publisher       queue.Publisher
 	versionPoller   *config.VersionPoller
 	downloadBaseURL string
-	terminalStore   *TerminalStore
 	ca              *pki.AgentCA
 	webServerCert   *pki.WebServerCert
 }
 
 // NewHeartbeatHandler creates a HeartbeatHandler.
-func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, versionPoller *config.VersionPoller, downloadBaseURL string, terminalStore *TerminalStore, ca *pki.AgentCA, webServerCert *pki.WebServerCert) *HeartbeatHandler {
+func NewHeartbeatHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, pub queue.Publisher, versionPoller *config.VersionPoller, downloadBaseURL string, ca *pki.AgentCA, webServerCert *pki.WebServerCert) *HeartbeatHandler {
 	return &HeartbeatHandler{
 		pool:            pool,
 		issuer:          issuer,
 		publisher:       pub,
 		versionPoller:   versionPoller,
 		downloadBaseURL: downloadBaseURL,
-		terminalStore:   terminalStore,
 		ca:              ca,
 		webServerCert:   webServerCert,
 	}
@@ -69,13 +67,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 	// Validate JWT
 	agentID, _, err := h.issuer.ValidateAgentToken(first.AgentId)
 	if err != nil {
-		// AgentId field carries the JWT token for authentication on first message
-		// If that fails, try treating it as an agent ID (backwards compat)
-		agentID = first.AgentId
-		if agentID == "" {
-			return status.Error(codes.Unauthenticated, "invalid or missing JWT")
-		}
-		slog.Debug("JWT validation failed, using agent_id directly", "agent_id", agentID, "err", err)
+		return status.Error(codes.Unauthenticated, "invalid or missing JWT")
 	}
 
 	// Verify agent is active
@@ -267,27 +259,6 @@ loop:
 				slog.Info("pushed cancel task IDs to agent", "host_id", hostID, "count", len(cancelIDs))
 			}
 
-			// Push pending terminal sessions to the agent.
-			if h.terminalStore != nil {
-				pendingSessions, tsErr := queries.GetPendingTerminalSessionsForHost(ctx, h.pool, hostID)
-				if tsErr != nil {
-					slog.Warn("fetching pending terminal sessions", "host_id", hostID, "err", tsErr)
-				} else if len(pendingSessions) > 0 {
-					if err := stream.Send(&agentv1.HeartbeatResponse{
-						Ok:                      true,
-						PendingTerminalSessions: pendingSessions,
-					}); err != nil {
-						slog.Warn("pushing terminal sessions to agent", "host_id", hostID, "err", err)
-						return err
-					}
-					for _, ps := range pendingSessions {
-						if sess, ok := h.terminalStore.Get(ps.SessionId); ok {
-							sess.incrementPushCount()
-						}
-					}
-					slog.Info("pushed pending terminal sessions to agent", "host_id", hostID, "count", len(pendingSessions))
-				}
-			}
 		}
 	}
 
@@ -297,12 +268,6 @@ loop:
 	}
 	if err := queries.SetHostOffline(context.Background(), h.pool, agentID); err != nil {
 		slog.Warn("setting host offline", "err", err)
-	}
-	// Clean up any in-flight terminal sessions for this host
-	if hostID != "" {
-		if err := queries.CleanupTerminalSessionsForHost(context.Background(), h.pool, hostID); err != nil {
-			slog.Warn("cleaning up terminal sessions for host", "host_id", hostID, "err", err)
-		}
 	}
 	if err := queries.InsertAgentStatusHistory(context.Background(), h.pool, agentID, agent.OrganisationID, "offline", nil, "heartbeat stream closed"); err != nil {
 		slog.Warn("inserting offline status history", "err", err)
@@ -516,23 +481,6 @@ func (h *HeartbeatHandler) processHeartbeat(
 			resp.Checks = defs
 		}
 
-		// Also include pending terminal sessions in every heartbeat response.
-		// This is redundant with the queryPollTicker push but ensures the agent
-		// sees terminal sessions even if the poll ticker is delayed.
-		if h.terminalStore != nil {
-			pendingSessions, tsErr := queries.GetPendingTerminalSessionsForHost(ctx, h.pool, hostID)
-			if tsErr != nil {
-				slog.Warn("fetching terminal sessions in heartbeat response", "host_id", hostID, "err", tsErr)
-			} else if len(pendingSessions) > 0 {
-				resp.PendingTerminalSessions = pendingSessions
-				for _, ps := range pendingSessions {
-					if sess, ok := h.terminalStore.Get(ps.SessionId); ok {
-						sess.incrementPushCount()
-					}
-				}
-				slog.Info("including terminal sessions in heartbeat response", "host_id", hostID, "count", len(pendingSessions))
-			}
-		}
 	}
 
 	return stream.Send(resp)
@@ -579,9 +527,9 @@ func (h *HeartbeatHandler) maybePushCert(ctx context.Context, stream agentv1.Ing
 		notAfterUnix = notAfter.Unix()
 	}
 	return stream.Send(&agentv1.HeartbeatResponse{
-		Ok:                             true,
-		PendingClientCertPem:           certPEM,
-		PendingClientCertNotAfterUnix:  notAfterUnix,
-		AgentCaCertPem:                 string(h.ca.CertPEM),
+		Ok:                            true,
+		PendingClientCertPem:          certPEM,
+		PendingClientCertNotAfterUnix: notAfterUnix,
+		AgentCaCertPem:                string(h.ca.CertPEM),
 	})
 }

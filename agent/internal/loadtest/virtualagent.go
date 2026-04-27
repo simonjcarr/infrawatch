@@ -42,10 +42,9 @@ type VirtualAgent struct {
 	// Dedupe maps so the same server-pushed work is not processed twice after
 	// a stream reconnect (matches the real agent's seenQueryIDs/seenTaskIDs
 	// pattern).
-	seenChecks    map[string]bool
-	seenQueries   map[string]bool
-	seenTasks     map[string]bool
-	seenTerminals map[string]bool
+	seenChecks  map[string]bool
+	seenQueries map[string]bool
+	seenTasks   map[string]bool
 
 	rng *rand.Rand
 }
@@ -60,18 +59,17 @@ func NewVirtualAgent(index int, cfg *Config, pool *ConnPool, stats *Stats) (*Vir
 	}
 	hostname := cfg.HostnameFor(index)
 	return &VirtualAgent{
-		index:         index,
-		hostname:      hostname,
-		cfg:           cfg,
-		pool:          pool,
-		stats:         stats,
-		keypair:       kp,
-		metrics:       NewSyntheticMetrics(index, hostname, cfg.MetricsJitter),
-		seenChecks:    make(map[string]bool),
-		seenQueries:   make(map[string]bool),
-		seenTasks:     make(map[string]bool),
-		seenTerminals: make(map[string]bool),
-		rng:           rand.New(rand.NewSource(int64(index) + time.Now().UnixNano())),
+		index:       index,
+		hostname:    hostname,
+		cfg:         cfg,
+		pool:        pool,
+		stats:       stats,
+		keypair:     kp,
+		metrics:     NewSyntheticMetrics(index, hostname, cfg.MetricsJitter),
+		seenChecks:  make(map[string]bool),
+		seenQueries: make(map[string]bool),
+		seenTasks:   make(map[string]bool),
+		rng:         rand.New(rand.NewSource(int64(index) + time.Now().UnixNano())),
 	}, nil
 }
 
@@ -301,15 +299,6 @@ func (v *VirtualAgent) handleServerPush(ctx context.Context, client agentv1.Inge
 		}
 	}
 
-	if v.cfg.SimulateTerminal {
-		for _, tsr := range resp.PendingTerminalSessions {
-			if tsr == nil || v.seenTerminals[tsr.SessionId] {
-				continue
-			}
-			v.seenTerminals[tsr.SessionId] = true
-			go v.simulateTerminalSession(ctx, client, tsr)
-		}
-	}
 }
 
 func (v *VirtualAgent) queueCheckResult(def *agentv1.CheckDefinition) {
@@ -361,4 +350,3 @@ func truncate(s string, max int) string {
 	}
 	return s[:max] + "..."
 }
-

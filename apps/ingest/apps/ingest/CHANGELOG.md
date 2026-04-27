@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.1.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.5...ingest/v0.1.6) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ingest:** cap inventory chunk size ([fc60ae3](https://github.com/carrtech-dev/ct-ops/commit/fc60ae3052b4e3f87a4fcfadb83a48642cbd5d47))
+* **ingest:** cap inventory chunk size ([4b0a3d8](https://github.com/carrtech-dev/ct-ops/commit/4b0a3d8ce39bacce0ff6849cbb9665e59dd71000))
+
+## [0.1.5](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.4...ingest/v0.1.5) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ingest:** cap grpc message and stream limits ([#608](https://github.com/carrtech-dev/ct-ops/issues/608)) ([730e8e4](https://github.com/carrtech-dev/ct-ops/commit/730e8e430ba6d34c30607eb6e638adb0487d0109))
+
+## [0.1.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.3...ingest/v0.1.4) (2026-04-26)
+
+
+### Bug Fixes
+
+* Codex/ssh backed terminal access ([#577](https://github.com/carrtech-dev/ct-ops/issues/577)) ([2a121a0](https://github.com/carrtech-dev/ct-ops/commit/2a121a0f8885b57f7cd2f569ad63c70ff35c1408))
+
+## [0.1.3](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.2...ingest/v0.1.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** reject invalid heartbeat jwt fallback ([660985b](https://github.com/carrtech-dev/ct-ops/commit/660985b2abc8a03b8862df33ab5ad2cb7ab1ecd9))
+* **security:** reject invalid heartbeat jwt fallback ([64d0f13](https://github.com/carrtech-dev/ct-ops/commit/64d0f13f8104803d37ad2eab753a908df0d64a9d))
+
+## [0.1.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.1...ingest/v0.1.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** require SSH credentials for terminal access ([#566](https://github.com/carrtech-dev/ct-ops/issues/566)) ([c0616dc](https://github.com/carrtech-dev/ct-ops/commit/c0616dc8a4aae98dea26eea49b8df22be89cc23e))
+
 ## [0.1.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.0...ingest/v0.1.1) (2026-04-25)
 
 

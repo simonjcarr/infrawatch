@@ -12,6 +12,7 @@ import {
   Loader2,
   Package,
   RefreshCw,
+  Send,
   Sparkles,
   Upload,
   XCircle,
@@ -38,6 +39,8 @@ import type {
   ResolvedPluginNode,
   ResolveResponse,
 } from '@/app/api/tools/jenkins-bundler/route'
+import { BundleTransferDialog, type TransferBundle, type TransferJobStatus } from './bundle-transfer-dialog'
+import { BundleTransferStatus } from './bundle-transfer-status'
 
 type PluginRow = ResolvedPlugin & {
   downloaded: boolean
@@ -163,6 +166,17 @@ function sortPluginNodes(nodes: ResolvedPluginNode[]): ResolvedPluginNode[] {
   }))
 }
 
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 // Bash script bundled into the offline-script zip. Reads manifest.tsv and
 // downloads each entry, then zips them up so the final archive matches what
 // the in-browser "Download bundle" button would produce.
@@ -266,7 +280,7 @@ Jenkins.instance.pluginManager.plugins
   .each { println it }
 `
 
-export function JenkinsBundler() {
+export function JenkinsBundler({ orgId }: { orgId: string }) {
   const [coreVersion, setCoreVersion] = useState('')
   const [javaVersion, setJavaVersion] = useState<string>('')
   const [pluginsText, setPluginsText] = useState('')
@@ -283,6 +297,8 @@ export function JenkinsBundler() {
   const [currentTotal, setCurrentTotal] = useState<number | null>(null)
   const [doneCount, setDoneCount] = useState(0)
   const [scriptBundling, setScriptBundling] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferJob, setTransferJob] = useState<TransferJobStatus | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function toggleExpanded(key: string) {
@@ -397,8 +413,8 @@ export function JenkinsBundler() {
     }
   }
 
-  async function downloadBundle() {
-    if (!report) return
+  async function buildJenkinsBundle(): Promise<{ blob: Blob; fileName: string }> {
+    if (!report) throw new Error('Resolve a bundle before transferring')
     setDownloadError(null)
     setDownloading(true)
     setDoneCount(0)
@@ -580,21 +596,64 @@ export function JenkinsBundler() {
       zip.file('bundle-manifest.json', JSON.stringify(manifest, null, 2))
 
       const blob = await zip.generateAsync({ type: 'blob' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `jenkins-${report.core.version}-bundle.zip`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
 
       commitDownloadState()
+      return {
+        blob,
+        fileName: `jenkins-${report.core.version}-bundle.zip`,
+      }
     } catch (e) {
-      setDownloadError(e instanceof Error ? e.message : 'Download failed')
+      const message = e instanceof Error ? e.message : 'Download failed'
+      setDownloadError(message)
+      throw new Error(message)
     } finally {
       setDownloading(false)
       setCurrentFile(null)
+    }
+  }
+
+  async function downloadBundle() {
+    try {
+      const bundle = await buildJenkinsBundle()
+      downloadBlob(bundle.blob, bundle.fileName)
+    } catch {
+      // buildJenkinsBundle already surfaced the error in the bundler panel.
+    }
+  }
+
+  function buildTransferBundle(): TransferBundle {
+    if (!report) throw new Error('Resolve a bundle before transferring')
+    return {
+      fileName: `jenkins-${report.core.version}-bundle.zip`,
+      payload: {
+        kind: 'jenkins',
+        generatedAt: report.generatedAt,
+        core: report.core,
+        includesTransitive: report.includesTransitive,
+        plugins: report.plugins.map((plugin) => ({
+          name: plugin.name,
+          requested: plugin.requested,
+          status: plugin.status,
+          version: plugin.version,
+          requiredCore: plugin.requiredCore,
+          minimumJavaVersion: plugin.minimumJavaVersion,
+          size: plugin.size,
+          sha256: plugin.sha256,
+          reason: plugin.reason,
+        })),
+        transitivePlugins: report.transitivePlugins.map((plugin) => ({
+          name: plugin.name,
+          requested: plugin.requested,
+          status: plugin.status,
+          version: plugin.version,
+          requiredCore: plugin.requiredCore,
+          minimumJavaVersion: plugin.minimumJavaVersion,
+          size: plugin.size,
+          sha256: plugin.sha256,
+          reason: plugin.reason,
+        })),
+        dependencyTree: report.plugins,
+      },
     }
   }
 
@@ -810,6 +869,15 @@ export function JenkinsBundler() {
               </Button>
               <Button
                 type="button"
+                onClick={() => setTransferOpen(true)}
+                disabled={!report || downloading || scriptBundling || totalToDownload === 0}
+                variant="outline"
+              >
+                <Send className="mr-1.5 size-4" />
+                Transfer bundle
+              </Button>
+              <Button
+                type="button"
                 onClick={downloadScriptBundle}
                 disabled={!report || downloading || scriptBundling || totalToDownload === 0}
                 variant="outline"
@@ -883,11 +951,19 @@ export function JenkinsBundler() {
             toggleExpanded={toggleExpanded}
           />
         )}
+        <BundleTransferStatus job={transferJob} onJobChange={setTransferJob} />
       </div>
 
       <div className="space-y-6">
         <HelpCard />
       </div>
+      <BundleTransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        orgId={orgId}
+        buildBundle={buildTransferBundle}
+        onTransferStarted={setTransferJob}
+      />
     </div>
   )
 }

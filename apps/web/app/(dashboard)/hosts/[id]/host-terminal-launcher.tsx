@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useState, useSyncExternalStore } from 'react'
-import { Terminal, User, AlertCircle } from 'lucide-react'
+import { KeyRound, Terminal, User, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,6 +44,7 @@ export function HostTerminalLauncher({ orgId, host, directAccess, accessDeniedRe
   const savedUsername = useSyncExternalStore(subscribe, getSnapshot, () => '')
 
   const [typedUsername, setTypedUsername] = useState<string | null>(null)
+  const [password, setPassword] = useState('')
   const username = typedUsername ?? savedUsername
 
   if (accessDeniedReason) {
@@ -67,10 +68,12 @@ export function HostTerminalLauncher({ orgId, host, directAccess, accessDeniedRe
     openTerminal({
       hostId: host.id,
       hostname: host.displayName ?? host.hostname,
-      username: directAccess ? null : username.trim(),
+      username: username.trim(),
+      password,
       orgId,
-      directAccess,
+      directAccess: false,
     })
+    setPassword('')
   }
 
   return (
@@ -85,39 +88,40 @@ export function HostTerminalLauncher({ orgId, host, directAccess, accessDeniedRe
         </p>
       </div>
 
-      {directAccess ? (
-        <div className="mx-auto max-w-xs">
-          <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
-            Direct access mode is enabled. You will connect with agent-level (root) privileges.
-          </p>
-          <Button onClick={handleOpen}>
-            <Terminal className="size-4 mr-1.5" />
-            Open Terminal
-          </Button>
+      <div className="mx-auto max-w-xs space-y-3">
+        <div className="text-left space-y-1.5">
+          <Label htmlFor="host-terminal-username" className="text-sm">
+            <User className="size-3.5 inline mr-1" />
+            Username
+          </Label>
+          <Input
+            id="host-terminal-username"
+            value={username}
+            onChange={(e) => setTypedUsername(e.target.value)}
+            placeholder="e.g. jsmith"
+          />
         </div>
-      ) : (
-        <div className="mx-auto max-w-xs space-y-3">
-          <div className="text-left space-y-1.5">
-            <Label htmlFor="host-terminal-username" className="text-sm">
-              <User className="size-3.5 inline mr-1" />
-              Username
-            </Label>
-            <Input
-              id="host-terminal-username"
-              value={username}
-              onChange={(e) => setTypedUsername(e.target.value)}
-              placeholder="e.g. jsmith"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && username.trim()) handleOpen()
-              }}
-            />
-          </div>
-          <Button onClick={handleOpen} disabled={!username.trim()}>
-            <Terminal className="size-4 mr-1.5" />
-            Open Terminal
-          </Button>
+        <div className="text-left space-y-1.5">
+          <Label htmlFor="host-terminal-password" className="text-sm">
+            <KeyRound className="size-3.5 inline mr-1" />
+            Password
+          </Label>
+          <Input
+            id="host-terminal-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && username.trim() && password) handleOpen()
+            }}
+          />
         </div>
-      )}
+        <Button onClick={handleOpen} disabled={!username.trim() || !password}>
+          <Terminal className="size-4 mr-1.5" />
+          Open Terminal
+        </Button>
+      </div>
     </div>
   )
 }

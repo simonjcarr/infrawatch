@@ -1,5 +1,7 @@
 'use server'
 
+import { requireOrgAccess } from '@/lib/actions/action-auth'
+
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import {
@@ -40,10 +42,18 @@ import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs'
 import { assignTagsToResource, getOrgDefaultTags, mergeTagLayers } from '@/lib/actions/tags'
 import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
+import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getRequiredSession } from '@/lib/auth/session'
+import {
+  calculateEnrolmentTokenExpiry,
+  DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,
+  DEFAULT_ENROLMENT_TOKEN_MAX_USES,
+  normaliseEnrolmentTokenLimits,
+} from '@/lib/agent/enrolment-token-policy'
 import { createHash } from 'crypto'
 import { createId } from '@paralleldrive/cuid2'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -57,14 +67,15 @@ const createEnrolmentTokenSchema = z.object({
   label: z.string().min(1, 'Label is required').max(100),
   autoApprove: z.boolean().default(false),
   skipVerify: z.boolean().default(false),
-  maxUses: z.number().int().positive().optional(),
-  expiresInDays: z.number().int().positive().optional(),
+  maxUses: z.number().int().positive().default(DEFAULT_ENROLMENT_TOKEN_MAX_USES),
+  expiresInDays: z.number().int().positive().max(365).default(DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS),
   tags: z
     .array(z.object({ key: z.string().min(1).max(100), value: z.string().min(1).max(500) }))
     .default([]),
 })
 
 export async function listPendingAgents(orgId: string): Promise<Agent[]> {
+  await requireOrgAccess(orgId)
   return db.query.agents.findMany({
     where: and(
       eq(agents.organisationId, orgId),
@@ -79,6 +90,7 @@ export async function approveAgent(
   agentId: string,
   actorId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -139,7 +151,7 @@ export async function approveAgent(
       // the (token → CLI) merge on the ingest side; here we layer org defaults
       // underneath (weakest), then run any saved tag_rules last.
       const defaults = await getOrgDefaultCollectionSettings(orgId)
-      const currentMetadata = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+      const currentMetadata = parseHostMetadata(host.metadata)
       const pendingTags: TagPair[] = currentMetadata.pendingTags ?? []
       const orgDefaultTags = await getOrgDefaultTags(orgId)
       const finalTags = await mergeTagLayers(orgDefaultTags, pendingTags)
@@ -210,6 +222,7 @@ export async function rejectAgent(
   agentId: string,
   actorId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -251,6 +264,7 @@ export async function rejectAgent(
 export type HostWithAgent = Host & { agent: Agent | null }
 
 export async function listHosts(orgId: string): Promise<HostWithAgent[]> {
+  await requireOrgAccess(orgId)
   const rows = await db
     .select()
     .from(hosts)
@@ -303,6 +317,7 @@ export async function listHostsPaginated(
   orgId: string,
   params: HostListParams = {},
 ): Promise<HostListResult> {
+  await requireOrgAccess(orgId)
   const limit = Math.max(1, Math.min(params.limit ?? 50, HOST_PAGE_MAX))
   const offset = Math.max(0, params.offset ?? 0)
   const sortBy: HostSortField = params.sortBy ?? 'hostname'
@@ -388,6 +403,7 @@ export interface HostInventoryStats {
 }
 
 export async function getHostInventoryStats(orgId: string): Promise<HostInventoryStats> {
+  await requireOrgAccess(orgId)
   const baseWhere = and(eq(hosts.organisationId, orgId), isNull(hosts.deletedAt))
   const threshold = HOST_HIGH_USAGE_THRESHOLD
   const staleCutoff = new Date(Date.now() - HOST_STALE_MINUTES * 60 * 1000)
@@ -458,6 +474,7 @@ export async function getHostInventoryStats(orgId: string): Promise<HostInventor
 }
 
 export async function listDistinctHostOses(orgId: string): Promise<string[]> {
+  await requireOrgAccess(orgId)
   const rows = await db
     .selectDistinct({ os: hosts.os })
     .from(hosts)
@@ -478,6 +495,7 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
+  await requireOrgAccess(orgId)
   if (!createEnrolmentTokenLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before creating another enrolment token.' }
   }
@@ -496,11 +514,8 @@ export async function createEnrolmentToken(
   }
 
   try {
-    let expiresAt: Date | undefined
-    if (parsed.data.expiresInDays) {
-      expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + parsed.data.expiresInDays)
-    }
+    const limits = normaliseEnrolmentTokenLimits(parsed.data)
+    const expiresAt = calculateEnrolmentTokenExpiry(limits.expiresInDays)
 
     // Generate the token explicitly so we can hash it before insertion.
     // The plaintext is returned to the caller once; subsequent list queries omit it.
@@ -513,8 +528,8 @@ export async function createEnrolmentToken(
         createdById: userId,
         autoApprove: parsed.data.autoApprove,
         skipVerify: parsed.data.skipVerify,
-        maxUses: parsed.data.maxUses ?? null,
-        expiresAt: expiresAt ?? null,
+        maxUses: limits.maxUses,
+        expiresAt,
         metadata: parsed.data.tags.length > 0 ? { tags: parsed.data.tags } : null,
         token,
         tokenHash: hashToken(token),
@@ -522,6 +537,23 @@ export async function createEnrolmentToken(
       .returning()
 
     if (!record) return { error: 'Failed to create enrolment token' }
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: userId,
+      action: 'agent.enrolment_token.created',
+      targetType: 'agent_enrolment_token',
+      targetId: record.id,
+      summary: `Created enrolment token ${record.label}`,
+      metadata: {
+        label: record.label,
+        autoApprove: record.autoApprove,
+        skipVerify: record.skipVerify,
+        maxUses: record.maxUses,
+        expiresAt: record.expiresAt,
+        tagCount: parsed.data.tags.length,
+      },
+    })
 
     return { token: record.token, id: record.id }
   } catch (err) {
@@ -535,6 +567,7 @@ export type EnrolmentTokenSafe = Omit<AgentEnrolmentToken, 'token' | 'tokenHash'
 }
 
 export async function listEnrolmentTokens(orgId: string): Promise<EnrolmentTokenSafe[]> {
+  await requireOrgAccess(orgId)
   const rows = await db.query.agentEnrolmentTokens.findMany({
     where: and(
       eq(agentEnrolmentTokens.organisationId, orgId),
@@ -551,6 +584,7 @@ export async function revokeEnrolmentToken(
   orgId: string,
   tokenId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
     await db
       .update(agentEnrolmentTokens)
@@ -641,6 +675,7 @@ export async function getHostMetrics(
   hostId: string,
   query: MetricsQuery,
 ): Promise<HostMetric[]> {
+  await requireOrgAccess(orgId)
   const { from, to, fromISO, toISO } = resolveTimeBounds(query)
   const bucketMode = computeBucketMode(to.getTime() - from.getTime())
 
@@ -764,6 +799,7 @@ export async function getAgentOfflinePeriods(
   agentId: string,
   query: MetricsQuery,
 ): Promise<OfflinePeriod[]> {
+  await requireOrgAccess(orgId)
   const { from, to } = resolveTimeBounds(query)
   const windowStart = from.getTime()
   // Look back one extra hour before the window to capture an offline event that
@@ -812,6 +848,7 @@ export async function getHeartbeatHistory(
   hostId: string,
   query: MetricsQuery,
 ): Promise<HeartbeatPoint[]> {
+  await requireOrgAccess(orgId)
   const { from, to, fromISO, toISO } = resolveTimeBounds(query)
   const bucketMode = computeBucketMode(to.getTime() - from.getTime())
 
@@ -898,6 +935,7 @@ export async function getHeartbeatHistory(
 }
 
 export async function getHost(orgId: string, hostId: string): Promise<HostWithAgent | null> {
+  await requireOrgAccess(orgId)
   const rows = await db
     .select()
     .from(hosts)
@@ -923,7 +961,9 @@ export async function deleteHost(
   orgId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
+  await requireOrgAccess(orgId)
   try {
+    const session = await getRequiredSession()
     // Capture the result of the "not found" check that happens inside the
     // transaction so we can surface it as an error after the transaction closes.
     let hostNotFound = false
@@ -941,6 +981,20 @@ export async function deleteHost(
         hostNotFound = true
         return
       }
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'host.deleted',
+        targetType: 'host',
+        targetId: host.id,
+        summary: `Deleted host ${host.hostname}`,
+        metadata: {
+          hostname: host.hostname,
+          agentId: host.agentId,
+          status: host.status,
+        },
+      })
 
       // 1. Identity events (references service_account_id, ssh_key_id, host_id)
       await tx
@@ -1162,6 +1216,7 @@ export async function uninstallAndDeleteHost(
   | { success: true }
   | { error: string; taskRunId?: string; agentOffline?: boolean }
 > {
+  await requireOrgAccess(orgId)
   try {
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),

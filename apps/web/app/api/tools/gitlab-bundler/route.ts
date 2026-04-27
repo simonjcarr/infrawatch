@@ -29,7 +29,14 @@ const ResolveSchema = z.object({
   arch: z.enum(['amd64', 'arm64', 'x86_64', 'aarch64']),
 })
 
-const BodySchema = z.discriminatedUnion('action', [ResolveSchema])
+const LatestSchema = z.object({
+  action: z.literal('latest'),
+  edition: EditionSchema,
+  packageTarget: PackageTargetSchema,
+  arch: z.enum(['amd64', 'arm64', 'x86_64', 'aarch64']),
+})
+
+const BodySchema = z.discriminatedUnion('action', [ResolveSchema, LatestSchema])
 
 const QuerySchema = z.object({
   edition: EditionSchema,
@@ -136,6 +143,23 @@ export type GitLabBundlerResponse =
         packages: string
       }
       steps: GitLabBundleStep[]
+    }
+  | { ok: false; error: string }
+
+export type GitLabLatestVersionResponse =
+  | {
+      ok: true
+      version: string
+      edition: Edition
+      packageTarget: {
+        key: PackageTarget
+        label: string
+        arch: string
+        kind: 'deb' | 'rpm'
+      }
+      sources: {
+        packages: string
+      }
     }
   | { ok: false; error: string }
 
@@ -361,7 +385,7 @@ function createStep(
   }
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse<GitLabBundlerResponse>> {
+export async function POST(req: NextRequest): Promise<NextResponse<GitLabBundlerResponse | GitLabLatestVersionResponse>> {
   try {
     const raw = await req.json()
     const parsed = BodySchema.safeParse(raw)
@@ -370,6 +394,38 @@ export async function POST(req: NextRequest): Promise<NextResponse<GitLabBundler
     }
 
     const body = parsed.data
+
+    if (body.action === 'latest') {
+      const targetDef = PACKAGE_TARGETS[body.packageTarget]
+      if (!targetDef.arches.includes(body.arch)) {
+        return NextResponse.json(
+          { ok: false, error: `${targetDef.label} does not publish ${body.arch} packages` },
+          { status: 400 },
+        )
+      }
+
+      const packageData = await fetchPackageCandidates(body.edition, body.packageTarget, body.arch)
+      const latest = packageData.candidates.sort((a, b) => compareVersions(a.version, b.version)).at(-1)
+      if (!latest) {
+        return NextResponse.json({ ok: false, error: 'No GitLab packages found for the selected target' }, { status: 404 })
+      }
+
+      return NextResponse.json({
+        ok: true,
+        version: latest.version,
+        edition: body.edition,
+        packageTarget: {
+          key: body.packageTarget,
+          label: targetDef.label,
+          arch: body.arch,
+          kind: targetDef.kind,
+        },
+        sources: {
+          packages: packageData.repoUrl,
+        },
+      })
+    }
+
     const current = fullVersion(body.currentVersion)
     const target = fullVersion(body.targetVersion)
     if (compareVersions(current, target) >= 0) {

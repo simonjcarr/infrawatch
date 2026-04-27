@@ -13,6 +13,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { hasLicenceFeature } from '@/lib/actions/licence-guard'
 import { COMMUNITY_MAX_RETENTION_DAYS } from '@/lib/features'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 const updateOrgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -125,6 +126,10 @@ export async function saveLicenceKey(
   }
 
   try {
+    const previous = await db.query.organisations.findFirst({
+      where: eq(organisations.id, orgId),
+      columns: { licenceTier: true },
+    })
     await db
       .update(organisations)
       .set({
@@ -133,6 +138,19 @@ export async function saveLicenceKey(
         updatedAt: new Date(),
       })
       .where(eq(organisations.id, orgId))
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'licence.updated',
+      targetType: 'organisation',
+      targetId: orgId,
+      summary: `Updated organisation licence to ${result.payload.tier}`,
+      metadata: {
+        previousTier: previous?.licenceTier ?? null,
+        nextTier: result.payload.tier,
+      },
+    })
 
     return { success: true, tier: result.payload.tier }
   } catch (err) {

@@ -53,6 +53,7 @@ import {
 } from '@/lib/agent/enrolment-token-policy'
 import { createHash } from 'crypto'
 import { createId } from '@paralleldrive/cuid2'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -537,6 +538,23 @@ export async function createEnrolmentToken(
 
     if (!record) return { error: 'Failed to create enrolment token' }
 
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: userId,
+      action: 'agent.enrolment_token.created',
+      targetType: 'agent_enrolment_token',
+      targetId: record.id,
+      summary: `Created enrolment token ${record.label}`,
+      metadata: {
+        label: record.label,
+        autoApprove: record.autoApprove,
+        skipVerify: record.skipVerify,
+        maxUses: record.maxUses,
+        expiresAt: record.expiresAt,
+        tagCount: parsed.data.tags.length,
+      },
+    })
+
     return { token: record.token, id: record.id }
   } catch (err) {
     console.error('Failed to create enrolment token:', err)
@@ -945,6 +963,7 @@ export async function deleteHost(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
+    const session = await getRequiredSession()
     // Capture the result of the "not found" check that happens inside the
     // transaction so we can surface it as an error after the transaction closes.
     let hostNotFound = false
@@ -962,6 +981,20 @@ export async function deleteHost(
         hostNotFound = true
         return
       }
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'host.deleted',
+        targetType: 'host',
+        targetId: host.id,
+        summary: `Deleted host ${host.hostname}`,
+        metadata: {
+          hostname: host.hostname,
+          agentId: host.agentId,
+          status: host.status,
+        },
+      })
 
       // 1. Identity events (references service_account_id, ssh_key_id, host_id)
       await tx

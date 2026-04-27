@@ -10,6 +10,7 @@ import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { getRequiredSession, type RequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { writeAuditEvent } from '@/lib/audit/events'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -156,7 +157,14 @@ export async function updateUserRole(
   }
 
   try {
-    await requireOrgAdmin(orgId)
+    const session = await requireOrgAdmin(orgId)
+    const targetUser = await db.query.users.findFirst({
+      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId)),
+      columns: { id: true, email: true, role: true },
+    })
+    if (!targetUser) {
+      return { error: 'User not found' }
+    }
 
     if (parsed.data.role !== 'super_admin') {
       const superAdmins = await db.query.users.findMany({
@@ -171,10 +179,26 @@ export async function updateUserRole(
       }
     }
 
-    await db
-      .update(users)
-      .set({ role: parsed.data.role, updatedAt: new Date() })
-      .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ role: parsed.data.role, updatedAt: new Date() })
+        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'user.role.updated',
+        targetType: 'user',
+        targetId: targetUser.id,
+        summary: `Changed ${targetUser.email} role from ${targetUser.role} to ${parsed.data.role}`,
+        metadata: {
+          targetEmail: targetUser.email,
+          previousRole: targetUser.role,
+          nextRole: parsed.data.role,
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {
@@ -263,10 +287,33 @@ export async function removeUser(
       return { error: 'Cannot remove the last super admin' }
     }
 
-    await db
-      .update(users)
-      .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
-      .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+    const targetUser = await db.query.users.findFirst({
+      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      columns: { id: true, email: true, role: true },
+    })
+    if (!targetUser) {
+      return { error: 'User not found' }
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
+        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'user.removed',
+        targetType: 'user',
+        targetId: targetUser.id,
+        summary: `Removed ${targetUser.email} from the organisation`,
+        metadata: {
+          targetEmail: targetUser.email,
+          role: targetUser.role,
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {

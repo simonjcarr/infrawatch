@@ -65,7 +65,7 @@ docker load < images.tar
 ```bash
 # First run: creates .env
 ./start.sh
-nano .env     # configure BETTER_AUTH_URL, passwords, etc.
+nano .env     # configure BETTER_AUTH_URL, REQUIRE_EMAIL_VERIFICATION, passwords, etc.
 
 # Second run: starts everything
 ./start.sh

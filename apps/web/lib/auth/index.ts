@@ -5,10 +5,16 @@ import { twoFactor } from 'better-auth/plugins'
 import { db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 import { sendVerificationEmail } from './email'
-import { getBetterAuthOrigin, getBetterAuthSecret, getBetterAuthUrl } from './env'
+import {
+  getBetterAuthOrigin,
+  getBetterAuthSecret,
+  getBetterAuthUrl,
+  getRequireEmailVerification,
+} from './env'
 import { passwordLoginAttemptGuard } from './login-attempts'
 
 const LOGIN_THROTTLED_MESSAGE = 'Too many login attempts — please wait before trying again.'
+const requireEmailVerification = getRequireEmailVerification()
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -22,7 +28,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification,
     minPasswordLength: 12,
     maxPasswordLength: 128,
   },

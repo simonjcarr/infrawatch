@@ -1,5 +1,13 @@
 type EnvLike = Record<string, string | undefined>
 
+function readBooleanEnv(env: EnvLike, name: string, fallback: boolean): boolean {
+  const value = env[name]?.trim().toLowerCase()
+  if (!value) return fallback
+  if (value === 'true' || value === '1') return true
+  if (value === 'false' || value === '0') return false
+  throw new Error(`${name} must be either true or false`)
+}
+
 function readRequiredEnv(env: EnvLike, name: 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL'): string {
   const value = env[name]?.trim()
   if (!value) {
@@ -24,6 +32,10 @@ export function getBetterAuthUrl(env: EnvLike = process.env): string {
 
 export function getBetterAuthOrigin(env: EnvLike = process.env): string {
   return new URL(getBetterAuthUrl(env)).origin
+}
+
+export function getRequireEmailVerification(env: EnvLike = process.env): boolean {
+  return readBooleanEnv(env, 'REQUIRE_EMAIL_VERIFICATION', true)
 }
 
 export function assertProductionAuthEnv(env: EnvLike = process.env): void {

@@ -44,6 +44,12 @@ import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getRequiredSession } from '@/lib/auth/session'
+import {
+  calculateEnrolmentTokenExpiry,
+  DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,
+  DEFAULT_ENROLMENT_TOKEN_MAX_USES,
+  normaliseEnrolmentTokenLimits,
+} from '@/lib/agent/enrolment-token-policy'
 import { createHash } from 'crypto'
 import { createId } from '@paralleldrive/cuid2'
 
@@ -59,8 +65,8 @@ const createEnrolmentTokenSchema = z.object({
   label: z.string().min(1, 'Label is required').max(100),
   autoApprove: z.boolean().default(false),
   skipVerify: z.boolean().default(false),
-  maxUses: z.number().int().positive().optional(),
-  expiresInDays: z.number().int().positive().optional(),
+  maxUses: z.number().int().positive().default(DEFAULT_ENROLMENT_TOKEN_MAX_USES),
+  expiresInDays: z.number().int().positive().max(365).default(DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS),
   tags: z
     .array(z.object({ key: z.string().min(1).max(100), value: z.string().min(1).max(500) }))
     .default([]),
@@ -506,11 +512,8 @@ export async function createEnrolmentToken(
   }
 
   try {
-    let expiresAt: Date | undefined
-    if (parsed.data.expiresInDays) {
-      expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + parsed.data.expiresInDays)
-    }
+    const limits = normaliseEnrolmentTokenLimits(parsed.data)
+    const expiresAt = calculateEnrolmentTokenExpiry(limits.expiresInDays)
 
     // Generate the token explicitly so we can hash it before insertion.
     // The plaintext is returned to the caller once; subsequent list queries omit it.
@@ -523,8 +526,8 @@ export async function createEnrolmentToken(
         createdById: userId,
         autoApprove: parsed.data.autoApprove,
         skipVerify: parsed.data.skipVerify,
-        maxUses: parsed.data.maxUses ?? null,
-        expiresAt: expiresAt ?? null,
+        maxUses: limits.maxUses,
+        expiresAt,
         metadata: parsed.data.tags.length > 0 ? { tags: parsed.data.tags } : null,
         token,
         tokenHash: hashToken(token),

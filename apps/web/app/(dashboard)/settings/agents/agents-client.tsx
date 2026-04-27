@@ -43,6 +43,10 @@ import {
 import type { AgentEnrolmentToken } from '@/lib/db/schema'
 import type { EnrolmentTokenSafe } from '@/lib/actions/agents'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
+import {
+  DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,
+  DEFAULT_ENROLMENT_TOKEN_MAX_USES,
+} from '@/lib/agent/enrolment-token-policy'
 
 const createTokenSchema = z.object({
   label: z.string().min(1, 'Label is required').max(100),
@@ -133,7 +137,13 @@ export function AgentsSettingsClient({
     formState: { errors },
   } = useForm<CreateTokenForm>({
     resolver: zodResolver(createTokenSchema),
-    defaultValues: { label: '', autoApprove: false, skipVerify: true },
+    defaultValues: {
+      label: '',
+      autoApprove: false,
+      skipVerify: true,
+      maxUses: String(DEFAULT_ENROLMENT_TOKEN_MAX_USES),
+      expiresInDays: String(DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS),
+    },
   })
 
   const autoApprove = watch('autoApprove')
@@ -430,22 +440,20 @@ export function AgentsSettingsClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="maxUses">Max uses (optional)</Label>
+                  <Label htmlFor="maxUses">Max uses</Label>
                   <Input
                     id="maxUses"
                     type="number"
                     min="1"
-                    placeholder="Unlimited"
                     {...register('maxUses')}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="expiresInDays">Expires in days (optional)</Label>
+                  <Label htmlFor="expiresInDays">Expires in days</Label>
                   <Input
                     id="expiresInDays"
                     type="number"
                     min="1"
-                    placeholder="Never"
                     {...register('expiresInDays')}
                   />
                 </div>

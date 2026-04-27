@@ -1,5 +1,3 @@
-import { getBetterAuthUrl } from '../auth/env.js'
-
 type EnvLike = Record<string, string | undefined>
 
 function normaliseOrigin(value: string): string | null {
@@ -10,9 +8,22 @@ function normaliseOrigin(value: string): string | null {
   }
 }
 
+function getConfiguredAuthUrl(env: EnvLike): string {
+  const value = env['BETTER_AUTH_URL']?.trim()
+  if (!value) {
+    throw new Error('BETTER_AUTH_URL must be set')
+  }
+
+  try {
+    return new URL(value).toString()
+  } catch {
+    throw new Error('BETTER_AUTH_URL must be a valid absolute URL')
+  }
+}
+
 export function getTrustedOrigins(env: EnvLike = process.env): string[] {
   const configured = [
-    getBetterAuthUrl(env),
+    getConfiguredAuthUrl(env),
     ...(env['BETTER_AUTH_TRUSTED_ORIGINS']
       ?.split(',')
       .map((value) => value.trim())

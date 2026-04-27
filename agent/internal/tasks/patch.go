@@ -157,7 +157,7 @@ func buildPatchCommand(pm, mode string) (*exec.Cmd, error) {
 // the write-end of the pipe to signal EOF to the scanner, then wait for it to
 // flush any remaining lines before returning.
 func runCommandStreaming(ctx context.Context, cmd *exec.Cmd, progressFn func(chunk string)) (exitCode int, rawOutput string, err error) {
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	cmd.Env = append(os.Environ(), append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")...)
 
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
@@ -201,9 +201,7 @@ func runCommandStreaming(ctx context.Context, cmd *exec.Cmd, progressFn func(chu
 	go func() {
 		select {
 		case <-ctx.Done():
-			if cmd.Process != nil {
-				_ = cmd.Process.Kill()
-			}
+			killCommand(cmd)
 		case <-scanDone:
 			// Completed normally — nothing to kill.
 		}

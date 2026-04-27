@@ -13,6 +13,7 @@ export async function register() {
   // `next build` sets NODE_ENV=production but secrets are not available at
   // build time. Skip runtime-only checks during the build phase.
   if (process.env.NEXT_PHASE === 'phase-production-build') return
+  if (process.env.E2E_DISABLE_AGENT_CACHE_PREWARM === '1') return
 
   // Validate critical auth env vars in production.
   // Better Auth accepts an empty secret and falls back silently, which would
@@ -43,6 +44,7 @@ export async function register() {
     }
   }
 
-  const { prewarmAgentCache } = await import('./lib/agent/cache-prewarm')
+  const prewarmModulePath = './lib/agent/cache-prewarm'
+  const { prewarmAgentCache } = await import(prewarmModulePath)
   await prewarmAgentCache()
 }

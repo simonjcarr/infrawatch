@@ -48,6 +48,7 @@ async function main() {
     process.env.BETTER_AUTH_TRUSTED_ORIGINS = appUrl
     process.env.E2E_PORT = String(port)
     process.env.AUTH_EMAIL_CAPTURE_FILE = authEmailCaptureFile
+    process.env.E2E_DISABLE_AGENT_CACHE_PREWARM = '1'
 
     await mkdir(path.dirname(authEmailCaptureFile), { recursive: true })
     await rm(authEmailCaptureFile, { force: true })

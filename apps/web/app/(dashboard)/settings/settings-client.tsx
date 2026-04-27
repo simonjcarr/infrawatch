@@ -273,7 +273,12 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+        <h1
+          className="text-2xl font-semibold text-foreground"
+          data-testid="settings-heading"
+        >
+          Settings
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your organisation settings</p>
       </div>
 
@@ -917,6 +922,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 variant={activationToken ? 'outline' : 'default'}
                 onClick={() => activationMutation.mutate()}
                 disabled={activationMutation.isPending}
+                data-testid="activation-token-generate"
               >
                 {activationMutation.isPending
                   ? 'Generating…'

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.19](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.18...web/v0.70.19) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** audit sensitive mutations ([#622](https://github.com/carrtech-dev/ct-ops/issues/622)) ([0eda649](https://github.com/carrtech-dev/ct-ops/commit/0eda64922798a769121c84f40c9e7d9564199756))
+
 ## [0.70.18](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.17...web/v0.70.18) (2026-04-27)
 
 

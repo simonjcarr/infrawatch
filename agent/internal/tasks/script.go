@@ -16,6 +16,17 @@ func init() {
 	Register("custom_script", RunCustomScript)
 }
 
+const (
+	defaultScriptTimeout = 10 * time.Minute
+	maxScriptTimeout     = time.Hour
+)
+
+var allowedScriptInterpreters = map[string]struct{}{
+	"sh":      {},
+	"bash":    {},
+	"python3": {},
+}
+
 // scriptConfig is the JSON structure stored in task_runs.config for custom_script tasks.
 type scriptConfig struct {
 	Script         string `json:"script"`          // script body to execute
@@ -41,17 +52,14 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 	if cfg.Interpreter == "" {
 		cfg.Interpreter = "sh"
 	}
-
-	// Apply an explicit timeout if requested, capped at 1 hour.
-	if cfg.TimeoutSeconds > 0 {
-		timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
-		if timeout > time.Hour {
-			timeout = time.Hour
-		}
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
+	if _, ok := allowedScriptInterpreters[cfg.Interpreter]; !ok {
+		return errorResult(fmt.Sprintf("interpreter %q is not permitted", cfg.Interpreter))
 	}
+
+	timeout := effectiveScriptTimeout(cfg.TimeoutSeconds)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	// Verify the interpreter is available before writing the temp file.
 	if _, err := exec.LookPath(cfg.Interpreter); err != nil {
@@ -77,9 +85,12 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 		return errorResult(fmt.Sprintf("failed to set script permissions: %v", err))
 	}
 
-	progressFn(fmt.Sprintf("Running script with interpreter: %s\n\n", cfg.Interpreter))
+	progressFn(fmt.Sprintf("Running script with interpreter: %s (timeout: %s)\n\n", cfg.Interpreter, timeout))
 
-	cmd := exec.CommandContext(ctx, cfg.Interpreter, tmpPath)
+	cmd, err := buildScriptCommand(ctx, cfg.Interpreter, tmpPath, timeout)
+	if err != nil {
+		return errorResult(err.Error())
+	}
 	exitCode, _, runErr := runCommandStreaming(ctx, cmd, progressFn)
 
 	if runErr != nil {
@@ -92,7 +103,7 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 		if errors.Is(runErr, context.DeadlineExceeded) {
 			return &agentv1.AgentTaskResult{
 				ExitCode: int32(exitCode),
-				Error:    fmt.Sprintf("task timed out (exceeded %d seconds)", cfg.TimeoutSeconds),
+				Error:    fmt.Sprintf("task timed out (exceeded %s)", timeout),
 			}
 		}
 		if exitCode == -1 {
@@ -108,4 +119,15 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 		ExitCode:   int32(exitCode),
 		ResultJson: string(resultJSON),
 	}
+}
+
+func effectiveScriptTimeout(timeoutSeconds int) time.Duration {
+	if timeoutSeconds <= 0 {
+		return defaultScriptTimeout
+	}
+	timeout := time.Duration(timeoutSeconds) * time.Second
+	if timeout > maxScriptTimeout {
+		return maxScriptTimeout
+	}
+	return timeout
 }

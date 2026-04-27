@@ -95,7 +95,9 @@ RUN mkdir -p apps/web/.next && chown nextjs:nodejs apps/web/.next
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
-# Release-please manifest — read at runtime to determine the required agent version
+# Release-please manifest — read at runtime to determine the required agent
+# version. Customer release bundles now pin the published web image by digest,
+# so the image itself must carry the manifest that identifies that release.
 COPY --from=builder --chown=nextjs:nodejs /app/.release-please-manifest.json /app/.release-please-manifest.json
 
 # Agent binaries — built fresh in the agent-builder stage so every web image is

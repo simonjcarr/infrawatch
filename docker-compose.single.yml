@@ -24,6 +24,8 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     depends_on:
+      agent-dist-init:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
     ports:
@@ -55,6 +57,20 @@ services:
       # Read-only mount of the nginx-facing server cert so the enrolment
       # bundle route can embed it in agent downloads.
       - ./deploy/tls:/var/lib/ct-ops/server-tls:ro
+
+  agent-dist-init:
+    image: busybox:1.36
+    restart: "no"
+    user: "0:0"
+    volumes:
+      - agent_dist:/var/lib/ct-ops/agent-dist
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /var/lib/ct-ops/agent-dist
+        chown 1001:1001 /var/lib/ct-ops/agent-dist
 
   migrate:
     image: ${WEB_IMAGE:-ghcr.io/carrtech-dev/ct-ops/web:latest}

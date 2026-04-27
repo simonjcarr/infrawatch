@@ -17,7 +17,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `CT_OPS_LOADTEST_ADMIN_KEY` | — 🔒 | — | Bearer credential for `/api/admin/hosts/bulk-delete`. Endpoint returns 503 when unset. Set only on environments running load tests |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |
-| `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download |
+| `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download. If you override or mount it, ensure it is writable by uid/gid `1001` (`nextjs:nodejs`) |
 | `AGENT_DOWNLOAD_BASE_URL` | — | `https://localhost` | Public URL agents use to download new binaries. Must be reachable from every agent host |
 | `INGEST_WS_URL` | — | *(empty)* | WebSocket URL of the ingest service. Empty = same-origin via the bundled nginx (recommended). Set to an absolute `wss://` URL only to bypass the bundled proxy |
 | `WEB_TLS_CERT` | — | `/var/lib/ct-ops/server-tls/server.crt` | Path to the nginx-facing server cert. The enrolment bundle route reads this file and embeds it so agents can verify the HTTPS download URL |

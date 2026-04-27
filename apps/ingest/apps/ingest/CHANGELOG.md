@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.5...ingest/v0.1.6) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ingest:** cap inventory chunk size ([fc60ae3](https://github.com/carrtech-dev/ct-ops/commit/fc60ae3052b4e3f87a4fcfadb83a48642cbd5d47))
+* **ingest:** cap inventory chunk size ([4b0a3d8](https://github.com/carrtech-dev/ct-ops/commit/4b0a3d8ce39bacce0ff6849cbb9665e59dd71000))
+
 ## [0.1.5](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.4...ingest/v0.1.5) (2026-04-27)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.2.0...ingest/v0.2.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ingest:** restrict terminal websocket origins ([#639](https://github.com/carrtech-dev/ct-ops/issues/639)) ([1e56c0f](https://github.com/carrtech-dev/ct-ops/commit/1e56c0f39120ffaa75ca495b4b4f4249b4c55957))
+
 ## [0.2.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.6...ingest/v0.2.0) (2026-04-27)
 
 

@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -41,7 +42,7 @@ export async function createGroup(
     if (!group) return { error: 'Failed to create group' }
     return { success: true, group }
   } catch (err) {
-    console.error('Failed to create group:', err)
+    logError('Failed to create group:', err)
     return { error: 'Failed to create group' }
   }
 }
@@ -66,7 +67,7 @@ export async function updateGroup(
     if (result.length === 0) return { error: 'Group not found' }
     return { success: true }
   } catch (err) {
-    console.error('Failed to update group:', err)
+    logError('Failed to update group:', err)
     return { error: 'Failed to update group' }
   }
 }
@@ -94,7 +95,7 @@ export async function deleteGroup(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete group:', err)
+    logError('Failed to delete group:', err)
     return { error: 'Failed to delete group' }
   }
 }
@@ -167,7 +168,7 @@ export async function addHostToGroup(
     })
     return { success: true }
   } catch (err) {
-    console.error('Failed to add host to group:', err)
+    logError('Failed to add host to group:', err)
     return { error: 'Failed to add host to group' }
   }
 }
@@ -195,7 +196,7 @@ export async function removeHostFromGroup(
     if (result.length === 0) return { error: 'Membership not found' }
     return { success: true }
   } catch (err) {
-    console.error('Failed to remove host from group:', err)
+    logError('Failed to remove host from group:', err)
     return { error: 'Failed to remove host from group' }
   }
 }

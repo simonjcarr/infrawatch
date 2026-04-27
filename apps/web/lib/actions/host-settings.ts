@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
@@ -59,7 +60,7 @@ export async function updateHostCollectionSettings(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update host collection settings:', err)
+    logError('Failed to update host collection settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -106,7 +107,7 @@ export async function updateOrgDefaultCollectionSettings(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update org default collection settings:', err)
+    logError('Failed to update org default collection settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

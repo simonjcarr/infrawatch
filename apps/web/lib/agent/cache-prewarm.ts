@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/logging'
 import fs from 'fs'
 import path from 'path'
 import { REQUIRED_AGENT_VERSION } from './version'
@@ -71,7 +72,7 @@ export async function prewarmAgentCache(): Promise<void> {
     }
     release = (await res.json()) as GitHubRelease
   } catch (err) {
-    console.warn('[agent-cache] Could not reach GitHub — skipping prewarm', err)
+    logWarn('[agent-cache] Could not reach GitHub — skipping prewarm', err)
     return
   }
 
@@ -131,6 +132,6 @@ async function downloadIfMissing(
       `[agent-cache] Cached ${versionedName} (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`
     )
   } catch (err) {
-    console.warn(`[agent-cache] Error downloading ${baseName}:`, err)
+    logWarn(`[agent-cache] Error downloading ${baseName}:`, err)
   }
 }

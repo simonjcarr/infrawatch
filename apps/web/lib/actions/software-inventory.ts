@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -87,7 +88,7 @@ export async function updateSoftwareInventorySettings(
       .where(eq(organisations.id, orgId))
     return { success: true }
   } catch (err) {
-    console.error('Failed to update software inventory settings:', err)
+    logError('Failed to update software inventory settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -140,7 +141,7 @@ export async function triggerSoftwareScan(
       return { success: true as const, taskRunId: run.id }
     })
   } catch (err) {
-    console.error('Failed to trigger software scan:', err)
+    logError('Failed to trigger software scan:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -801,7 +802,7 @@ export async function saveSoftwareReport(
       .returning()
     return { success: true, id: row!.id }
   } catch (err) {
-    console.error('Failed to save report:', err)
+    logError('Failed to save report:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -826,7 +827,7 @@ export async function deleteSavedReport(
       )
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete saved report:', err)
+    logError('Failed to delete saved report:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

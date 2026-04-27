@@ -1,3 +1,4 @@
+import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { users, accounts, sessions, ldapConfigurations } from '@/lib/db/schema'
@@ -210,14 +211,14 @@ export async function POST(request: NextRequest) {
       return withAuthDelay(requestStart, response)
     }
 
-    console.error(`[LDAP] All configs failed for user "${username}":`, errors)
+    logError(`[LDAP] All configs failed for user "${username}":`, errors)
     passwordLoginAttemptGuard.recordFailure(username)
     return withAuthDelay(
       requestStart,
       NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
     )
   } catch (err) {
-    console.error('[LDAP] Unexpected error during login:', err)
+    logError('[LDAP] Unexpected error during login:', err)
     return withAuthDelay(
       requestStart,
       NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 }),

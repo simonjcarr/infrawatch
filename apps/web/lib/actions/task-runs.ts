@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
@@ -85,7 +86,7 @@ async function createTaskRun(
       return { success: true, taskRunId: run.id }
     })
   } catch (err) {
-    console.error('Failed to create task run:', err)
+    logError('Failed to create task run:', err)
     return { error: 'Failed to create task run' }
   }
 }
@@ -318,7 +319,7 @@ export async function cancelTaskRun(
       return { success: true }
     })
   } catch (err) {
-    console.error('Failed to cancel task run:', err)
+    logError('Failed to cancel task run:', err)
     return { error: 'Failed to cancel task run' }
   }
 }
@@ -551,7 +552,7 @@ export async function deleteTaskRuns(
     })
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete task runs:', err)
+    logError('Failed to delete task runs:', err)
     return { error: 'Failed to delete task runs' }
   }
 }

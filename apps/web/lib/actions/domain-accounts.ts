@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -171,7 +172,7 @@ export async function createDomainAccount(
     if (message.includes('domain_accounts_org_username_idx')) {
       return { error: 'An account with this username already exists' }
     }
-    console.error('Failed to create service account:', err)
+    logError('Failed to create service account:', err)
     return { error: 'Failed to create service account' }
   }
 }

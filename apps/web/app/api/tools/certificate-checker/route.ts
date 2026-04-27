@@ -1,3 +1,4 @@
+import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import * as crypto from 'crypto'
 import * as forge from 'node-forge'
@@ -152,7 +153,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 })
   } catch (err) {
-    console.error('[certificate-checker] Unexpected error:', err)
+    logError('[certificate-checker] Unexpected error:', err)
     const message = err instanceof Error ? err.message : 'Internal error'
     // Expose the message only for operational errors whose text is explicitly user-friendly
     // (e.g. SSRF guard, size limit, parse failure). Avoid leaking raw stack traces.

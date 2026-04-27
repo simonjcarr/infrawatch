@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
@@ -282,7 +283,7 @@ export async function createNote(
     })
     return { success: true, note: created }
   } catch (err) {
-    console.error('Failed to create note:', err)
+    logError('Failed to create note:', err)
     return { error: 'Failed to create note' }
   }
 }
@@ -366,7 +367,7 @@ export async function updateNote(
       return { success: true as const, note: updated }
     })
   } catch (err) {
-    console.error('Failed to update note:', err)
+    logError('Failed to update note:', err)
     return { error: 'Failed to update note' }
   }
 }
@@ -399,7 +400,7 @@ export async function deleteNote(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete note:', err)
+    logError('Failed to delete note:', err)
     return { error: 'Failed to delete note' }
   }
 }
@@ -461,7 +462,7 @@ export async function setNoteTargets(
       return { success: true as const }
     })
   } catch (err) {
-    console.error('Failed to set note targets:', err)
+    logError('Failed to set note targets:', err)
     return { error: 'Failed to update targets' }
   }
 }
@@ -532,7 +533,7 @@ export async function toggleNotePin(
       return { success: true as const }
     })
   } catch (err) {
-    console.error('Failed to toggle pin:', err)
+    logError('Failed to toggle pin:', err)
     return { error: 'Failed to update pin' }
   }
 }
@@ -568,7 +569,7 @@ export async function toggleNotePrivate(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to toggle privacy:', err)
+    logError('Failed to toggle privacy:', err)
     return { error: 'Failed to update privacy' }
   }
 }
@@ -612,7 +613,7 @@ export async function addNoteReaction(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to add reaction:', err)
+    logError('Failed to add reaction:', err)
     return { error: 'Failed to add reaction' }
   }
 }
@@ -639,7 +640,7 @@ export async function removeNoteReaction(
       )
     return { success: true }
   } catch (err) {
-    console.error('Failed to remove reaction:', err)
+    logError('Failed to remove reaction:', err)
     return { error: 'Failed to remove reaction' }
   }
 }

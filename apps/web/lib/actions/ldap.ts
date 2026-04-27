@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -131,7 +132,7 @@ export async function createLdapConfiguration(
     if (!row) return { error: 'Insert failed' }
     return { success: true, id: row.id }
   } catch (err) {
-    console.error('Failed to create LDAP configuration:', err)
+    logError('Failed to create LDAP configuration:', err)
     return { error: 'Failed to create LDAP configuration' }
   }
 }

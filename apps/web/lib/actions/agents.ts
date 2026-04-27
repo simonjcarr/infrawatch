@@ -1,5 +1,6 @@
 'use server'
 
+import { logError, logWarn } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -173,7 +174,7 @@ export async function approveAgent(
       if (finalTags.length > 0) {
         const result = await assignTagsToResource(orgId, 'host', host.id, finalTags)
         if ('error' in result) {
-          console.warn('Failed to apply tags on approval:', result.error)
+          logWarn('Failed to apply tags on approval:', result.error)
         }
       }
 
@@ -183,7 +184,7 @@ export async function approveAgent(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to approve agent:', err)
+    logError('Failed to approve agent:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -256,7 +257,7 @@ export async function rejectAgent(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to reject agent:', err)
+    logError('Failed to reject agent:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -557,7 +558,7 @@ export async function createEnrolmentToken(
 
     return { token: record.token, id: record.id }
   } catch (err) {
-    console.error('Failed to create enrolment token:', err)
+    logError('Failed to create enrolment token:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -595,7 +596,7 @@ export async function revokeEnrolmentToken(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to revoke enrolment token:', err)
+    logError('Failed to revoke enrolment token:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -1189,7 +1190,7 @@ export async function deleteHost(
     if (hostNotFound) return { error: 'Host not found' }
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete host:', err)
+    logError('Failed to delete host:', err)
     return { error: 'An unexpected error occurred while deleting the host' }
   }
 }
@@ -1270,7 +1271,7 @@ export async function uninstallAndDeleteHost(
 
     return await deleteHost(orgId, hostId)
   } catch (err) {
-    console.error('Failed to uninstall agent and delete host:', err)
+    logError('Failed to uninstall agent and delete host:', err)
     return { error: 'An unexpected error occurred while uninstalling the agent' }
   }
 }

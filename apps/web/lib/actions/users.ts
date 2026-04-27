@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -140,7 +141,7 @@ export async function inviteUser(
     const baseUrl = getBetterAuthOrigin()
     return { inviteLink: `${baseUrl}/register?invite=${invite.token}` }
   } catch (err) {
-    console.error('Failed to invite user:', err)
+    logError('Failed to invite user:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -202,7 +203,7 @@ export async function updateUserRole(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update role:', err)
+    logError('Failed to update role:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -238,7 +239,7 @@ export async function deactivateUser(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to deactivate user:', err)
+    logError('Failed to deactivate user:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -258,7 +259,7 @@ export async function reactivateUser(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to reactivate user:', err)
+    logError('Failed to reactivate user:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -317,7 +318,7 @@ export async function removeUser(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to remove user:', err)
+    logError('Failed to remove user:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -337,7 +338,7 @@ export async function cancelInvite(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to cancel invite:', err)
+    logError('Failed to cancel invite:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

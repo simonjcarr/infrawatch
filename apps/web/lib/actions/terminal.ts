@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
@@ -145,7 +146,7 @@ export async function createTerminalSession(
       websocketToken,
     }
   } catch (err) {
-    console.error('Failed to create terminal session:', err)
+    logError('Failed to create terminal session:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -223,7 +224,7 @@ export async function updateOrgTerminalSettings(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update org terminal settings:', err)
+    logError('Failed to update org terminal settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -299,7 +300,7 @@ export async function updateHostTerminalSettings(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update host terminal settings:', err)
+    logError('Failed to update host terminal settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

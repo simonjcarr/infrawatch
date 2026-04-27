@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { users, organisations } from '@/lib/db/schema'
@@ -29,7 +30,7 @@ export async function updateName(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update name:', err)
+    logError('Failed to update name:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -65,7 +66,7 @@ export async function updateEmail(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update email:', err)
+    logError('Failed to update email:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -97,7 +98,7 @@ export async function updateTheme(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update theme:', err)
+    logError('Failed to update theme:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -169,7 +170,7 @@ export async function updatePassword(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to change password:', err)
+    logError('Failed to change password:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

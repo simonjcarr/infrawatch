@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -42,7 +43,7 @@ export async function updateOrgName(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update org name:', err)
+    logError('Failed to update org name:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -101,7 +102,7 @@ export async function updateMetricRetention(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update metric retention:', err)
+    logError('Failed to update metric retention:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -154,7 +155,7 @@ export async function saveLicenceKey(
 
     return { success: true, tier: result.payload.tier }
   } catch (err) {
-    console.error('Failed to save licence key:', err)
+    logError('Failed to save licence key:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -187,7 +188,7 @@ export async function generateActivationToken(
     })
     return { success: true, token }
   } catch (err) {
-    console.error('Failed to generate activation token:', err)
+    logError('Failed to generate activation token:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

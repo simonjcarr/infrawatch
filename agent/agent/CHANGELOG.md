@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.6](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.5...agent/v0.30.6) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** validate config file ownership and mode ([#614](https://github.com/carrtech-dev/ct-ops/issues/614)) ([8451d1f](https://github.com/carrtech-dev/ct-ops/commit/8451d1f3ca70213e0d77d0134c1a2fe476182e18))
+
 ## [0.30.5](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.4...agent/v0.30.5) (2026-04-27)
 
 

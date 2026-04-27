@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.0...web/v0.73.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** redact sensitive error logs ([#646](https://github.com/carrtech-dev/ct-ops/issues/646)) ([ea53494](https://github.com/carrtech-dev/ct-ops/commit/ea534940b5d43ccdeb5dfa251d7a8593f68307c9))
+
 ## [0.73.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.72.0...web/v0.73.0) (2026-04-27)
 
 

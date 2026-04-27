@@ -153,6 +153,9 @@ func main() {
 	// Start task schedule sweeper goroutine
 	go handlers.RunTaskScheduleSweeper(ctx, pool, 30*time.Second)
 
+	// Start notification purge sweeper goroutine
+	go handlers.RunNotificationPurgeSweeper(ctx, pool, 24*time.Hour)
+
 	// Start gRPC server in goroutine
 	grpcErr := make(chan error, 1)
 	go func() {

@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations'
 import { hosts } from './hosts'
@@ -127,6 +128,7 @@ export const notifications = pgTable('notifications', {
   index('notifications_user_read_idx').on(table.userId, table.read),
   index('notifications_org_user_idx').on(table.organisationId, table.userId),
   index('notifications_user_created_idx').on(table.userId, table.createdAt),
+  index('notifications_deleted_at_idx').on(table.deletedAt).where(sql`${table.deletedAt} IS NOT NULL`),
 ])
 
 export const alertSilences = pgTable('alert_silences', {

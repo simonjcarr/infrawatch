@@ -23,6 +23,7 @@
 - Added rules requiring explicit, relevant seed data for tests instead of relying on leaked state
 - Added Progress Tracking guidance: when new feature work satisfies all or part of a requirement, update `PROGRESS.md` and state what is complete versus outstanding
 - Added Completion Cleanup guidance: remove temporary worktrees only after commit, push, release, and any relevant image/artifact publication, and never delete worktrees with uncommitted user work
+- Added unrelated-finding guidance: when an agent identifies an unrelated error, bug, or security risk, it should create a focused GitHub issue so the finding is tracked instead of forgotten
 
 **E2E harness docs** (`apps/docs/docs/development/testing.md`)
 - Expanded the Playwright/Testcontainers documentation with agent-ready detail on how the tmpfs TimescaleDB/Postgres database is created, how `DATABASE_URL` is injected before Next.js starts, and how migrations run

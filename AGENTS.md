@@ -49,6 +49,12 @@ For forms and other user-controlled inputs:
 These examples are not exhaustive. Consider the broader security implications of
 the feature, its failure modes, and how it could be abused before shipping.
 
+If you identify an error, bug, or security risk that is unrelated to the task
+you are working on, create an issue in the GitHub repository before finishing so
+the finding is tracked and not forgotten. Keep the issue focused, include enough
+evidence to reproduce or assess the risk, and do not expand the current task's
+scope unless the user explicitly asks you to fix it.
+
 ## Testing Expectations
 
 Use test-driven development for new features and meaningful behavior changes.

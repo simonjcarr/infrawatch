@@ -5,12 +5,14 @@ import { TEST_ORG } from '../fixtures/seed'
 test('authenticated user can search and filter the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
-  const [{ id: orgId }] = await sql<Array<{ id: string }>>`
+  const orgRows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM organisations
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
+  expect(orgRows).toHaveLength(1)
+  const orgId = orgRows[0]!.id
 
   await sql`
     INSERT INTO hosts (

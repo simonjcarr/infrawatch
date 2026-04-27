@@ -9,7 +9,7 @@ RUN corepack enable && corepack prepare pnpm@10 --activate
 # missing baked agent binaries.
 # The download route falls back to these baked binaries when the operator-managed
 # volume is empty and GitHub is unreachable (air-gap installs).
-FROM golang:1.25-alpine AS agent-builder
+FROM golang:1.26-alpine AS agent-builder
 RUN apk add --no-cache jq
 WORKDIR /src
 # `replace github.com/carrtech-dev/ct-ops/proto => ../proto/gen/go` in agent/go.mod

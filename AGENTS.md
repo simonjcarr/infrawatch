@@ -46,6 +46,12 @@ reason. Then implement the code needed to make those tests pass. This helps
 confirm the implementation does what was intended and ensures new behavior has
 test coverage.
 
+Do not consider implementation work complete, commit it, or open a pull request
+while relevant tests are failing. Investigate and fix failures caused by the
+change before finishing. If failures are unrelated or cannot be fixed within the
+task scope, document the evidence in the PR and clearly call out the residual
+risk.
+
 If a test-first workflow is not practical for a specific change, document why in
 the PR and describe the alternative validation that was performed.
 

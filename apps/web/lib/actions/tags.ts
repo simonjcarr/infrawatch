@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -154,7 +155,7 @@ export async function assignTagsToResource(
     })
     return { success: true }
   } catch (err) {
-    console.error('Failed to assign tags:', err)
+    logError('Failed to assign tags:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -181,7 +182,7 @@ export async function removeTagFromResource(
     })
     return { success: true }
   } catch (err) {
-    console.error('Failed to remove tag:', err)
+    logError('Failed to remove tag:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -260,7 +261,7 @@ export async function replaceResourceTags(
     })
     return { success: true }
   } catch (err) {
-    console.error('Failed to replace tags:', err)
+    logError('Failed to replace tags:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -329,7 +330,7 @@ export async function updateOrgDefaultTags(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to update org default tags:', err)
+    logError('Failed to update org default tags:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { readFile } from 'node:fs/promises'
 import { createPublicKey, X509Certificate } from 'node:crypto'
 import { z } from 'zod'
@@ -65,7 +66,7 @@ export async function getSecurityOverview(): Promise<SecurityOverview | { error:
 
     return { serverTls, agentCa }
   } catch (err) {
-    console.error('getSecurityOverview failed:', err)
+    logError('getSecurityOverview failed:', err)
     return { error: err instanceof Error ? err.message : 'An unexpected error occurred' }
   }
 }
@@ -136,7 +137,7 @@ export async function uploadAgentCA(
 
     return { success: true, fingerprint }
   } catch (err) {
-    console.error('uploadAgentCA failed:', err)
+    logError('uploadAgentCA failed:', err)
     return { error: err instanceof Error ? err.message : 'An unexpected error occurred' }
   }
 }

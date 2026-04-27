@@ -1,3 +1,4 @@
+import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
@@ -375,7 +376,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       transitivePlugins,
     } satisfies JenkinsBundlerResponse)
   } catch (err) {
-    console.error('[jenkins-bundler] error:', err)
+    logError('[jenkins-bundler] error:', err)
     const message = err instanceof Error ? err.message : 'Internal error'
     const isSafe =
       message.startsWith('Upstream returned') ||

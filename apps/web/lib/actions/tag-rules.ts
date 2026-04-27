@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
@@ -88,7 +89,7 @@ export async function bulkAssignTags(
     }
     return { success: true, applied }
   } catch (err) {
-    console.error('Failed to bulk assign tags:', err)
+    logError('Failed to bulk assign tags:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -123,7 +124,7 @@ export async function createTagRule(
     if (!row) return { error: 'Failed to create rule' }
     return { success: true, id: row.id }
   } catch (err) {
-    console.error('Failed to create tag rule:', err)
+    logError('Failed to create tag rule:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -165,7 +166,7 @@ export async function updateTagRule(
       .where(and(eq(tagRules.id, ruleId), eq(tagRules.organisationId, orgId)))
     return { success: true }
   } catch (err) {
-    console.error('Failed to update tag rule:', err)
+    logError('Failed to update tag rule:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -182,7 +183,7 @@ export async function deleteTagRule(
       .where(and(eq(tagRules.id, ruleId), eq(tagRules.organisationId, orgId)))
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete tag rule:', err)
+    logError('Failed to delete tag rule:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -206,7 +207,7 @@ export async function runTagRule(
     if (!rule) return { error: 'Rule not found' }
     return bulkAssignTags(orgId, rule.filter, rule.tags)
   } catch (err) {
-    console.error('Failed to run tag rule:', err)
+    logError('Failed to run tag rule:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

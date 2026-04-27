@@ -1,3 +1,4 @@
+import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import archiver from 'archiver'
 import { z } from 'zod'
@@ -626,7 +627,7 @@ async function runTransferJob(job: TransferJob, request: TransferRequest, baseUr
 
     await refreshTransferTaskStatus(job)
   } catch (err) {
-    console.error('Bundle transfer failed:', err)
+    logError('Bundle transfer failed:', err)
     const cleanupDir = job.tempDir
     publishJob(job, {
       phase: 'failed',

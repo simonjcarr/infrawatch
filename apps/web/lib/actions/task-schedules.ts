@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
@@ -234,7 +235,7 @@ export async function createSchedule(
     if (!row) return { error: 'Failed to create schedule' }
     return { success: true, id: row.id }
   } catch (err) {
-    console.error('Failed to create schedule:', err)
+    logError('Failed to create schedule:', err)
     return { error: 'Failed to create schedule' }
   }
 }
@@ -297,7 +298,7 @@ export async function updateSchedule(
       .where(eq(taskSchedules.id, id))
     return { success: true }
   } catch (err) {
-    console.error('Failed to update schedule:', err)
+    logError('Failed to update schedule:', err)
     return { error: 'Failed to update schedule' }
   }
 }
@@ -338,7 +339,7 @@ export async function setScheduleEnabled(
       .where(eq(taskSchedules.id, id))
     return { success: true }
   } catch (err) {
-    console.error('Failed to toggle schedule:', err)
+    logError('Failed to toggle schedule:', err)
     return { error: 'Failed to update schedule' }
   }
 }
@@ -365,7 +366,7 @@ export async function deleteSchedule(
       )
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete schedule:', err)
+    logError('Failed to delete schedule:', err)
     return { error: 'Failed to delete schedule' }
   }
 }

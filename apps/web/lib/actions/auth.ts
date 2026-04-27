@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { headers } from 'next/headers'
 import { db } from '@/lib/db'
 import { invitations, users } from '@/lib/db/schema'
@@ -69,7 +70,7 @@ export async function acceptInvite(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to accept invite:', err)
+    logError('Failed to accept invite:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

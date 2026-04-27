@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
@@ -90,7 +91,7 @@ export async function createNetwork(
     if (!network) return { error: 'Failed to create network' }
     return { success: true, network }
   } catch (err) {
-    console.error('Failed to create network:', err)
+    logError('Failed to create network:', err)
     return { error: 'Failed to create network' }
   }
 }
@@ -126,7 +127,7 @@ export async function updateNetwork(
     if (result.length === 0) return { error: 'Network not found' }
     return { success: true }
   } catch (err) {
-    console.error('Failed to update network:', err)
+    logError('Failed to update network:', err)
     return { error: 'Failed to update network' }
   }
 }
@@ -164,7 +165,7 @@ export async function deleteNetwork(
 
     return { success: true }
   } catch (err) {
-    console.error('Failed to delete network:', err)
+    logError('Failed to delete network:', err)
     return { error: 'Failed to delete network' }
   }
 }
@@ -209,7 +210,7 @@ export async function addHostToNetwork(
     })
     return { success: true }
   } catch (err) {
-    console.error('Failed to add host to network:', err)
+    logError('Failed to add host to network:', err)
     return { error: 'Failed to add host to network' }
   }
 }
@@ -242,7 +243,7 @@ export async function removeHostFromNetwork(
     if (result.length === 0) return { error: 'Membership not found' }
     return { success: true }
   } catch (err) {
-    console.error('Failed to remove host from network:', err)
+    logError('Failed to remove host from network:', err)
     return { error: 'Failed to remove host from network' }
   }
 }

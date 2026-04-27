@@ -1,5 +1,6 @@
 'use server'
 
+import { logError } from '@/lib/logging'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { organisations, users } from '@/lib/db/schema'
@@ -50,7 +51,7 @@ export async function createOrganisation(
 
     return { organisation }
   } catch (err) {
-    console.error('Failed to create organisation:', err)
+    logError('Failed to create organisation:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

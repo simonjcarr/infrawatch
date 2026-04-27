@@ -18,13 +18,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	ctcrypto "github.com/carrtech-dev/ct-ops/ingest/internal/crypto"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
 
 // AlertEvent is the payload sent to webhook notification channels.
 type AlertEvent struct {
-	Event     string `json:"event"`     // "alert.fired" | "alert.resolved"
-	Severity  string `json:"severity"`  // "info" | "warning" | "critical"
+	Event     string `json:"event"`    // "alert.fired" | "alert.resolved"
+	Severity  string `json:"severity"` // "info" | "warning" | "critical"
 	Host      string `json:"host"`
 	Rule      string `json:"rule"`
 	Message   string `json:"message"`
@@ -71,12 +72,23 @@ type smtpChannelConfig struct {
 	Host        string   `json:"host"`
 	Port        int      `json:"port"`
 	Encryption  string   `json:"encryption"` // 'none' | 'starttls' | 'tls'
-	Secure      *bool    `json:"secure"`      // legacy field — superseded by Encryption
+	Secure      *bool    `json:"secure"`     // legacy field — superseded by Encryption
 	Username    string   `json:"username"`
 	Password    string   `json:"password"`
 	FromAddress string   `json:"fromAddress"`
 	FromName    string   `json:"fromName"`
 	ToAddresses []string `json:"toAddresses"`
+}
+
+type smtpRelayConfig struct {
+	Enabled           bool   `json:"enabled"`
+	Host              string `json:"host"`
+	Port              int    `json:"port"`
+	Encryption        string `json:"encryption"` // 'none' | 'starttls' | 'tls'
+	Username          string `json:"username"`
+	PasswordEncrypted string `json:"passwordEncrypted"`
+	FromAddress       string `json:"fromAddress"`
+	FromName          string `json:"fromName"`
 }
 
 func (c *smtpChannelConfig) effectiveEncryption() string {
@@ -88,6 +100,28 @@ func (c *smtpChannelConfig) effectiveEncryption() string {
 		return "tls"
 	}
 	return "starttls"
+}
+
+func smtpConfigFromRelay(relay smtpRelayConfig, recipients []string) (smtpChannelConfig, error) {
+	password := ""
+	if relay.PasswordEncrypted != "" {
+		decrypted, err := ctcrypto.Decrypt(relay.PasswordEncrypted)
+		if err != nil {
+			return smtpChannelConfig{}, fmt.Errorf("decrypt smtp password: %w", err)
+		}
+		password = string(decrypted)
+	}
+
+	return smtpChannelConfig{
+		Host:        relay.Host,
+		Port:        relay.Port,
+		Encryption:  relay.Encryption,
+		Username:    relay.Username,
+		Password:    password,
+		FromAddress: relay.FromAddress,
+		FromName:    relay.FromName,
+		ToAddresses: recipients,
+	}, nil
 }
 
 // sendSmtpEmail delivers an AlertEvent to a single SMTP channel.
@@ -193,6 +227,26 @@ func dispatchSmtp(smtpChannels []queries.SmtpChannelRow, event AlertEvent) {
 		var cfg smtpChannelConfig
 		if err := json.Unmarshal([]byte(ch.ConfigJSON), &cfg); err != nil {
 			slog.Warn("dispatchSmtp: unmarshal channel config", "channel_id", ch.ID, "err", err)
+			continue
+		}
+		if ch.RelayConfigJSON != "" && ch.RelayConfigJSON != "{}" {
+			var relay smtpRelayConfig
+			if err := json.Unmarshal([]byte(ch.RelayConfigJSON), &relay); err != nil {
+				slog.Warn("dispatchSmtp: unmarshal relay config", "channel_id", ch.ID, "err", err)
+				continue
+			}
+			if !relay.Enabled {
+				continue
+			}
+			relayCfg, err := smtpConfigFromRelay(relay, cfg.ToAddresses)
+			if err != nil {
+				slog.Warn("dispatchSmtp: prepare relay config", "channel_id", ch.ID, "err", err)
+				continue
+			}
+			cfg = relayCfg
+		}
+		if cfg.Host == "" || cfg.FromAddress == "" || len(cfg.ToAddresses) == 0 {
+			slog.Warn("dispatchSmtp: incomplete smtp configuration", "channel_id", ch.ID)
 			continue
 		}
 		go func(c smtpChannelConfig) {

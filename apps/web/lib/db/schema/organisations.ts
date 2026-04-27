@@ -3,11 +3,13 @@ import { createId } from '@paralleldrive/cuid2'
 import { z } from 'zod'
 import { DEFAULT_NOTIFICATION_ROLES } from '../../auth/roles'
 import type { HostCollectionSettings } from './hosts'
+import { smtpRelaySettingsSchema, type SmtpRelaySettings } from '../../notifications/smtp-settings'
 
 export interface OrgNotificationSettings {
   inAppEnabled?: boolean      // default true — master switch for in-app notifications
   inAppRoles?: string[]       // default ['super_admin','org_admin','engineer']
   allowUserOptOut?: boolean   // default true — whether users can individually opt out
+  smtpRelay?: SmtpRelaySettings
 }
 
 export interface SoftwareInventorySettings {
@@ -47,6 +49,7 @@ const orgNotificationSettingsSchema = z.object({
   inAppEnabled: z.boolean().optional().catch(undefined),
   inAppRoles: z.array(z.string()).catch([...DEFAULT_NOTIFICATION_ROLES]).optional(),
   allowUserOptOut: z.boolean().optional().catch(undefined),
+  smtpRelay: smtpRelaySettingsSchema.optional().catch(undefined),
 }).strip()
 
 const softwareInventorySettingsSchema = z.object({

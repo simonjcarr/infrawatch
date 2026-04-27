@@ -10,20 +10,26 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, Bell, ScanLine, Tag as TagIcon, Copy, Check } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, Bell, ScanLine, Tag as TagIcon, Copy, Check, Mail, FlaskConical } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivationToken } from '@/lib/actions/settings'
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
-import { getOrgNotificationSettings, updateOrgNotificationSettings } from '@/lib/actions/notification-settings'
+import {
+  getOrgNotificationSettings,
+  getOrgSmtpRelaySettings,
+  sendTestSmtpRelaySettings,
+  updateOrgNotificationSettings,
+  updateOrgSmtpRelaySettings,
+} from '@/lib/actions/notification-settings'
 import { getSoftwareInventorySettings, updateSoftwareInventorySettings } from '@/lib/actions/software-inventory'
 import { getOrgDefaultTags, updateOrgDefaultTags } from '@/lib/actions/tags'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import type { TagPair } from '@/lib/db/schema'
 import type { OrgTerminalSettings } from '@/lib/actions/terminal'
-import type { OrgNotificationSettingsFull } from '@/lib/actions/notification-settings'
+import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput } from '@/lib/actions/notification-settings'
 import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 import { COMMUNITY_MAX_RETENTION_DAYS, hasFeature, type LicenceTier } from '@/lib/features'
@@ -69,6 +75,31 @@ const RETENTION_OPTIONS = [
   { value: '180', label: '180 days' },
   { value: '365', label: '1 year' },
 ]
+
+type SmtpEncryptionValue = 'none' | 'starttls' | 'tls'
+
+const SMTP_ENCRYPTION_DEFAULT_PORTS: Record<SmtpEncryptionValue, number> = {
+  none: 25,
+  starttls: 587,
+  tls: 465,
+}
+
+const SMTP_ENCRYPTION_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'starttls', label: 'STARTTLS' },
+  { value: 'tls', label: 'SSL/TLS' },
+] as const
+
+const EMPTY_SMTP_RELAY_SETTINGS: OrgSmtpRelaySettingsInput = {
+  enabled: false,
+  host: '',
+  port: 587,
+  encryption: 'starttls',
+  username: '',
+  password: '',
+  fromAddress: '',
+  fromName: '',
+}
 
 export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
   const queryClient = useQueryClient()
@@ -248,6 +279,50 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       setTimeout(() => setNotificationSaveSuccess(false), 3000)
     },
   })
+
+  const [smtpSaveSuccess, setSmtpSaveSuccess] = useState(false)
+  const [smtpError, setSmtpError] = useState<string | null>(null)
+  const [smtpTestResult, setSmtpTestResult] = useState<{ success?: boolean; error?: string } | null>(null)
+  const { data: smtpRelayDefaults } = useQuery({
+    queryKey: ['org-smtp-relay-settings', org.id],
+    queryFn: () => getOrgSmtpRelaySettings(org.id),
+  })
+  const [localSmtpRelaySettings, setLocalSmtpRelaySettings] = useState<OrgSmtpRelaySettingsInput | null>(null)
+  const currentSmtpRelaySettings = localSmtpRelaySettings ?? {
+    ...EMPTY_SMTP_RELAY_SETTINGS,
+    ...(smtpRelayDefaults ?? {}),
+    password: '',
+  }
+  const smtpDirty = localSmtpRelaySettings !== null
+
+  const smtpMutation = useMutation({
+    mutationFn: (settings: OrgSmtpRelaySettingsInput) => updateOrgSmtpRelaySettings(org.id, settings),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setSmtpError(result.error)
+        setSmtpSaveSuccess(false)
+        return
+      }
+      setLocalSmtpRelaySettings(null)
+      setSmtpError(null)
+      setSmtpSaveSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ['org-smtp-relay-settings', org.id] })
+      setTimeout(() => setSmtpSaveSuccess(false), 3000)
+    },
+  })
+
+  const smtpTestMutation = useMutation({
+    mutationFn: () => sendTestSmtpRelaySettings(org.id),
+    onSuccess: (result) => {
+      setSmtpTestResult('error' in result ? { error: result.error } : { success: true })
+    },
+  })
+
+  function updateSmtpRelaySetting(patch: Partial<OrgSmtpRelaySettingsInput>) {
+    setLocalSmtpRelaySettings({ ...currentSmtpRelaySettings, ...patch })
+    setSmtpError(null)
+    setSmtpTestResult(null)
+  }
 
   // Software inventory settings
   const [swInvSaveSuccess, setSwInvSaveSuccess] = useState(false)
@@ -734,6 +809,177 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 <>
                   <p>Receiving roles: {currentNotificationSettings.inAppRoles.join(', ')}</p>
                   <p>User opt-out: {currentNotificationSettings.allowUserOptOut ? 'Allowed' : 'Not allowed'}</p>
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SMTP Relay section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mail className="size-4 text-muted-foreground" />
+            SMTP Relay
+          </CardTitle>
+          <CardDescription>
+            Central email delivery settings used by alert email channels.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isAdmin ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm">Enable SMTP relay</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Email notification channels use this relay for delivery
+                  </p>
+                </div>
+                <Switch
+                  checked={currentSmtpRelaySettings.enabled}
+                  onCheckedChange={(enabled) => updateSmtpRelaySetting({ enabled })}
+                />
+              </div>
+              {currentSmtpRelaySettings.enabled && (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2 space-y-1.5">
+                      <Label htmlFor="smtp-relay-host">Host</Label>
+                      <Input
+                        id="smtp-relay-host"
+                        placeholder="smtp.example.com"
+                        value={currentSmtpRelaySettings.host}
+                        onChange={(e) => updateSmtpRelaySetting({ host: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="smtp-relay-port">Port</Label>
+                      <Input
+                        id="smtp-relay-port"
+                        type="number"
+                        value={currentSmtpRelaySettings.port}
+                        onChange={(e) => updateSmtpRelaySetting({ port: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="smtp-relay-encryption">Encryption</Label>
+                    <Select
+                      value={currentSmtpRelaySettings.encryption}
+                      onValueChange={(value) => {
+                        const encryption = value as SmtpEncryptionValue
+                        updateSmtpRelaySetting({
+                          encryption,
+                          port: SMTP_ENCRYPTION_DEFAULT_PORTS[encryption],
+                        })
+                      }}
+                    >
+                      <SelectTrigger id="smtp-relay-encryption" className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SMTP_ENCRYPTION_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="smtp-relay-username">
+                        Username <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Input
+                        id="smtp-relay-username"
+                        value={currentSmtpRelaySettings.username ?? ''}
+                        onChange={(e) => updateSmtpRelaySetting({ username: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="smtp-relay-password">
+                        Password{' '}
+                        <span className="text-muted-foreground font-normal">
+                          ({smtpRelayDefaults?.hasPassword ? 'leave blank to keep existing' : 'optional'})
+                        </span>
+                      </Label>
+                      <Input
+                        id="smtp-relay-password"
+                        type="password"
+                        placeholder={smtpRelayDefaults?.hasPassword ? '••••••••' : ''}
+                        value={currentSmtpRelaySettings.password ?? ''}
+                        onChange={(e) => updateSmtpRelaySetting({ password: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="smtp-relay-from-address">From address</Label>
+                      <Input
+                        id="smtp-relay-from-address"
+                        placeholder="alerts@example.com"
+                        value={currentSmtpRelaySettings.fromAddress}
+                        onChange={(e) => updateSmtpRelaySetting({ fromAddress: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="smtp-relay-from-name">
+                        From name <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Input
+                        id="smtp-relay-from-name"
+                        placeholder="CT-Ops Alerts"
+                        value={currentSmtpRelaySettings.fromName ?? ''}
+                        onChange={(e) => updateSmtpRelaySetting({ fromName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+              {smtpError && <p className="text-sm text-destructive">{smtpError}</p>}
+              {smtpTestResult?.error && <p className="text-sm text-destructive">{smtpTestResult.error}</p>}
+              {smtpTestResult?.success && (
+                <p className="flex items-center gap-1 text-sm text-green-700">
+                  <CheckCircle2 className="size-4" />
+                  Test email sent
+                </p>
+              )}
+              <div className="flex items-center gap-3 pt-2 border-t">
+                <Button
+                  size="sm"
+                  disabled={!smtpDirty || smtpMutation.isPending}
+                  onClick={() => smtpMutation.mutate(currentSmtpRelaySettings)}
+                >
+                  {smtpMutation.isPending ? 'Saving…' : 'Save'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={smtpDirty || smtpTestMutation.isPending || !smtpRelayDefaults?.enabled}
+                  onClick={() => smtpTestMutation.mutate()}
+                >
+                  <FlaskConical className="size-3.5 mr-1" />
+                  {smtpTestMutation.isPending ? 'Testing…' : 'Test'}
+                </Button>
+                {smtpSaveSuccess && (
+                  <span className="flex items-center gap-1 text-sm text-green-700">
+                    <CheckCircle2 className="size-4" />
+                    Saved
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <p>SMTP relay: {smtpRelayDefaults?.enabled ? 'Enabled' : 'Disabled'}</p>
+              {smtpRelayDefaults?.enabled && (
+                <>
+                  <p>Host: {smtpRelayDefaults.host}:{smtpRelayDefaults.port}</p>
+                  <p>Encryption: {smtpRelayDefaults.encryption.toUpperCase()}</p>
+                  <p>From: {smtpRelayDefaults.fromAddress}</p>
                 </>
               )}
             </div>

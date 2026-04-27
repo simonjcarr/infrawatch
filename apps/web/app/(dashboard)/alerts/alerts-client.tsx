@@ -214,61 +214,14 @@ function AddWebhookDialog({
   )
 }
 
-// ─── SMTP Dialog ──────────────────────────────────────────────────────────────
-
-type SmtpEncryptionValue = 'none' | 'starttls' | 'tls'
-
-const ENCRYPTION_DEFAULTS: Record<SmtpEncryptionValue, number> = {
-  none: 25,
-  starttls: 587,
-  tls: 465,
-}
-
-const ENCRYPTION_LABELS: Record<SmtpEncryptionValue, { label: string; description: string }> = {
-  none:     { label: 'None',     description: 'Unencrypted — not recommended' },
-  starttls: { label: 'STARTTLS', description: 'Plain connect, upgrades to TLS (port 587)' },
-  tls:      { label: 'SSL/TLS',  description: 'Direct TLS connection (port 465)' },
-}
+// ─── SMTP Recipient Dialog ───────────────────────────────────────────────────
 
 const smtpFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  host: z.string().min(1, 'Host is required'),
-  port: z.number().int().min(1).max(65535),
-  encryption: z.enum(['none', 'starttls', 'tls']),
-  username: z.string().optional(),
-  password: z.string().optional(),
-  fromAddress: z.string().email('Must be a valid email'),
-  fromName: z.string().optional(),
   toAddresses: z.string().min(1, 'At least one recipient required'),
 })
 
 type SmtpFormValues = z.infer<typeof smtpFormSchema>
-
-function SmtpEncryptionSelect({
-  value,
-  onChange,
-}: {
-  value: SmtpEncryptionValue
-  onChange: (v: SmtpEncryptionValue) => void
-}) {
-  return (
-    <Select value={value} onValueChange={(v) => onChange(v as SmtpEncryptionValue)}>
-      <SelectTrigger>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {(Object.entries(ENCRYPTION_LABELS) as [SmtpEncryptionValue, { label: string; description: string }][]).map(
-          ([key, { label, description }]) => (
-            <SelectItem key={key} value={key}>
-              <span className="font-medium">{label}</span>
-              <span className="ml-2 text-muted-foreground text-xs">{description}</span>
-            </SelectItem>
-          ),
-        )}
-      </SelectContent>
-    </Select>
-  )
-}
 
 function AddSmtpDialog({
   orgId,
@@ -285,20 +238,8 @@ function AddSmtpDialog({
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<SmtpFormValues>({
-    resolver: zodResolver(smtpFormSchema),
-    defaultValues: { port: 587, encryption: 'starttls' },
-  })
-
-  const encryption = watch('encryption') as SmtpEncryptionValue
-
-  function handleEncryptionChange(v: SmtpEncryptionValue) {
-    setValue('encryption', v)
-    setValue('port', ENCRYPTION_DEFAULTS[v])
-  }
+  } = useForm<SmtpFormValues>({ resolver: zodResolver(smtpFormSchema) })
 
   async function onSubmit(values: SmtpFormValues) {
     const toAddresses = values.toAddresses
@@ -310,13 +251,6 @@ function AddSmtpDialog({
       name: values.name,
       type: 'smtp',
       config: {
-        host: values.host,
-        port: values.port,
-        encryption: values.encryption,
-        username: values.username || undefined,
-        password: values.password || undefined,
-        fromAddress: values.fromAddress,
-        fromName: values.fromName || undefined,
         toAddresses,
       },
     })
@@ -330,56 +264,13 @@ function AddSmtpDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add SMTP Channel</DialogTitle>
+          <DialogTitle>Add Email Channel</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="smtp-name">Name</Label>
             <Input id="smtp-name" placeholder="e.g. Ops Alerts" {...register('name')} />
             {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1.5">
-              <Label htmlFor="smtp-host">Host</Label>
-              <Input id="smtp-host" placeholder="smtp.example.com" {...register('host')} />
-              {errors.host && <p className="text-sm text-red-600">{errors.host.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="smtp-port">Port</Label>
-              <Input id="smtp-port" type="number" {...register('port', { valueAsNumber: true })} />
-              {errors.port && <p className="text-sm text-red-600">{errors.port.message}</p>}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Encryption</Label>
-            <SmtpEncryptionSelect value={encryption} onChange={handleEncryptionChange} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="smtp-username">
-                Username <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Input id="smtp-username" placeholder="user@example.com" {...register('username')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="smtp-password">
-                Password <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Input id="smtp-password" type="password" placeholder="••••••••" {...register('password')} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="smtp-from">From address</Label>
-              <Input id="smtp-from" placeholder="alerts@example.com" {...register('fromAddress')} />
-              {errors.fromAddress && <p className="text-sm text-red-600">{errors.fromAddress.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="smtp-fromname">
-                From name <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Input id="smtp-fromname" placeholder="CT-Ops Alerts" {...register('fromName')} />
-            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="smtp-to">Recipients</Label>
@@ -391,6 +282,9 @@ function AddSmtpDialog({
             <p className="text-xs text-muted-foreground">Comma-separated list of email addresses</p>
             {errors.toAddresses && <p className="text-sm text-red-600">{errors.toAddresses.message}</p>}
           </div>
+          <p className="text-xs text-muted-foreground">
+            SMTP relay settings are managed in Settings → Notification Settings.
+          </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -559,17 +453,10 @@ function EditWebhookDialog({
   )
 }
 
-// ─── Edit SMTP Dialog ──────────────────────────────────────────────────────────
+// ─── Edit SMTP Recipient Dialog ───────────────────────────────────────────────
 
 const editSmtpFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  host: z.string().min(1, 'Host is required'),
-  port: z.number().int().min(1).max(65535),
-  encryption: z.enum(['none', 'starttls', 'tls']),
-  username: z.string().optional(),
-  password: z.string().optional(),
-  fromAddress: z.string().email('Must be a valid email'),
-  fromName: z.string().optional(),
   toAddresses: z.string().min(1, 'At least one recipient required'),
 })
 
@@ -591,30 +478,14 @@ function EditSmtpDialog({
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<EditSmtpFormValues>({
     resolver: zodResolver(editSmtpFormSchema),
     defaultValues: {
       name: channel.name,
-      host: channel.config.host,
-      port: channel.config.port,
-      encryption: channel.config.encryption,
-      username: channel.config.username ?? '',
-      password: '',
-      fromAddress: channel.config.fromAddress,
-      fromName: channel.config.fromName ?? '',
       toAddresses: channel.config.toAddresses.join(', '),
     },
   })
-
-  const encryption = watch('encryption') as SmtpEncryptionValue
-
-  function handleEncryptionChange(v: SmtpEncryptionValue) {
-    setValue('encryption', v)
-    setValue('port', ENCRYPTION_DEFAULTS[v])
-  }
 
   async function onSubmit(values: EditSmtpFormValues) {
     const toAddresses = values.toAddresses
@@ -624,13 +495,6 @@ function EditSmtpDialog({
 
     const result = await updateNotificationChannel(orgId, channel.id, {
       name: values.name,
-      host: values.host,
-      port: values.port,
-      encryption: values.encryption,
-      username: values.username || undefined,
-      password: values.password || undefined,
-      fromAddress: values.fromAddress,
-      fromName: values.fromName || undefined,
       toAddresses,
     })
     if ('error' in result) return
@@ -642,7 +506,7 @@ function EditSmtpDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit SMTP Channel</DialogTitle>
+          <DialogTitle>Edit Email Channel</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
@@ -650,63 +514,15 @@ function EditSmtpDialog({
             <Input id="edit-smtp-name" {...register('name')} />
             {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1.5">
-              <Label htmlFor="edit-smtp-host">Host</Label>
-              <Input id="edit-smtp-host" {...register('host')} />
-              {errors.host && <p className="text-sm text-red-600">{errors.host.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-smtp-port">Port</Label>
-              <Input id="edit-smtp-port" type="number" {...register('port', { valueAsNumber: true })} />
-              {errors.port && <p className="text-sm text-red-600">{errors.port.message}</p>}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Encryption</Label>
-            <SmtpEncryptionSelect value={encryption} onChange={handleEncryptionChange} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-smtp-username">
-                Username <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Input id="edit-smtp-username" {...register('username')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-smtp-password">
-                Password{' '}
-                <span className="text-muted-foreground font-normal">
-                  ({channel.config.hasPassword ? 'leave blank to keep existing' : 'optional'})
-                </span>
-              </Label>
-              <Input
-                id="edit-smtp-password"
-                type="password"
-                placeholder={channel.config.hasPassword ? '••••••••' : ''}
-                {...register('password')}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-smtp-from">From address</Label>
-              <Input id="edit-smtp-from" {...register('fromAddress')} />
-              {errors.fromAddress && <p className="text-sm text-red-600">{errors.fromAddress.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-smtp-fromname">
-                From name <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Input id="edit-smtp-fromname" {...register('fromName')} />
-            </div>
-          </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-smtp-to">Recipients</Label>
             <Input id="edit-smtp-to" {...register('toAddresses')} />
             <p className="text-xs text-muted-foreground">Comma-separated list of email addresses</p>
             {errors.toAddresses && <p className="text-sm text-red-600">{errors.toAddresses.message}</p>}
           </div>
+          <p className="text-xs text-muted-foreground">
+            SMTP relay settings are managed in Settings → Notification Settings.
+          </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -1652,7 +1468,7 @@ export function AlertsClient({
               onClick={() => setAddSmtpOpen(true)}
             >
               <Plus className="size-3.5 mr-1" />
-              Add SMTP
+              Add Email
             </Button>
             <Button
               size="sm"
@@ -1695,7 +1511,7 @@ export function AlertsClient({
                       {ch.type === 'smtp' ? (
                         <Badge variant="outline" className="gap-1">
                           <Mail className="size-3" />
-                          SMTP
+                          Email
                         </Badge>
                       ) : ch.type === 'slack' ? (
                         <Badge variant="outline" className="gap-1">
@@ -1717,7 +1533,7 @@ export function AlertsClient({
                     <TableCell className="text-sm text-muted-foreground">
                       {ch.type === 'smtp' ? (
                         <span>
-                          {ch.config.host}:{ch.config.port} ({ch.config.encryption.toUpperCase()}) → {ch.config.toAddresses.join(', ')}
+                          {ch.config.toAddresses.join(', ')}
                         </span>
                       ) : ch.type === 'slack' ? (
                         <span className="font-mono truncate block max-w-xs">{ch.config.webhookUrl}</span>

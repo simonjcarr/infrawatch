@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.72.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.71.0...web/v0.72.0) (2026-04-27)
+
+
+### Features
+
+* **auth:** add email verification resend flow ([bd23fd9](https://github.com/carrtech-dev/ct-ops/commit/bd23fd9c0b8233888205d5c364f369887d3aaa3f))
+* **auth:** add email verification resend flow ([ad767f5](https://github.com/carrtech-dev/ct-ops/commit/ad767f5a5ac6711d00516931a8f14994eb3cb056))
+* **notifications:** purge old soft-deleted rows ([fd0b96f](https://github.com/carrtech-dev/ct-ops/commit/fd0b96fe8dc95fcf64ce324b6f6ce3d0e754e876))
+* **notifications:** purge old soft-deleted rows ([593a8cd](https://github.com/carrtech-dev/ct-ops/commit/593a8cd83f0658d43feb177c7639eb3e7ed63ead))
+
 ## [0.71.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.20...web/v0.71.0) (2026-04-27)
 
 

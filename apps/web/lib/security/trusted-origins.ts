@@ -1,4 +1,4 @@
-import { getBetterAuthUrl } from '../auth/env.ts'
+import { getBetterAuthUrl } from '../auth/env.js'
 
 type EnvLike = Record<string, string | undefined>
 

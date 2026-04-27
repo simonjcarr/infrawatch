@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.6...ingest/v0.2.0) (2026-04-27)
+
+
+### Features
+
+* **notifications:** purge old soft-deleted rows ([fd0b96f](https://github.com/carrtech-dev/ct-ops/commit/fd0b96fe8dc95fcf64ce324b6f6ce3d0e754e876))
+* **notifications:** purge old soft-deleted rows ([593a8cd](https://github.com/carrtech-dev/ct-ops/commit/593a8cd83f0658d43feb177c7639eb3e7ed63ead))
+
 ## [0.1.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.5...ingest/v0.1.6) (2026-04-27)
 
 

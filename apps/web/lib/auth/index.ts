@@ -5,6 +5,7 @@ import { twoFactor } from 'better-auth/plugins'
 import { db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 import { sendVerificationEmail } from './email'
+import { getBetterAuthOrigin, getBetterAuthSecret, getBetterAuthUrl } from './env'
 import { passwordLoginAttemptGuard } from './login-attempts'
 
 const LOGIN_THROTTLED_MESSAGE = 'Too many login attempts — please wait before trying again.'
@@ -70,15 +71,15 @@ export const auth = betterAuth({
   },
   trustedOrigins: Array.from(
     new Set([
-      process.env['BETTER_AUTH_URL'] ?? 'http://localhost:3000',
+      getBetterAuthOrigin(),
       ...(process.env['BETTER_AUTH_TRUSTED_ORIGINS']
         ?.split(',')
         .map((o) => o.trim())
         .filter(Boolean) ?? []),
     ]),
   ),
-  secret: process.env['BETTER_AUTH_SECRET'] ?? '',
-  baseURL: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:3000',
+  secret: getBetterAuthSecret(),
+  baseURL: getBetterAuthUrl(),
 })
 
 export type Auth = typeof auth

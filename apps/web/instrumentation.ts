@@ -1,3 +1,5 @@
+import { assertProductionAuthEnv } from '@/lib/auth/env'
+
 /**
  * Next.js instrumentation hook — runs once when the server starts.
  *
@@ -19,19 +21,7 @@ export async function register() {
   // Better Auth accepts an empty secret and falls back silently, which would
   // allow session cookies to be signed with an empty key.
   if (process.env.NODE_ENV === 'production') {
-    const secret = process.env.BETTER_AUTH_SECRET
-    if (!secret || secret.length < 32) {
-      throw new Error(
-        'BETTER_AUTH_SECRET must be set to a random string of at least 32 characters in production. ' +
-          'Generate one with: openssl rand -base64 32',
-      )
-    }
-    if (!process.env.BETTER_AUTH_URL || process.env.BETTER_AUTH_URL === 'http://localhost:3000') {
-      throw new Error(
-        'BETTER_AUTH_URL must be set to the public URL of this deployment in production ' +
-          '(e.g. https://ct-ops.corp.example.com).',
-      )
-    }
+    assertProductionAuthEnv()
     if (!process.env.LDAP_ENCRYPTION_KEY) {
       // Not a hard failure — LDAP may not be used — but warn loudly so operators know
       // to set this before configuring LDAP. Without it, BETTER_AUTH_SECRET is used as

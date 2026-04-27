@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getBetterAuthUrl } from '@/lib/auth/env'
 
 type VerifyEmailPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -18,7 +19,7 @@ export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageP
     redirect('/login?error=missing_verification_token')
   }
 
-  const target = new URL('/api/auth/verify-email', process.env['BETTER_AUTH_URL'] ?? 'http://localhost:3000')
+  const target = new URL('/api/auth/verify-email', getBetterAuthUrl())
   target.searchParams.set('token', token)
   target.searchParams.set('callbackURL', callbackURL)
   redirect(target.toString())

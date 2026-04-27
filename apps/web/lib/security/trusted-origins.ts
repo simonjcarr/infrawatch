@@ -1,4 +1,4 @@
-const DEFAULT_AUTH_URL = 'http://localhost:3000'
+import { getBetterAuthUrl } from '../auth/env.ts'
 
 type EnvLike = Record<string, string | undefined>
 
@@ -12,7 +12,7 @@ function normaliseOrigin(value: string): string | null {
 
 export function getTrustedOrigins(env: EnvLike = process.env): string[] {
   const configured = [
-    env['BETTER_AUTH_URL'] ?? DEFAULT_AUTH_URL,
+    getBetterAuthUrl(env),
     ...(env['BETTER_AUTH_TRUSTED_ORIGINS']
       ?.split(',')
       .map((value) => value.trim())

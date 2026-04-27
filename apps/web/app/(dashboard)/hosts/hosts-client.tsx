@@ -365,7 +365,7 @@ export function HostsClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Hosts</h1>
+        <h1 className="text-2xl font-semibold text-foreground" data-testid="hosts-heading">Hosts</h1>
         <p className="text-muted-foreground mt-1">
           {stats.total.toLocaleString()} host{stats.total !== 1 ? 's' : ''} registered
         </p>
@@ -584,10 +584,11 @@ export function HostsClient({
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search hostname, display name or IP…"
                 className="pl-9"
+                data-testid="hosts-search-input"
               />
             </div>
             <Select value={status} onValueChange={(v) => handleStatusChange(v as StatusFilter)}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-40" data-testid="hosts-status-filter">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -598,7 +599,7 @@ export function HostsClient({
               </SelectContent>
             </Select>
             <Select value={os} onValueChange={handleOsChange}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="w-44" data-testid="hosts-os-filter">
                 <SelectValue placeholder="OS" />
               </SelectTrigger>
               <SelectContent>
@@ -626,7 +627,13 @@ export function HostsClient({
               </SelectContent>
             </Select>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={resetFilters} className="gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="gap-1"
+                data-testid="hosts-clear-filters"
+              >
                 <X className="size-3.5" />
                 Clear filters
               </Button>

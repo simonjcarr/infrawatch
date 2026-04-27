@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.70.14](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.13...web/v0.70.14) (2026-04-27)
+
+
+### Bug Fixes
+
+* **web:** remove root startup from web image ([#591](https://github.com/carrtech-dev/ct-ops/issues/591)) ([e1aa368](https://github.com/carrtech-dev/ct-ops/commit/e1aa36872f0c114554f47505f8f6332bffcd6752))
+
 ## [0.70.13](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.12...web/v0.70.13) (2026-04-27)
 
 

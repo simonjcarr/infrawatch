@@ -9,6 +9,6 @@ import (
 	"time"
 )
 
-func buildScriptCommand(_ context.Context, _, _ string, _ time.Duration) (*exec.Cmd, error) {
+func buildScriptCommand(_ context.Context, _, _ string, _ time.Duration, _ bool) (*exec.Cmd, error) {
 	return nil, fmt.Errorf("custom_script tasks are disabled on Windows until sandboxing is implemented")
 }

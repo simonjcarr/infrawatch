@@ -17,8 +17,7 @@ func init() {
 }
 
 const (
-	defaultScriptTimeout = 10 * time.Minute
-	maxScriptTimeout     = time.Hour
+	maxScriptTimeout = time.Hour
 )
 
 var allowedScriptInterpreters = map[string]struct{}{
@@ -56,10 +55,12 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 		return errorResult(fmt.Sprintf("interpreter %q is not permitted", cfg.Interpreter))
 	}
 
-	timeout := effectiveScriptTimeout(cfg.TimeoutSeconds)
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, timeout)
-	defer cancel()
+	timeout, hasTimeout := effectiveScriptTimeout(cfg.TimeoutSeconds)
+	if hasTimeout {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	// Verify the interpreter is available before writing the temp file.
 	if _, err := exec.LookPath(cfg.Interpreter); err != nil {
@@ -85,9 +86,13 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 		return errorResult(fmt.Sprintf("failed to set script permissions: %v", err))
 	}
 
-	progressFn(fmt.Sprintf("Running script with interpreter: %s (timeout: %s)\n\n", cfg.Interpreter, timeout))
+	timeoutLabel := "inherited"
+	if hasTimeout {
+		timeoutLabel = timeout.String()
+	}
+	progressFn(fmt.Sprintf("Running script with interpreter: %s (timeout: %s)\n\n", cfg.Interpreter, timeoutLabel))
 
-	cmd, err := buildScriptCommand(ctx, cfg.Interpreter, tmpPath, timeout)
+	cmd, err := buildScriptCommand(ctx, cfg.Interpreter, tmpPath, timeout, hasTimeout)
 	if err != nil {
 		return errorResult(err.Error())
 	}
@@ -121,13 +126,13 @@ func RunCustomScript(ctx context.Context, configJSON string, progressFn func(chu
 	}
 }
 
-func effectiveScriptTimeout(timeoutSeconds int) time.Duration {
+func effectiveScriptTimeout(timeoutSeconds int) (time.Duration, bool) {
 	if timeoutSeconds <= 0 {
-		return defaultScriptTimeout
+		return 0, false
 	}
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	if timeout > maxScriptTimeout {
-		return maxScriptTimeout
+		return maxScriptTimeout, true
 	}
-	return timeout
+	return timeout, true
 }

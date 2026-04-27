@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { users, invitations } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
+import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { getRequiredSession, type RequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
 
@@ -135,7 +136,7 @@ export async function inviteUser(
 
     if (!invite) return { error: 'Failed to create invitation' }
 
-    const baseUrl = process.env['BETTER_AUTH_URL'] ?? 'http://localhost:3000'
+    const baseUrl = getBetterAuthOrigin()
     return { inviteLink: `${baseUrl}/register?invite=${invite.token}` }
   } catch (err) {
     console.error('Failed to invite user:', err)

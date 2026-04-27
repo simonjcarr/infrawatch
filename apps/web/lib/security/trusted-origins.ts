@@ -1,5 +1,3 @@
-const DEFAULT_AUTH_URL = 'http://localhost:3000'
-
 type EnvLike = Record<string, string | undefined>
 
 function normaliseOrigin(value: string): string | null {
@@ -10,9 +8,22 @@ function normaliseOrigin(value: string): string | null {
   }
 }
 
+function getConfiguredAuthUrl(env: EnvLike): string {
+  const value = env['BETTER_AUTH_URL']?.trim()
+  if (!value) {
+    throw new Error('BETTER_AUTH_URL must be set')
+  }
+
+  try {
+    return new URL(value).toString()
+  } catch {
+    throw new Error('BETTER_AUTH_URL must be a valid absolute URL')
+  }
+}
+
 export function getTrustedOrigins(env: EnvLike = process.env): string[] {
   const configured = [
-    env['BETTER_AUTH_URL'] ?? DEFAULT_AUTH_URL,
+    getConfiguredAuthUrl(env),
     ...(env['BETTER_AUTH_TRUSTED_ORIGINS']
       ?.split(',')
       .map((value) => value.trim())

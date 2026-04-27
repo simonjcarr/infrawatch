@@ -21,6 +21,10 @@ test('getTrustedOrigins normalises BETTER_AUTH_URL and additional origins', () =
   ])
 })
 
+test('getTrustedOrigins rejects missing BETTER_AUTH_URL instead of silently using localhost', () => {
+  assert.throws(() => getTrustedOrigins({}), /BETTER_AUTH_URL must be set/)
+})
+
 test('getTrustedOriginHosts keeps the host:port values expected by Next serverActions.allowedOrigins', () => {
   const env = {
     BETTER_AUTH_URL: 'https://ct-ops.example.com',

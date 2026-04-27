@@ -6,6 +6,7 @@ import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
 import { randomBytes } from 'crypto'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getBetterAuthSecret } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
 
 // Produce a signed cookie value in exactly the format Hono's serializeSigned uses:
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
         userAgent: request.headers.get('user-agent') ?? null,
       })
 
-      const authSecret = process.env['BETTER_AUTH_SECRET'] ?? ''
+      const authSecret = getBetterAuthSecret()
       const cookieValue = await makeSessionCookieValue(sessionToken, authSecret)
 
       const response = NextResponse.json({

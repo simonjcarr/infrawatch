@@ -6,6 +6,7 @@ import { users, organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { headers, cookies } from 'next/headers'
 import type { OrgMetadata } from '@/lib/db/schema/organisations'
+import { getBetterAuthOrigin } from '@/lib/auth/env'
 
 const updateNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -146,7 +147,7 @@ export async function updatePassword(
   try {
     const reqHeaders = await headers()
     const cookie = reqHeaders.get('cookie') ?? ''
-    const baseUrl = process.env['BETTER_AUTH_URL'] ?? 'http://localhost:3000'
+    const baseUrl = getBetterAuthOrigin()
 
     const response = await fetch(`${baseUrl}/api/auth/change-password`, {
       method: 'POST',

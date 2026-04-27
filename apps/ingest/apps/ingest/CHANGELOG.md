@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.4...ingest/v0.1.5) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ingest:** cap grpc message and stream limits ([#608](https://github.com/carrtech-dev/ct-ops/issues/608)) ([730e8e4](https://github.com/carrtech-dev/ct-ops/commit/730e8e430ba6d34c30607eb6e638adb0487d0109))
+
 ## [0.1.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.1.3...ingest/v0.1.4) (2026-04-26)
 
 

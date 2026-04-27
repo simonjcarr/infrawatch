@@ -179,6 +179,7 @@ jobs:
             INGEST_IMAGE_REF="$(docker buildx imagetools inspect ghcr.io/carrtech-dev/ct-ops/ingest:latest --format '{{json .Manifest.Digest}}' | tr -d '"')"
             INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@${INGEST_IMAGE_REF}"
           fi
+          export WEB_IMAGE_REF INGEST_IMAGE_REF
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example

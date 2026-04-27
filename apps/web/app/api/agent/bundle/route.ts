@@ -4,7 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema/auth'
-import { agentEnrolmentTokens } from '@/lib/db/schema/agents'
+import { agentEnrolmentTokens, parseAgentEnrolmentTokenMetadata } from '@/lib/db/schema/agents'
 import {
   SUPPORTED_OS,
   SUPPORTED_ARCH,
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (parsed.data.skipVerify === undefined) {
       effectiveSkipVerify = existing.skipVerify
     }
-    const tokenMetaTags = existing.metadata?.tags ?? []
+    const tokenMetaTags = parseAgentEnrolmentTokenMetadata(existing.metadata).tags ?? []
     if (bundleTags.length === 0 && tokenMetaTags.length > 0) {
       bundleTags = [...tokenMetaTags]
     }

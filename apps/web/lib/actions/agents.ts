@@ -42,6 +42,7 @@ import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs'
 import { assignTagsToResource, getOrgDefaultTags, mergeTagLayers } from '@/lib/actions/tags'
 import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
+import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getRequiredSession } from '@/lib/auth/session'
 import {
@@ -149,7 +150,7 @@ export async function approveAgent(
       // the (token → CLI) merge on the ingest side; here we layer org defaults
       // underneath (weakest), then run any saved tag_rules last.
       const defaults = await getOrgDefaultCollectionSettings(orgId)
-      const currentMetadata = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+      const currentMetadata = parseHostMetadata(host.metadata)
       const pendingTags: TagPair[] = currentMetadata.pendingTags ?? []
       const orgDefaultTags = await getOrgDefaultTags(orgId)
       const finalTags = await mergeTagLayers(orgDefaultTags, pendingTags)

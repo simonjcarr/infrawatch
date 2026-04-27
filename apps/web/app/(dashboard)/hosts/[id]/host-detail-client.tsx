@@ -56,6 +56,7 @@ import type { HostWithAgent, MetricsPreset, MetricsQuery, HeartbeatPoint } from 
 import { useHostStream } from '@/hooks/use-host-stream'
 import { useChartZoom } from '@/hooks/use-chart-zoom'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
+import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { ChecksTab } from './checks-tab'
 import { AlertsTab } from './alerts-tab'
 import { HostNotificationCharts } from './host-notification-charts'
@@ -436,8 +437,9 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
   if (!host) return null
 
-  const disks: DiskInfo[] = host.metadata?.disks ?? []
-  const networkInterfaces: NetworkInterface[] = host.metadata?.network_interfaces ?? []
+  const hostMetadata = parseHostMetadata(host.metadata)
+  const disks: DiskInfo[] = hostMetadata.disks
+  const networkInterfaces: NetworkInterface[] = hostMetadata.network_interfaces
 
   const cpuColor =
     (host.cpuPercent ?? 0) > 90

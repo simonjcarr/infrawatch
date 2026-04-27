@@ -8,7 +8,8 @@ import { eq, and, isNull } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { createHash, randomBytes } from 'node:crypto'
 import { getRequiredSession } from '@/lib/auth/session'
-import type { OrgMetadata, HostMetadata } from '@/lib/db/schema'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 export interface TerminalAccessResult {
@@ -43,7 +44,7 @@ export async function checkTerminalAccess(
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const orgMeta = (org?.metadata ?? {}) as OrgMetadata
+  const orgMeta = parseOrgMetadata(org?.metadata)
   if (orgMeta.terminalEnabled === false) {
     return { allowed: false, reason: 'Terminal access is disabled for this organisation' }
   }
@@ -56,7 +57,7 @@ export async function checkTerminalAccess(
   if (!host) {
     return { allowed: false, reason: 'Host not found' }
   }
-  const hostMeta = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+  const hostMeta = parseHostMetadata(host.metadata)
   if (hostMeta.terminalEnabled === false) {
     return { allowed: false, reason: 'Terminal access is disabled for this host' }
   }
@@ -164,7 +165,7 @@ export async function getOrgTerminalSettings(
     where: eq(organisations.id, orgId),
     columns: { metadata: true },
   })
-  const meta = (org?.metadata ?? {}) as OrgMetadata
+  const meta = parseOrgMetadata(org?.metadata)
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalLoggingEnabled: meta.terminalLoggingEnabled === true,
@@ -189,8 +190,8 @@ export async function updateOrgTerminalSettings(
     })
     if (!org) return { error: 'Organisation not found' }
 
-    const currentMetadata = (org.metadata ?? {}) as OrgMetadata
-    const updatedMetadata: OrgMetadata = {
+    const currentMetadata = parseOrgMetadata(org.metadata)
+    const updatedMetadata = {
       ...currentMetadata,
       terminalEnabled: settings.terminalEnabled,
       terminalLoggingEnabled: settings.terminalLoggingEnabled,
@@ -225,7 +226,7 @@ export async function getHostTerminalSettings(
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
     columns: { metadata: true },
   })
-  const meta = (host?.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
+  const meta = parseHostMetadata(host?.metadata)
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalAllowedUsers: meta.terminalAllowedUsers ?? [],
@@ -250,8 +251,8 @@ export async function updateHostTerminalSettings(
     })
     if (!host) return { error: 'Host not found' }
 
-    const currentMetadata = (host.metadata ?? { disks: [], network_interfaces: [] }) as HostMetadata
-    const updatedMetadata: HostMetadata = {
+    const currentMetadata = parseHostMetadata(host.metadata)
+    const updatedMetadata = {
       ...currentMetadata,
       terminalEnabled: settings.terminalEnabled,
       terminalAllowedUsers: settings.terminalAllowedUsers,

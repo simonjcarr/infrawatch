@@ -28,6 +28,7 @@ import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 
 const triggerScanLimiter = createRateLimiter(60_000, 5)
 const softwareReportLimiter = createRateLimiter(60_000, 10)
@@ -49,12 +50,11 @@ export async function getSoftwareInventorySettings(
     where: and(eq(organisations.id, orgId), isNull(organisations.deletedAt)),
     columns: { metadata: true },
   })
-  return (
-    org?.metadata?.softwareInventorySettings ?? {
-      enabled: false,
-      intervalHours: 24,
-    }
-  )
+  const metadata = parseOrgMetadata(org?.metadata)
+  return metadata.softwareInventorySettings ?? {
+    enabled: false,
+    intervalHours: 24,
+  }
 }
 
 export async function updateSoftwareInventorySettings(
@@ -77,7 +77,7 @@ export async function updateSoftwareInventorySettings(
       where: eq(organisations.id, orgId),
       columns: { metadata: true },
     })
-    const currentMetadata = org?.metadata ?? {}
+    const currentMetadata = parseOrgMetadata(org?.metadata)
     await db
       .update(organisations)
       .set({

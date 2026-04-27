@@ -309,6 +309,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 <Label htmlFor="org-name">Organisation name</Label>
                 <Input
                   id="org-name"
+                  data-testid="settings-org-name-input"
                   {...orgForm.register('name')}
                 />
                 {orgForm.formState.errors.name && (
@@ -318,11 +319,19 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <Button type="submit" size="sm" disabled={orgMutation.isPending}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={orgMutation.isPending}
+                  data-testid="settings-org-name-save"
+                >
                   {orgMutation.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 {orgSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span
+                    className="flex items-center gap-1 text-sm text-green-700"
+                    data-testid="settings-org-name-success"
+                  >
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>
@@ -892,6 +901,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                       variant="outline"
                       onClick={copyActivationToken}
                       className="shrink-0"
+                      data-testid="activation-token-copy"
                     >
                       {activationCopied ? (
                         <>

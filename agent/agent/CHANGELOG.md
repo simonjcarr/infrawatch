@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.30.5](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.4...agent/v0.30.5) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** preserve inherited script timeouts ([c2643c5](https://github.com/carrtech-dev/ct-ops/commit/c2643c5bdc593106dd2518282a334ca854572075))
+* **agent:** preserve inherited script timeouts ([6e52742](https://github.com/carrtech-dev/ct-ops/commit/6e5274239a94e8462d874ba6794b782b9a4363c1))
+
 ## [0.30.4](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.3...agent/v0.30.4) (2026-04-27)
 
 

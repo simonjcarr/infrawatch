@@ -29,6 +29,7 @@ CT-Ops validates licence JWTs using an RSA public key. The production public key
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `LICENCE_PUBLIC_KEY` | — 🔒 | *(baked-in prod key)* | PEM-encoded RSA public key used to verify licence JWTs. **Do not set this in normal deployments.** Reserved for emergency key rotation and internal QA/staging environments using a non-production keypair. In production, the dev key is explicitly rejected even if supplied here. |
+| `LICENCE_REVOCATION_URL` | `https://licence.carrtech.dev/.well-known/ct-ops-licence-revocations.jwt` | same | Signed JWT bundle listing revoked licence ids (`jti`). Connected installs refresh it opportunistically; offline installs fall back to expiry-only validation until the endpoint is reachable again. Set to an empty string to disable remote revocation checks. |
 
 ### Example `.env.local` (development)
 

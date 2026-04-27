@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.15](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.14...web/v0.70.15) (2026-04-27)
+
+
+### Bug Fixes
+
+* **release:** ship digest-pinned compose bundle ([e42347c](https://github.com/carrtech-dev/ct-ops/commit/e42347ccb28b505aefd49c1f9fcb4197784d4fc4))
+* **release:** ship digest-pinned compose bundle ([a292b49](https://github.com/carrtech-dev/ct-ops/commit/a292b49e8d7d775ed31bdfadec12b49cb1653523))
+
 ## [0.70.14](https://github.com/carrtech-dev/ct-ops/compare/web/v0.70.13...web/v0.70.14) (2026-04-27)
 
 

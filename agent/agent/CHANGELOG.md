@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.30.8](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.7...agent/v0.30.8) (2026-04-27)
+
+
+### Bug Fixes
+
+* **agent:** cap buffered heartbeat task output ([cc5384b](https://github.com/carrtech-dev/ct-ops/commit/cc5384b703c6bb21e9d4d76be9d900fb7f789436))
+* **agent:** cap buffered heartbeat task output ([ae69da9](https://github.com/carrtech-dev/ct-ops/commit/ae69da9d78ee1086380b9b1e874868faebe6ae39))
+
 ## [0.30.7](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.6...agent/v0.30.7) (2026-04-27)
 
 

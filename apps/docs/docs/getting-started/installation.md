@@ -21,7 +21,7 @@ That's it. No local Go, Node.js, or pnpm required.
 
 ## Option A — Pre-built images from GHCR
 
-The fastest way to get CT-Ops running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release:
+The fastest way to get CT-Ops running. One command downloads a small bundle (compose file, `start.sh`, `.env.example`) from the latest GitHub release and verifies the published SHA-256 checksum before unpacking:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh | bash

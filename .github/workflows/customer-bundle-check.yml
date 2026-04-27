@@ -6,9 +6,11 @@ on:
       - ".github/workflows/agent-release.yml"
       - ".github/workflows/customer-bundle-check.yml"
       - "deploy/customer-bundle/**"
+      - "deploy/scripts/test-install.sh"
       - "deploy/nginx/nginx.conf"
       - "docker-compose.single.yml"
       - ".env.example"
+      - "install.sh"
   workflow_dispatch:
 
 jobs:
@@ -39,6 +41,12 @@ jobs:
           test -f .env.example
           bash -n start.sh
           bash -n build-offline-installer.sh
+
+      - name: Validate installer script
+        run: |
+          set -euo pipefail
+          bash -n install.sh
+          bash deploy/scripts/test-install.sh
 
       - name: Render compose config
         working-directory: dist/ct-ops

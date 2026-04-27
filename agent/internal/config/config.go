@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/BurntSushi/toml"
 )
@@ -63,18 +62,8 @@ func validateFileSecurity(path string) error {
 		return fmt.Errorf("config %s must not grant group/other access (mode %04o)", path, info.Mode().Perm())
 	}
 
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return nil
-	}
-
-	euid := uint32(os.Geteuid())
-	if stat.Uid != euid {
-		expectedOwner := "root"
-		if euid != 0 {
-			expectedOwner = fmt.Sprintf("uid %d", euid)
-		}
-		return fmt.Errorf("config %s must be owned by %s (found uid %d)", path, expectedOwner, stat.Uid)
+	if err := validateConfigOwner(path, info); err != nil {
+		return err
 	}
 
 	return nil

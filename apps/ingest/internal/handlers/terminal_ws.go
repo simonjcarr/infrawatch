@@ -6,11 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -25,11 +27,19 @@ import (
 // TerminalWSHandler serves browser WebSocket connections for SSH-backed
 // terminal sessions. It never asks the agent to open a shell.
 type TerminalWSHandler struct {
-	pool *pgxpool.Pool
+	pool       *pgxpool.Pool
+	acceptOpts *websocket.AcceptOptions
 }
 
-func NewTerminalWSHandler(pool *pgxpool.Pool) *TerminalWSHandler {
-	return &TerminalWSHandler{pool: pool}
+func NewTerminalWSHandler(pool *pgxpool.Pool, trustedOrigins []string) (*TerminalWSHandler, error) {
+	acceptOpts, err := terminalWSAcceptOptions(trustedOrigins)
+	if err != nil {
+		return nil, err
+	}
+	return &TerminalWSHandler{
+		pool:       pool,
+		acceptOpts: acceptOpts,
+	}, nil
 }
 
 type wsMessage struct {
@@ -51,9 +61,7 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID := parts[0]
 
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
-	})
+	conn, err := websocket.Accept(w, r, h.acceptOpts)
 	if err != nil {
 		slog.Warn("terminal ws: accept failed", "err", err)
 		return
@@ -192,6 +200,36 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func terminalWSAcceptOptions(trustedOrigins []string) (*websocket.AcceptOptions, error) {
+	patterns := make([]string, 0, len(trustedOrigins))
+	for _, raw := range trustedOrigins {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			return nil, fmt.Errorf("parse terminal trusted origin %q: %w", raw, err)
+		}
+		if parsed.Scheme == "" || parsed.Host == "" {
+			return nil, fmt.Errorf("terminal trusted origin %q must include scheme and host", raw)
+		}
+		if parsed.Path != "" && parsed.Path != "/" {
+			return nil, errors.New("terminal trusted origins must not include a path")
+		}
+		if parsed.RawQuery != "" || parsed.Fragment != "" {
+			return nil, errors.New("terminal trusted origins must not include query or fragment")
+		}
+
+		patterns = append(patterns, parsed.Scheme+"://"+parsed.Host)
+	}
+
+	return &websocket.AcceptOptions{
+		OriginPatterns: patterns,
+	}, nil
 }
 
 func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, username, password string) (*ssh.Client, *ssh.Session, io.WriteCloser, io.Reader, error) {

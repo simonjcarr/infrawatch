@@ -120,6 +120,14 @@ If you stop the bundled nginx and terminate TLS with your own proxy (HAProxy, a 
 
 Set `INGEST_WS_URL=wss://host:8443` (or `ws://host:8080` for unencrypted LAN setups). The browser connects to that URL instead of the page origin. Only useful when you want the browser to talk to ingest directly rather than through any proxy.
 
+When you use direct mode across origins, also set `INGEST_TERMINAL_TRUSTED_ORIGINS` on ingest to the browser origins that should be allowed to open terminal WebSockets. Example:
+
+```env
+INGEST_TERMINAL_TRUSTED_ORIGINS=https://ct-ops.example.com,https://ops-admin.example.com
+```
+
+Leave `INGEST_TERMINAL_TRUSTED_ORIGINS` empty when the browser connects through the same origin or bundled proxy.
+
 #### Cloudflare Tunnel example
 
 In your `cloudflared` config, add a path-based ingress rule for `/ws/terminal/*` **before** the catch-all rule for the web app:

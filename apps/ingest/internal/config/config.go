@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -12,13 +13,14 @@ import (
 
 // Config is the ingest service configuration loaded from a YAML file.
 type Config struct {
-	GRPCPort    int                   `yaml:"grpc_port"`
-	HTTPPort    int                   `yaml:"http_port"`
-	DatabaseURL string                `yaml:"database_url"`
-	TLS         TLSConfig             `yaml:"tls"`
-	JWT         JWTConfig             `yaml:"jwt"`
-	Queue       QueueConfig           `yaml:"queue"`
+	GRPCPort    int                     `yaml:"grpc_port"`
+	HTTPPort    int                     `yaml:"http_port"`
+	DatabaseURL string                  `yaml:"database_url"`
+	TLS         TLSConfig               `yaml:"tls"`
+	JWT         JWTConfig               `yaml:"jwt"`
+	Queue       QueueConfig             `yaml:"queue"`
 	Agent       AgentDistributionConfig `yaml:"agent"`
+	Terminal    TerminalConfig          `yaml:"terminal"`
 }
 
 // AgentDistributionConfig controls agent version management.
@@ -54,14 +56,21 @@ type TLSConfig struct {
 type JWTConfig struct {
 	// KeyFile is the path to the RSA private key PEM file used to sign agent JWTs.
 	// Generated on first start if it does not exist.
-	KeyFile     string        `yaml:"key_file"`
-	Issuer      string        `yaml:"issuer"`
-	TokenTTL    time.Duration `yaml:"token_ttl"`
+	KeyFile  string        `yaml:"key_file"`
+	Issuer   string        `yaml:"issuer"`
+	TokenTTL time.Duration `yaml:"token_ttl"`
 }
 
 type QueueConfig struct {
 	// Type is "inprocess" (buffered channels) or "redpanda".
 	Type string `yaml:"type"`
+}
+
+type TerminalConfig struct {
+	// TrustedOrigins allows cross-origin browser connections to the terminal
+	// WebSocket endpoint when INGEST_WS_URL points directly at ingest instead
+	// of using same-origin proxying. Leave empty to require same-origin only.
+	TrustedOrigins []string `yaml:"trusted_origins"`
 }
 
 // Load reads a YAML config file and applies INGEST_ environment overrides.
@@ -181,4 +190,20 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("INGEST_WEB_SERVER_CERT"); v != "" {
 		cfg.TLS.WebServerCertFile = v
 	}
+	if v := os.Getenv("INGEST_TERMINAL_TRUSTED_ORIGINS"); v != "" {
+		cfg.Terminal.TrustedOrigins = splitCSV(v)
+	}
+}
+
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		values = append(values, part)
+	}
+	return values
 }

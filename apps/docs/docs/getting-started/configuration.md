@@ -58,6 +58,7 @@ INGEST_WS_URL=
 | `INGEST_GRPC_PORT` | — | `9443` | gRPC listener port |
 | `INGEST_HTTP_PORT` | — | `8080` | HTTP port for JWKS endpoint and health check |
 | `INGEST_AGENT_DOWNLOAD_BASE_URL` | — | `https://localhost` | Public URL of the web app — agents construct their binary download URL from this |
+| `INGEST_TERMINAL_TRUSTED_ORIGINS` | — 🔒 | *(empty)* | Comma-separated browser origins allowed to open terminal WebSockets directly against ingest. Leave empty to require same-origin proxying |
 | `INGEST_WEB_SERVER_CERT` | — | `/etc/ct-ops/server-tls/server.crt` | Path to the nginx-facing server cert. Ingest reads this and pushes rotations down the heartbeat stream when an operator swaps the cert, so agents keep verifying download URLs without manual CA distribution. Empty disables the rotation RPC |
 
 :::warning JWT Key Backup

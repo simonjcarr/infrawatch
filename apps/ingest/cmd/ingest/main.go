@@ -108,7 +108,11 @@ func main() {
 	versionPoller := config.NewVersionPoller(cfg.Agent.LatestVersion, 5*time.Minute)
 	versionPoller.Start(ctx)
 	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, agentCA, webServerCert)
-	terminalWSHandler := handlers.NewTerminalWSHandler(pool)
+	terminalWSHandler, err := handlers.NewTerminalWSHandler(pool, cfg.Terminal.TrustedOrigins)
+	if err != nil {
+		slog.Error("initialising terminal websocket handler", "err", err)
+		os.Exit(1)
+	}
 	inventoryHandler := handlers.NewInventoryHandler(pool, issuer)
 	renewHandler := handlers.NewRenewCertHandler(pool, agentCA)
 

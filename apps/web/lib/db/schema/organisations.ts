@@ -1,9 +1,9 @@
 import { pgTable, text, timestamp, jsonb, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { z } from 'zod'
-import { DEFAULT_NOTIFICATION_ROLES } from '../../auth/roles'
+import { DEFAULT_NOTIFICATION_ROLES } from '../../auth/roles.ts'
 import type { HostCollectionSettings } from './hosts'
-import { smtpRelaySettingsSchema, type SmtpRelaySettings } from '../../notifications/smtp-settings'
+import { smtpRelaySettingsSchema, type SmtpRelaySettings } from '../../notifications/smtp-settings.ts'
 
 export interface OrgNotificationSettings {
   inAppEnabled?: boolean      // default true — master switch for in-app notifications

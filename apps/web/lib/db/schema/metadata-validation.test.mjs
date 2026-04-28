@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import hostsModule from './hosts.ts'
-import organisationsModule from './organisations.ts'
+import * as hostsModule from './hosts.ts'
+import * as organisationsModule from './organisations.ts'
 
 const { parseHostMetadata } = hostsModule
 const { parseOrgMetadata } = organisationsModule

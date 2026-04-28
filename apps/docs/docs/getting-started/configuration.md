@@ -60,6 +60,12 @@ INGEST_WS_URL=
 | `INGEST_AGENT_DOWNLOAD_BASE_URL` | — | `https://localhost` | Public URL of the web app — agents construct their binary download URL from this |
 | `INGEST_TERMINAL_TRUSTED_ORIGINS` | — 🔒 | *(empty)* | Comma-separated browser origins allowed to open terminal WebSockets directly against ingest. Leave empty to require same-origin proxying |
 | `INGEST_WEB_SERVER_CERT` | — | `/etc/ct-ops/server-tls/server.crt` | Path to the nginx-facing server cert. Ingest reads this and pushes rotations down the heartbeat stream when an operator swaps the cert, so agents keep verifying download URLs without manual CA distribution. Empty disables the rotation RPC |
+| `INGEST_VULNERABILITY_SYNC_ENABLED` | — | `true` | Enables the Linux OS package vulnerability intelligence sync and host matching worker |
+| `INGEST_VULNERABILITY_SYNC_INTERVAL` | — | `6h` | How often ingest refreshes vulnerability feeds and rematches hosts |
+| `INGEST_VULNERABILITY_SYNC_ON_STARTUP` | — | `true` | Runs an initial vulnerability feed sync shortly after ingest starts |
+| `INGEST_VULNERABILITY_REQUEST_TIMEOUT` | — | `45s` | HTTP timeout per vulnerability feed request |
+| `NVD_API_KEY` | — | *(empty)* | Optional NVD API key. Without it, sync uses the public unauthenticated NVD rate limits |
+| `INGEST_VULNERABILITY_ALPINE_RELEASES` | — | `v3.18,v3.19,v3.20,v3.21,v3.22,v3.23` | Alpine releases to fetch from Alpine SecDB |
 
 :::warning JWT Key Backup
 Back up `INGEST_JWT_KEY_FILE`. Losing it invalidates all existing agent JWTs and forces every agent to re-register.

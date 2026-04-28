@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -52,6 +53,9 @@ func UpsertSoftwarePackagesBatch(
 	pool *pgxpool.Pool,
 	orgID, hostID, source string,
 	names, versions, archs, publishers []string,
+	distroIDs, distroVersionIDs, distroCodenames []string,
+	distroIDLikes [][]string,
+	sourceNames, sourceVersions, packageEpochs, packageReleases, repositories, origins []string,
 	installDates []int64,
 	lastSeenAt time.Time,
 ) (added int, err error) {
@@ -80,6 +84,8 @@ func UpsertSoftwarePackagesBatch(
 		WITH ins AS (
 		  INSERT INTO software_packages
 		    (id, organisation_id, host_id, name, version, architecture, publisher, source,
+		     distro_id, distro_version_id, distro_codename, distro_id_like,
+		     source_name, source_version, package_epoch, package_release, repository, origin,
 		     install_date, first_seen_at, last_seen_at, created_at, updated_at)
 		  SELECT
 		    unnest($1::text[]),
@@ -89,12 +95,32 @@ func UpsertSoftwarePackagesBatch(
 		    unnest($6::text[]),
 		    unnest($7::text[]),
 		    $8,
-		    unnest($9::timestamptz[]),
-		    $10, $10, $10, $10
+		    NULLIF(unnest($9::text[]), ''),
+		    NULLIF(unnest($10::text[]), ''),
+		    NULLIF(unnest($11::text[]), ''),
+		    NULLIF(unnest($12::text[]), '')::jsonb,
+		    NULLIF(unnest($13::text[]), ''),
+		    NULLIF(unnest($14::text[]), ''),
+		    NULLIF(unnest($15::text[]), ''),
+		    NULLIF(unnest($16::text[]), ''),
+		    NULLIF(unnest($17::text[]), ''),
+		    NULLIF(unnest($18::text[]), ''),
+		    unnest($19::timestamptz[]),
+		    $20, $20, $20, $20
 		  ON CONFLICT (organisation_id, host_id, name, version, architecture)
 		  DO UPDATE SET
 		    last_seen_at = EXCLUDED.last_seen_at,
 		    publisher    = COALESCE(EXCLUDED.publisher, software_packages.publisher),
+		    distro_id = COALESCE(EXCLUDED.distro_id, software_packages.distro_id),
+		    distro_version_id = COALESCE(EXCLUDED.distro_version_id, software_packages.distro_version_id),
+		    distro_codename = COALESCE(EXCLUDED.distro_codename, software_packages.distro_codename),
+		    distro_id_like = COALESCE(EXCLUDED.distro_id_like, software_packages.distro_id_like),
+		    source_name = COALESCE(EXCLUDED.source_name, software_packages.source_name),
+		    source_version = COALESCE(EXCLUDED.source_version, software_packages.source_version),
+		    package_epoch = COALESCE(EXCLUDED.package_epoch, software_packages.package_epoch),
+		    package_release = COALESCE(EXCLUDED.package_release, software_packages.package_release),
+		    repository = COALESCE(EXCLUDED.repository, software_packages.repository),
+		    origin = COALESCE(EXCLUDED.origin, software_packages.origin),
 		    removed_at   = NULL,
 		    updated_at   = NOW()
 		  RETURNING (xmax = 0) AS was_inserted
@@ -106,10 +132,43 @@ func UpsertSoftwarePackagesBatch(
 		ids, orgID, hostID,
 		names, versions, archs, publishers,
 		source,
+		nullableStrings(distroIDs),
+		nullableStrings(distroVersionIDs),
+		nullableStrings(distroCodenames),
+		marshalStringArrays(distroIDLikes),
+		nullableStrings(sourceNames),
+		nullableStrings(sourceVersions),
+		nullableStrings(packageEpochs),
+		nullableStrings(packageReleases),
+		nullableStrings(repositories),
+		nullableStrings(origins),
 		installTimestamps,
 		lastSeenAt,
 	).Scan(&added)
 	return added, err
+}
+
+func nullableStrings(values []string) []string {
+	out := make([]string, len(values))
+	copy(out, values)
+	return out
+}
+
+func marshalStringArrays(values [][]string) []string {
+	out := make([]string, len(values))
+	for i, value := range values {
+		if len(value) == 0 {
+			out[i] = ""
+			continue
+		}
+		b, err := json.Marshal(value)
+		if err != nil {
+			out[i] = ""
+			continue
+		}
+		out[i] = string(b)
+	}
+	return out
 }
 
 // MarkRemovedPackages sets removed_at = now() on all packages for the given
@@ -185,8 +244,8 @@ func UpdateHostLastSoftwareScanAt(ctx context.Context, pool *pgxpool.Pool, hostI
 
 // SoftwareSweeperHost is a minimal host row returned by the sweeper query.
 type SoftwareSweeperHost struct {
-	ID     string
-	OrgID  string
+	ID    string
+	OrgID string
 }
 
 // GetHostsDueForSoftwareScan returns hosts belonging to organisations that have

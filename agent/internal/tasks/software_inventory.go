@@ -48,11 +48,21 @@ type softwareInventoryResult struct {
 
 // collectedPackage holds a single installed package from any package manager.
 type collectedPackage struct {
-	Name        string
-	Version     string
-	Arch        string
-	Publisher   string
-	InstallDate int64 // Unix timestamp; 0 if unknown
+	Name            string
+	Version         string
+	Arch            string
+	Publisher       string
+	InstallDate     int64 // Unix timestamp; 0 if unknown
+	DistroID        string
+	DistroVersionID string
+	DistroCodename  string
+	DistroIDLike    []string
+	SourceName      string
+	SourceVersion   string
+	PackageEpoch    string
+	PackageRelease  string
+	Repository      string
+	Origin          string
 }
 
 const swInvChunkSize = 500
@@ -140,6 +150,16 @@ func streamPackages(ctx context.Context, scanID, source string, pkgs []collected
 				Architecture:    p.Arch,
 				Publisher:       p.Publisher,
 				InstallDateUnix: p.InstallDate,
+				DistroId:        p.DistroID,
+				DistroVersionId: p.DistroVersionID,
+				DistroCodename:  p.DistroCodename,
+				DistroIdLike:    p.DistroIDLike,
+				SourceName:      p.SourceName,
+				SourceVersion:   p.SourceVersion,
+				PackageEpoch:    p.PackageEpoch,
+				PackageRelease:  p.PackageRelease,
+				Repository:      p.Repository,
+				Origin:          p.Origin,
 			}
 		}
 

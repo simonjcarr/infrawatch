@@ -20,6 +20,7 @@ import (
 	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/queue/inprocess"
 	ingesttls "github.com/carrtech-dev/ct-ops/ingest/internal/tls"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/vuln"
 )
 
 func main() {
@@ -150,6 +151,22 @@ func main() {
 
 	// Start software inventory sweeper goroutine
 	go handlers.RunSoftwareSweeper(ctx, pool)
+
+	// Start vulnerability feed sync and matching goroutine
+	go vuln.RunSyncer(ctx, pool, vuln.SyncConfig{
+		Enabled:        cfg.Vulnerability.Enabled,
+		Interval:       cfg.Vulnerability.Interval,
+		SyncOnStartup:  cfg.Vulnerability.SyncOnStartup,
+		RequestTimeout: cfg.Vulnerability.RequestTimeout,
+		NVDAPIKey:      cfg.Vulnerability.NVDAPIKey,
+		NVDDaysBack:    cfg.Vulnerability.NVDDaysBack,
+		CISAURL:        cfg.Vulnerability.CISAURL,
+		DebianURL:      cfg.Vulnerability.DebianURL,
+		UbuntuOSVURL:   cfg.Vulnerability.UbuntuOSVURL,
+		AlpineBaseURL:  cfg.Vulnerability.AlpineBaseURL,
+		AlpineReleases: cfg.Vulnerability.AlpineReleases,
+		RedHatURL:      cfg.Vulnerability.RedHatURL,
+	})
 
 	// Start cert URL refresh sweeper goroutine
 	go handlers.RunCertRefreshSweeper(ctx, pool, 60*time.Second)

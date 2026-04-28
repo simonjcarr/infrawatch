@@ -31,6 +31,7 @@ import {
   terminalSessions,
   softwarePackages,
   softwareScans,
+  hostVulnerabilityFindings,
   hostNetworkMemberships,
 } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, lte, asc, desc, sql, inArray, ilike, or, count } from 'drizzle-orm'
@@ -1104,8 +1105,11 @@ export async function deleteHost(
           eq(resourceTags.organisationId, orgId),
         ))
 
-      // 13a. Software packages + scans must be removed BEFORE task_run_hosts
-      //      because software_scans.task_run_host_id references task_run_hosts.id.
+      // 13a. Vulnerability findings reference software_packages, and software
+      //      scans reference task_run_hosts, so remove in FK order.
+      await tx
+        .delete(hostVulnerabilityFindings)
+        .where(and(eq(hostVulnerabilityFindings.hostId, hostId), eq(hostVulnerabilityFindings.organisationId, orgId)))
       await tx
         .delete(softwarePackages)
         .where(and(eq(softwarePackages.hostId, hostId), eq(softwarePackages.organisationId, orgId)))

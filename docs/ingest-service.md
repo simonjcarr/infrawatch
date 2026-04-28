@@ -78,6 +78,11 @@ queue:
 | `INGEST_TLS_CERT` | `tls.cert_file` |
 | `INGEST_TLS_KEY` | `tls.key_file` |
 | `INGEST_JWT_KEY_FILE` | `jwt.key_file` |
+| `INGEST_VULNERABILITY_SYNC_ENABLED` | `vulnerability.enabled` |
+| `INGEST_VULNERABILITY_SYNC_INTERVAL` | `vulnerability.sync_interval` |
+| `INGEST_VULNERABILITY_SYNC_ON_STARTUP` | `vulnerability.sync_on_startup` |
+| `INGEST_VULNERABILITY_REQUEST_TIMEOUT` | `vulnerability.request_timeout` |
+| `NVD_API_KEY` | `vulnerability.nvd_api_key` |
 
 ---
 

@@ -18,14 +18,15 @@ const agentReleasesURL = "https://api.github.com/repos/simonjcarr/ct-ops/release
 
 // Config is the ingest service configuration loaded from a YAML file.
 type Config struct {
-	GRPCPort    int                     `yaml:"grpc_port"`
-	HTTPPort    int                     `yaml:"http_port"`
-	DatabaseURL string                  `yaml:"database_url"`
-	TLS         TLSConfig               `yaml:"tls"`
-	JWT         JWTConfig               `yaml:"jwt"`
-	Queue       QueueConfig             `yaml:"queue"`
-	Agent       AgentDistributionConfig `yaml:"agent"`
-	Terminal    TerminalConfig          `yaml:"terminal"`
+	GRPCPort      int                     `yaml:"grpc_port"`
+	HTTPPort      int                     `yaml:"http_port"`
+	DatabaseURL   string                  `yaml:"database_url"`
+	TLS           TLSConfig               `yaml:"tls"`
+	JWT           JWTConfig               `yaml:"jwt"`
+	Queue         QueueConfig             `yaml:"queue"`
+	Agent         AgentDistributionConfig `yaml:"agent"`
+	Terminal      TerminalConfig          `yaml:"terminal"`
+	Vulnerability VulnerabilityConfig     `yaml:"vulnerability"`
 }
 
 // AgentDistributionConfig controls agent version management.
@@ -76,6 +77,21 @@ type TerminalConfig struct {
 	// WebSocket endpoint when INGEST_WS_URL points directly at ingest instead
 	// of using same-origin proxying. Leave empty to require same-origin only.
 	TrustedOrigins []string `yaml:"trusted_origins"`
+}
+
+type VulnerabilityConfig struct {
+	Enabled        bool          `yaml:"enabled"`
+	Interval       time.Duration `yaml:"interval"`
+	SyncOnStartup  bool          `yaml:"sync_on_startup"`
+	RequestTimeout time.Duration `yaml:"request_timeout"`
+	NVDAPIKey      string        `yaml:"nvd_api_key"`
+	NVDDaysBack    int           `yaml:"nvd_days_back"`
+	CISAURL        string        `yaml:"cisa_url"`
+	DebianURL      string        `yaml:"debian_url"`
+	UbuntuOSVURL   string        `yaml:"ubuntu_osv_url"`
+	AlpineBaseURL  string        `yaml:"alpine_base_url"`
+	AlpineReleases []string      `yaml:"alpine_releases"`
+	RedHatURL      string        `yaml:"redhat_url"`
 }
 
 // Load reads a YAML config file and applies INGEST_ environment overrides.
@@ -238,6 +254,19 @@ func defaults() *Config {
 		Queue: QueueConfig{
 			Type: "inprocess",
 		},
+		Vulnerability: VulnerabilityConfig{
+			Enabled:        true,
+			Interval:       6 * time.Hour,
+			SyncOnStartup:  true,
+			RequestTimeout: 45 * time.Second,
+			NVDDaysBack:    14,
+			CISAURL:        "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+			DebianURL:      "https://security-tracker.debian.org/tracker/data/json",
+			UbuntuOSVURL:   "https://security-metadata.canonical.com/osv/osv-all.tar.xz",
+			AlpineBaseURL:  "https://secdb.alpinelinux.org",
+			AlpineReleases: []string{"v3.18", "v3.19", "v3.20", "v3.21", "v3.22", "v3.23"},
+			RedHatURL:      "https://access.redhat.com/hydra/rest/securitydata/cve.json",
+		},
 	}
 }
 
@@ -282,6 +311,48 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("INGEST_TERMINAL_TRUSTED_ORIGINS"); v != "" {
 		cfg.Terminal.TrustedOrigins = splitCSV(v)
 	}
+	if v := os.Getenv("INGEST_VULNERABILITY_SYNC_ENABLED"); v != "" {
+		cfg.Vulnerability.Enabled = parseBool(v, cfg.Vulnerability.Enabled)
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_SYNC_ON_STARTUP"); v != "" {
+		cfg.Vulnerability.SyncOnStartup = parseBool(v, cfg.Vulnerability.SyncOnStartup)
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_SYNC_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Vulnerability.Interval = d
+		}
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_REQUEST_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Vulnerability.RequestTimeout = d
+		}
+	}
+	if v := os.Getenv("NVD_API_KEY"); v != "" {
+		cfg.Vulnerability.NVDAPIKey = v
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_NVD_DAYS_BACK"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Vulnerability.NVDDaysBack = n
+		}
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_CISA_URL"); v != "" {
+		cfg.Vulnerability.CISAURL = v
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_DEBIAN_URL"); v != "" {
+		cfg.Vulnerability.DebianURL = v
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_UBUNTU_OSV_URL"); v != "" {
+		cfg.Vulnerability.UbuntuOSVURL = v
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_ALPINE_BASE_URL"); v != "" {
+		cfg.Vulnerability.AlpineBaseURL = v
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_ALPINE_RELEASES"); v != "" {
+		cfg.Vulnerability.AlpineReleases = splitCSV(v)
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_REDHAT_URL"); v != "" {
+		cfg.Vulnerability.RedHatURL = v
+	}
 }
 
 func splitCSV(raw string) []string {
@@ -295,4 +366,15 @@ func splitCSV(raw string) []string {
 		values = append(values, part)
 	}
 	return values
+}
+
+func parseBool(raw string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }

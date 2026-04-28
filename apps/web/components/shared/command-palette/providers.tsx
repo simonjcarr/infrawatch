@@ -19,6 +19,7 @@ import {
   ScanSearch,
   Server,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   Users,
 } from 'lucide-react'
@@ -37,6 +38,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-reports', label: 'Reports', icon: FileBarChart, href: '/reports' },
   { id: 'nav-reports-software', label: 'Installed Software Report', icon: Package, href: '/reports/software' },
   { id: 'nav-reports-patch-status', label: 'Patch Status Report', icon: ShieldCheck, href: '/reports/patch-status' },
+  { id: 'nav-reports-vulnerabilities', label: 'Vulnerability Report', icon: ShieldAlert, href: '/reports/vulnerabilities' },
   { id: 'nav-cert-checker', label: 'SSL Certificate Checker', icon: ScanSearch, href: '/certificate-checker' },
   { id: 'nav-dir-lookup', label: 'Directory User Lookup', icon: FolderSearch, href: '/directory-lookup' },
   { id: 'nav-bundlers', label: 'Air-gap Bundlers', icon: Package, href: '/bundlers' },

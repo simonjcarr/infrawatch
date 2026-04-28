@@ -12,6 +12,7 @@ export type Tab =
   | 'storage'
   | 'network'
   | 'patch-status'
+  | 'vulnerabilities'
   | 'metrics'
   | 'checks'
   | 'alerts'
@@ -30,6 +31,7 @@ export const TAB_LABELS: Record<Tab, string> = {
   storage: 'Storage',
   network: 'Network',
   'patch-status': 'Patch Status',
+  vulnerabilities: 'Vulnerabilities',
   metrics: 'Metrics',
   checks: 'Checks',
   alerts: 'Alerts',
@@ -53,7 +55,7 @@ export const PARENT_TABS: Array<{
   { id: 'overview', label: 'Overview', defaultTab: 'overview', children: null },
   { id: 'monitoring', label: 'Monitoring', defaultTab: 'metrics', children: ['metrics', 'checks', 'alerts'] },
   { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network', 'host-networks', 'patch-status'] },
-  { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages'] },
+  { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages', 'vulnerabilities'] },
   { id: 'notes', label: 'Notes', defaultTab: 'notes', children: null },
   { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'settings'] },
   { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'logs', 'terminal'] },

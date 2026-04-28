@@ -1,6 +1,6 @@
 # Reports
 
-The Reports section provides fleet-wide views that aggregate data across all hosts. Currently the primary report is the **Software Inventory** report.
+The Reports section provides fleet-wide views that aggregate data across all hosts. Currently the primary reports are **Software Inventory**, **Patch Status**, and **Vulnerabilities**.
 
 ---
 
@@ -68,6 +68,35 @@ The software report page includes two summary charts for the selected package:
 Chart axis labels are theme-aware and remain visible in both light and dark mode.
 
 These charts help you quickly assess fleet homogeneity and identify hosts that haven't been updated.
+
+---
+
+## Vulnerabilities
+
+Navigate to **Reports → Vulnerabilities** to see open Linux OS package CVE findings across the fleet. Findings are created by ingest after it downloads vendor/distro advisory feeds and compares them with agent-reported software inventory.
+
+### Scope
+
+V1 assesses Linux packages collected from `dpkg`, `rpm`, and `apk`. Agents continue to work without the new metadata fields, but older or unsupported inventory is treated as **unassessed** rather than safe. Windows software, macOS apps, Homebrew, Snap, Flatpak, Pacman/Arch, and third-party application registries are not matched in this version.
+
+### Matching model
+
+CT-Ops uses vendor package feeds for affected-package truth and treats NVD/CISA as enrichment. The matcher does not create findings from fuzzy package-name matches or NVD CPE guesses. A host is marked affected only when its package manager, distro/source package, release metadata, and installed version match an advisory range or fixed-version rule.
+
+### Filtering
+
+| Filter | Description |
+|---|---|
+| **CVE** | Search by CVE identifier |
+| **Package** | Search by installed package name |
+| **Severity** | Critical / high / medium / low / unknown |
+| **Host group** | Limit findings to hosts in a group |
+| **Distro** | Ubuntu / Debian / Alpine / RHEL-family feeds |
+| **Source** | Installed package source: `dpkg`, `rpm`, or `apk` |
+| **Known exploited** | Show only CISA KEV-enriched findings |
+| **Fix available** | Show findings that have a fixed package version |
+
+Host detail pages also include an **Inventory → Vulnerabilities** tab for the selected host.
 
 ---
 

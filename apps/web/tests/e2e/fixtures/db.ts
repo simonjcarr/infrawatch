@@ -37,6 +37,7 @@ const APP_TABLES = [
   'host_metrics',
   'host_package_updates',
   'host_patch_statuses',
+  'host_vulnerability_findings',
   'hosts',
   'identity_events',
   'invitations',
@@ -61,6 +62,9 @@ const APP_TABLES = [
   'task_runs',
   'task_schedules',
   'terminal_sessions',
+  'vulnerability_affected_packages',
+  'vulnerability_cves',
+  'vulnerability_sources',
 ]
 
 export async function truncateAppTables(): Promise<void> {

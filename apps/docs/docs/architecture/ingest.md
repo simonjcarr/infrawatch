@@ -35,6 +35,12 @@ All configuration is via environment variables:
 | `INGEST_GRPC_PORT` | — | `9443` | gRPC listener port |
 | `INGEST_HTTP_PORT` | — | `8080` | HTTP port for JWKS and health check |
 | `INGEST_AGENT_DOWNLOAD_BASE_URL` | — | `http://localhost:3000` | Public URL of the web app — agents construct their binary download URL from this. Must be reachable from agent hosts. |
+| `INGEST_VULNERABILITY_SYNC_ENABLED` | — | `true` | Enables server-side CVE/advisory downloads and Linux package vulnerability matching |
+| `INGEST_VULNERABILITY_SYNC_INTERVAL` | — | `6h` | Refresh cadence for vulnerability feeds and full host rematching |
+| `INGEST_VULNERABILITY_SYNC_ON_STARTUP` | — | `true` | Starts one vulnerability sync after ingest startup |
+| `INGEST_VULNERABILITY_REQUEST_TIMEOUT` | — | `45s` | HTTP timeout per vulnerability feed request |
+| `NVD_API_KEY` | — | *(empty)* | Optional NVD API key for higher rate limits |
+| `INGEST_VULNERABILITY_ALPINE_RELEASES` | — | `v3.18,v3.19,v3.20,v3.21,v3.22,v3.23` | Alpine SecDB releases to sync |
 
 :::warning JWT Key Backup
 Back up the JWT key file. Losing it invalidates all existing agent JWTs and forces every agent to re-register.

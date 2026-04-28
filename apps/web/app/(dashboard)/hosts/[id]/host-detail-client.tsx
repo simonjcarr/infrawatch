@@ -77,42 +77,7 @@ import { listNetworksForHost, listNetworks, addHostToNetwork, removeHostFromNetw
 import type { HostGroup } from '@/lib/db/schema'
 import type { HostGroupWithCount } from '@/lib/actions/host-groups'
 import type { NetworkWithMembership, NetworkWithCount } from '@/lib/actions/networks'
-
-type ParentTabId = 'overview' | 'monitoring' | 'infrastructure' | 'inventory' | 'notes' | 'management' | 'tools'
-type Tab = 'overview' | 'storage' | 'network' | 'metrics' | 'checks' | 'alerts' | 'users' | 'settings' | 'groups' | 'host-networks' | 'tasks' | 'logs' | 'terminal' | 'packages' | 'notes'
-
-const TAB_LABELS: Record<Tab, string> = {
-  overview: 'Overview',
-  storage: 'Storage',
-  network: 'Network',
-  metrics: 'Metrics',
-  checks: 'Checks',
-  alerts: 'Alerts',
-  users: 'Users',
-  settings: 'Settings',
-  groups: 'Groups',
-  'host-networks': 'Networks',
-  tasks: 'Tasks',
-  logs: 'Logs',
-  terminal: 'Terminal',
-  packages: 'Packages',
-  notes: 'Notes',
-}
-
-const PARENT_TABS: Array<{
-  id: ParentTabId
-  label: string
-  defaultTab: Tab
-  children: Tab[] | null
-}> = [
-  { id: 'overview', label: 'Overview', defaultTab: 'overview', children: null },
-  { id: 'monitoring', label: 'Monitoring', defaultTab: 'metrics', children: ['metrics', 'checks', 'alerts'] },
-  { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network'] },
-  { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages'] },
-  { id: 'notes', label: 'Notes', defaultTab: 'notes', children: null },
-  { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'host-networks', 'settings'] },
-  { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'logs', 'terminal'] },
-]
+import { PARENT_TABS, TAB_LABELS, type ParentTabId, type Tab } from '@/lib/hosts/host-detail-tabs'
 
 interface Props {
   host: HostWithAgent

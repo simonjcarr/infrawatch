@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.74.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.1...web/v0.74.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** stabilise schedule form e2e selectors ([#682](https://github.com/carrtech-dev/ct-ops/issues/682)) ([0fcedfb](https://github.com/carrtech-dev/ct-ops/commit/0fcedfb38f89ab05ce3b9a8ad2077940db877b85))
+
 ## [0.74.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.0...web/v0.74.1) (2026-04-28)
 
 

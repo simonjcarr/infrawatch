@@ -16,7 +16,7 @@ import {
   hostGroupMembers,
   hostGroups,
 } from '@/lib/db/schema'
-import { eq, and, isNull, desc, sql, ilike, count, countDistinct, gte, lte, inArray } from 'drizzle-orm'
+import { eq, and, isNull, desc, ilike, countDistinct, gte, inArray } from 'drizzle-orm'
 import type {
   SoftwarePackage,
   SoftwareScan,
@@ -383,16 +383,14 @@ export async function getSoftwareReport(
 
   // Filter by host group if needed
   if (filters.hostGroupIds && filters.hostGroupIds.length > 0) {
-    const members = await db
-      .select({ hostId: hostGroupMembers.hostId })
-      .from(hostGroupMembers)
-      .where(
-        and(
-          eq(hostGroupMembers.organisationId, orgId),
-          inArray(hostGroupMembers.groupId, filters.hostGroupIds),
-          isNull(hostGroupMembers.deletedAt),
-        ),
-      )
+    const members = await db.query.hostGroupMembers.findMany({
+      columns: { hostId: true },
+      where: and(
+        eq(hostGroupMembers.organisationId, orgId),
+        inArray(hostGroupMembers.groupId, filters.hostGroupIds),
+        isNull(hostGroupMembers.deletedAt),
+      ),
+    })
     const memberHostIds = new Set(members.map((m) => m.hostId))
     filtered = filtered.filter((p) => memberHostIds.has(p.hostId))
   }
@@ -464,23 +462,21 @@ export async function getNewPackages(
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - windowDays)
 
-  const rows = await db
-    .select({
-      name: softwarePackages.name,
-      source: softwarePackages.source,
-      hostId: softwarePackages.hostId,
-      firstSeenAt: softwarePackages.firstSeenAt,
-    })
-    .from(softwarePackages)
-    .where(
-      and(
-        eq(softwarePackages.organisationId, orgId),
-        isNull(softwarePackages.removedAt),
-        isNull(softwarePackages.deletedAt),
-        gte(softwarePackages.firstSeenAt, cutoff),
-      ),
-    )
-    .orderBy(desc(softwarePackages.firstSeenAt))
+  const rows = await db.query.softwarePackages.findMany({
+    columns: {
+      name: true,
+      source: true,
+      hostId: true,
+      firstSeenAt: true,
+    },
+    where: and(
+      eq(softwarePackages.organisationId, orgId),
+      isNull(softwarePackages.removedAt),
+      isNull(softwarePackages.deletedAt),
+      gte(softwarePackages.firstSeenAt, cutoff),
+    ),
+    orderBy: [desc(softwarePackages.firstSeenAt)],
+  })
 
   const grouped = new Map<string, NewPackageRow>()
   for (const row of rows) {
@@ -679,21 +675,17 @@ export async function getPackageVersions(
 ): Promise<string[]> {
   await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
-  const rows = await db
-    .select({ version: softwarePackages.version })
-    .from(softwarePackages)
-    .where(
-      and(
-        eq(softwarePackages.organisationId, orgId),
-        eq(softwarePackages.name, packageName),
-        isNull(softwarePackages.removedAt),
-        isNull(softwarePackages.deletedAt),
-      ),
-    )
-    .groupBy(softwarePackages.version)
-    .orderBy(softwarePackages.version)
+  const rows = await db.query.softwarePackages.findMany({
+    columns: { version: true },
+    where: and(
+      eq(softwarePackages.organisationId, orgId),
+      eq(softwarePackages.name, packageName),
+      isNull(softwarePackages.removedAt),
+      isNull(softwarePackages.deletedAt),
+    ),
+  })
 
-  return rows.map((r) => r.version).sort((a, b) => compareVersions(b, a))
+  return [...new Set(rows.map((row) => row.version))].sort((a, b) => compareVersions(b, a))
 }
 
 // ── Compare two hosts ─────────────────────────────────────────────────────────

@@ -144,12 +144,11 @@ export async function listNotes(
     conditions.push(eq(notes.authorId, session.user.id))
   }
 
-  return db
-    .select()
-    .from(notes)
-    .where(and(...conditions))
-    .orderBy(desc(notes.updatedAt))
-    .limit(500)
+  return db.query.notes.findMany({
+    where: and(...conditions),
+    orderBy: [desc(notes.updatedAt)],
+    limit: 500,
+  })
 }
 
 // websearch_to_tsquery is forgiving of partial queries but still throws on

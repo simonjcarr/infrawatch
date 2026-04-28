@@ -50,18 +50,18 @@ export async function previewHostFilter(
   const where = buildHostFilterWhere(orgId, parsed.data)
   if (!where) return []
 
-  const rows = await db
-    .select({
-      id: hosts.id,
-      hostname: hosts.hostname,
-      displayName: hosts.displayName,
-      os: hosts.os,
-      status: hosts.status,
-      ipAddresses: hosts.ipAddresses,
-    })
-    .from(hosts)
-    .where(where)
-    .limit(1000)
+  const rows = await db.query.hosts.findMany({
+    columns: {
+      id: true,
+      hostname: true,
+      displayName: true,
+      os: true,
+      status: true,
+      ipAddresses: true,
+    },
+    where,
+    limit: 1000,
+  })
 
   return rows as HostFilterResult[]
 }

@@ -34,14 +34,13 @@ export type EffectiveLicence = {
 // Cached per-request so multiple requireFeature() calls in one server action
 // don't re-validate the JWT repeatedly.
 const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicence> => {
-  const [org] = await db
-    .select({
-      licenceTier: organisations.licenceTier,
-      licenceKey: organisations.licenceKey,
-    })
-    .from(organisations)
-    .where(eq(organisations.id, orgId))
-    .limit(1)
+  const org = await db.query.organisations.findFirst({
+    columns: {
+      licenceTier: true,
+      licenceKey: true,
+    },
+    where: eq(organisations.id, orgId),
+  })
 
   if (!org) {
     return { tier: 'community', features: [] }

@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 65 — Query-style lint guard for auditability
+
+**Drizzle query-style convergence** (`apps/web/eslint.config.mjs`, `apps/web/lib/eslint/`, `apps/web/lib/actions/`, `apps/web/app/api/admin/hosts/bulk-delete/route.ts`)
+- Added a local ESLint rule that rejects straightforward single-table `db.select().from(...)` and `tx.select().from(...)` reads, while still allowing query-builder paths that need joins, grouping, or aggregate SQL.
+- Normalised the remaining simple single-table reads in licence, tags, notes, tag-rule preview, agent cleanup/collision helpers, software inventory filters, and the admin bulk-delete route onto `db.query.*` / `tx.query.*`.
+- This satisfies security finding `I-07` / issue `#366` by making the preferred read pattern explicit and enforceable without forcing a risky broad rewrite of aggregate/reporting queries.
+
+**Validation**
+- Added focused unit coverage for the custom ESLint rule so future regressions fail close to the policy.
+
 ### Session 64 — Penetration testing scope and rules of engagement
 
 **Security engagement documentation** (`PENTEST.md`)

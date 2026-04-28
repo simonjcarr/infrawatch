@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import localRules from "./lib/eslint/index.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -16,6 +17,14 @@ const eslintConfig = defineConfig([
     "migrate.js",
     "scripts/validate-migrations.js",
   ]),
+  {
+    plugins: {
+      local: localRules,
+    },
+    rules: {
+      "local/no-single-table-select": "error",
+    },
+  },
   {
     // Playwright fixtures use a `use()` callback that the react-hooks plugin
     // mistakes for React's `use()` hook. Disable that rule inside the e2e

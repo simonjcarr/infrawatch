@@ -15,10 +15,11 @@ const rootDb = drizzle(client, { schema })
 
 export const db = rootDb
 export type Database = typeof rootDb
+export type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 
 export async function withOrgDatabaseScope<T>(
   orgId: string,
-  run: (db: Database) => Promise<T>,
+  run: (db: TransactionDatabase) => Promise<T>,
 ): Promise<T> {
-  return runWithOrgDatabaseScope(rootDb, orgId, run)
+  return runWithOrgDatabaseScope<TransactionDatabase, T>(rootDb, orgId, run)
 }

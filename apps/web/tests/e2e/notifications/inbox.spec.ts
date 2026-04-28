@@ -219,3 +219,102 @@ test('authenticated user can mark all unread notifications as read', async ({ au
   await page.getByTestId('notifications-tab-unread').click()
   await expect(page.getByText('No unread notifications')).toBeVisible()
 })
+
+test('authenticated user can mark selected read notifications as unread', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO notifications (
+      id,
+      organisation_id,
+      user_id,
+      subject,
+      body,
+      severity,
+      resource_type,
+      resource_id,
+      read,
+      created_at
+    )
+    VALUES
+      (
+        'notification-mark-unread-1',
+        ${orgId},
+        ${userId},
+        'Patch window completed',
+        'The scheduled patch run completed successfully.',
+        'info',
+        'host',
+        'host-mark-unread-1',
+        true,
+        NOW() - INTERVAL '20 minutes'
+      ),
+      (
+        'notification-mark-unread-2',
+        ${orgId},
+        ${userId},
+        'Certificate inventory refreshed',
+        'A certificate scan refreshed the inventory.',
+        'warning',
+        'certificate',
+        'certificate-mark-unread-2',
+        true,
+        NOW() - INTERVAL '12 minutes'
+      ),
+      (
+        'notification-mark-unread-3',
+        ${orgId},
+        ${userId},
+        'Agent check-in recovered',
+        'worker-02 is reporting normally again.',
+        'info',
+        'host',
+        'host-mark-unread-3',
+        false,
+        NOW() - INTERVAL '3 minutes'
+      )
+  `
+
+  await page.goto('/notifications')
+
+  await expect(page.getByTestId('notification-card-notification-mark-unread-1')).toBeVisible()
+  await expect(page.getByTestId('notification-card-notification-mark-unread-2')).toBeVisible()
+
+  await page
+    .getByTestId('notification-card-notification-mark-unread-1')
+    .getByRole('checkbox')
+    .click()
+  await page
+    .getByTestId('notification-card-notification-mark-unread-2')
+    .getByRole('checkbox')
+    .click()
+  await page.getByTestId('notifications-bulk-mark-unread').click()
+
+  await expect(page.getByTestId('notifications-tab-unread')).toContainText('3')
+  await page.getByTestId('notifications-tab-unread').click()
+  await expect(page.getByTestId('notification-card-notification-mark-unread-1')).toBeVisible()
+  await expect(page.getByTestId('notification-card-notification-mark-unread-2')).toBeVisible()
+  await expect(page.getByTestId('notification-card-notification-mark-unread-3')).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ id: string; read: boolean }>>`
+        SELECT id, read
+        FROM notifications
+        WHERE id IN (
+          'notification-mark-unread-1',
+          'notification-mark-unread-2',
+          'notification-mark-unread-3'
+        )
+        ORDER BY id ASC
+      `
+
+      return rows
+    })
+    .toEqual([
+      { id: 'notification-mark-unread-1', read: false },
+      { id: 'notification-mark-unread-2', read: false },
+      { id: 'notification-mark-unread-3', read: false },
+    ])
+})

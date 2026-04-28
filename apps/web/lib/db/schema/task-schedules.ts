@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, jsonb, integer, boolean, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { users } from './auth'
-import type { TaskType, TaskConfig } from './task-runs'
+import { organisations } from './organisations.ts'
+import { users } from './auth.ts'
+import type { TaskType, TaskConfig } from './task-runs.ts'
 
 export const taskSchedules = pgTable('task_schedules', {
   id: text('id').primaryKey().$defaultFn(() => createId()),

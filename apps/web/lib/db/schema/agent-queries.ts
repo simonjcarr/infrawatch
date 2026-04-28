@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
 
 export type AgentQueryType = 'list_ports' | 'list_services'
 export type AgentQueryStatus = 'pending' | 'complete' | 'error'

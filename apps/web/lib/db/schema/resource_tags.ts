@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { tags } from './tags'
+import { organisations } from './organisations.ts'
+import { tags } from './tags.ts'
 
 export const resourceTags = pgTable(
   'resource_tags',

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
+import { organisations } from './organisations.ts'
 
 /**
  * Serials of revoked agent client certificates.

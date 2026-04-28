@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, jsonb, integer, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
+import { users } from './auth.ts'
 
 export type TaskType = 'patch' | 'custom_script' | 'service' | 'agent_uninstall' | 'software_inventory'
 export type TaskRunStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed'

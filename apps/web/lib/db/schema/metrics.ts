@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, real, integer, primaryKey, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
 
 export const hostMetrics = pgTable(
   'host_metrics',

@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, jsonb, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
-import { checks } from './checks'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
+import { checks } from './checks.ts'
 
 export interface CertificateChainEntry {
   subject: string

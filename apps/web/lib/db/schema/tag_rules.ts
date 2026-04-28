@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import type { TagPair } from './tags'
+import { organisations } from './organisations.ts'
+import type { TagPair } from './tags.ts'
 
 // A host filter expressed as a discriminated-union of optional predicates.
 // All present fields AND together. Match semantics:

@@ -1,9 +1,9 @@
 import { pgTable, text, timestamp, jsonb, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
-import { taskRunHosts } from './task-runs'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
+import { taskRunHosts } from './task-runs.ts'
+import { users } from './auth.ts'
 
 export type PackageSource =
   | 'rpm'

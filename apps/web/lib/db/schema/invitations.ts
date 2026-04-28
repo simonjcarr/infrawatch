@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, jsonb } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { randomBytes } from 'crypto'
-import { organisations } from './organisations'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import { users } from './auth.ts'
 
 export const invitations = pgTable('invitations', {
   id: text('id').primaryKey().$defaultFn(() => createId()),

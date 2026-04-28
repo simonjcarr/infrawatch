@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, customType, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { agents } from './agents'
+import { agents } from './agents.ts'
 
 // drizzle's built-in bytea helper renders as `customType` for BYTEA columns.
 const bytea = customType<{ data: Buffer; default: false }>({

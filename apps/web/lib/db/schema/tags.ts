@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
+import { organisations } from './organisations.ts'
 
 // Normalised tag catalogue. One row per distinct (org, key, value) — resource
 // assignments reference this table via resource_tags.tag_id. The case-insensitive

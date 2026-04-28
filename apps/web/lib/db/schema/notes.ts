@@ -10,8 +10,8 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import { users } from './auth.ts'
 
 export const NOTE_CATEGORIES = [
   'general',

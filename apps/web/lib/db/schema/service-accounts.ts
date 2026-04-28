@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, integer, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
 
 export type ServiceAccountStatus = 'active' | 'missing' | 'disabled'
 export type ServiceAccountType = 'human' | 'service' | 'system'

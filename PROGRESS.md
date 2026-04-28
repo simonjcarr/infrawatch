@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 76 — Vulnerability catalog detail modal
+
+**Vulnerability operations UI** (`apps/web/app/(dashboard)/settings/vulnerabilities/`)
+- Added an in-page CVE detail modal to **Administration → Vulnerabilities** so admins can open a catalog vulnerability without leaving the page or losing current catalog filters.
+- The modal shows the full CVE description, title, severity, CVSS score, source, known-exploited/rejected status, affected rule count, open finding count, and published/modified timestamps.
+
+**Validation**
+- Extended database-backed E2E coverage for `/settings/vulnerabilities` to open a filtered CVE detail modal, assert key details, close it, and verify the filter remains applied.
+- Validation run: `pnpm --filter web type-check`, targeted `pnpm --filter web lint -- ...`, and `pnpm --filter web test:e2e tests/e2e/settings/vulnerabilities.spec.ts`.
+- This completes the requested modal-based full vulnerability detail view while preserving user filters on the admin page.
+
 ### Session 75 — Admin ingest and agent health visibility
 
 **System health operations view** (`apps/web/app/(dashboard)/settings/system/`, `apps/web/app/api/system/health/route.ts`)

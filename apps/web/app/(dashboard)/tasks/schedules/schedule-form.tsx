@@ -211,7 +211,7 @@ export function ScheduleForm({
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" data-testid={`task-schedule-form-${mode}`}>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Basics</CardTitle>
@@ -260,7 +260,7 @@ export function ScheduleForm({
                 onValueChange={(v) => setTaskType(v as ScheduledType)}
                 disabled={mode === 'edit'}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="task-schedule-task-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -282,7 +282,7 @@ export function ScheduleForm({
               <div>
                 <Label>Patch mode</Label>
                 <Select value={patchMode} onValueChange={(v) => setPatchMode(v as 'security' | 'all')}>
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="task-schedule-patch-mode">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -384,7 +384,7 @@ export function ScheduleForm({
                   setTargetId('')
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="task-schedule-target-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,7 +396,7 @@ export function ScheduleForm({
             <div>
               <Label>{targetType === 'host' ? 'Host' : 'Group'}</Label>
               <Select value={targetId} onValueChange={setTargetId}>
-                <SelectTrigger>
+                <SelectTrigger data-testid="task-schedule-target-id">
                   <SelectValue placeholder={`Select a ${targetType}`} />
                 </SelectTrigger>
                 <SelectContent>
@@ -463,7 +463,7 @@ export function ScheduleForm({
             <div>
               <Label>Timezone</Label>
               <Select value={timezone} onValueChange={setTimezone}>
-                <SelectTrigger>
+                <SelectTrigger data-testid="task-schedule-timezone">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -505,7 +505,7 @@ export function ScheduleForm({
         )}
 
         <div className="flex items-center gap-2">
-          <Button type="submit" disabled={submit.isPending}>
+          <Button type="submit" disabled={submit.isPending} data-testid={`task-schedule-submit-${mode}`}>
             {submit.isPending ? (
               <Loader2 className="size-4 mr-2 animate-spin" />
             ) : (

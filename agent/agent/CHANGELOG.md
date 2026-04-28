@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.32.0...agent/v0.32.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **agent:** restore automatic self-updates ([#699](https://github.com/carrtech-dev/ct-ops/issues/699)) ([43b7cf6](https://github.com/carrtech-dev/ct-ops/commit/43b7cf6020ee0ab35c12b3910402f7e96582be1d))
+
 ## [0.32.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.31.0...agent/v0.32.0) (2026-04-28)
 
 

@@ -102,3 +102,105 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
     },
   ])
 })
+
+test('admin can update and delete a service account from the detail page', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+
+  const licenceKey = await issueTestLicence({
+    orgId,
+    features: ['serviceAccountTracker'],
+  })
+
+  await sql`
+    UPDATE organisations
+    SET licence_key = ${licenceKey},
+        licence_tier = 'pro'
+    WHERE id = ${orgId}
+  `
+
+  await sql`
+    INSERT INTO domain_accounts (
+      id,
+      organisation_id,
+      username,
+      display_name,
+      email,
+      status,
+      password_expires_at
+    )
+    VALUES (
+      'svc-account-detail',
+      ${orgId},
+      'svc-detail',
+      'Ops Service',
+      'ops-service@example.com',
+      'active',
+      DATE '2026-05-01'
+    )
+  `
+
+  await page.goto('/service-accounts')
+  await page.getByTestId('service-account-row-svc-account-detail').click()
+
+  await expect(page).toHaveURL(/\/service-accounts\/svc-account-detail$/)
+  await expect(page.getByTestId('service-account-detail-heading')).toContainText('svc-detail')
+  await expect(page.getByText('Ops Service')).toBeVisible()
+
+  await page.getByTestId('service-account-edit-open').click()
+  await page.getByTestId('service-account-edit-display-name').fill('Ops Service Updated')
+  await page.getByTestId('service-account-edit-email').fill('ops-updated@example.com')
+  await page.getByTestId('service-account-edit-status').click()
+  await page.getByRole('option', { name: 'Disabled' }).click()
+  await page.getByTestId('service-account-edit-password-expiry').fill('2026-06-15')
+  await page.getByTestId('service-account-edit-save').click()
+
+  await expect(page.getByText('Ops Service Updated')).toBeVisible()
+  await expect(page.getByText('ops-updated@example.com')).toBeVisible()
+  await expect(page.getByTestId('service-account-detail-status')).toContainText('Disabled')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        display_name: string | null
+        email: string | null
+        status: string
+        password_expires_at: string | null
+      }>>`
+        SELECT
+          display_name,
+          email,
+          status,
+          password_expires_at::text
+        FROM domain_accounts
+        WHERE id = 'svc-account-detail'
+        LIMIT 1
+      `
+
+      return rows[0] ?? null
+    })
+    .toEqual({
+      display_name: 'Ops Service Updated',
+      email: 'ops-updated@example.com',
+      status: 'disabled',
+      password_expires_at: '2026-06-15 00:00:00+00',
+    })
+
+  await page.getByTestId('service-account-delete-open').click()
+  await page.getByTestId('service-account-delete-confirm').click()
+
+  await expect(page).toHaveURL(/\/service-accounts$/)
+  await expect(page.getByTestId('service-account-row-svc-account-detail')).toHaveCount(0)
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ deleted_at: Date | null }>>`
+        SELECT deleted_at
+        FROM domain_accounts
+        WHERE id = 'svc-account-detail'
+        LIMIT 1
+      `
+      return rows[0]?.deleted_at ?? null
+    })
+    .toBeTruthy()
+})

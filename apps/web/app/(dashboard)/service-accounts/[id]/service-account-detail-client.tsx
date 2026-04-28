@@ -146,9 +146,11 @@ export function ServiceAccountDetailClient({
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-foreground font-mono">
-              {account.username}
+              <span data-testid="service-account-detail-heading">{account.username}</span>
             </h1>
-            <StatusBadge status={account.status as DomainAccountStatus} />
+            <span data-testid="service-account-detail-status">
+              <StatusBadge status={account.status as DomainAccountStatus} />
+            </span>
           </div>
           {account.displayName && (
             <p className="text-muted-foreground mt-1">{account.displayName}</p>
@@ -159,13 +161,19 @@ export function ServiceAccountDetailClient({
             variant="outline"
             size="sm"
             onClick={() => setEditing(!editing)}
+            data-testid="service-account-edit-open"
           >
             <Pencil className="size-4 mr-1.5" />
             Edit
           </Button>
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                data-testid="service-account-delete-open"
+              >
                 <Trash2 className="size-4 mr-1.5" />
                 Delete
               </Button>
@@ -183,6 +191,7 @@ export function ServiceAccountDetailClient({
                   variant="destructive"
                   onClick={() => deleteMutation.mutate()}
                   disabled={deleteMutation.isPending}
+                  data-testid="service-account-delete-confirm"
                 >
                   {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
                 </Button>
@@ -204,6 +213,7 @@ export function ServiceAccountDetailClient({
               <Input
                 value={editForm.displayName}
                 onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
+                data-testid="service-account-edit-display-name"
               />
             </div>
             <div className="space-y-1.5">
@@ -212,6 +222,7 @@ export function ServiceAccountDetailClient({
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                data-testid="service-account-edit-email"
               />
             </div>
             <div className="space-y-1.5">
@@ -220,7 +231,7 @@ export function ServiceAccountDetailClient({
                 value={editForm.status}
                 onValueChange={(v) => setEditForm({ ...editForm, status: v as DomainAccountStatus })}
               >
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48" data-testid="service-account-edit-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,6 +248,7 @@ export function ServiceAccountDetailClient({
                 type="date"
                 value={editForm.passwordExpiresAt}
                 onChange={(e) => setEditForm({ ...editForm, passwordExpiresAt: e.target.value })}
+                data-testid="service-account-edit-password-expiry"
               />
               <p className="text-xs text-muted-foreground">
                 Leave blank if the password doesn&apos;t expire.
@@ -247,6 +259,7 @@ export function ServiceAccountDetailClient({
                 size="sm"
                 onClick={() => updateMutation.mutate()}
                 disabled={updateMutation.isPending}
+                data-testid="service-account-edit-save"
               >
                 {updateMutation.isPending ? 'Saving...' : 'Save'}
               </Button>

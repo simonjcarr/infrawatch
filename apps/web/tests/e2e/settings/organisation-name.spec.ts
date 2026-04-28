@@ -4,11 +4,29 @@ import { TEST_ORG } from '../fixtures/seed'
 
 test('admin can update the organisation name from settings', async ({ authenticatedPage: page }) => {
   const updatedName = `Updated Org ${Date.now()}`
+  const sql = getTestDb()
 
   await page.goto('/settings')
   await expect(page.getByTestId('settings-heading')).toBeVisible()
 
   const orgNameInput = page.getByTestId('settings-org-name-input')
+  await orgNameInput.click()
+  await orgNameInput.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`)
+  await orgNameInput.fill('A')
+  await page.getByTestId('settings-org-name-save').click()
+
+  await expect(page.getByText('Name must be at least 2 characters')).toBeVisible()
+
+  const beforeRows = await sql<Array<{ name: string }>>`
+    SELECT name
+    FROM organisations
+    WHERE slug = ${TEST_ORG.slug}
+    LIMIT 1
+  `
+
+  expect(beforeRows).toHaveLength(1)
+  expect(beforeRows[0]?.name).toBe(TEST_ORG.name)
+
   await orgNameInput.click()
   await orgNameInput.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`)
   await orgNameInput.fill(updatedName)
@@ -17,7 +35,6 @@ test('admin can update the organisation name from settings', async ({ authentica
   await expect(page.getByTestId('settings-org-name-success')).toHaveText('Saved')
   await expect(orgNameInput).toHaveValue(updatedName)
 
-  const sql = getTestDb()
   const rows = await sql<Array<{ name: string }>>`
     SELECT name
     FROM organisations

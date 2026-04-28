@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/test'
+import { expect, test } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
@@ -18,9 +18,9 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ or
   }
 }
 
-test('admin can filter, acknowledge, and configure alerting from the alerts page', async ({ authenticatedPage: page }) => {
+test('admin can acknowledge alerts and manage webhook channels and silences', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { orgId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
@@ -30,33 +30,19 @@ test('admin can filter, acknowledge, and configure alerting from the alerts page
       display_name,
       os,
       arch,
-      ip_addresses,
       status,
       last_seen_at
     )
-    VALUES
-      (
-        'alerts-host-critical',
-        ${orgId},
-        'alerts-host-critical',
-        'Alerts Host Critical',
-        'Ubuntu 24.04',
-        'x86_64',
-        '["10.70.0.10"]'::jsonb,
-        'online',
-        NOW()
-      ),
-      (
-        'alerts-host-warning',
-        ${orgId},
-        'alerts-host-warning',
-        'Alerts Host Warning',
-        'Ubuntu 24.04',
-        'x86_64',
-        '["10.70.0.11"]'::jsonb,
-        'online',
-        NOW()
-      )
+    VALUES (
+      'alerts-host-1',
+      ${orgId},
+      'alerts-host-1',
+      'Alerts Host 1',
+      'Ubuntu 24.04',
+      'x86_64',
+      'online',
+      NOW()
+    )
   `
 
   await sql`
@@ -67,33 +53,17 @@ test('admin can filter, acknowledge, and configure alerting from the alerts page
       name,
       condition_type,
       config,
-      severity,
-      enabled,
-      is_global_default
+      severity
     )
-    VALUES
-      (
-        'alerts-rule-critical',
-        ${orgId},
-        'alerts-host-critical',
-        'CPU saturation',
-        'metric_threshold',
-        '{"metric":"cpu","operator":"gt","threshold":95}'::jsonb,
-        'critical',
-        true,
-        false
-      ),
-      (
-        'alerts-rule-warning',
-        ${orgId},
-        'alerts-host-warning',
-        'Disk usage warning',
-        'metric_threshold',
-        '{"metric":"disk","operator":"gt","threshold":80}'::jsonb,
-        'warning',
-        true,
-        false
-      )
+    VALUES (
+      'alerts-rule-1',
+      ${orgId},
+      'alerts-host-1',
+      'CPU usage high',
+      'metric_threshold',
+      '{"metric":"cpu","operator":"gt","threshold":90}'::jsonb,
+      'critical'
+    )
   `
 
   await sql`
@@ -106,92 +76,160 @@ test('admin can filter, acknowledge, and configure alerting from the alerts page
       message,
       triggered_at
     )
-    VALUES
-      (
-        'alerts-instance-critical',
-        'alerts-rule-critical',
-        'alerts-host-critical',
-        ${orgId},
-        'firing',
-        'CPU has exceeded 95% for 10 minutes',
-        NOW() - INTERVAL '10 minutes'
-      ),
-      (
-        'alerts-instance-warning',
-        'alerts-rule-warning',
-        'alerts-host-warning',
-        ${orgId},
-        'firing',
-        'Disk usage has exceeded 80%',
-        NOW() - INTERVAL '5 minutes'
-      )
+    VALUES (
+      'alerts-instance-1',
+      'alerts-rule-1',
+      'alerts-host-1',
+      ${orgId},
+      'firing',
+      'CPU exceeded 90% for more than five minutes.',
+      NOW() - INTERVAL '10 minutes'
+    )
   `
 
   await page.goto('/alerts')
 
-  await expect(page.getByTestId('alerts-heading')).toBeVisible()
-  await expect(page.getByTestId('alert-row-alerts-instance-critical')).toContainText('alerts-host-critical')
-  await expect(page.getByTestId('alert-row-alerts-instance-warning')).toContainText('alerts-host-warning')
+  await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible()
+  await expect(page.getByText('1 active alert')).toBeVisible()
 
-  await page.getByTestId('alerts-severity-filter').click()
-  await page.getByRole('option', { name: 'Critical' }).click()
-
-  await expect(page.getByTestId('alert-row-alerts-instance-critical')).toBeVisible()
-  await expect(page.getByTestId('alert-row-alerts-instance-warning')).toHaveCount(0)
-
-  await page.getByTestId('alert-acknowledge-alerts-instance-critical').click()
-
-  await expect(page.getByTestId('alert-row-alerts-instance-critical')).toHaveCount(0)
-  await expect(page.getByTestId('alert-history-row-alerts-instance-critical')).toContainText('Acknowledged')
+  const activeRow = page.getByRole('row', { name: /alerts-host-1.*CPU usage high/i })
+  await expect(activeRow).toContainText('Critical')
+  await activeRow.getByRole('button', { name: 'Acknowledge' }).click()
 
   await expect
     .poll(async () => {
-      const rows = await sql<Array<{ status: string; acknowledged_at: string | null }>>`
-        SELECT status, acknowledged_at::text
+      const rows = await sql<Array<{ status: string; acknowledged_by: string | null }>>`
+        SELECT status, acknowledged_by
         FROM alert_instances
-        WHERE id = 'alerts-instance-critical'
+        WHERE id = 'alerts-instance-1'
         LIMIT 1
       `
       return rows[0] ?? null
     })
     .toEqual({
       status: 'acknowledged',
-      acknowledged_at: expect.any(String),
+      acknowledged_by: userId,
     })
 
-  await page.getByTestId('alerts-add-silence').click()
-  await page.getByLabel('Host (leave blank for org-wide)').selectOption('alerts-host-warning')
-  await page.getByLabel('Reason').fill('Scheduled maintenance')
-  await page.getByTestId('alert-silence-submit').click()
+  await expect(page.getByText('0 active alerts')).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Acknowledged' })).toBeVisible()
 
-  await expect(page.getByTestId('alert-silence-row')).toContainText('alerts-host-warning')
-  await expect(page.getByTestId('alert-silence-row')).toContainText('Scheduled maintenance')
+  await page.getByRole('button', { name: 'Add Webhook' }).click()
+  await page.getByLabel('Name').fill('PagerDuty Webhook')
+  await page.getByLabel('URL').fill('https://alerts.example.test/webhook')
+  await page.getByLabel(/Secret/i).fill('super-secret')
+  await page.getByRole('button', { name: 'Add Channel' }).click()
 
-  await page.getByTestId('alerts-add-email').click()
-  await page.getByLabel('Name').fill('Ops Email')
-  await page.getByLabel('Recipients').fill('ops@example.com, team@example.com')
-  await page.getByTestId('alert-email-submit').click()
-
-  const emailRow = page.getByTestId('alert-channel-row').filter({ hasText: 'Ops Email' })
-  await expect(emailRow).toContainText('ops@example.com, team@example.com')
+  const webhookRow = page.getByRole('row', { name: /PagerDuty Webhook.*alerts\.example\.test\/webhook/i })
+  await expect(webhookRow).toBeVisible()
 
   await expect
     .poll(async () => {
-      const rows = await sql<Array<{ name: string; type: string; config: { toAddresses: string[] } }>>`
+      const rows = await sql<Array<{ name: string; type: string; config: { url?: string; secret?: string } }>>`
         SELECT name, type, config
         FROM notification_channels
         WHERE organisation_id = ${orgId}
-          AND name = 'Ops Email'
+          AND name = 'PagerDuty Webhook'
           AND deleted_at IS NULL
         LIMIT 1
       `
       return rows[0] ?? null
     })
     .toEqual({
-      name: 'Ops Email',
-      type: 'smtp',
+      name: 'PagerDuty Webhook',
+      type: 'webhook',
       config: {
-        toAddresses: ['ops@example.com', 'team@example.com'],
+        url: 'https://alerts.example.test/webhook',
+        secret: 'super-secret',
       },
+    })
+
+  await webhookRow.getByRole('button', { name: /edit channel/i }).click()
+  await page.getByLabel('Name').fill('Ops Webhook')
+  await page.getByLabel('URL').fill('https://alerts.example.test/ops')
+  await page.getByRole('button', { name: 'Save Changes' }).click()
+
+  const updatedWebhookRow = page.getByRole('row', { name: /Ops Webhook.*alerts\.example\.test\/ops/i })
+  await expect(updatedWebhookRow).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ name: string; config: { url?: string; secret?: string } }>>`
+        SELECT name, config
+        FROM notification_channels
+        WHERE organisation_id = ${orgId}
+          AND name = 'Ops Webhook'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      name: 'Ops Webhook',
+      config: {
+        url: 'https://alerts.example.test/ops',
+        secret: 'super-secret',
+      },
+    })
+
+  await page.getByRole('button', { name: 'Add Silence' }).click()
+  await page.getByLabel('Host').selectOption('alerts-host-1')
+  await page.getByLabel('Reason').fill('Planned kernel maintenance')
+  await page.getByLabel('Starts at').fill('2026-04-28T10:00')
+  await page.getByLabel('Ends at').fill('2026-04-28T12:00')
+  await page.getByRole('button', { name: 'Create Silence' }).click()
+
+  const silenceRow = page.getByRole('row', { name: /alerts-host-1.*Planned kernel maintenance/i })
+  await expect(silenceRow).toBeVisible()
+  await expect(silenceRow).toContainText('Expired')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ reason: string; host_id: string | null }>>`
+        SELECT reason, host_id
+        FROM alert_silences
+        WHERE organisation_id = ${orgId}
+          AND reason = 'Planned kernel maintenance'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      reason: 'Planned kernel maintenance',
+      host_id: 'alerts-host-1',
+    })
+
+  await silenceRow.getByRole('button', { name: /remove silence/i }).click()
+  await expect(silenceRow).toHaveCount(0)
+
+  await updatedWebhookRow.getByRole('button', { name: /delete channel/i }).click()
+  await expect(updatedWebhookRow).toHaveCount(0)
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ deleted_channels: number; deleted_silences: number }>>`
+        SELECT
+          cast(count(*) FILTER (WHERE table_name = 'notification_channels') as int) AS deleted_channels,
+          cast(count(*) FILTER (WHERE table_name = 'alert_silences') as int) AS deleted_silences
+        FROM (
+          SELECT 'notification_channels' AS table_name
+          FROM notification_channels
+          WHERE organisation_id = ${orgId}
+            AND name = 'Ops Webhook'
+            AND deleted_at IS NOT NULL
+          UNION ALL
+          SELECT 'alert_silences' AS table_name
+          FROM alert_silences
+          WHERE organisation_id = ${orgId}
+            AND reason = 'Planned kernel maintenance'
+            AND deleted_at IS NOT NULL
+        ) deleted_rows
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      deleted_channels: 1,
+      deleted_silences: 1,
     })
 })

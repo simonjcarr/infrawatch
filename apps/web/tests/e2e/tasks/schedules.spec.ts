@@ -438,6 +438,214 @@ test('admin can create a custom script schedule for a single host', async ({ aut
     })
 })
 
+test('admin can edit an existing host-group schedule and review recent runs', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      last_seen_at
+    )
+    VALUES
+      (
+        'schedule-edit-host-1',
+        ${orgId},
+        'schedule-edit-host-1',
+        'Schedule Edit Host 1',
+        'Ubuntu 24.04',
+        'x86_64',
+        '["10.70.0.10"]'::jsonb,
+        'online',
+        NOW()
+      ),
+      (
+        'schedule-edit-host-2',
+        ${orgId},
+        'schedule-edit-host-2',
+        'Schedule Edit Host 2',
+        'Ubuntu 24.04',
+        'arm64',
+        '["10.70.0.11"]'::jsonb,
+        'online',
+        NOW()
+      )
+  `
+
+  await sql`
+    INSERT INTO host_groups (
+      id,
+      organisation_id,
+      name,
+      description
+    )
+    VALUES (
+      'schedule-edit-group-1',
+      ${orgId},
+      'Schedule Edit Group',
+      'Hosts used for edit flow coverage'
+    )
+  `
+
+  await sql`
+    INSERT INTO host_group_members (
+      id,
+      organisation_id,
+      group_id,
+      host_id
+    )
+    VALUES
+      (
+        'schedule-edit-member-1',
+        ${orgId},
+        'schedule-edit-group-1',
+        'schedule-edit-host-1'
+      ),
+      (
+        'schedule-edit-member-2',
+        ${orgId},
+        'schedule-edit-group-1',
+        'schedule-edit-host-2'
+      )
+  `
+
+  await sql`
+    INSERT INTO task_schedules (
+      id,
+      organisation_id,
+      created_by,
+      name,
+      description,
+      task_type,
+      config,
+      target_type,
+      target_id,
+      max_parallel,
+      cron_expression,
+      timezone,
+      enabled,
+      next_run_at
+    )
+    VALUES (
+      'schedule-edit-1',
+      ${orgId},
+      ${userId},
+      'Weekly service restart',
+      'Restart nginx each week.',
+      'service',
+      '{"service_name":"nginx","action":"restart"}'::jsonb,
+      'group',
+      'schedule-edit-group-1',
+      1,
+      '0 4 * * 1',
+      'UTC',
+      true,
+      NOW() + INTERVAL '3 days'
+    )
+  `
+
+  await sql`
+    INSERT INTO task_runs (
+      id,
+      organisation_id,
+      triggered_by,
+      scheduled_from_id,
+      target_type,
+      target_id,
+      task_type,
+      status,
+      config,
+      max_parallel,
+      created_at,
+      started_at,
+      completed_at
+    )
+    VALUES (
+      'schedule-edit-run-1',
+      ${orgId},
+      ${userId},
+      'schedule-edit-1',
+      'group',
+      'schedule-edit-group-1',
+      'service',
+      'completed',
+      '{"service_name":"nginx","action":"restart"}'::jsonb,
+      1,
+      NOW() - INTERVAL '2 hours',
+      NOW() - INTERVAL '2 hours',
+      NOW() - INTERVAL '110 minutes'
+    )
+  `
+
+  await page.goto('/tasks/schedules/schedule-edit-1')
+
+  await expect(page.getByTestId('task-schedule-heading-edit')).toContainText('Weekly service restart')
+  await expect(page.getByText('Task type cannot be changed')).toBeVisible()
+  await expect(page.getByText('Recent runs triggered by this schedule')).toBeVisible()
+  const recentRunsCard = page.locator('section, div').filter({ hasText: 'Recent runs triggered by this schedule' }).first()
+  await expect(recentRunsCard.getByRole('link', { name: 'View', exact: true })).toHaveAttribute(
+    'href',
+    /\/tasks\/schedule-edit-run-1$/,
+  )
+
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Fortnightly service restart')
+  await page.getByLabel('Description (optional)').fill('Restart nginx across the service group every other week.')
+  await page.getByLabel('Service name').fill('sshd')
+
+  await page.getByRole('button', { name: 'Every 1st of month at 03:00' }).click()
+  await page.getByTestId('task-schedule-timezone').click()
+  await page.getByRole('option', { name: 'Europe/Berlin' }).click()
+  await page.getByLabel('Max parallel hosts').fill('2')
+  await page.getByRole('switch', { name: 'Enabled' }).click()
+
+  await expect(page.getByTestId('task-schedule-preview-list')).toBeVisible()
+
+  await page.getByTestId('task-schedule-submit-edit').click()
+
+  await expect(page).toHaveURL(/\/tasks$/)
+  const scheduleRow = page.getByRole('row', { name: /Fortnightly service restart/i })
+  await expect(scheduleRow).toContainText('Service action')
+  await expect(scheduleRow).toContainText('Schedule Edit Group')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        name: string
+        description: string | null
+        cron_expression: string
+        timezone: string
+        enabled: boolean
+        max_parallel: number
+        config: { service_name?: string; action?: string }
+      }>>`
+        SELECT name, description, cron_expression, timezone, enabled, max_parallel, config
+        FROM task_schedules
+        WHERE id = 'schedule-edit-1'
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      name: 'Fortnightly service restart',
+      description: 'Restart nginx across the service group every other week.',
+      cron_expression: '0 3 1 * *',
+      timezone: 'Europe/Berlin',
+      enabled: false,
+      max_parallel: 2,
+      config: {
+        service_name: 'sshd',
+        action: 'restart',
+      },
+    })
+})
+
 test('admin can create a service action schedule for a host group', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { orgId } = await getOrgAndUserIds(sql)

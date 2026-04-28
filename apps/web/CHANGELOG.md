@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.6...web/v0.73.7) (2026-04-28)
+
+
+### Bug Fixes
+
+* **auth:** persist security throttles across replicas ([#667](https://github.com/carrtech-dev/ct-ops/issues/667)) ([e05b5a2](https://github.com/carrtech-dev/ct-ops/commit/e05b5a2ee2b03473389c8e37f9e8cb2e40abee3f))
+
 ## [0.73.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.5...web/v0.73.6) (2026-04-28)
 
 

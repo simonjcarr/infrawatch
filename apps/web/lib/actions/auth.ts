@@ -9,7 +9,11 @@ import type { Invitation } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
 
 // 10 invite-token lookups per IP per 60 s — prevents token enumeration
-const inviteRateLimit = createRateLimiter(60_000, 10)
+const inviteRateLimit = createRateLimiter({
+  scope: 'auth:invite',
+  windowMs: 60_000,
+  max: 10,
+})
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
@@ -22,7 +26,7 @@ async function getClientIp(): Promise<string> {
 
 export async function getInviteByToken(token: string): Promise<Invitation | null> {
   const ip = await getClientIp()
-  if (!inviteRateLimit.check(ip)) return null
+  if (!await inviteRateLimit.check(ip)) return null
 
   const invite = await db.query.invitations.findFirst({
     where: and(
@@ -40,7 +44,7 @@ export async function acceptInvite(
   userId: string,
 ): Promise<{ success: true } | { error: string }> {
   const ip = await getClientIp()
-  if (!inviteRateLimit.check(ip)) {
+  if (!await inviteRateLimit.check(ip)) {
     return { error: 'Too many requests — please wait before trying again.' }
   }
 

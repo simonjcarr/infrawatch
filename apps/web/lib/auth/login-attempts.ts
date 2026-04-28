@@ -1,19 +1,17 @@
+import type { ThrottleStore } from '../throttle-store'
+
 export interface LoginAttemptGuardOptions {
+  scope: string
   windowMs: number
   maxFailures: number
   baseLockoutMs: number
   maxLockoutMs: number
+  store?: ThrottleStore
 }
 
 export interface LoginAttemptStatus {
   allowed: boolean
   retryAfterMs: number
-}
-
-interface AttemptState {
-  failures: number[]
-  lockoutLevel: number
-  lockedUntil: number
 }
 
 function pruneFailures(failures: number[], windowMs: number, now: number): number[] {
@@ -26,83 +24,92 @@ function normalizeIdentifier(identifier: string): string {
 }
 
 export function createLoginAttemptGuard(options: LoginAttemptGuardOptions) {
-  const state = new Map<string, AttemptState>()
+  async function getStore(): Promise<ThrottleStore> {
+    if (options.store) return options.store
+    return (await import('../db-throttle-store')).dbThrottleStore
+  }
 
-  function getState(rawIdentifier: string, now = Date.now()): [string, AttemptState] | null {
+  function normaliseIdentifier(rawIdentifier: string): string | null {
     const identifier = normalizeIdentifier(rawIdentifier)
-    if (!identifier) return null
-
-    const existing = state.get(identifier)
-    const next: AttemptState = existing
-      ? {
-          failures: pruneFailures(existing.failures, options.windowMs, now),
-          lockoutLevel: existing.lockoutLevel,
-          lockedUntil: existing.lockedUntil,
-        }
-      : {
-          failures: [],
-          lockoutLevel: 0,
-          lockedUntil: 0,
-        }
-
-    state.set(identifier, next)
-    return [identifier, next]
+    return identifier || null
   }
 
   return {
-    check(identifier: string, now = Date.now()): LoginAttemptStatus {
-      const entry = getState(identifier, now)
-      if (!entry) return { allowed: true, retryAfterMs: 0 }
+    async check(identifier: string, now = Date.now()): Promise<LoginAttemptStatus> {
+      const normalized = normaliseIdentifier(identifier)
+      if (!normalized) return { allowed: true, retryAfterMs: 0 }
 
-      const [, current] = entry
-      if (current.lockedUntil > now) {
-        return {
-          allowed: false,
-          retryAfterMs: current.lockedUntil - now,
+      const store = await getStore()
+      return store.transact<LoginAttemptStatus>(options.scope, normalized, (state) => {
+        const next = {
+          ...state,
+          hits: pruneFailures(state.hits, options.windowMs, now),
+          lockedUntil: state.lockedUntil > now ? state.lockedUntil : 0,
         }
-      }
 
-      if (current.lockedUntil !== 0) {
-        current.lockedUntil = 0
-      }
+        if (next.lockedUntil > now) {
+          return {
+            result: {
+              allowed: false,
+              retryAfterMs: next.lockedUntil - now,
+            },
+            state: next,
+          }
+        }
 
-      return { allowed: true, retryAfterMs: 0 }
+        return {
+          result: { allowed: true, retryAfterMs: 0 },
+          state: next,
+        }
+      })
     },
 
-    recordFailure(identifier: string, now = Date.now()): LoginAttemptStatus {
-      const entry = getState(identifier, now)
-      if (!entry) return { allowed: true, retryAfterMs: 0 }
+    async recordFailure(identifier: string, now = Date.now()): Promise<LoginAttemptStatus> {
+      const normalized = normaliseIdentifier(identifier)
+      if (!normalized) return { allowed: true, retryAfterMs: 0 }
 
-      const [, current] = entry
-      current.failures.push(now)
+      const store = await getStore()
+      return store.transact<LoginAttemptStatus>(options.scope, normalized, (state) => {
+        const hits = pruneFailures(state.hits, options.windowMs, now)
+        hits.push(now)
 
-      if (current.failures.length < options.maxFailures) {
-        return { allowed: true, retryAfterMs: 0 }
-      }
+        if (hits.length < options.maxFailures) {
+          return {
+            result: { allowed: true, retryAfterMs: 0 },
+            state: { ...state, hits },
+          }
+        }
 
-      current.failures = []
-      current.lockoutLevel += 1
-      const lockoutMs = Math.min(
-        options.baseLockoutMs * 2 ** (current.lockoutLevel - 1),
-        options.maxLockoutMs,
-      )
-      current.lockedUntil = now + lockoutMs
-
-      return {
-        allowed: false,
-        retryAfterMs: lockoutMs,
-      }
+        const lockoutLevel = state.lockoutLevel + 1
+        const lockoutMs = Math.min(
+          options.baseLockoutMs * 2 ** (lockoutLevel - 1),
+          options.maxLockoutMs,
+        )
+        return {
+          result: {
+            allowed: false,
+            retryAfterMs: lockoutMs,
+          },
+          state: {
+            hits: [],
+            lockoutLevel,
+            lockedUntil: now + lockoutMs,
+          },
+        }
+      })
     },
 
-    reset(identifier: string): void {
-      const normalized = normalizeIdentifier(identifier)
+    async reset(identifier: string): Promise<void> {
+      const normalized = normaliseIdentifier(identifier)
       if (!normalized) return
-      state.delete(normalized)
+      const store = await getStore()
+      await store.clear(options.scope, normalized)
     },
   }
 }
 
 export const passwordLoginAttemptGuard = createLoginAttemptGuard({
+  scope: 'auth:password-login',
   windowMs: 15 * 60_000,
   maxFailures: 5,
   baseLockoutMs: 5 * 60_000,

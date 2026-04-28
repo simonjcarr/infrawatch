@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRateLimiter } from '@/lib/rate-limit'
 
 // Cookie set by Better Auth on sign-in
 const SESSION_COOKIE = 'better-auth.session_token'
@@ -28,7 +27,16 @@ const BETTER_AUTH_SENSITIVE_PATHS = [
   '/api/auth/forget-password',
   '/api/auth/reset-password',
 ]
-const authRateLimit = createRateLimiter(60_000, 10)
+const authRateLimitHits = new Map<string, number[]>()
+
+function checkAuthRateLimit(ip: string, now = Date.now()): boolean {
+  const cutoff = now - 60_000
+  const hits = (authRateLimitHits.get(ip) ?? []).filter((timestamp) => timestamp > cutoff)
+  if (hits.length >= 10) return false
+  hits.push(now)
+  authRateLimitHits.set(ip, hits)
+  return true
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -53,7 +61,7 @@ export function proxy(request: NextRequest) {
     request.method === 'POST' &&
     BETTER_AUTH_SENSITIVE_PATHS.some((p) => pathname.startsWith(p))
   ) {
-    if (!authRateLimit.check(ip)) {
+    if (!checkAuthRateLimit(ip)) {
       const limitResponse = NextResponse.json(
         { error: 'Too many requests — please wait before trying again.' },
         { status: 429 },

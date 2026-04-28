@@ -20,7 +20,11 @@ import {
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
 
-const trackFromUrlLimiter = createRateLimiter(60_000, 20)
+const trackFromUrlLimiter = createRateLimiter({
+  scope: 'certificates:track-from-url',
+  windowMs: 60_000,
+  max: 20,
+})
 
 type CertificateTrackingMetadata = {
   tlsSkipVerify?: boolean
@@ -272,7 +276,7 @@ export async function trackCertificateFromUrl(
   if (session.user.organisationId !== orgId) {
     return { error: 'Organisation mismatch' }
   }
-  if (!trackFromUrlLimiter.check(orgId)) {
+  if (!await trackFromUrlLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before adding more certificates.' }
   }
 

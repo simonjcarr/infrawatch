@@ -62,7 +62,7 @@ export const auth = betterAuth({
         const email = typeof ctx.body?.email === 'string' ? ctx.body.email : ''
         const request = ctx.request
         const ip = request ? getVerificationResendClientIp(request) : 'unknown'
-        if (!emailVerificationResendPolicy.check({ email, ip })) {
+        if (!await emailVerificationResendPolicy.check({ email, ip })) {
           throw new APIError('TOO_MANY_REQUESTS', {
             message: EMAIL_VERIFICATION_RESEND_THROTTLED_MESSAGE,
           })
@@ -76,7 +76,7 @@ export const auth = betterAuth({
       if (ctx.path !== '/sign-in/email') return
 
       const email = typeof ctx.body?.email === 'string' ? ctx.body.email : ''
-      const status = passwordLoginAttemptGuard.check(email)
+      const status = await passwordLoginAttemptGuard.check(email)
       if (status.allowed) return
 
       throw new APIError('TOO_MANY_REQUESTS', {
@@ -88,11 +88,11 @@ export const auth = betterAuth({
       if (typeof ctx.body?.email !== 'string' || typeof ctx.body?.password !== 'string') return
 
       if (ctx.context.newSession) {
-        passwordLoginAttemptGuard.reset(ctx.body.email)
+        await passwordLoginAttemptGuard.reset(ctx.body.email)
         return
       }
 
-      passwordLoginAttemptGuard.recordFailure(ctx.body.email)
+      await passwordLoginAttemptGuard.recordFailure(ctx.body.email)
     }),
   },
   trustedOrigins: Array.from(

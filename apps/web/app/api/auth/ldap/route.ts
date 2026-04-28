@@ -28,7 +28,11 @@ async function makeSessionCookieValue(token: string, secret: string): Promise<st
 }
 
 // 5 attempts per IP per 60 seconds — prevents brute-force and user enumeration
-const ldapRateLimit = createRateLimiter(60_000, 5)
+const ldapRateLimit = createRateLimiter({
+  scope: 'auth:ldap',
+  windowMs: 60_000,
+  max: 5,
+})
 
 // Enforce a minimum response time for all auth outcomes to resist timing-based
 // user enumeration. A valid user that proceeds through DB operations takes longer
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest) {
       ?? request.headers.get('x-real-ip')
       ?? 'unknown'
 
-    if (!ldapRateLimit.check(ip)) {
+    if (!await ldapRateLimit.check(ip)) {
       return NextResponse.json(
         { error: 'Too many login attempts — please wait before trying again.' },
         { status: 429 },
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
     }
 
-    const accountStatus = passwordLoginAttemptGuard.check(username)
+    const accountStatus = await passwordLoginAttemptGuard.check(username)
     if (!accountStatus.allowed) {
       return NextResponse.json(
         { error: 'Too many login attempts — please wait before trying again.' },
@@ -170,7 +174,7 @@ export async function POST(request: NextRequest) {
       if (!user || !user.isActive || user.deletedAt) {
         // Log internally but return the same generic error to avoid leaking account existence.
         console.warn(`[LDAP] Login rejected — account inactive or deleted: userId=${userId}`)
-        passwordLoginAttemptGuard.recordFailure(username)
+        await passwordLoginAttemptGuard.recordFailure(username)
         return withAuthDelay(
           requestStart,
           NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
@@ -207,12 +211,12 @@ export async function POST(request: NextRequest) {
         `better-auth.session_token=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
       )
 
-      passwordLoginAttemptGuard.reset(username)
+      await passwordLoginAttemptGuard.reset(username)
       return withAuthDelay(requestStart, response)
     }
 
     logError(`[LDAP] All configs failed for user "${username}":`, errors)
-    passwordLoginAttemptGuard.recordFailure(username)
+    await passwordLoginAttemptGuard.recordFailure(username)
     return withAuthDelay(
       requestStart,
       NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),

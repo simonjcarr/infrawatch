@@ -31,8 +31,16 @@ import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 
-const triggerScanLimiter = createRateLimiter(60_000, 5)
-const softwareReportLimiter = createRateLimiter(60_000, 10)
+const triggerScanLimiter = createRateLimiter({
+  scope: 'software-inventory:trigger-scan',
+  windowMs: 60_000,
+  max: 5,
+})
+const softwareReportLimiter = createRateLimiter({
+  scope: 'software-inventory:report',
+  windowMs: 60_000,
+  max: 10,
+})
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +112,7 @@ export async function triggerSoftwareScan(
   if (!ADMIN_ROLES.includes(session.user.role)) {
     return { error: 'You do not have permission to perform this action' }
   }
-  if (!triggerScanLimiter.check(orgId)) {
+  if (!await triggerScanLimiter.check(orgId)) {
     return { error: 'Too many scan requests — please wait before triggering another scan.' }
   }
 
@@ -315,7 +323,7 @@ export async function getSoftwareReport(
 ): Promise<SoftwareReportResult> {
   await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
-  if (!softwareReportLimiter.check(orgId)) {
+  if (!await softwareReportLimiter.check(orgId)) {
     throw new Error('Too many requests — please wait before generating another report.')
   }
   const page = filters.page ?? 1

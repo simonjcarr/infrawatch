@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRateLimiter } from '@/lib/rate-limit'
 
 // 30 requests per IP per 60 s — generous for CI/CD pipelines but throttles enumeration/DoS.
-const installRateLimit = createRateLimiter(60_000, 30)
+const installRateLimit = createRateLimiter({
+  scope: 'agent:install',
+  windowMs: 60_000,
+  max: 30,
+})
 
 /**
  * Returns a shell bootstrap script that detects OS/arch, downloads the agent
@@ -26,7 +30,7 @@ export async function GET(request: NextRequest) {
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     request.headers.get('x-real-ip') ??
     'unknown'
-  if (!installRateLimit.check(ip)) {
+  if (!await installRateLimit.check(ip)) {
     return NextResponse.json(
       { error: 'Too many requests — please wait before trying again.' },
       { status: 429 },

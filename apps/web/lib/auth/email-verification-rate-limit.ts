@@ -1,3 +1,6 @@
+import { createRateLimiter } from '../rate-limit.ts'
+import type { ThrottleStore } from '../throttle-store.ts'
+
 export const EMAIL_VERIFICATION_RESEND_THROTTLED_MESSAGE =
   'Too many verification emails requested. Please wait a minute before trying again.'
 
@@ -9,38 +12,21 @@ function normalizeIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase()
 }
 
-function recentHits(
-  requestLog: Map<string, number[]>,
-  key: string,
+export function createEmailVerificationResendGuard(
   windowMs: number,
-  now: number,
-): { normalized: string; hits: number[] } {
-  const normalized = normalizeIdentifier(key)
-  if (!normalized) return { normalized, hits: [] }
-
-  const cutoff = now - windowMs
-  return {
-    normalized,
-    hits: (requestLog.get(normalized) ?? []).filter((timestamp) => timestamp > cutoff),
-  }
-}
-
-function recordHit(requestLog: Map<string, number[]>, normalized: string, hits: number[], now: number) {
-  if (!normalized) return
-  hits.push(now)
-  requestLog.set(normalized, hits)
-}
-
-export function createEmailVerificationResendGuard(windowMs: number, maxRequests: number) {
-  const requestLog = new Map<string, number[]>()
+  maxRequests: number,
+  store?: ThrottleStore,
+) {
+  const limiter = createRateLimiter({
+    scope: 'auth:verification-resend:email',
+    windowMs,
+    max: maxRequests,
+    store,
+  })
 
   return {
-    check(email: string, now = Date.now()): boolean {
-      const emailHits = recentHits(requestLog, normalizeEmail(email), windowMs, now)
-      if (emailHits.hits.length >= maxRequests) return false
-
-      recordHit(requestLog, emailHits.normalized, emailHits.hits, now)
-      return true
+    async check(email: string, now = Date.now()): Promise<boolean> {
+      return limiter.check(normalizeEmail(email), now)
     },
   }
 }
@@ -49,25 +35,30 @@ export function createEmailVerificationResendPolicy(options: {
   windowMs: number
   maxRequestsPerEmail: number
   maxRequestsPerIp: number
+  store?: ThrottleStore
 }) {
-  const emailRequests = new Map<string, number[]>()
-  const ipRequests = new Map<string, number[]>()
+  const emailLimiter = createRateLimiter({
+    scope: 'auth:verification-resend:email',
+    windowMs: options.windowMs,
+    max: options.maxRequestsPerEmail,
+    store: options.store,
+  })
+  const ipLimiter = createRateLimiter({
+    scope: 'auth:verification-resend:ip',
+    windowMs: options.windowMs,
+    max: options.maxRequestsPerIp,
+    store: options.store,
+  })
 
   return {
-    check(input: { email: string; ip: string }, now = Date.now()): boolean {
-      const emailHits = recentHits(emailRequests, normalizeEmail(input.email), options.windowMs, now)
-      const ipHits = recentHits(ipRequests, input.ip, options.windowMs, now)
+    async check(input: { email: string; ip: string }, now = Date.now()): Promise<boolean> {
+      const normalizedEmail = normalizeEmail(input.email)
+      const normalizedIp = normalizeIdentifier(input.ip)
+      if (!normalizedEmail || !normalizedIp) return false
 
-      if (
-        emailHits.hits.length >= options.maxRequestsPerEmail ||
-        ipHits.hits.length >= options.maxRequestsPerIp
-      ) {
-        return false
-      }
-
-      recordHit(emailRequests, emailHits.normalized, emailHits.hits, now)
-      recordHit(ipRequests, ipHits.normalized, ipHits.hits, now)
-      return true
+      const emailAllowed = await emailLimiter.check(normalizedEmail, now)
+      if (!emailAllowed) return false
+      return ipLimiter.check(normalizedIp, now)
     },
   }
 }

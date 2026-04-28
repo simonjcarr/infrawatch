@@ -60,7 +60,11 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-const createEnrolmentTokenLimiter = createRateLimiter(60_000, 10)
+const createEnrolmentTokenLimiter = createRateLimiter({
+  scope: 'agents:create-enrolment-token',
+  windowMs: 60_000,
+  max: 10,
+})
 
 export type OfflinePeriod = { start: number; end: number | null }
 
@@ -497,7 +501,7 @@ export async function createEnrolmentToken(
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
   await requireOrgAccess(orgId)
-  if (!createEnrolmentTokenLimiter.check(orgId)) {
+  if (!await createEnrolmentTokenLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before creating another enrolment token.' }
   }
   const parsed = createEnrolmentTokenSchema.safeParse(input)

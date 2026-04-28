@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.75.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.1...web/v0.75.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** centralise authz guards ([#693](https://github.com/carrtech-dev/ct-ops/issues/693)) ([b8809a7](https://github.com/carrtech-dev/ct-ops/commit/b8809a7712194f58df1bc3fcd41b9ae236e0c5f2))
+
 ## [0.75.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.0...web/v0.75.1) (2026-04-28)
 
 

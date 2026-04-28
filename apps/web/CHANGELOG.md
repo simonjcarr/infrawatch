@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.80.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.80.0...web/v0.80.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** add stable selectors for directory lookup e2e ([#727](https://github.com/carrtech-dev/ct-ops/issues/727)) ([5428d48](https://github.com/carrtech-dev/ct-ops/commit/5428d4853d5ff1ad4d8cf56bda640f13dbc3edf2))
+
 ## [0.80.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.79.0...web/v0.80.0) (2026-04-28)
 
 

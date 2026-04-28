@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.31.0...agent/v0.32.0) (2026-04-28)
+
+
+### Features
+
+* **checks:** add patch status monitoring ([#690](https://github.com/carrtech-dev/ct-ops/issues/690)) ([b26a692](https://github.com/carrtech-dev/ct-ops/commit/b26a692701a6a12eb820aef964bb59f9c1c42bca))
+
 ## [0.31.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.8...agent/v0.31.0) (2026-04-28)
 
 

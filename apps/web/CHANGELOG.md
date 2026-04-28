@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.76.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.4...web/v0.76.0) (2026-04-28)
+
+
+### Features
+
+* **checks:** add patch status monitoring ([#690](https://github.com/carrtech-dev/ct-ops/issues/690)) ([b26a692](https://github.com/carrtech-dev/ct-ops/commit/b26a692701a6a12eb820aef964bb59f9c1c42bca))
+
+
+### Bug Fixes
+
+* **web:** refresh filtered certificate results ([#701](https://github.com/carrtech-dev/ct-ops/issues/701)) ([49f3dad](https://github.com/carrtech-dev/ct-ops/commit/49f3dad18325eb55455c959260b491fe9d5ec3fb))
+
 ## [0.75.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.3...web/v0.75.4) (2026-04-28)
 
 

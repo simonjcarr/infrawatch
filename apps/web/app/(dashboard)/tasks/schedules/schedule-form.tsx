@@ -206,7 +206,7 @@ export function ScheduleForm({
             Scheduled Tasks
           </Link>
         </Button>
-        <h1 className="text-2xl font-semibold text-foreground">
+        <h1 className="text-2xl font-semibold text-foreground" data-testid={`task-schedule-heading-${mode}`}>
           {mode === 'create' ? 'New schedule' : `Edit schedule: ${schedule?.name}`}
         </h1>
       </div>
@@ -479,11 +479,11 @@ export function ScheduleForm({
             <div>
               <Label>Next 5 scheduled runs</Label>
               {previewError ? (
-                <p className="text-sm text-destructive">{previewError}</p>
+                <p className="text-sm text-destructive" data-testid="task-schedule-preview-error">{previewError}</p>
               ) : preview.length === 0 ? (
-                <p className="text-sm text-muted-foreground">—</p>
+                <p className="text-sm text-muted-foreground" data-testid="task-schedule-preview-empty">—</p>
               ) : (
-                <ul className="text-sm space-y-0.5 mt-1">
+                <ul className="text-sm space-y-0.5 mt-1" data-testid="task-schedule-preview-list">
                   {preview.map((iso) => (
                     <li key={iso} className="font-mono text-xs">
                       {new Date(iso).toLocaleString()}{' '}

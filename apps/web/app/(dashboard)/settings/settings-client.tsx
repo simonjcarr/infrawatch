@@ -731,6 +731,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                   </p>
                 </div>
                 <Switch
+                  data-testid="settings-notifications-enabled-toggle"
                   checked={currentNotificationSettings.inAppEnabled}
                   onCheckedChange={(checked) =>
                     setLocalNotificationSettings({
@@ -742,7 +743,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
               </div>
               {currentNotificationSettings.inAppEnabled && (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-testid="settings-notifications-role-list">
                     <Label className="text-sm">Roles that receive notifications</Label>
                     <p className="text-xs text-muted-foreground">
                       Select which roles get in-app notifications when alerts fire or resolve
@@ -752,6 +753,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                         <div key={role.value} className="flex items-center gap-2">
                           <Checkbox
                             id={`role-${role.value}`}
+                            data-testid={`settings-notifications-role-${role.value}`}
                             checked={currentNotificationSettings.inAppRoles.includes(role.value)}
                             onCheckedChange={(checked) => {
                               const roles = checked
@@ -778,6 +780,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                       </p>
                     </div>
                     <Switch
+                      data-testid="settings-notifications-allow-opt-out-toggle"
                       checked={currentNotificationSettings.allowUserOptOut}
                       onCheckedChange={(checked) =>
                         setLocalNotificationSettings({
@@ -791,6 +794,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
               )}
               <div className="flex items-center gap-3 pt-2 border-t">
                 <Button
+                  data-testid="settings-notifications-save"
                   size="sm"
                   disabled={!notificationDirty || notificationMutation.isPending}
                   onClick={() => notificationMutation.mutate(currentNotificationSettings)}
@@ -798,7 +802,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                   {notificationMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
                 {notificationSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span
+                    className="flex items-center gap-1 text-sm text-green-700"
+                    data-testid="settings-notifications-success"
+                  >
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>

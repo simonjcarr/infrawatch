@@ -9,11 +9,22 @@
 **Phase 5 — Tooling + release hardening (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — tooling has expanded beyond Directory User Lookup and SSL Certificate Checker into Jenkins/GitLab air-gap bundle generation, recursive plugin dependency resolution, offline install bundles, host-mediated bundle transfer, and better transfer/download status. Since the last update the platform has also had a substantial release-hardening pass: local auth email verification, login lockout, shared database-backed auth and abuse throttles across replicas, trusted-origin mutation checks, org-authenticated server actions, enrolment-token limits, certificate-checker SSRF and parsing hardening, signed-update enforcement, terminal SSH credential enforcement, heartbeat/JWT tightening, agent script limits, ingest gRPC caps, config-file permission validation, digest-pinned customer bundles, installer checksum verification, and broader E2E/process coverage.
+🟢 Phase 5 progressing — tooling has expanded beyond Directory User Lookup and SSL Certificate Checker into Jenkins/GitLab air-gap bundle generation, recursive plugin dependency resolution, offline install bundles, host-mediated bundle transfer, and better transfer/download status. Since the last update the platform has also had a substantial release-hardening pass: local auth email verification, login lockout, self-service password reset for local accounts, shared database-backed auth and abuse throttles across replicas, trusted-origin mutation checks, org-authenticated server actions, enrolment-token limits, certificate-checker SSRF and parsing hardening, signed-update enforcement, terminal SSH credential enforcement, heartbeat/JWT tightening, agent script limits, ingest gRPC caps, config-file permission validation, digest-pinned customer bundles, installer checksum verification, and broader E2E/process coverage.
 
 ---
 
 ## What Has Been Built
+
+### Session 69 — Local account password reset flow
+
+**Self-service password reset** (`apps/web/app/(auth)/forgot-password/`, `apps/web/app/reset-password/`, `apps/web/lib/auth/`)
+- Added a local-account password reset entry point from the email/password login form so users who forgot their password are no longer stranded at sign-in.
+- Wired Better Auth's reset capability into CT-Ops by configuring `sendResetPassword`, revoking existing sessions on reset, and sending captured/SMTP password-reset emails through the shared auth email helper.
+- Added a reset request page plus a token-based reset form that validates new passwords, safely constrains post-reset redirects to in-app paths, and returns the user to `/login?reset=1` with a success notice after the password changes.
+
+**Validation**
+- Added targeted E2E coverage for requesting a reset from the login page, consuming the reset email, setting a new password, and signing in with the updated credential.
+- Validation run: `pnpm --dir apps/web test:e2e tests/e2e/auth/login.spec.ts` and `pnpm --dir apps/web type-check`.
 
 ### Session 68 — Centralised authz guards
 

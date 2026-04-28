@@ -12,7 +12,17 @@ export const metadata: Metadata = {
   title: 'Sign in',
 }
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
+function readParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams
   const session = await auth.api.getSession({ headers: await headers() })
   if (session) {
     const user = await db.query.users.findFirst({ where: eq(users.id, session.user.id) })
@@ -20,6 +30,12 @@ export default async function LoginPage() {
   }
 
   const ldapEnabled = await hasLdapLoginEnabled()
+  const resetComplete = readParam(params.reset) === '1'
 
-  return <LoginForm ldapLoginEnabled={ldapEnabled} />
+  return (
+    <LoginForm
+      ldapLoginEnabled={ldapEnabled}
+      notice={resetComplete ? 'Your password has been reset. Sign in with your new password.' : null}
+    />
+  )
 }

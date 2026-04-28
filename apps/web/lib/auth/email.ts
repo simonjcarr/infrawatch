@@ -94,3 +94,36 @@ export async function sendVerificationEmail(input: {
     metadata: { verificationUrl: input.verificationUrl },
   })
 }
+
+export async function sendPasswordResetEmail(input: {
+  email: string
+  name: string
+  resetUrl: string
+}): Promise<void> {
+  const subject = 'Reset your CT-Ops password'
+  const text = [
+    `Hi ${input.name || 'there'},`,
+    '',
+    'We received a request to reset your CT-Ops password.',
+    'Use the link below to choose a new password:',
+    input.resetUrl,
+    '',
+    'If you did not request this, you can ignore this email.',
+  ].join('\n')
+
+  const html = [
+    `<p>Hi ${input.name || 'there'},</p>`,
+    '<p>We received a request to reset your CT-Ops password.</p>',
+    `<p><a href="${input.resetUrl}">Reset password</a></p>`,
+    `<p>If the button does not work, use this link:<br /><a href="${input.resetUrl}">${input.resetUrl}</a></p>`,
+    '<p>If you did not request this, you can ignore this email.</p>',
+  ].join('')
+
+  await sendAuthEmail({
+    to: input.email,
+    subject,
+    text,
+    html,
+    metadata: { resetUrl: input.resetUrl },
+  })
+}

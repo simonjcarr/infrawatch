@@ -127,8 +127,8 @@ export function InventoryTab({ hostId, orgId }: Props) {
           <p className="text-sm font-medium text-foreground">Software inventory is not enabled</p>
           <p className="text-sm text-muted-foreground mt-1">
             Enable software scanning in{' '}
-            <a href="/settings" className="underline text-foreground">
-              Settings → Organisation
+            <a href="/settings/agents/software" className="underline text-foreground">
+              Administration → Agents → Software inventory
             </a>{' '}
             to start collecting package data.
           </p>

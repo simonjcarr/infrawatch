@@ -53,9 +53,23 @@ const licenceSchema = z.object({
 })
 type LicenceValues = z.infer<typeof licenceSchema>
 
+export type SettingsSection =
+  | 'organisation'
+  | 'licence'
+  | 'retention'
+  | 'collection'
+  | 'tags'
+  | 'terminal'
+  | 'notifications'
+  | 'smtp'
+  | 'software'
+
 interface SettingsClientProps {
   org: Organisation
   isAdmin: boolean
+  sections?: SettingsSection[]
+  title?: string
+  description?: string
 }
 
 function tierBadgeVariant(tier: string): 'outline' | 'default' | 'secondary' {
@@ -103,10 +117,29 @@ const EMPTY_SMTP_RELAY_SETTINGS: OrgSmtpRelaySettingsInput = {
   fromName: '',
 }
 
-export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
+export function SettingsClient({
+  org,
+  isAdmin,
+  sections,
+  title = 'Settings',
+  description = 'Manage your organisation settings',
+}: SettingsClientProps) {
   const queryClient = useQueryClient()
   const tier = org.licenceTier as LicenceTier
   const canExtendRetention = hasFeature(tier, 'metricRetentionExtended')
+  const visibleSections = new Set<SettingsSection>(
+    sections ?? [
+      'organisation',
+      'retention',
+      'collection',
+      'tags',
+      'terminal',
+      'notifications',
+      'smtp',
+      'software',
+      'licence',
+    ],
+  )
   const [orgSaveSuccess, setOrgSaveSuccess] = useState(false)
   const [licenceResult, setLicenceResult] = useState<{
     success?: boolean
@@ -371,9 +404,9 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           className="text-2xl font-semibold text-foreground"
           data-testid="settings-heading"
         >
-          Settings
+          {title}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your organisation settings</p>
+        <p className="text-sm text-muted-foreground mt-1">{description}</p>
       </div>
 
       {!isAdmin && (
@@ -384,6 +417,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
       )}
 
       {/* Organisation section */}
+      {visibleSections.has('organisation') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Organisation</CardTitle>
@@ -437,8 +471,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Metric Retention section */}
+      {visibleSections.has('retention') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -506,8 +542,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Default Data Collection section */}
+      {visibleSections.has('collection') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -595,8 +633,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Default Tags section */}
+      {visibleSections.has('tags') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -638,8 +678,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Terminal Access section */}
+      {visibleSections.has('terminal') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -727,8 +769,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Notification Settings section */}
+      {visibleSections.has('notifications') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -844,8 +888,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* SMTP Relay section */}
+      {visibleSections.has('smtp') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -1114,8 +1160,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Software Inventory section */}
+      {visibleSections.has('software') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -1230,8 +1278,10 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Licence section */}
+      {visibleSections.has('licence') && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Licence</CardTitle>
@@ -1378,6 +1428,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }

@@ -16,7 +16,7 @@ ca_cert_file = ""
 tls_skip_verify = false
 
 [agent]
-# Enrolment token from the CT-Ops UI (Settings → Agent Enrolment)
+# Enrolment token from the CT-Ops UI (Administration → Agents → Enrolment)
 # Can also be set via CT_OPS_ORG_TOKEN environment variable.
 org_token = ""
 

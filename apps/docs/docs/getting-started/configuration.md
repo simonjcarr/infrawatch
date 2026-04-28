@@ -81,7 +81,7 @@ address = "ingest.corp.example.com:9443"
 ca_cert_file = "/etc/ct-ops/ca.crt"
 
 [agent]
-# Enrolment token from Settings → Agent Enrolment
+# Enrolment token from Administration → Agents → Enrolment
 # Can also be set via CT_OPS_ORG_TOKEN env var
 org_token = "tok_..."
 

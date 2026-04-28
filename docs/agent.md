@@ -105,7 +105,7 @@ ca_cert_file = ""
 
 
 [agent]
-# Enrolment token from the CT-Ops UI (Settings → Agent Enrolment).
+# Enrolment token from the CT-Ops UI (Administration → Agents → Enrolment).
 # Can also be set via the CT_OPS_ORG_TOKEN environment variable.
 org_token = ""
 
@@ -222,5 +222,5 @@ To fully remove an agent:
 
 1. Stop the agent process
 2. In the CT-Ops UI, go to **Hosts** and find the host — it will show as `Offline`
-3. To prevent it from re-registering, revoke its enrolment token in **Settings → Agent Enrolment** (if no other agents use that token)
+3. To prevent it from re-registering, revoke its enrolment token in **Administration → Agents → Enrolment** (if no other agents use that token)
 4. Delete the data directory on the host: `rm -rf /var/lib/ct-ops/agent`

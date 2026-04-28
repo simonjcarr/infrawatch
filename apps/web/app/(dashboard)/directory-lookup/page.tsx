@@ -33,7 +33,7 @@ export default async function DirectoryLookupPage() {
               Add an LDAP or Active Directory configuration to enable directory lookups.
             </p>
             <Button asChild size="sm">
-              <Link href="/settings/ldap">Configure LDAP</Link>
+              <Link href="/settings/integrations">Configure LDAP</Link>
             </Button>
           </CardContent>
         </Card>

@@ -3,14 +3,14 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { SettingsClient } from './settings-client'
+import { SettingsClient } from '../settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 
 export const metadata: Metadata = {
-  title: 'Organisation Settings',
+  title: 'Licence Settings',
 }
 
-export default async function SettingsPage() {
+export default async function LicenceSettingsPage() {
   const session = await getRequiredSession()
   const orgId = session.user.organisationId!
 
@@ -33,9 +33,9 @@ export default async function SettingsPage() {
       <SettingsClient
         org={org}
         isAdmin={isAdmin}
-        sections={['organisation']}
+        sections={['licence']}
         title="Organisation"
-        description="Manage your organisation profile."
+        description="Manage your licence and feature tier."
       />
     </div>
   )

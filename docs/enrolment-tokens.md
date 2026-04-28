@@ -14,7 +14,7 @@ After registration, the token is no longer used — the agent authenticates subs
 
 ## Creating a token
 
-1. Go to **Settings → Agent Enrolment** in the sidebar
+1. Go to **Administration → Agents → Enrolment** in the sidebar
 2. Click **New Token**
 3. Fill in the form:
 

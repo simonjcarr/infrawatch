@@ -9,7 +9,7 @@ GCP semantics).
 
 There are four places tags can originate, merged in weakest-to-strongest order:
 
-1. **Organisation defaults** — Settings → Organisation → Default Tags. Applied
+1. **Organisation defaults** — Administration → Agents → Host defaults → Default Tags. Applied
    to every newly approved host.
 2. **Enrolment token** — chosen when creating an install token. Baked into the
    install bundle so every machine installed with that bundle registers with

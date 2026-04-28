@@ -13,6 +13,7 @@ import {
   HeartPulse,
   Key,
   Layers,
+  Lock,
   Network,
   Package,
   ScanSearch,
@@ -40,12 +41,13 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-bundlers', label: 'Air-gap Bundlers', icon: Package, href: '/bundlers' },
   { id: 'nav-runbooks', label: 'Runbooks', icon: BookOpen, href: '/runbooks' },
   { id: 'nav-tasks', label: 'Scheduled Tasks', icon: Activity, href: '/tasks' },
-  { id: 'nav-team', label: 'Team', icon: Users, href: '/team' },
-  { id: 'nav-settings', label: 'Settings', icon: Settings, href: '/settings' },
-  { id: 'nav-agent-enrolment', label: 'Agent Enrolment', icon: Server, href: '/settings/agents' },
-  { id: 'nav-alert-defaults', label: 'Alert Defaults', icon: BellPlus, href: '/settings/alerts' },
-  { id: 'nav-ldap', label: 'LDAP / Directory', icon: Key, href: '/settings/ldap' },
-  { id: 'nav-system-health', label: 'System Health', icon: HeartPulse, href: '/settings/system' },
+  { id: 'nav-people', label: 'People', icon: Users, href: '/team', keywords: ['team', 'members', 'users'] },
+  { id: 'nav-organisation', label: 'Organisation', icon: Settings, href: '/settings', keywords: ['settings', 'profile'] },
+  { id: 'nav-agents-admin', label: 'Agents', icon: Server, href: '/settings/agents', keywords: ['enrolment', 'defaults'] },
+  { id: 'nav-monitoring-admin', label: 'Monitoring Settings', icon: BellPlus, href: '/settings/monitoring', keywords: ['alerts', 'retention'] },
+  { id: 'nav-integrations-admin', label: 'Integrations', icon: Key, href: '/settings/integrations', keywords: ['ldap', 'smtp', 'directory'] },
+  { id: 'nav-security-admin', label: 'Security', icon: Lock, href: '/settings/security', keywords: ['mtls', 'terminal'] },
+  { id: 'nav-system-health', label: 'System', icon: HeartPulse, href: '/settings/system', keywords: ['health'] },
 ]
 
 export function useNavigationItems(): CommandPaletteItem[] {

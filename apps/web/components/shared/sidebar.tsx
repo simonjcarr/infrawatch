@@ -17,7 +17,6 @@ import {
   HeartPulse,
   ChevronRight,
   Layers,
-  Terminal,
   FileBarChart,
   Network,
   FolderSearch,
@@ -103,20 +102,13 @@ const toolingNav: NavItem[] = [
 ]
 
 const adminNav: NavItem[] = [
-  { title: 'Team', href: '/team', icon: Users },
-  {
-    title: 'Settings',
-    href: '/settings',
-    icon: Settings,
-    children: [
-      { title: 'Organisation', href: '/settings', icon: Settings },
-      { title: 'Agent Enrolment', href: '/settings/agents', icon: Server },
-      { title: 'Alert Defaults', href: '/settings/alerts', icon: BellPlus },
-      { title: 'LDAP / Directory', href: '/settings/ldap', icon: Key },
-      { title: 'Security / mTLS', href: '/settings/security', icon: Lock },
-      { title: 'System Health', href: '/settings/system', icon: HeartPulse },
-    ],
-  },
+  { title: 'People', href: '/team', icon: Users },
+  { title: 'Organisation', href: '/settings', icon: Settings },
+  { title: 'Agents', href: '/settings/agents', icon: Server },
+  { title: 'Monitoring', href: '/settings/monitoring', icon: BellPlus },
+  { title: 'Integrations', href: '/settings/integrations', icon: Key },
+  { title: 'Security', href: '/settings/security', icon: Lock },
+  { title: 'System', href: '/settings/system', icon: HeartPulse },
 ]
 
 function ProBadge() {
@@ -226,8 +218,8 @@ function NavGroupItems({ items, tier }: { items: NavItem[]; tier: LicenceTier })
         }
 
         const isActive =
-          item.href === '/dashboard'
-            ? pathname === '/dashboard'
+          item.href === '/dashboard' || item.href === '/settings'
+            ? pathname === item.href
             : pathname.startsWith(item.href)
         const locked = item.feature ? !hasFeature(tier, item.feature) : false
         return (

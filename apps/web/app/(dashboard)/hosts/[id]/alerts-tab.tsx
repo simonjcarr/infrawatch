@@ -709,8 +709,8 @@ export function AlertsTab({ orgId, hostId, currentUserId }: Props) {
             <CardDescription className="mt-1">
               These rules apply to <strong>all hosts</strong> in your organisation and are
               evaluated in addition to the host-specific rules above.{' '}
-              <a href="/settings/alerts" className="underline underline-offset-2">
-                Manage in Settings → Alerts
+              <a href="/settings/monitoring" className="underline underline-offset-2">
+                Manage in Administration → Monitoring
               </a>
               .
             </CardDescription>

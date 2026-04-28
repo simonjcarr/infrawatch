@@ -106,7 +106,7 @@ Open [http://localhost:3000](http://localhost:3000) in a browser.
 
 An enrolment token is what the agent uses to register itself with your organisation.
 
-1. In the sidebar, click **Agent Enrolment** (under Administration)
+1. In the sidebar, click **Agents** (under Administration), then use the **Enrolment** tab
 2. Click **New Token**
 3. Give it a label (e.g. `dev-servers`)
 4. Tick **Auto-approve agents** for development — this skips the manual approval step

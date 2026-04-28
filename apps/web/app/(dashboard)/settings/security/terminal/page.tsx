@@ -1,22 +1,29 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getSecurityOverview } from '@/lib/actions/security'
+import { db } from '@/lib/db'
+import { organisations } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
-import { SecuritySettingsClient } from './security-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
+import { SettingsClient } from '../../settings-client'
 
 export const metadata: Metadata = {
-  title: 'Security — mTLS & Agent CA',
+  title: 'Terminal Access Settings',
 }
 
-export default async function SecuritySettingsPage() {
+export default async function TerminalAccessSettingsPage() {
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) {
     redirect('/settings')
   }
 
-  const overview = await getSecurityOverview()
+  const orgId = session.user.organisationId!
+  const org = await db.query.organisations.findFirst({
+    where: eq(organisations.id, orgId),
+  })
+
+  if (!org) return null
 
   return (
     <div className="space-y-6">
@@ -26,7 +33,13 @@ export default async function SecuritySettingsPage() {
           { title: 'Terminal access', href: '/settings/security/terminal' },
         ]}
       />
-      <SecuritySettingsClient initialOverview={overview} />
+      <SettingsClient
+        org={org}
+        isAdmin
+        sections={['terminal']}
+        title="Terminal Access"
+        description="Control interactive terminal access and session logging across hosts."
+      />
     </div>
   )
 }

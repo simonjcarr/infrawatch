@@ -21,7 +21,7 @@ Bundle generation is gated to **`super_admin`** and **`org_admin`** roles. Every
 ## Generate and download
 
 1. Sign in to the CT-Ops web UI.
-2. Go to **Settings → Agent Enrolment**.
+2. Go to **Administration → Agents → Enrolment**.
 3. Click **Download Install Bundle**.
 4. Pick the target **OS** (Linux, macOS, Windows) and **architecture** (amd64, arm64).
 5. Choose how the enrolment token is handled:
@@ -99,7 +99,7 @@ When you choose **Create a new single-use token**, the token row is persisted in
 - `metadata.source` = `install-bundle`
 - `metadata.os` / `metadata.arch` — the target platform
 
-The same token is consumed on first use, and usage is tracked via `usageCount`. Revoke a token at any time from **Settings → Agent Enrolment → Revoke**.
+The same token is consumed on first use, and usage is tracked via `usageCount`. Revoke a token at any time from **Administration → Agents → Enrolment → Revoke**.
 
 ## Troubleshooting
 

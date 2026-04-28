@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 66 — SMTP relay test recipient prompt
+
+**SMTP relay testing UX** (`apps/web/app/(dashboard)/settings/settings-client.tsx`, `apps/web/lib/actions/notification-settings.ts`, `apps/web/lib/notifications/smtp-settings.ts`)
+- Changed the central SMTP Relay **Test** button to open a modal that asks which email address should receive the test message.
+- The backend test action now validates a single requested recipient and sends the test email there instead of defaulting to the configured sender address.
+- The modal remains open after sending and shows a sanitized SMTP test log with recipient, relay endpoint, sender, auth mode, host validation, and final success/error status without exposing credentials.
+
+**Validation**
+- Added focused unit coverage for SMTP test-recipient normalization.
+- Validation run: `pnpm --filter web exec node --experimental-strip-types --test lib/notifications/smtp-settings.test.mjs`, `pnpm --filter web type-check`, and `pnpm --filter web test:unit`.
+
 ### Session 65 — Query-style lint guard for auditability
 
 **Drizzle query-style convergence** (`apps/web/eslint.config.mjs`, `apps/web/lib/eslint/`, `apps/web/lib/actions/`, `apps/web/app/api/admin/hosts/bulk-delete/route.ts`)

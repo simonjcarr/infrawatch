@@ -14,6 +14,7 @@ import { encrypt, decrypt } from '@/lib/crypto/encrypt'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
 import {
   SMTP_ALLOWED_PORTS,
+  normaliseSmtpTestRecipient,
   sanitiseSmtpRelayForClient,
   smtpEncryptionSchema,
   type SmtpRelaySettings,
@@ -59,6 +60,11 @@ const updateOrgSmtpRelaySettingsSchema = z.object({
 })
 
 export type OrgSmtpRelaySettingsInput = z.infer<typeof updateOrgSmtpRelaySettingsSchema>
+
+export interface SmtpRelayTestLogEntry {
+  level: 'info' | 'success' | 'error'
+  message: string
+}
 
 export async function getOrgNotificationSettings(
   orgId: string,
@@ -211,26 +217,61 @@ export async function updateOrgSmtpRelaySettings(
 
 export async function sendTestSmtpRelaySettings(
   orgId: string,
-): Promise<{ success: true } | { error: string }> {
+  recipientInput: unknown,
+): Promise<{ success: true; log: SmtpRelayTestLogEntry[] } | { error: string; log: SmtpRelayTestLogEntry[] }> {
+  const log: SmtpRelayTestLogEntry[] = []
   const access = await getAdminOrgMetadata(orgId)
-  if ('error' in access) return { error: access.error ?? 'Unable to load SMTP settings' }
+  if ('error' in access) {
+    return {
+      error: access.error ?? 'Unable to load SMTP settings',
+      log: [{ level: 'error', message: access.error ?? 'Unable to load SMTP settings' }],
+    }
+  }
   if (!await smtpRelayTestLimiter.check(orgId)) {
-    return { error: 'Too many requests — please wait before sending another SMTP test.' }
+    return {
+      error: 'Too many requests — please wait before sending another SMTP test.',
+      log: [{ level: 'error', message: 'SMTP test rate limit exceeded' }],
+    }
   }
 
-  const cfg = access.metadata.notificationSettings?.smtpRelay
-  if (!cfg?.enabled) return { error: 'SMTP relay is not enabled' }
+  let recipient: string
+  try {
+    recipient = normaliseSmtpTestRecipient(recipientInput)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Enter a valid email address'
+    return { error: message, log: [{ level: 'error', message }] }
+  }
+  log.push({ level: 'info', message: `Recipient: ${recipient}` })
 
-  await assertPublicHost(cfg.host)
+  const cfg = access.metadata.notificationSettings?.smtpRelay
+  if (!cfg?.enabled) {
+    log.push({ level: 'error', message: 'SMTP relay is not enabled' })
+    return { error: 'SMTP relay is not enabled', log }
+  }
+
+  log.push({ level: 'info', message: `Relay: ${cfg.host}:${cfg.port} (${cfg.encryption.toUpperCase()})` })
+  log.push({ level: 'info', message: `Sender: ${cfg.fromAddress}` })
+
+  try {
+    await assertPublicHost(cfg.host)
+    log.push({ level: 'info', message: 'Relay host passed public host validation' })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'SMTP host is not allowed'
+    log.push({ level: 'error', message })
+    return { error: message, log }
+  }
 
   let password = ''
   if (cfg.passwordEncrypted) {
     try {
       password = decrypt(cfg.passwordEncrypted)
     } catch {
-      return { error: 'Stored SMTP password could not be decrypted' }
+      log.push({ level: 'error', message: 'Stored SMTP password could not be decrypted' })
+      return { error: 'Stored SMTP password could not be decrypted', log }
     }
   }
+  log.push({ level: 'info', message: cfg.username ? `Authentication: enabled as ${cfg.username}` : 'Authentication: disabled' })
+  log.push({ level: 'info', message: 'Sending SMTP test message' })
 
   try {
     await sendSmtpMessage({
@@ -242,13 +283,16 @@ export async function sendTestSmtpRelaySettings(
       fromAddress: cfg.fromAddress,
       fromName: cfg.fromName,
     }, {
-      to: [cfg.fromAddress],
+      to: [recipient],
       subject: 'CT-Ops SMTP Test',
       text: 'This is a test email from CT-Ops. Your central SMTP relay is configured correctly.',
       html: '<p>This is a test email from <strong>CT-Ops</strong>. Your central SMTP relay is configured correctly.</p>',
     })
-    return { success: true }
+    log.push({ level: 'success', message: 'SMTP server accepted the test message' })
+    return { success: true, log }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Failed to send SMTP test' }
+    const message = err instanceof Error ? err.message : 'Failed to send SMTP test'
+    log.push({ level: 'error', message })
+    return { error: message, log }
   }
 }

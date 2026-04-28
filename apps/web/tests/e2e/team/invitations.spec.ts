@@ -61,3 +61,39 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
   expect(cancelledInviteRows).toHaveLength(1)
   expect(cancelledInviteRows[0]?.deleted_at).toBeTruthy()
 })
+
+test('admin cannot create a duplicate pending invitation for the same email address', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+  const inviteeEmail = 'duplicate-teammate@example.com'
+
+  await page.goto('/team')
+
+  await expect(page.getByTestId('team-heading')).toBeVisible()
+  await page.getByTestId('team-invite-open').click()
+  await page.getByTestId('team-invite-email').fill(inviteeEmail)
+  await page.getByTestId('team-invite-role').selectOption('engineer')
+  await page.getByTestId('team-invite-submit').click()
+  await expect(page.getByTestId('team-invite-link')).toBeVisible()
+  await page.getByTestId('team-invite-done').click()
+
+  await page.getByTestId('team-invite-open').click()
+  await page.getByTestId('team-invite-email').fill(inviteeEmail)
+  await page.getByTestId('team-invite-role').selectOption('org_admin')
+  await page.getByTestId('team-invite-submit').click()
+
+  await expect(page.getByText('An invitation has already been sent to this email address')).toBeVisible()
+  await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
+
+  const inviteRows = await sql<Array<{ role: string; deleted_at: Date | null }>>`
+    SELECT role, deleted_at
+    FROM invitations
+    WHERE organisation_id = ${orgId}
+      AND email = ${inviteeEmail}
+    ORDER BY created_at ASC
+  `
+
+  expect(inviteRows).toHaveLength(1)
+  expect(inviteRows[0]?.role).toBe('engineer')
+  expect(inviteRows[0]?.deleted_at).toBeNull()
+})

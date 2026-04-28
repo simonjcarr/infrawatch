@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.2...web/v0.73.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** add missing dashboard and host e2e coverage ([#654](https://github.com/carrtech-dev/ct-ops/issues/654)) ([9953996](https://github.com/carrtech-dev/ct-ops/commit/9953996a03df0b25bcb6950d0cb7b7bdadb758cb))
+
 ## [0.73.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.1...web/v0.73.2) (2026-04-28)
 
 

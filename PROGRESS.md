@@ -31,6 +31,19 @@
 - Added parser, version comparator, match-rule, agent metadata extraction, and database-backed E2E coverage for report and host vulnerability display.
 - V1 scope is Linux OS packages from `dpkg`, `rpm`, and `apk`; Windows, macOS apps, Homebrew, Snap, Flatpak, Pacman/Arch, and third-party application registry matching remain out of scope and unassessed.
 
+### Session 73 — Build document builder
+
+**Build Docs product area** (`apps/web/app/(dashboard)/build-docs/`, `apps/web/lib/actions/build-docs.ts`, `apps/web/lib/db/schema/build-docs.ts`)
+- Added a new Build Docs workspace for organisation-level build document templates, reusable snippets, structured reorderable sections, screenshot/image assets, browser preview, and PDF/DOCX exports.
+- Added immutable template versions, snippet provenance on inserted sections, document/section revision snapshots, Postgres full-text search vectors, and org-scoped RLS-backed database tables.
+- Added filesystem-backed image storage by default plus S3-compatible storage settings and storage adapter support for object storage deployments.
+- Replaced the placeholder Runbooks route with a redirect to Build Docs and added Build Docs to navigation and the command palette.
+
+**Validation**
+- Added unit coverage for template required/optional field validation, deterministic section ordering, snippet snapshots, asset validation, and render-model table-of-contents/image attachment.
+- Added database-backed E2E coverage for admin template/snippet creation, build doc creation, section editing, image upload, preview, search, and export links.
+- Validation run: `pnpm --filter web test:unit`, `pnpm --filter web type-check`, `pnpm --filter web lint`, `pnpm --filter web db:validate`, `pnpm --filter web test:e2e tests/e2e/build-docs/build-docs.spec.ts`, and `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=... DATABASE_URL=postgres://ctops:ctops@127.0.0.1:5432/ctops pnpm --filter web build`.
+
 ### Session 71 — Customer support data bundle
 
 **Support diagnostics tooling** (`deploy/customer-bundle/generate_support_data`, `.github/workflows/`, `apps/docs/docs/`)

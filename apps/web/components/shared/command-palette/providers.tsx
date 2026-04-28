@@ -42,7 +42,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-cert-checker', label: 'SSL Certificate Checker', icon: ScanSearch, href: '/certificate-checker' },
   { id: 'nav-dir-lookup', label: 'Directory User Lookup', icon: FolderSearch, href: '/directory-lookup' },
   { id: 'nav-bundlers', label: 'Air-gap Bundlers', icon: Package, href: '/bundlers' },
-  { id: 'nav-runbooks', label: 'Runbooks', icon: BookOpen, href: '/runbooks' },
+  { id: 'nav-build-docs', label: 'Build Docs', icon: BookOpen, href: '/build-docs', keywords: ['runbooks', 'build documents'] },
   { id: 'nav-tasks', label: 'Scheduled Tasks', icon: Activity, href: '/tasks' },
   { id: 'nav-people', label: 'People', icon: Users, href: '/team', keywords: ['team', 'members', 'users'] },
   { id: 'nav-organisation', label: 'Organisation', icon: Settings, href: '/settings', keywords: ['settings', 'profile'] },

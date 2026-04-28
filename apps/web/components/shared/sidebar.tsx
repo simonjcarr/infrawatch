@@ -100,7 +100,7 @@ const toolingNav: NavItem[] = [
   { title: 'SSL Certificate Checker', href: '/certificate-checker', icon: ScanSearch },
   { title: 'Directory User Lookup', href: '/directory-lookup', icon: FolderSearch },
   { title: 'Air-gap Bundlers', href: '/bundlers', icon: Package },
-  { title: 'Runbooks', href: '/runbooks', icon: BookOpen },
+  { title: 'Build Docs', href: '/build-docs', icon: BookOpen },
   { title: 'Scheduled Tasks', href: '/tasks', icon: Activity },
 ]
 

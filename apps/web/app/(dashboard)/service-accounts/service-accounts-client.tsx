@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import {
@@ -36,8 +36,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  getDomainAccounts,
-  getDomainAccountCounts,
   createDomainAccount,
 } from '@/lib/actions/domain-accounts'
 import type { DomainAccountCounts, DomainAccountListFilters } from '@/lib/actions/domain-accounts'
@@ -132,24 +130,45 @@ export function ServiceAccountsClient({
   const [addForm, setAddForm] = useState({ ...INITIAL_ADD_FORM })
   const [addError, setAddError] = useState<string | null>(null)
 
-  const filters: DomainAccountListFilters = {
-    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
-    ...(searchTerm !== '' ? { search: searchTerm } : {}),
-    sortBy: 'username',
-    sortDir: 'asc',
-    limit: 100,
-  }
-
   const { data: accounts = initialAccounts } = useQuery({
-    queryKey: ['domain-accounts', orgId, filters],
-    queryFn: () => getDomainAccounts(orgId, filters),
+    queryKey: ['domain-accounts', orgId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        sortBy: 'username',
+        sortDir: 'asc',
+        limit: '100',
+        offset: '0',
+      })
+      const res = await fetch(`/api/domain-accounts?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch service accounts')
+      return res.json() as Promise<DomainAccount[]>
+    },
     initialData: initialAccounts,
     staleTime: 30_000,
   })
 
+  const visibleAccounts = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    return accounts.filter((account) => {
+      if (statusFilter !== 'all' && account.status !== statusFilter) return false
+      if (!normalizedSearch) return true
+
+      const haystacks = [
+        account.username,
+        account.displayName ?? '',
+      ].map((value) => value.toLowerCase())
+
+      return haystacks.some((value) => value.includes(normalizedSearch))
+    })
+  }, [accounts, searchTerm, statusFilter])
+
   const { data: counts = initialCounts } = useQuery({
     queryKey: ['domain-account-counts', orgId],
-    queryFn: () => getDomainAccountCounts(orgId),
+    queryFn: async () => {
+      const res = await fetch('/api/domain-accounts/counts')
+      if (!res.ok) throw new Error('Failed to fetch service account counts')
+      return res.json() as Promise<DomainAccountCounts>
+    },
     initialData: initialCounts,
     staleTime: 30_000,
   })
@@ -185,14 +204,14 @@ export function ServiceAccountsClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Service Accounts</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="service-accounts-heading">Service Accounts</h1>
           <p className="text-muted-foreground mt-1">
             {counts.total} service account{counts.total !== 1 ? 's' : ''} tracked
           </p>
         </div>
         <Dialog open={showAddDialog} onOpenChange={(open) => { if (!open) resetAddDialog(); else setShowAddDialog(true) }}>
           <DialogTrigger asChild>
-            <Button size="sm">
+            <Button size="sm" data-testid="service-accounts-add-open">
               <Plus className="size-4 mr-1.5" />
               Add Account
             </Button>
@@ -209,6 +228,7 @@ export function ServiceAccountsClient({
                 <Label htmlFor="add-username">Username</Label>
                 <Input
                   id="add-username"
+                  data-testid="service-accounts-add-username"
                   value={addForm.username}
                   onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
                   placeholder="e.g. svc-deploy"
@@ -218,6 +238,7 @@ export function ServiceAccountsClient({
                 <Label htmlFor="add-displayname">Display Name</Label>
                 <Input
                   id="add-displayname"
+                  data-testid="service-accounts-add-display-name"
                   value={addForm.displayName}
                   onChange={(e) => setAddForm({ ...addForm, displayName: e.target.value })}
                   placeholder="e.g. Deploy Service Account"
@@ -228,6 +249,7 @@ export function ServiceAccountsClient({
                 <Input
                   id="add-email"
                   type="email"
+                  data-testid="service-accounts-add-email"
                   value={addForm.email}
                   onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                   placeholder="e.g. svc-deploy@example.com"
@@ -254,12 +276,13 @@ export function ServiceAccountsClient({
               <Button variant="outline" onClick={resetAddDialog}>
                 Cancel
               </Button>
-              <Button
-                onClick={() => addMutation.mutate()}
-                disabled={addMutation.isPending || !canAdd}
-              >
-                {addMutation.isPending ? 'Adding...' : 'Add Account'}
-              </Button>
+                <Button
+                  onClick={() => addMutation.mutate()}
+                  disabled={addMutation.isPending || !canAdd}
+                  data-testid="service-accounts-add-submit"
+                >
+                  {addMutation.isPending ? 'Adding...' : 'Add Account'}
+                </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -316,15 +339,16 @@ export function ServiceAccountsClient({
           <Input
             placeholder="Search by username or display name..."
             className="pl-9 w-72"
+            data-testid="service-accounts-search-input"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select
+          <Select
           value={statusFilter}
           onValueChange={(v) => setStatusFilter(v as DomainAccountStatus | 'all')}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" data-testid="service-accounts-status-filter">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -338,7 +362,7 @@ export function ServiceAccountsClient({
       </div>
 
       {/* Table */}
-      {accounts.length === 0 ? (
+      {visibleAccounts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Key className="size-12 text-muted-foreground/40 mb-4" />
           <p className="text-muted-foreground font-medium">No service accounts found</p>
@@ -359,11 +383,12 @@ export function ServiceAccountsClient({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts.map((acct) => (
+              {visibleAccounts.map((acct) => (
                 <TableRow
                   key={acct.id}
                   className="cursor-pointer"
                   onClick={() => router.push(`/service-accounts/${acct.id}`)}
+                  data-testid={`service-account-row-${acct.id}`}
                 >
                   <TableCell className="font-medium font-mono">{acct.username}</TableCell>
                   <TableCell className="text-muted-foreground">

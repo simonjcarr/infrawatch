@@ -300,7 +300,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">{group.name}</h1>
+            <h1 className="text-2xl font-semibold text-foreground" data-testid="host-group-detail-heading">{group.name}</h1>
             {group.description && (
               <p className="text-sm text-muted-foreground mt-1">{group.description}</p>
             )}
@@ -318,7 +318,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
               <Shield className="size-4 mr-1" />
               Patch Group
             </Button>
-            <Button onClick={() => setAddOpen(true)}>
+            <Button onClick={() => setAddOpen(true)} data-testid="host-group-add-open">
               <Plus className="size-4 mr-1" />
               Add Hosts
             </Button>
@@ -328,7 +328,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
       {/* Members table */}
       {group.members.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="rounded-lg border border-dashed p-12 text-center" data-testid="host-group-empty-state">
           <Server className="size-8 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-medium text-foreground">No hosts in this group</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -353,7 +353,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
             </TableHeader>
             <TableBody>
               {group.members.map((host) => (
-                <TableRow key={host.id}>
+                <TableRow key={host.id} data-testid={`host-group-member-${host.id}`}>
                   <TableCell>
                     <Link
                       href={`/hosts/${host.id}`}
@@ -382,6 +382,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
                       size="icon"
                       className="size-8 text-destructive hover:text-destructive"
                       onClick={() => setRemoveTarget(host)}
+                      data-testid={`host-group-remove-${host.id}`}
                     >
                       <Trash2 className="size-3.5" />
                     </Button>
@@ -742,6 +743,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
+                data-testid="host-group-add-search"
               />
             </div>
             <div className="max-h-80 overflow-y-auto rounded-lg border divide-y">
@@ -770,6 +772,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
                       variant="outline"
                       disabled={isAdding}
                       onClick={() => doAdd(host.id)}
+                      data-testid={`host-group-add-${host.id}`}
                     >
                       {isAdding ? <Loader2 className="size-3.5 animate-spin" /> : 'Add'}
                     </Button>
@@ -883,6 +886,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => removeTarget && doRemove(removeTarget.id)}
               disabled={isRemoving}
+              data-testid="host-group-remove-confirm"
             >
               {isRemoving && <Loader2 className="size-4 mr-1 animate-spin" />}
               Remove

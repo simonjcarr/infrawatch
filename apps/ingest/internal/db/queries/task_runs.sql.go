@@ -4,8 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type taskRunExec interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
 
 // PendingAgentTask represents a task_run_hosts row that is ready to be dispatched
 // to an agent, along with the parent task_run config.
@@ -168,6 +173,10 @@ func CompleteTaskRunHost(
 // 'running' status for longer than maxAge as 'failed', then closes any parent
 // task_run whose all hosts are now in a terminal state.
 func TimeoutStuckTaskRunHosts(ctx context.Context, pool *pgxpool.Pool, maxAge time.Duration) error {
+	return timeoutStuckTaskRunHosts(ctx, pool, maxAge)
+}
+
+func timeoutStuckTaskRunHosts(ctx context.Context, exec taskRunExec, maxAge time.Duration) error {
 	const q = `
 		WITH timed_out AS (
 		  UPDATE task_run_hosts
@@ -177,7 +186,7 @@ func TimeoutStuckTaskRunHosts(ctx context.Context, pool *pgxpool.Pool, maxAge ti
 		      updated_at   = NOW()
 		  WHERE status     IN ('running', 'cancelling')
 		    AND deleted_at IS NULL
-		    AND started_at < NOW() - ($1 || ' seconds')::interval
+		    AND started_at < NOW() - make_interval(secs => $1::int)
 		  RETURNING task_run_id
 		),
 		affected AS (
@@ -207,8 +216,8 @@ func TimeoutStuckTaskRunHosts(ctx context.Context, pool *pgxpool.Pool, maxAge ti
 		  AND rc.still_active   = 0
 		  AND tr.status NOT IN ('completed', 'failed', 'cancelled')
 	`
-	secs := int64(maxAge.Seconds())
-	_, err := pool.Exec(ctx, q, secs)
+	secs := int32(maxAge / time.Second)
+	_, err := exec.Exec(ctx, q, secs)
 	return err
 }
 

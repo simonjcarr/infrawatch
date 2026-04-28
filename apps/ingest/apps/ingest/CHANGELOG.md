@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.4.0...ingest/v0.4.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **agent:** restore automatic self-updates ([#699](https://github.com/carrtech-dev/ct-ops/issues/699)) ([43b7cf6](https://github.com/carrtech-dev/ct-ops/commit/43b7cf6020ee0ab35c12b3910402f7e96582be1d))
+
 ## [0.4.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.3.1...ingest/v0.4.0) (2026-04-28)
 
 

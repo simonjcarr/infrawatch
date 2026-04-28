@@ -182,7 +182,7 @@ export function AgentsSettingsClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Agent Enrolment</h1>
+        <h1 className="text-2xl font-semibold text-foreground" data-testid="agent-enrolment-heading">Agent Enrolment</h1>
         <p className="text-muted-foreground mt-1">
           Manage enrolment tokens used to register new agents with your organisation.
         </p>
@@ -205,7 +205,7 @@ export function AgentsSettingsClient({
               <Package className="size-4 mr-1" />
               Download Install Bundle
             </Button>
-            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+            <Button size="sm" onClick={() => setShowCreateDialog(true)} data-testid="agent-enrolment-create-open">
               <Plus className="size-4 mr-1" />
               New Token
             </Button>
@@ -238,7 +238,7 @@ export function AgentsSettingsClient({
                   const status = tokenStatus(token)
                   const isActive = status.label === 'Active'
                   return (
-                    <TableRow key={token.id}>
+                    <TableRow key={token.id} data-testid="agent-enrolment-row">
                       <TableCell className="font-medium">{token.label}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -284,6 +284,7 @@ export function AgentsSettingsClient({
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7"
                             onClick={() => revokeMutation.mutate(token.id)}
                             disabled={revokeMutation.isPending}
+                            data-testid="agent-enrolment-revoke"
                           >
                             <Trash2 className="size-3.5 mr-1" />
                             Revoke
@@ -353,8 +354,8 @@ export function AgentsSettingsClient({
                 Token created. Run this command on each server you want to enrol:
               </p>
 
-              <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
-                <code className="text-xs font-mono flex-1 break-all leading-relaxed">
+                <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
+                <code className="text-xs font-mono flex-1 break-all leading-relaxed" data-testid="agent-enrolment-install-command">
                   {newInstallCommand}
                 </code>
                 <CopyButton text={newInstallCommand} />
@@ -366,7 +367,7 @@ export function AgentsSettingsClient({
                 </summary>
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                    <code className="text-xs font-mono flex-1 break-all">{newTokenValue}</code>
+                    <code className="text-xs font-mono flex-1 break-all" data-testid="agent-enrolment-raw-token">{newTokenValue}</code>
                     <CopyButton text={newTokenValue} />
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -382,6 +383,7 @@ export function AgentsSettingsClient({
                     setNewTokenValue(null)
                     setNewInstallCommand(null)
                   }}
+                  data-testid="agent-enrolment-create-done"
                 >
                   Done
                 </Button>
@@ -394,6 +396,7 @@ export function AgentsSettingsClient({
                 <Input
                   id="label"
                   placeholder="e.g. Production servers"
+                  data-testid="agent-enrolment-label"
                   {...register('label')}
                 />
                 {errors.label && (
@@ -408,6 +411,7 @@ export function AgentsSettingsClient({
                   className="h-4 w-4 rounded border-border"
                   checked={autoApprove}
                   onChange={(e) => setValue('autoApprove', e.target.checked)}
+                  data-testid="agent-enrolment-auto-approve"
                 />
                 <div>
                   <Label htmlFor="autoApprove" className="font-normal cursor-pointer">
@@ -427,6 +431,7 @@ export function AgentsSettingsClient({
                   className="h-4 w-4 rounded border-border"
                   checked={skipVerify}
                   onChange={(e) => setValue('skipVerify', e.target.checked)}
+                  data-testid="agent-enrolment-skip-verify"
                 />
                 <div>
                   <Label htmlFor="skipVerify" className="font-normal cursor-pointer">
@@ -445,6 +450,7 @@ export function AgentsSettingsClient({
                     id="maxUses"
                     type="number"
                     min="1"
+                    data-testid="agent-enrolment-max-uses"
                     {...register('maxUses')}
                   />
                 </div>
@@ -454,6 +460,7 @@ export function AgentsSettingsClient({
                     id="expiresInDays"
                     type="number"
                     min="1"
+                    data-testid="agent-enrolment-expires-days"
                     {...register('expiresInDays')}
                   />
                 </div>
@@ -476,7 +483,7 @@ export function AgentsSettingsClient({
                 <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
+                <Button type="submit" disabled={createMutation.isPending} data-testid="agent-enrolment-create-submit">
                   {createMutation.isPending ? (
                     <>
                       <RefreshCw className="size-3.5 mr-1 animate-spin" />

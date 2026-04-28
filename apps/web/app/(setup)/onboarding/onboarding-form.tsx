@@ -96,6 +96,7 @@ export function OnboardingForm() {
               placeholder="Acme Engineering"
               {...register('name')}
               onChange={handleNameChange}
+              data-testid="onboarding-name"
             />
             {errors.name && (
               <p className="text-xs text-destructive">{errors.name.message}</p>
@@ -111,6 +112,7 @@ export function OnboardingForm() {
                 placeholder="acme-engineering"
                 {...register('slug')}
                 onChange={(e) => setSlugPreview(e.target.value)}
+                data-testid="onboarding-slug"
               />
             </div>
             {errors.slug && (
@@ -124,7 +126,7 @@ export function OnboardingForm() {
           </p>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={isPending}>
+          <Button type="submit" className="w-full" disabled={isPending} data-testid="onboarding-submit">
             {isPending ? 'Creating…' : 'Create organisation'}
           </Button>
         </CardFooter>

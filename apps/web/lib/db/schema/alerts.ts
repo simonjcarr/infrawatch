@@ -1,10 +1,10 @@
 import { pgTable, text, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import type { SmtpEncryption } from '../../notifications/smtp-settings'
-import { hosts } from './hosts'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import type { SmtpEncryption } from '../../notifications/smtp-settings.ts'
+import { hosts } from './hosts.ts'
+import { users } from './auth.ts'
 
 export type NotificationResourceType = 'host' | 'certificate'
 

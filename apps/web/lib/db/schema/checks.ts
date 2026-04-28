@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, boolean, integer, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
 
 export interface PortCheckConfig {
   host: string

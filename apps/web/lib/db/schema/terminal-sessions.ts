@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, integer, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
-import { hosts } from './hosts'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import { hosts } from './hosts.ts'
+import { users } from './auth.ts'
 
 export type TerminalSessionStatus = 'pending' | 'active' | 'ended' | 'error'
 

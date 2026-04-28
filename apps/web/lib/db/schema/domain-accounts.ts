@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
+import { organisations } from './organisations.ts'
 
 export type DomainAccountStatus = 'active' | 'disabled' | 'locked' | 'expired'
 

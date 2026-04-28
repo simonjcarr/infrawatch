@@ -330,6 +330,13 @@
       "when": 1777349659609,
       "tag": "0046_talented_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1777365000000,
+      "tag": "0047_org_scoped_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, integer, boolean } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
+import { organisations } from './organisations.ts'
 
 export const ldapConfigurations = pgTable('ldap_configurations', {
   id: text('id').primaryKey().$defaultFn(() => createId()),

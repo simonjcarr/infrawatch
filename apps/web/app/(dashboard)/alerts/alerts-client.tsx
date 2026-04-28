@@ -289,7 +289,7 @@ function AddSmtpDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} data-testid="alert-email-submit">
               Add Channel
             </Button>
           </DialogFooter>
@@ -970,7 +970,7 @@ function AddSilenceDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} data-testid="alert-silence-submit">
               Create Silence
             </Button>
           </DialogFooter>
@@ -1115,7 +1115,7 @@ export function AlertsClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Alerts</h1>
+        <h1 className="text-2xl font-semibold text-foreground" data-testid="alerts-heading">Alerts</h1>
         <p className="text-muted-foreground mt-1">
           {activeAlerts.length} active alert{activeAlerts.length !== 1 ? 's' : ''}
         </p>
@@ -1124,11 +1124,11 @@ export function AlertsClient({
       {/* Filters */}
       <div className="flex items-center gap-3">
         <Label className="text-sm text-muted-foreground shrink-0">Severity</Label>
-        <Select
+          <Select
           value={severityFilter}
           onValueChange={(v) => setSeverityFilter(v as SeverityFilter)}
         >
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-36" data-testid="alerts-severity-filter">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1173,7 +1173,7 @@ export function AlertsClient({
               </TableHeader>
               <TableBody>
                 {filteredActive.map((alert) => (
-                  <TableRow key={alert.id}>
+                  <TableRow key={alert.id} data-testid={`alert-row-${alert.id}`}>
                     <TableCell>
                       <SeverityBadge severity={alert.ruleSeverity} />
                     </TableCell>
@@ -1198,6 +1198,7 @@ export function AlertsClient({
                         variant="outline"
                         onClick={() => acknowledgeMutation.mutate(alert.id)}
                         disabled={acknowledgeMutation.isPending}
+                        data-testid={`alert-acknowledge-${alert.id}`}
                       >
                         Acknowledge
                       </Button>
@@ -1282,7 +1283,7 @@ export function AlertsClient({
                 </TableHeader>
                 <TableBody>
                   {historyAlerts.map((alert) => (
-                    <TableRow key={alert.id}>
+                    <TableRow key={alert.id} data-testid={`alert-history-row-${alert.id}`}>
                       <TableCell>
                         <SeverityBadge severity={alert.ruleSeverity} />
                       </TableCell>
@@ -1356,6 +1357,7 @@ export function AlertsClient({
             variant="outline"
             className="shrink-0"
             onClick={() => setAddSilenceOpen(true)}
+            data-testid="alerts-add-silence"
           >
             <Plus className="size-3.5 mr-1" />
             Add Silence
@@ -1386,7 +1388,7 @@ export function AlertsClient({
                   const isActive = start <= now && end >= now
                   const isExpired = end < now
                   return (
-                    <TableRow key={s.id}>
+                    <TableRow key={s.id} data-testid="alert-silence-row">
                       <TableCell className="font-medium">
                         {s.hostname ? (
                           <Link href={`/hosts/${s.hostId}`} className="hover:underline text-foreground">
@@ -1466,6 +1468,7 @@ export function AlertsClient({
               size="sm"
               variant="outline"
               onClick={() => setAddSmtpOpen(true)}
+              data-testid="alerts-add-email"
             >
               <Plus className="size-3.5 mr-1" />
               Add Email
@@ -1505,7 +1508,7 @@ export function AlertsClient({
               </TableHeader>
               <TableBody>
                 {channels.map((ch) => (
-                  <TableRow key={ch.id}>
+                  <TableRow key={ch.id} data-testid="alert-channel-row">
                     <TableCell className="font-medium">{ch.name}</TableCell>
                     <TableCell>
                       {ch.type === 'smtp' ? (

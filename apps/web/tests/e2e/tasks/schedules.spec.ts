@@ -437,3 +437,128 @@ test('admin can create a custom script schedule for a single host', async ({ aut
       },
     })
 })
+
+test('admin can create a service action schedule for a host group', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      last_seen_at
+    )
+    VALUES (
+      'schedule-service-host-1',
+      ${orgId},
+      'schedule-service-host-1',
+      'Schedule Service Host',
+      'Ubuntu 24.04',
+      'x86_64',
+      '["10.60.0.10"]'::jsonb,
+      'online',
+      NOW()
+    )
+  `
+
+  await sql`
+    INSERT INTO host_groups (
+      id,
+      organisation_id,
+      name,
+      description
+    )
+    VALUES (
+      'schedule-service-group-1',
+      ${orgId},
+      'Frontend Fleet',
+      'Hosts for scheduled service restarts'
+    )
+  `
+
+  await sql`
+    INSERT INTO host_group_members (
+      id,
+      organisation_id,
+      group_id,
+      host_id
+    )
+    VALUES (
+      'schedule-service-group-member-1',
+      ${orgId},
+      'schedule-service-group-1',
+      'schedule-service-host-1'
+    )
+  `
+
+  await page.goto('/tasks/schedules/new')
+
+  await expect(page.getByTestId('task-schedule-heading-create')).toBeVisible()
+  await page.getByLabel('Name').fill('Restart nginx weekly')
+  await page.getByLabel('Description (optional)').fill('Restart the frontend service window every week.')
+
+  await page.getByTestId('task-schedule-task-type').click()
+  await page.getByRole('option', { name: 'Service action' }).click()
+
+  await page.getByLabel('Service name').fill('nginx')
+  await page.getByTestId('task-schedule-service-action').click()
+  await page.getByRole('option', { name: 'restart' }).click()
+
+  await page.getByTestId('task-schedule-target-type').click()
+  await page.getByRole('option', { name: 'Host group' }).click()
+  await page.getByTestId('task-schedule-target-id').click()
+  await page.getByRole('option', { name: 'Frontend Fleet' }).click()
+
+  await page.getByLabel('Max parallel hosts').fill('3')
+  await page.getByLabel('Cron expression (5 fields: minute hour dom month dow)').fill('30 4 * * 1')
+  await page.getByTestId('task-schedule-timezone').click()
+  await page.getByRole('option', { name: 'UTC' }).click()
+
+  await page.getByTestId('task-schedule-submit-create').click()
+
+  await expect(page).toHaveURL(/\/tasks$/)
+  const scheduleRow = page.getByRole('row', { name: /Restart nginx weekly/i })
+  await expect(scheduleRow).toContainText('Service action')
+  await expect(scheduleRow).toContainText('Frontend Fleet')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        name: string
+        cron_expression: string
+        timezone: string
+        target_type: string
+        target_id: string
+        max_parallel: number
+        task_type: string
+        config: { service_name: string; action: string }
+      }>>`
+        SELECT name, cron_expression, timezone, target_type, target_id, max_parallel, task_type, config
+        FROM task_schedules
+        WHERE organisation_id = ${orgId}
+          AND name = 'Restart nginx weekly'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      name: 'Restart nginx weekly',
+      cron_expression: '30 4 * * 1',
+      timezone: 'UTC',
+      target_type: 'group',
+      target_id: 'schedule-service-group-1',
+      max_parallel: 3,
+      task_type: 'service',
+      config: {
+        service_name: 'nginx',
+        action: 'restart',
+      },
+    })
+})

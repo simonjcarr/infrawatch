@@ -57,10 +57,14 @@ export async function POST(request: NextRequest) {
   }
   const { hostnamePrefix } = parsed.data
 
-  const matching = await db
-    .select({ id: hosts.id, organisationId: hosts.organisationId, hostname: hosts.hostname })
-    .from(hosts)
-    .where(and(like(hosts.hostname, `${hostnamePrefix}%`), isNull(hosts.deletedAt)))
+  const matching = await db.query.hosts.findMany({
+    columns: {
+      id: true,
+      organisationId: true,
+      hostname: true,
+    },
+    where: and(like(hosts.hostname, `${hostnamePrefix}%`), isNull(hosts.deletedAt)),
+  })
 
   const failed: string[] = []
   let deleted = 0

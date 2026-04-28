@@ -206,20 +206,18 @@ async function findOnlineHostCollision(
   const ipOverlap = ips.length > 0
     ? sql`${hosts.ipAddresses} ?| ARRAY[${sql.join(ips.map((ip) => sql`${ip}`), sql`, `)}]::text[]`
     : sql`false`
-  const rows = await db
-    .select({ id: hosts.id, hostname: hosts.hostname })
-    .from(hosts)
-    .where(
-      and(
+  return (
+    await db.query.hosts.findFirst({
+      columns: { id: true, hostname: true },
+      where: and(
         eq(hosts.organisationId, orgId),
         isNull(hosts.deletedAt),
         eq(hosts.status, 'online'),
         sql`(${hosts.agentId} IS NULL OR ${hosts.agentId} <> ${excludeAgentId})`,
         sql`(${hosts.hostname} = ${hostname} OR ${ipOverlap})`,
       ),
-    )
-    .limit(1)
-  return rows[0] ?? null
+    })
+  ) ?? null
 }
 
 export async function rejectAgent(
@@ -784,19 +782,16 @@ export async function getHostMetrics(
   }
 
   // Raw path (short spans) or final fallback — always capped to prevent huge payloads
-  return db
-    .select()
-    .from(hostMetrics)
-    .where(
-      and(
-        eq(hostMetrics.organisationId, orgId),
-        eq(hostMetrics.hostId, hostId),
-        gte(hostMetrics.recordedAt, from),
-        lte(hostMetrics.recordedAt, to),
-      ),
-    )
-    .orderBy(asc(hostMetrics.recordedAt))
-    .limit(MAX_DATA_POINTS)
+  return db.query.hostMetrics.findMany({
+    where: and(
+      eq(hostMetrics.organisationId, orgId),
+      eq(hostMetrics.hostId, hostId),
+      gte(hostMetrics.recordedAt, from),
+      lte(hostMetrics.recordedAt, to),
+    ),
+    orderBy: [asc(hostMetrics.recordedAt)],
+    limit: MAX_DATA_POINTS,
+  })
 }
 
 export async function getAgentOfflinePeriods(
@@ -811,18 +806,16 @@ export async function getAgentOfflinePeriods(
   // started before the visible range.
   const lookback = new Date(from.getTime() - 3_600_000)
 
-  const events = await db
-    .select({ status: agentStatusHistory.status, createdAt: agentStatusHistory.createdAt })
-    .from(agentStatusHistory)
-    .where(
-      and(
-        eq(agentStatusHistory.agentId, agentId),
-        eq(agentStatusHistory.organisationId, orgId),
-        gte(agentStatusHistory.createdAt, lookback),
-        lte(agentStatusHistory.createdAt, to),
-      ),
-    )
-    .orderBy(asc(agentStatusHistory.createdAt))
+  const events = await db.query.agentStatusHistory.findMany({
+    columns: { status: true, createdAt: true },
+    where: and(
+      eq(agentStatusHistory.agentId, agentId),
+      eq(agentStatusHistory.organisationId, orgId),
+      gte(agentStatusHistory.createdAt, lookback),
+      lte(agentStatusHistory.createdAt, to),
+    ),
+    orderBy: [asc(agentStatusHistory.createdAt)],
+  })
 
   const periods: OfflinePeriod[] = []
   let offlineStart: number | null = null
@@ -1024,23 +1017,23 @@ export async function deleteHost(
       // 5. Certificate events & certificates (certificates reference both
       //    discovered_by_host_id AND check_id, so must be deleted before checks)
       const hostCheckIds = (
-        await tx
-          .select({ id: checks.id })
-          .from(checks)
-          .where(and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)))
+        await tx.query.checks.findMany({
+          columns: { id: true },
+          where: and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)),
+        })
       ).map((c) => c.id)
 
-      const hostCerts = await tx
-        .select({ id: certificates.id })
-        .from(certificates)
-        .where(and(
+      const hostCerts = await tx.query.certificates.findMany({
+        columns: { id: true },
+        where: and(
           eq(certificates.organisationId, orgId),
           sql`(${certificates.discoveredByHostId} = ${hostId}${
             hostCheckIds.length > 0
               ? sql` OR ${certificates.checkId} IN (${sql.join(hostCheckIds.map((id) => sql`${id}`), sql`, `)})`
               : sql``
           })`,
-        ))
+        ),
+      })
 
       if (hostCerts.length > 0) {
         const certIds = hostCerts.map((c) => c.id)
@@ -1064,17 +1057,18 @@ export async function deleteHost(
         .where(and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)))
 
       // 7a. Notifications referencing this host's alert instances (FK constraint)
-      await tx
-        .delete(notifications)
-        .where(and(
-          inArray(
-            notifications.alertInstanceId,
-            tx
-              .select({ id: alertInstances.id })
-              .from(alertInstances)
-              .where(and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId))),
-          ),
-        ))
+      const hostAlertInstanceIds = (
+        await tx.query.alertInstances.findMany({
+          columns: { id: true },
+          where: and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId)),
+        })
+      ).map((instance) => instance.id)
+
+      if (hostAlertInstanceIds.length > 0) {
+        await tx
+          .delete(notifications)
+          .where(inArray(notifications.alertInstanceId, hostAlertInstanceIds))
+      }
 
       // 7b. Alert instances
       await tx
@@ -1167,16 +1161,16 @@ export async function deleteHost(
         // Capture the agent's client cert serial before we delete the row so
         // we can blacklist it — otherwise a deleted agent whose cert is still
         // inside its validity window could reconnect and register fresh.
-        const [agentRow] = await tx
-          .select({ serial: agents.clientCertSerial })
-          .from(agents)
-          .where(eq(agents.id, host.agentId))
-        if (agentRow?.serial) {
+        const agentRow = await tx.query.agents.findFirst({
+          columns: { clientCertSerial: true },
+          where: eq(agents.id, host.agentId),
+        })
+        if (agentRow?.clientCertSerial) {
           await tx
             .insert(revokedCertificates)
             .values({
               organisationId: orgId,
-              serial: agentRow.serial,
+              serial: agentRow.clientCertSerial,
               reason: 'Host deleted',
             })
             .onConflictDoNothing()

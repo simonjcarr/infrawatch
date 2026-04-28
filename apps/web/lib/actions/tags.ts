@@ -65,12 +65,11 @@ export async function searchTags(
     )
   }
 
-  return db
-    .select()
-    .from(tags)
-    .where(and(...conditions))
-    .orderBy(desc(tags.usageCount), asc(tags.key), asc(tags.value))
-    .limit(limit)
+  return db.query.tags.findMany({
+    where: and(...conditions),
+    orderBy: [desc(tags.usageCount), asc(tags.key), asc(tags.value)],
+    limit,
+  })
 }
 
 // Looks up an existing tag case-insensitively, inserting it if absent. The
@@ -82,18 +81,15 @@ async function upsertTag(
   orgId: string,
   pair: TagPair,
 ): Promise<string> {
-  const existing = await tx
-    .select({ id: tags.id })
-    .from(tags)
-    .where(
-      and(
-        eq(tags.organisationId, orgId),
-        sql`lower(${tags.key}) = lower(${pair.key})`,
-        sql`lower(${tags.value}) = lower(${pair.value})`,
-      ),
-    )
-    .limit(1)
-  if (existing[0]?.id) return existing[0].id
+  const existing = await tx.query.tags.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(tags.organisationId, orgId),
+      sql`lower(${tags.key}) = lower(${pair.key})`,
+      sql`lower(${tags.value}) = lower(${pair.value})`,
+    ),
+  })
+  if (existing?.id) return existing.id
 
   try {
     const [row] = await tx
@@ -105,18 +101,15 @@ async function upsertTag(
     // Concurrent insert won the race — re-read.
   }
 
-  const retry = await tx
-    .select({ id: tags.id })
-    .from(tags)
-    .where(
-      and(
-        eq(tags.organisationId, orgId),
-        sql`lower(${tags.key}) = lower(${pair.key})`,
-        sql`lower(${tags.value}) = lower(${pair.value})`,
-      ),
-    )
-    .limit(1)
-  const id = retry[0]?.id
+  const retry = await tx.query.tags.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(tags.organisationId, orgId),
+      sql`lower(${tags.key}) = lower(${pair.key})`,
+      sql`lower(${tags.value}) = lower(${pair.value})`,
+    ),
+  })
+  const id = retry?.id
   if (!id) throw new Error('Tag upsert could not resolve tag id')
   return id
 }

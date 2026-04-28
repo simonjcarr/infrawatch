@@ -1,6 +1,9 @@
 import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import nodemailer from 'nodemailer'
+import { decrypt } from '../crypto/encrypt.ts'
+import type { OrgNotificationSettings } from '../db/schema/organisations.ts'
+import type { SmtpSendConfig } from '../notifications/smtp-send.ts'
 
 type AuthEmailInput = {
   to: string
@@ -15,6 +18,42 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return value === '1' || value.toLowerCase() === 'true'
 }
 
+export function getAuthEmailConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): SmtpSendConfig | null {
+  const host = env['AUTH_EMAIL_SMTP_HOST']
+  const fromAddress = env['AUTH_EMAIL_FROM']
+  if (!host || !fromAddress) return null
+
+  const port = Number(env['AUTH_EMAIL_SMTP_PORT'] ?? '587')
+  return {
+    host,
+    port,
+    encryption: parseBoolean(env['AUTH_EMAIL_SMTP_SECURE'], port === 465) ? 'tls' : 'none',
+    username: env['AUTH_EMAIL_SMTP_USER'] || undefined,
+    password: env['AUTH_EMAIL_SMTP_PASSWORD'] || undefined,
+    fromAddress,
+    fromName: env['AUTH_EMAIL_FROM_NAME'] ?? 'CT-Ops',
+  }
+}
+
+export function getAuthEmailConfigFromOrgSettings(
+  notificationSettings: OrgNotificationSettings | undefined,
+): SmtpSendConfig | null {
+  const relay = notificationSettings?.smtpRelay
+  if (!relay?.enabled) return null
+
+  return {
+    host: relay.host,
+    port: relay.port,
+    encryption: relay.encryption,
+    username: relay.username || undefined,
+    password: relay.passwordEncrypted ? decrypt(relay.passwordEncrypted) : undefined,
+    fromAddress: relay.fromAddress,
+    fromName: relay.fromName || undefined,
+  }
+}
+
 async function captureEmail(input: AuthEmailInput): Promise<void> {
   const file = process.env['AUTH_EMAIL_CAPTURE_FILE']
   if (!file) return
@@ -24,25 +63,23 @@ async function captureEmail(input: AuthEmailInput): Promise<void> {
 `, 'utf8')
 }
 
-export async function sendAuthEmail(input: AuthEmailInput): Promise<void> {
-  const host = process.env['AUTH_EMAIL_SMTP_HOST']
-  const port = Number(process.env['AUTH_EMAIL_SMTP_PORT'] ?? '587')
-  const secure = parseBoolean(process.env['AUTH_EMAIL_SMTP_SECURE'], port === 465)
-  const user = process.env['AUTH_EMAIL_SMTP_USER']
-  const password = process.env['AUTH_EMAIL_SMTP_PASSWORD']
-  const fromAddress = process.env['AUTH_EMAIL_FROM']
-  const fromName = process.env['AUTH_EMAIL_FROM_NAME'] ?? 'CT-Ops'
+export async function sendAuthEmail(
+  input: AuthEmailInput,
+  smtpConfig: SmtpSendConfig | null = null,
+): Promise<void> {
+  const config = smtpConfig ?? getAuthEmailConfigFromEnv()
 
-  if (host && fromAddress) {
+  if (config) {
     const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      ...(user ? { auth: { user, pass: password ?? '' } } : {}),
+      host: config.host,
+      port: config.port,
+      secure: config.encryption === 'tls',
+      requireTLS: config.encryption === 'starttls',
+      ...(config.username ? { auth: { user: config.username, pass: config.password ?? '' } } : {}),
     })
 
     await transporter.sendMail({
-      from: fromName ? `"${fromName}" <${fromAddress}>` : fromAddress,
+      from: config.fromName ? `"${config.fromName}" <${config.fromAddress}>` : config.fromAddress,
       to: input.to,
       subject: input.subject,
       text: input.text,
@@ -67,6 +104,7 @@ export async function sendVerificationEmail(input: {
   email: string
   name: string
   verificationUrl: string
+  smtpConfig?: SmtpSendConfig | null
 }): Promise<void> {
   const subject = 'Verify your CT-Ops email address'
   const text = [
@@ -92,13 +130,14 @@ export async function sendVerificationEmail(input: {
     text,
     html,
     metadata: { verificationUrl: input.verificationUrl },
-  })
+  }, input.smtpConfig ?? null)
 }
 
 export async function sendPasswordResetEmail(input: {
   email: string
   name: string
   resetUrl: string
+  smtpConfig?: SmtpSendConfig | null
 }): Promise<void> {
   const subject = 'Reset your CT-Ops password'
   const text = [
@@ -125,5 +164,5 @@ export async function sendPasswordResetEmail(input: {
     text,
     html,
     metadata: { resetUrl: input.resetUrl },
-  })
+  }, input.smtpConfig ?? null)
 }

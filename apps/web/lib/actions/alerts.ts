@@ -12,7 +12,11 @@ import { decrypt } from '@/lib/crypto/encrypt'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import { sendSmtpMessage } from '@/lib/notifications/smtp-send'
 
-const testNotificationLimiter = createRateLimiter(60_000, 5)
+const testNotificationLimiter = createRateLimiter({
+  scope: 'alerts:test-notification',
+  windowMs: 60_000,
+  max: 5,
+})
 import { db } from '@/lib/db'
 import { alertRules, alertInstances, notificationChannels, alertSilences, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, desc, inArray, sql, lte, gte, count } from 'drizzle-orm'
@@ -751,7 +755,7 @@ export async function sendTestNotification(
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
-  if (!testNotificationLimiter.check(orgId)) {
+  if (!await testNotificationLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before sending another test notification.' }
   }
   const existing = await db.query.notificationChannels.findFirst({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from '@/lib/agent/repo'
+import { createRateLimiter } from '@/lib/rate-limit'
 
 interface GitHubRelease {
   tag_name: string
@@ -22,28 +23,17 @@ interface ReleasePayload {
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 let cacheEntry: { data: ReleasePayload; expiresAt: number } | null = null
 
-// ── Per-IP rate limiter ───────────────────────────────────────────────────────
-// Limits unauthenticated callers to 10 requests per minute so a single source
-// cannot keep triggering cache misses and fanning out to GitHub.
-const ipTimestamps = new Map<string, number[]>()
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX = 10
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const timestamps = ipTimestamps.get(ip) ?? []
-  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
-  if (recent.length >= RATE_LIMIT_MAX) return false
-  recent.push(now)
-  ipTimestamps.set(ip, recent)
-  return true
-}
+const latestRateLimit = createRateLimiter({
+  scope: 'agent:latest',
+  windowMs: 60_000,
+  max: 10,
+})
 
 export async function GET() {
   const reqHeaders = await headers()
   const ip = reqHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
 
-  if (!checkRateLimit(ip)) {
+  if (!await latestRateLimit.check(ip)) {
     return NextResponse.json(
       { error: 'Rate limited — please wait a moment before retrying.' },
       { status: 429 },

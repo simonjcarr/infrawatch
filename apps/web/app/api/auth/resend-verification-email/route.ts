@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
   }
 
   const email = normalizeVerificationEmail(parsed.data.email)
-  if (!emailVerificationResendPolicy.check({ email, ip })) {
+  if (!await emailVerificationResendPolicy.check({ email, ip })) {
     return NextResponse.json(
       { message: EMAIL_VERIFICATION_RESEND_THROTTLED_MESSAGE },
       { status: 429 },
     )
   }
 
-  const accountStatus = passwordLoginAttemptGuard.check(email)
+  const accountStatus = await passwordLoginAttemptGuard.check(email)
   if (!accountStatus.allowed) {
     return NextResponse.json(
       { message: 'Too many login attempts — please wait before trying again.' },
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       hash: '$argon2id$v=19$m=65536,t=3,p=4$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       password: parsed.data.password,
     }).catch(() => undefined)
-    passwordLoginAttemptGuard.recordFailure(email)
+    await passwordLoginAttemptGuard.recordFailure(email)
     return withAuthDelay(requestStart, invalidResponse())
   }
 
@@ -105,11 +105,11 @@ export async function POST(request: NextRequest) {
   })
 
   if (!passwordMatches) {
-    passwordLoginAttemptGuard.recordFailure(email)
+    await passwordLoginAttemptGuard.recordFailure(email)
     return withAuthDelay(requestStart, invalidResponse())
   }
 
-  passwordLoginAttemptGuard.reset(email)
+  await passwordLoginAttemptGuard.reset(email)
 
   if (user.emailVerified || !user.isActive) {
     return withAuthDelay(

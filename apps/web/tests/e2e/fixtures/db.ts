@@ -47,6 +47,7 @@ const APP_TABLES = [
   'notification_channels',
   'notifications',
   'resource_tags',
+  'security_throttles',
   'saved_software_reports',
   'service_accounts',
   'software_packages',

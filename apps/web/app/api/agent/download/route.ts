@@ -10,7 +10,11 @@ import {
 import { createRateLimiter } from '@/lib/rate-limit'
 
 // 20 requests per IP per 60 s — prevents binary-download floods while accommodating automation.
-const downloadRateLimit = createRateLimiter(60_000, 20)
+const downloadRateLimit = createRateLimiter({
+  scope: 'agent:download',
+  windowMs: 60_000,
+  max: 20,
+})
 
 /**
  * Serves the agent binary for the required version (pinned in lib/agent/version.ts).
@@ -29,7 +33,7 @@ export async function GET(request: NextRequest) {
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     request.headers.get('x-real-ip') ??
     'unknown'
-  if (!downloadRateLimit.check(ip)) {
+  if (!await downloadRateLimit.check(ip)) {
     return NextResponse.json(
       { error: 'Too many requests — please wait before trying again.' },
       { status: 429 },

@@ -22,7 +22,11 @@ import {
 import { sendSmtpMessage } from '@/lib/notifications/smtp-send'
 import { createRateLimiter } from '@/lib/rate-limit'
 
-const smtpRelayTestLimiter = createRateLimiter(60_000, 5)
+const smtpRelayTestLimiter = createRateLimiter({
+  scope: 'notifications:smtp-relay-test',
+  windowMs: 60_000,
+  max: 5,
+})
 
 const updateOrgNotificationSettingsSchema = z.object({
   inAppEnabled: z.boolean(),
@@ -210,7 +214,7 @@ export async function sendTestSmtpRelaySettings(
 ): Promise<{ success: true } | { error: string }> {
   const access = await getAdminOrgMetadata(orgId)
   if ('error' in access) return { error: access.error ?? 'Unable to load SMTP settings' }
-  if (!smtpRelayTestLimiter.check(orgId)) {
+  if (!await smtpRelayTestLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before sending another SMTP test.' }
   }
 

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  assertAllowedCertificateCheckerTarget,
   assertAllowedCertificateCheckerPort,
   getAllowedCertificateCheckerPorts,
 } from './certificate-checker-policy.ts'
@@ -17,5 +18,11 @@ test('rejects non-TLS and internal-service ports', () => {
       () => assertAllowedCertificateCheckerPort(port),
       /Blocked: port .* is not allowed/,
     )
+  }
+})
+
+test('allows certificate checks against private network hosts on allowed TLS ports', () => {
+  for (const host of ['192.168.8.215', '10.0.0.12', 'ct-ops.carrtech.laptop']) {
+    assert.doesNotThrow(() => assertAllowedCertificateCheckerTarget(host, 443))
   }
 })

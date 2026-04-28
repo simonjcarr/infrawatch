@@ -25,3 +25,14 @@ export function assertAllowedCertificateCheckerPort(port: number): void {
     `Blocked: port ${port} is not allowed. Use one of: ${ALLOWED_CERTIFICATE_CHECKER_PORTS.join(', ')}`,
   )
 }
+
+export function assertAllowedCertificateCheckerTarget(host: string, port: number): void {
+  const normalizedHost = host.trim()
+  if (!normalizedHost) {
+    throw new Error('Blocked: hostname is required.')
+  }
+
+  // Certificate inspection is intentionally used against private infrastructure.
+  // Keep the abuse boundary on authenticated access plus a narrow TLS port allowlist.
+  assertAllowedCertificateCheckerPort(port)
+}

@@ -11,8 +11,7 @@ import {
   parseCertificateBuffer,
   resolveUrlTarget,
 } from '@/lib/certificates/fetch'
-import { assertAllowedCertificateCheckerPort } from '@/lib/net/certificate-checker-policy'
-import { assertPublicHost } from '@/lib/net/ssrf-guard'
+import { assertAllowedCertificateCheckerTarget } from '@/lib/net/certificate-checker-policy'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 
 export type { ParsedCertificate, ParsedSAN, ChainEntry } from '@/lib/certificates/fetch'
@@ -96,8 +95,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (data.action === 'fetch-url') {
       const { host, port } = resolveUrlTarget(data.url, data.port)
-      assertAllowedCertificateCheckerPort(port)
-      await assertPublicHost(host)
+      assertAllowedCertificateCheckerTarget(host, port)
       const { certificate } = await fetchCertificateFromUrl(data.url, data.port, data.servername)
       const keyMatch = data.keyPem ? checkKeyMatch(data.keyPem, certificate.pem) : undefined
       return NextResponse.json({ ok: true, certificate, keyMatch } satisfies CertCheckerResponse)

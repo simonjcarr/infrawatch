@@ -159,13 +159,13 @@ export function TeamClient({
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Team</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="team-heading">Team</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage members and pending invitations
           </p>
         </div>
         {canManage(currentUserRole) && (
-          <Button onClick={() => setIsInviteOpen(true)} size="sm">
+          <Button onClick={() => setIsInviteOpen(true)} size="sm" data-testid="team-invite-open">
             <UserPlus className="size-4 mr-2" />
             Invite member
           </Button>
@@ -310,7 +310,7 @@ export function TeamClient({
               </thead>
               <tbody className="divide-y divide-border">
                 {pendingInvites.map((invite) => (
-                  <tr key={invite.id}>
+                  <tr key={invite.id} data-testid="team-pending-invite-row">
                     <td className="px-4 py-3 text-foreground">{invite.email}</td>
                     <td className="px-4 py-3">
                       <Badge variant={roleBadgeVariant(invite.role)}>
@@ -329,6 +329,7 @@ export function TeamClient({
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => cancelInviteMutation.mutate(invite.id)}
                           disabled={cancelInviteMutation.isPending}
+                          data-testid="team-pending-invite-cancel"
                         >
                           <X className="size-4 mr-1" />
                           Cancel
@@ -356,7 +357,7 @@ export function TeamClient({
                 Invitation created. Share this link with the new member — it expires in 7 days.
               </p>
               <div className="flex gap-2">
-                <Input value={inviteLink} readOnly className="font-mono text-xs" />
+                <Input value={inviteLink} readOnly className="font-mono text-xs" data-testid="team-invite-link" />
                 <Button variant="outline" size="icon" onClick={copyLink}>
                   {copiedLink ? (
                     <Check className="size-4 text-green-600" />
@@ -365,7 +366,7 @@ export function TeamClient({
                   )}
                 </Button>
               </div>
-              <Button className="w-full" onClick={closeInviteDialog}>
+              <Button className="w-full" onClick={closeInviteDialog} data-testid="team-invite-done">
                 Done
               </Button>
             </div>
@@ -380,6 +381,7 @@ export function TeamClient({
                   id="invite-email"
                   type="email"
                   placeholder="colleague@example.com"
+                  data-testid="team-invite-email"
                   {...register('email')}
                 />
                 {errors.email && (
@@ -392,6 +394,7 @@ export function TeamClient({
                   id="invite-role"
                   {...register('role')}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  data-testid="team-invite-role"
                 >
                   {INVITE_ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -407,7 +410,7 @@ export function TeamClient({
                 <Button type="button" variant="outline" onClick={closeInviteDialog}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={inviteMutation.isPending}>
+                <Button type="submit" disabled={inviteMutation.isPending} data-testid="team-invite-submit">
                   {inviteMutation.isPending ? 'Sending…' : 'Send invitation'}
                 </Button>
               </div>

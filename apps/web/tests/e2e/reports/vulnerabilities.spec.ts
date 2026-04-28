@@ -63,3 +63,110 @@ test('vulnerability report filters open findings', async ({ authenticatedPage: p
   await page.getByLabel('Package').fill('does-not-match')
   await expect(page.getByText('CVE-2024-4321')).toBeHidden()
 })
+
+test('vulnerability report applies host group, severity, KEV, and fix filters', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+  const licenceKey = await issueTestLicence({ orgId, tier: 'pro' })
+
+  await sql`
+    UPDATE organisations
+    SET licence_key = ${licenceKey},
+        licence_tier = 'pro'
+    WHERE id = ${orgId}
+  `
+
+  await sql`
+    INSERT INTO host_groups (
+      id,
+      organisation_id,
+      name,
+      description
+    )
+    VALUES (
+      'report-vuln-group-1',
+      ${orgId},
+      'Critical Linux',
+      'Linux hosts with critical vulnerabilities.'
+    )
+  `
+
+  await sql`
+    INSERT INTO hosts (id, organisation_id, hostname, display_name, os, arch, status)
+    VALUES
+      ('report-vuln-host-2', ${orgId}, 'report-vuln-node-2', 'Critical Linux Node', 'linux', 'x86_64', 'online'),
+      ('report-vuln-host-3', ${orgId}, 'report-vuln-node-3', 'General Linux Node', 'linux', 'x86_64', 'online')
+  `
+
+  await sql`
+    INSERT INTO host_group_members (id, organisation_id, group_id, host_id)
+    VALUES (
+      'report-vuln-group-member-1',
+      ${orgId},
+      'report-vuln-group-1',
+      'report-vuln-host-2'
+    )
+  `
+
+  await sql`
+    INSERT INTO software_packages (
+      id, organisation_id, host_id, name, version, source,
+      distro_id, distro_version_id, distro_codename, source_name,
+      first_seen_at, last_seen_at
+    )
+    VALUES
+      (
+        'report-vuln-pkg-2', ${orgId}, 'report-vuln-host-2', 'openssl', '3.0.1', 'dpkg',
+        'ubuntu', '24.04', 'noble', 'openssl',
+        NOW(), NOW()
+      ),
+      (
+        'report-vuln-pkg-3', ${orgId}, 'report-vuln-host-3', 'curl', '8.5.0', 'apk',
+        'alpine', '3.19', 'edge', 'curl',
+        NOW(), NOW()
+      )
+  `
+
+  await sql`
+    INSERT INTO vulnerability_cves (cve_id, description, severity, known_exploited)
+    VALUES
+      ('CVE-2024-9991', 'Grouped critical vulnerability', 'critical', true),
+      ('CVE-2024-9992', 'Ungrouped medium vulnerability', 'medium', false)
+  `
+
+  await sql`
+    INSERT INTO host_vulnerability_findings (
+      id, organisation_id, host_id, software_package_id, cve_id, status,
+      package_name, installed_version, fixed_version, source, severity, known_exploited,
+      first_seen_at, last_seen_at
+    )
+    VALUES
+      (
+        'report-finding-2', ${orgId}, 'report-vuln-host-2', 'report-vuln-pkg-2', 'CVE-2024-9991', 'open',
+        'openssl', '3.0.1', '3.0.9', 'dpkg', 'critical', true,
+        NOW(), NOW()
+      ),
+      (
+        'report-finding-3', ${orgId}, 'report-vuln-host-3', 'report-vuln-pkg-3', 'CVE-2024-9992', 'open',
+        'curl', '8.5.0', NULL, 'apk', 'medium', false,
+        NOW(), NOW()
+      )
+  `
+
+  await page.goto('/reports/vulnerabilities')
+
+  await expect(page.getByTestId('vulnerability-report-finding-row-report-finding-2')).toBeVisible()
+  await expect(page.getByTestId('vulnerability-report-finding-row-report-finding-3')).toBeVisible()
+
+  await page.getByTestId('vulnerability-report-host-group-filter').click()
+  await page.getByRole('option', { name: 'Critical Linux' }).click()
+
+  await page.getByTestId('vulnerability-report-severity-filter').click()
+  await page.getByRole('option', { name: 'critical' }).click()
+
+  await page.getByTestId('vulnerability-report-kev-filter').click()
+  await page.getByTestId('vulnerability-report-fix-available-filter').click()
+
+  await expect(page.getByTestId('vulnerability-report-finding-row-report-finding-2')).toContainText('CVE-2024-9991')
+  await expect(page.getByTestId('vulnerability-report-finding-row-report-finding-3')).toHaveCount(0)
+})

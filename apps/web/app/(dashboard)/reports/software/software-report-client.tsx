@@ -376,13 +376,23 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Installed Software</h1>
+          <h1
+            className="text-2xl font-semibold text-foreground"
+            data-testid="software-report-heading"
+          >
+            Installed Software
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Search and report on software installed across your host estate.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setSavedReportsOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSavedReportsOpen(true)}
+            data-testid="software-report-saved-reports-open"
+          >
             <Save className="size-3.5 mr-1.5" />
             Saved reports
             {savedReports.length > 0 && (
@@ -406,6 +416,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
           <button
             key={tab.id}
             onClick={() => setActiveView(tab.id)}
+            data-testid={`software-report-tab-${tab.id}`}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeView === tab.id
                 ? 'border-foreground text-foreground'
@@ -432,6 +443,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                     <div className="relative">
                       <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
                       <Input
+                        data-testid="software-report-package-name"
                         placeholder="e.g. openssl"
                         className="pl-8 h-8 text-sm"
                         value={nameInput}
@@ -588,7 +600,10 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                     setPage('1')
                   }}
                 >
-                  <SelectTrigger className="h-8 text-sm w-[140px]">
+                  <SelectTrigger
+                    className="h-8 text-sm w-[140px]"
+                    data-testid="software-report-os-filter"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -635,6 +650,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                     size="sm"
                     onClick={() => setSaveDialogOpen(true)}
                     disabled={!filters.name}
+                    data-testid="software-report-save-filters-open"
                   >
                     <Save className="size-3.5 mr-1.5" />
                     Save filters
@@ -740,7 +756,10 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                     </TableHeader>
                     <TableBody>
                       {displayedRows.map((row) => (
-                        <TableRow key={`${row.hostId}:${row.version}:${row.architecture ?? ''}`}>
+                        <TableRow
+                          key={`${row.hostId}:${row.version}:${row.architecture ?? ''}`}
+                          data-testid={`software-report-row-${row.hostId}`}
+                        >
                           <TableCell className="font-medium text-sm">
                             <Link
                               href={`/hosts/${row.hostId}`}
@@ -833,7 +852,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                 </TableHeader>
                 <TableBody>
                   {newPackages.map((pkg) => (
-                    <TableRow key={pkg.name}>
+                    <TableRow key={pkg.name} data-testid={`software-report-new-package-${pkg.name}`}>
                       <TableCell className="font-mono text-sm font-medium">{pkg.name}</TableCell>
                       <TableCell>
                         <Badge variant="secondary">{pkg.hostCount}</Badge>
@@ -885,7 +904,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                 </TableHeader>
                 <TableBody>
                   {driftRows.map((row, i) => (
-                    <TableRow key={i}>
+                    <TableRow key={i} data-testid={`software-report-drift-row-${i}`}>
                       <TableCell className="font-mono text-sm font-medium">{row.packageName}</TableCell>
                       <TableCell className="text-sm">{row.groupName}</TableCell>
                       <TableCell>
@@ -933,6 +952,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
               <Label htmlFor="save-name">Report name</Label>
               <Input
                 id="save-name"
+                data-testid="software-report-save-name"
                 placeholder="e.g. OpenSSL < 3.0 exposure"
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
@@ -946,6 +966,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
             <Button
               disabled={!saveName.trim() || saveMutation.isPending}
               onClick={() => saveMutation.mutate()}
+              data-testid="software-report-save-submit"
             >
               {saveMutation.isPending ? 'Saving…' : 'Save'}
             </Button>
@@ -965,12 +986,13 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
             </p>
           ) : (
             <div className="space-y-2 py-2 max-h-80 overflow-y-auto">
-              {savedReports.map((r) => (
+              {savedReports.map((r, index) => (
                 <div
                   key={r.id}
                   className="flex items-center justify-between gap-2 p-2.5 rounded-md border hover:bg-muted/50"
                 >
                   <button
+                    data-testid={`software-report-saved-report-load-${index}`}
                     className="flex-1 text-left text-sm font-medium text-foreground"
                     onClick={() => loadSavedReport(r.filters as SoftwareReportFilters)}
                   >
@@ -981,6 +1003,7 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
                     size="sm"
                     className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                     onClick={() => deleteSavedMutation.mutate(r.id)}
+                    data-testid={`software-report-saved-report-delete-${index}`}
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
@@ -989,7 +1012,11 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSavedReportsOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setSavedReportsOpen(false)}
+              data-testid="software-report-saved-reports-close"
+            >
               Close
             </Button>
           </DialogFooter>

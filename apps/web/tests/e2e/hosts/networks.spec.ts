@@ -96,6 +96,13 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
   await expect(networkRow).toContainText('10.55.0.0/24')
   await expect(networkRow).toContainText('Branch office LAN')
 
+  await page.getByTestId('networks-view-graph').click()
+  await expect(page.getByTestId('networks-graph')).toBeVisible()
+  await expect(page.getByText('Branch Office')).toBeVisible()
+
+  await page.getByTestId('networks-view-table').click()
+  await expect(networkRow).toBeVisible()
+
   await networkRow.getByRole('link', { name: 'Branch Office' }).click()
 
   await expect(page).toHaveURL(new RegExp(`/hosts/networks/${networkId}$`))
@@ -110,6 +117,15 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
   await expect(memberRow).toContainText('Edge Node 1')
   await expect(memberRow).toContainText('online')
   await expect(page.getByTestId('network-detail-empty-state')).toHaveCount(0)
+
+  await page.getByTestId('network-detail-view-graph').click()
+  const detailGraph = page.getByTestId('network-detail-graph')
+  await expect(detailGraph).toBeVisible()
+  await expect(detailGraph.getByText('Branch Office')).toBeVisible()
+  await expect(detailGraph.getByText('Edge Node 1')).toBeVisible()
+
+  await page.getByTestId('network-detail-view-table').click()
+  await expect(memberRow).toBeVisible()
 
   const membershipRows = await sql<Array<{ deleted_at: string | null; auto_assigned: boolean }>>`
     SELECT deleted_at, auto_assigned

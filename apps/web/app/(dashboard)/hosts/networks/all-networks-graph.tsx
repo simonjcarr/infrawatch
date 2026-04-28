@@ -147,7 +147,11 @@ export function AllNetworksGraph({ networksWithHosts }: Props) {
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
   return (
-    <div className="w-full h-[620px] rounded-lg border overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className="w-full h-[620px] rounded-lg border overflow-hidden"
+      data-testid="networks-graph"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <ReactFlow
         key={graphKey}
         defaultNodes={nodes}

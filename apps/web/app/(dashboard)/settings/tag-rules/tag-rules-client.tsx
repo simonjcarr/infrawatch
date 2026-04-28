@@ -84,7 +84,7 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Tag Rules</h1>
+        <h1 className="text-2xl font-semibold" data-testid="tag-rules-heading">Tag Rules</h1>
         <p className="text-muted-foreground text-sm">
           Rules auto-apply tags to hosts that match their filter. Evaluated at host approval and
           when you click Run.
@@ -93,6 +93,7 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
 
       {message && (
         <div
+          data-testid="tag-rules-message"
           className={`rounded-md border p-3 text-sm ${
             message.kind === 'error'
               ? 'border-destructive/50 bg-destructive/10 text-destructive'
@@ -130,7 +131,7 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
               </TableHeader>
               <TableBody>
                 {rules.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} data-testid={`tag-rule-row-${r.id}`}>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell className="max-w-sm text-xs text-muted-foreground">
                       {summariseFilter(r.filter)}
@@ -157,6 +158,8 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
                           variant="ghost"
                           size="sm"
                           title="Run now"
+                          data-testid={`tag-rule-run-${r.id}`}
+                          aria-label={`Run tag rule ${r.name}`}
                           onClick={() => runMutation.mutate(r.id)}
                           disabled={runMutation.isPending}
                         >
@@ -166,6 +169,8 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
                           variant="ghost"
                           size="sm"
                           title={r.enabled ? 'Disable' : 'Enable'}
+                          data-testid={`tag-rule-toggle-${r.id}`}
+                          aria-label={`${r.enabled ? 'Disable' : 'Enable'} tag rule ${r.name}`}
                           onClick={() =>
                             toggleMutation.mutate({ ruleId: r.id, enabled: !r.enabled })
                           }
@@ -177,6 +182,8 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
                           variant="ghost"
                           size="sm"
                           title="Delete"
+                          data-testid={`tag-rule-delete-${r.id}`}
+                          aria-label={`Delete tag rule ${r.name}`}
                           onClick={() => deleteMutation.mutate(r.id)}
                           disabled={deleteMutation.isPending}
                         >

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations'
+import { organisations } from './organisations.ts'
 
 // Better Auth core tables
 export const users = pgTable('user', {

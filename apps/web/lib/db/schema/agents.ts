@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, jsonb, boolean, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { z } from 'zod'
-import { organisations } from './organisations'
-import { users } from './auth'
+import { organisations } from './organisations.ts'
+import { users } from './auth.ts'
 
 export interface AgentEnrolmentTokenMetadata {
   tags?: Array<{ key: string; value: string }>

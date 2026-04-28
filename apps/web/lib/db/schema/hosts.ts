@@ -1,8 +1,8 @@
 import { pgTable, text, timestamp, jsonb, integer, real } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { z } from 'zod'
-import { organisations } from './organisations'
-import { agents } from './agents'
+import { organisations } from './organisations.ts'
+import { agents } from './agents.ts'
 
 export interface DiskInfo {
   mount_point: string

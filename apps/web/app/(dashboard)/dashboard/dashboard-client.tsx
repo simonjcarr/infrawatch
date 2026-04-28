@@ -23,13 +23,18 @@ function StatRow({
   label,
   value,
   className,
+  testId,
 }: {
   label: string
   value: number | string
   className?: string
+  testId?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+    <div
+      className="flex items-center justify-between py-1.5 border-b border-border last:border-0"
+      data-testid={testId}
+    >
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className={`text-sm font-medium tabular-nums ${className ?? 'text-foreground'}`}>
         {value}
@@ -88,16 +93,18 @@ export function DashboardClient() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <StatRow label="Total enrolled" value={data.agents.total} />
+            <StatRow label="Total enrolled" value={data.agents.total} testId="dashboard-agents-total" />
             <StatRow
               label="Online"
               value={data.agents.online}
               className={data.agents.online > 0 ? 'text-green-700' : 'text-foreground'}
+              testId="dashboard-agents-online"
             />
             <StatRow
               label="Offline"
               value={data.agents.offline}
               className={data.agents.offline > 0 ? 'text-amber-600' : 'text-foreground'}
+              testId="dashboard-agents-offline"
             />
           </CardContent>
         </Card>
@@ -117,16 +124,19 @@ export function DashboardClient() {
               label="Valid"
               value={data.certificates.valid}
               className={data.certificates.valid > 0 ? 'text-green-700' : 'text-foreground'}
+              testId="dashboard-certificates-valid"
             />
             <StatRow
               label="Expiring soon"
               value={data.certificates.expiringSoon}
               className={data.certificates.expiringSoon > 0 ? 'text-amber-600' : 'text-foreground'}
+              testId="dashboard-certificates-expiring-soon"
             />
             <StatRow
               label="Expired"
               value={data.certificates.expired}
               className={data.certificates.expired > 0 ? 'text-destructive' : 'text-foreground'}
+              testId="dashboard-certificates-expired"
             />
           </CardContent>
         </Card>
@@ -146,11 +156,13 @@ export function DashboardClient() {
               label="Firing"
               value={data.alerts.firing}
               className={data.alerts.firing > 0 ? 'text-destructive' : 'text-foreground'}
+              testId="dashboard-alerts-firing"
             />
             <StatRow
               label="Acknowledged"
               value={data.alerts.acknowledged}
               className={data.alerts.acknowledged > 0 ? 'text-amber-600' : 'text-foreground'}
+              testId="dashboard-alerts-acknowledged"
             />
           </CardContent>
         </Card>
@@ -165,12 +177,12 @@ export function DashboardClient() {
           </CardHeader>
           <CardContent>
             {!hasIssues ? (
-              <div className="flex items-center gap-2 text-green-700 py-1">
+              <div className="flex items-center gap-2 text-green-700 py-1" data-testid="dashboard-summary-nominal">
                 <CheckCircle2 className="size-4" />
                 <span className="text-sm font-medium">All systems nominal</span>
               </div>
             ) : (
-              <ul className="space-y-1.5">
+              <ul className="space-y-1.5" data-testid="dashboard-summary-issues">
                 {data.alerts.firing > 0 && (
                   <li className="flex items-center gap-2 text-destructive text-sm">
                     <XCircle className="size-4 shrink-0" />

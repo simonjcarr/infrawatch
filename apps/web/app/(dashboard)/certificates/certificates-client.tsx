@@ -106,6 +106,7 @@ export function CertificatesClient({
     sortDir: 'asc',
     limit: 100,
   }
+  const useServerInitialCertificates = statusFilter === 'all' && hostFilter === '' && sortBy === 'not_after'
 
   const { data: certs = initialCertificates } = useQuery({
     queryKey: ['certificates', orgId, filters],
@@ -121,7 +122,7 @@ export function CertificatesClient({
       if (!res.ok) throw new Error('Failed to fetch certificates')
       return res.json() as Promise<Certificate[]>
     },
-    initialData: initialCertificates,
+    initialData: useServerInitialCertificates ? initialCertificates : undefined,
     staleTime: 30_000,
   })
 
@@ -150,7 +151,7 @@ export function CertificatesClient({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Certificates</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="certificates-heading">Certificates</h1>
           <p className="text-muted-foreground mt-1">
             {totalCerts} certificate{totalCerts !== 1 ? 's' : ''} tracked across your infrastructure
           </p>
@@ -223,13 +224,14 @@ export function CertificatesClient({
             className="pl-9 w-56"
             value={hostFilter}
             onChange={(e) => setHostFilter(e.target.value)}
+            data-testid="certificates-filter-host"
           />
         </div>
         <Select
           value={statusFilter}
           onValueChange={(v) => setStatusFilter(v as CertificateStatus | 'all')}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-44" data-testid="certificates-status-filter">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -244,7 +246,7 @@ export function CertificatesClient({
           value={sortBy}
           onValueChange={(v) => setSortBy(v as CertificateListFilters['sortBy'])}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-44" data-testid="certificates-sort-filter">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
@@ -284,6 +286,7 @@ export function CertificatesClient({
                   key={cert.id}
                   className="cursor-pointer"
                   onClick={() => router.push(`/certificates/${cert.id}`)}
+                  data-testid={`certificate-row-${cert.id}`}
                 >
                   <TableCell className="font-medium max-w-48 truncate">{cert.commonName}</TableCell>
                   <TableCell className="text-muted-foreground max-w-40 truncate">{cert.issuer}</TableCell>
@@ -305,6 +308,7 @@ export function CertificatesClient({
                       variant="ghost"
                       size="icon"
                       className="size-8 text-muted-foreground hover:text-destructive"
+                      data-testid={`certificate-delete-${cert.id}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         deleteMutation.mutate(cert.id)

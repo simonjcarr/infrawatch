@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.81.0...web/v0.82.0) (2026-04-28)
+
+
+### Features
+
+* **web:** improve build docs markdown editor ([#732](https://github.com/carrtech-dev/ct-ops/issues/732)) ([7db8fd3](https://github.com/carrtech-dev/ct-ops/commit/7db8fd3692f9559f36467c5bec16be2fc3113160))
+
 ## [0.81.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.80.2...web/v0.81.0) (2026-04-28)
 
 

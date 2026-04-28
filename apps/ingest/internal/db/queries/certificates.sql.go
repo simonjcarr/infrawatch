@@ -295,6 +295,7 @@ type TrackedCertRow struct {
 	ServerName             string
 	TrackedURL             string
 	RefreshIntervalSeconds int
+	TLSSkipVerify          bool
 	FingerprintSHA256      string
 	NotAfter               time.Time
 	Status                 string
@@ -310,6 +311,7 @@ func ListCertsDueForUrlRefresh(
 	const q = `
 		SELECT id, organisation_id, host, port, server_name,
 		       tracked_url, COALESCE(refresh_interval_seconds, 3600),
+		       COALESCE((metadata->>'tlsSkipVerify')::boolean, false),
 		       fingerprint_sha256, not_after, status
 		FROM certificates
 		WHERE tracked_url IS NOT NULL
@@ -333,6 +335,7 @@ func ListCertsDueForUrlRefresh(
 		if err := rows.Scan(
 			&r.ID, &r.OrgID, &r.Host, &r.Port, &r.ServerName,
 			&r.TrackedURL, &r.RefreshIntervalSeconds,
+			&r.TLSSkipVerify,
 			&r.FingerprintSHA256, &r.NotAfter, &r.Status,
 		); err != nil {
 			return nil, err

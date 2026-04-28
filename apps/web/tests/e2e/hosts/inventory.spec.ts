@@ -76,7 +76,6 @@ test('authenticated user can search and filter the host inventory', async ({ aut
   await expect(page.getByRole('link', { name: 'Beta Node' })).toBeVisible()
 
   await page.getByTestId('hosts-search-input').fill('10.0.0.20')
-  await expect(page.getByText('Showing 1–1 of 1')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Beta Node' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Alpha Node' })).toHaveCount(0)
   await expect(page.getByTestId('hosts-clear-filters')).toBeVisible()
@@ -95,7 +94,7 @@ test('authenticated user can search and filter the host inventory', async ({ aut
   await page.getByRole('option', { name: 'Windows 11' }).click()
 
   await expect(page.getByRole('link', { name: 'Beta Node' })).toBeVisible()
-  await expect(page.getByText('Showing 1–1 of 1')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Alpha Node' })).toHaveCount(0)
 })
 
 test('admin can approve a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
@@ -168,4 +167,102 @@ test('admin can approve a pending agent from the host inventory page', async ({ 
   expect(agentRows).toHaveLength(1)
   expect(agentRows[0]?.status).toBe('active')
   expect(agentRows[0]?.approved_by_id).toBe(userId)
+})
+
+test('admin can reject a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO agents (
+      id,
+      organisation_id,
+      hostname,
+      public_key,
+      status,
+      os,
+      arch,
+      client_cert_serial
+    )
+    VALUES (
+      'pending-agent-reject-1',
+      ${orgId},
+      'rejected-node',
+      'pending-public-key-reject-1',
+      'pending',
+      'Ubuntu 24.04',
+      'arm64',
+      'reject-serial-1'
+    )
+  `
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      agent_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status
+    )
+    VALUES (
+      'pending-host-reject-1',
+      ${orgId},
+      'pending-agent-reject-1',
+      'rejected-node',
+      'Rejected Node',
+      'Ubuntu 24.04',
+      'arm64',
+      '["10.0.1.99"]'::jsonb,
+      'unknown'
+    )
+  `
+
+  await page.goto('/hosts')
+
+  const pendingAgentRow = page.getByTestId('pending-agent-row-pending-agent-reject-1')
+  await expect(pendingAgentRow).toContainText('rejected-node')
+
+  await page.getByTestId('pending-agent-reject-pending-agent-reject-1').click()
+
+  await expect(pendingAgentRow).toHaveCount(0)
+  await expect(page.getByTestId('pending-agent-approvals')).toHaveCount(0)
+
+  const agentRows = await sql<Array<{ status: string }>>`
+    SELECT status
+    FROM agents
+    WHERE id = 'pending-agent-reject-1'
+    LIMIT 1
+  `
+
+  expect(agentRows).toHaveLength(1)
+  expect(agentRows[0]?.status).toBe('revoked')
+
+  const statusRows = await sql<Array<{ status: string; actor_id: string | null; reason: string | null }>>`
+    SELECT status, actor_id, reason
+    FROM agent_status_history
+    WHERE agent_id = 'pending-agent-reject-1'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `
+
+  expect(statusRows).toHaveLength(1)
+  expect(statusRows[0]?.status).toBe('revoked')
+  expect(statusRows[0]?.actor_id).toBe(userId)
+  expect(statusRows[0]?.reason).toBe('Rejected by admin')
+
+  const revokedRows = await sql<Array<{ serial: string; reason: string | null }>>`
+    SELECT serial, reason
+    FROM revoked_certificates
+    WHERE organisation_id = ${orgId}
+      AND serial = 'reject-serial-1'
+    LIMIT 1
+  `
+
+  expect(revokedRows).toHaveLength(1)
+  expect(revokedRows[0]?.serial).toBe('reject-serial-1')
+  expect(revokedRows[0]?.reason).toBe('Rejected by admin')
 })

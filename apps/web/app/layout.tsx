@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { cookies } from 'next/headers'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { QueryProvider } from '@/components/shared/query-provider'
+import '@mdxeditor/editor/style.css'
 import './globals.css'
 
 const geistSans = Geist({

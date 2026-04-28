@@ -185,6 +185,130 @@
   cursor: default !important;
 }
 
+/* ── Build Docs rich Markdown editor ───────────────────────────────────────── */
+.build-doc-markdown-editor {
+  --basePageBg: var(--background);
+  --baseBase: var(--background);
+  --baseBgSubtle: var(--muted);
+  --baseBg: var(--card);
+  --baseBgHover: var(--muted);
+  --baseBgActive: var(--accent);
+  --baseLine: var(--border);
+  --baseBorder: var(--border);
+  --baseBorderHover: var(--ring);
+  --baseSolid: var(--muted-foreground);
+  --baseSolidHover: var(--foreground);
+  --baseText: var(--muted-foreground);
+  --baseTextContrast: var(--foreground);
+  --accentBase: var(--background);
+  --accentBgSubtle: var(--muted);
+  --accentBg: var(--accent);
+  --accentBgHover: var(--muted);
+  --accentBgActive: var(--accent);
+  --accentLine: var(--border);
+  --accentBorder: var(--ring);
+  --accentBorderHover: var(--ring);
+  --accentSolid: var(--primary);
+  --accentSolidHover: var(--primary);
+  --accentText: var(--foreground);
+  --accentTextContrast: var(--primary-foreground);
+  overflow: hidden;
+}
+
+.build-doc-markdown-editor__root {
+  min-height: inherit;
+}
+
+.build-doc-markdown-editor__toolbar {
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--card);
+}
+
+.build-doc-markdown-editor__content {
+  max-width: 78ch;
+  padding: 1.25rem 1.5rem 2rem;
+  color: var(--foreground);
+  caret-color: var(--foreground);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.build-doc-markdown-editor--fullscreen .build-doc-markdown-editor__content {
+  max-width: 92ch;
+  padding: 1.5rem 2rem 3rem;
+}
+
+.build-doc-markdown-editor__content:focus {
+  outline: none;
+}
+
+.build-doc-markdown-editor__content h1 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.45rem;
+  font-weight: 650;
+}
+
+.build-doc-markdown-editor__content h2 {
+  margin: 0.9rem 0 0.45rem;
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.build-doc-markdown-editor__content h3,
+.build-doc-markdown-editor__content h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.build-doc-markdown-editor__content p,
+.build-doc-markdown-editor__content ul,
+.build-doc-markdown-editor__content ol,
+.build-doc-markdown-editor__content blockquote,
+.build-doc-markdown-editor__content pre,
+.build-doc-markdown-editor__content table {
+  margin: 0.65rem 0;
+}
+
+.build-doc-markdown-editor__content ul,
+.build-doc-markdown-editor__content ol {
+  padding-left: 1.5rem;
+}
+
+.build-doc-markdown-editor__content blockquote {
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+  padding-left: 0.85rem;
+}
+
+.build-doc-markdown-editor__content code {
+  border-radius: 0.25rem;
+  background: var(--muted);
+  padding: 0.1rem 0.25rem;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85em;
+}
+
+.build-doc-markdown-editor__content pre {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--muted);
+  padding: 0.9rem;
+  overflow-x: auto;
+}
+
+.build-doc-markdown-editor__content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.build-doc-markdown-editor__content th,
+.build-doc-markdown-editor__content td {
+  border: 1px solid var(--border);
+  padding: 0.45rem 0.55rem;
+}
+
 /* ── React Flow animated edge — flowing dash keyframe ────────────────────────── */
 /* Drives the stroke-dashoffset animation on the dashed bezier edges.
    dasharray: 6 4 → total pattern = 10 → animate from 10 → 0 for

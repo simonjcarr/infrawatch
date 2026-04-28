@@ -11,6 +11,10 @@ import { createRateLimiter } from '@/lib/rate-limit'
 // 10 invite-token lookups per IP per 60 s — prevents token enumeration
 const inviteRateLimit = createRateLimiter(60_000, 10)
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
 async function getClientIp(): Promise<string> {
   const h = await headers()
   return h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? h.get('x-real-ip') ?? 'unknown'
@@ -52,6 +56,26 @@ export async function acceptInvite(
 
     if (!invite) {
       return { error: 'Invitation not found or has expired' }
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    })
+
+    if (!user) {
+      return { error: 'Account not found' }
+    }
+
+    if (user.organisationId) {
+      return { error: 'This account already belongs to an organisation' }
+    }
+
+    if (!user.emailVerified) {
+      return { error: 'Verify your email before accepting this invitation' }
+    }
+
+    if (normalizeEmail(user.email) !== normalizeEmail(invite.email)) {
+      return { error: 'This invitation was sent to a different email address' }
     }
 
     await db

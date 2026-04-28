@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.32.1...agent/v0.32.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **release:** correct package changelog paths ([#711](https://github.com/carrtech-dev/ct-ops/issues/711)) ([3dd5f74](https://github.com/carrtech-dev/ct-ops/commit/3dd5f741f709f14ce414cbc14609032ada0ed7f0))
+
 ## [0.32.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.32.0...agent/v0.32.1) (2026-04-28)
 
 

@@ -104,7 +104,7 @@ export function SchedulesClient({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Scheduled Tasks</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="task-schedules-heading">Scheduled Tasks</h1>
           <p className="text-muted-foreground mt-1">
             Run patches, custom scripts, service actions, and inventory scans on a recurring cadence.
           </p>
@@ -126,7 +126,7 @@ export function SchedulesClient({
       )}
 
       {schedules.length === 0 ? (
-        <Card>
+        <Card data-testid="task-schedules-empty">
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
               No schedules yet.
@@ -159,7 +159,7 @@ export function SchedulesClient({
             </TableHeader>
             <TableBody>
               {schedules.map((s) => (
-                <TableRow key={s.id}>
+                <TableRow key={s.id} data-testid={`task-schedule-row-${s.id}`}>
                   <TableCell>
                     <Link href={`/tasks/schedules/${s.id}`} className="font-medium hover:underline">
                       {s.name}
@@ -195,6 +195,7 @@ export function SchedulesClient({
                   </TableCell>
                   <TableCell>
                     <Switch
+                      data-testid={`task-schedule-toggle-${s.id}`}
                       checked={s.enabled}
                       disabled={!canEdit || toggle.isPending}
                       onCheckedChange={(checked) => toggle.mutate({ id: s.id, enabled: checked })}
@@ -226,6 +227,7 @@ export function SchedulesClient({
                             variant="ghost"
                             size="icon"
                             title="Delete"
+                            data-testid={`task-schedule-delete-${s.id}`}
                             onClick={() => setDeleteTarget(s)}
                           >
                             <Trash2 className="size-4" />
@@ -253,6 +255,7 @@ export function SchedulesClient({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              data-testid="task-schedule-delete-confirm"
               onClick={() => deleteTarget && remove.mutate(deleteTarget.id)}
               disabled={remove.isPending}
             >

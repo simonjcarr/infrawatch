@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.7...web/v0.73.8) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** enforce a single style for simple reads ([#672](https://github.com/carrtech-dev/ct-ops/issues/672)) ([818ba03](https://github.com/carrtech-dev/ct-ops/commit/818ba03394b4f1f11b6b9bfc78c1210740f49f2a))
+
 ## [0.73.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.6...web/v0.73.7) (2026-04-28)
 
 

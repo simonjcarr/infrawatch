@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.5.0...ingest/v0.6.0) (2026-04-28)
+
+
+### Features
+
+* **web:** add NVD API key administration ([#723](https://github.com/carrtech-dev/ct-ops/issues/723)) ([612c346](https://github.com/carrtech-dev/ct-ops/commit/612c346e333902389f1369cea0cffe06e8547560))
+
 ## [0.5.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.4.3...ingest/v0.5.0) (2026-04-28)
 
 

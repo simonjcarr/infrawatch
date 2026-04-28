@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.3.1...ingest/v0.4.0) (2026-04-28)
+
+
+### Features
+
+* **checks:** add patch status monitoring ([#690](https://github.com/carrtech-dev/ct-ops/issues/690)) ([b26a692](https://github.com/carrtech-dev/ct-ops/commit/b26a692701a6a12eb820aef964bb59f9c1c42bca))
+
 ## [0.3.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.3.0...ingest/v0.3.1) (2026-04-28)
 
 

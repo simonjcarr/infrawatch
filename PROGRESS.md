@@ -15,6 +15,18 @@
 
 ## What Has Been Built
 
+### Session 76 — Build Docs rich Markdown editor
+
+**Build Docs editing and exports** (`apps/web/app/(dashboard)/build-docs/[id]/`, `apps/web/components/build-docs/`, `apps/web/lib/build-docs/`)
+- Replaced section body textareas with a larger reusable rich Markdown editor powered by MDXEditor, including document-style spacing, Markdown shortcuts, source mode, headings, emphasis, links, lists, blockquotes, code blocks, tables, undo/redo, and dark-mode styling aligned with the dashboard.
+- Added per-section full-screen editing with live draft preservation between inline and full-screen modes, section title editing, Save/Cancel controls, and read-only behavior that disables editing controls.
+- Reworked PDF and DOCX exports to parse Markdown into supported document structures instead of flattening section bodies as plain text. Headings are demoted beneath Build Docs section titles, and bold/italic, inline code, lists, blockquotes, fenced code blocks, and tables now render in exports.
+
+**Validation**
+- Added Markdown export unit coverage for heading demotion, inline formatting, lists, blockquotes, fenced code blocks, tables, and DOCX formatting output.
+- Extended Build Docs E2E coverage for rich editor source editing, full-screen editing, save/reload behavior, Markdown preview rendering, image upload, search, and export links.
+- Validation run: `pnpm --filter web test:unit`, `pnpm --filter web type-check`, `pnpm --filter web lint` (existing warnings only), `pnpm --filter web db:validate`, `pnpm --filter web test:e2e tests/e2e/build-docs/build-docs.spec.ts`, and `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=... DATABASE_URL=postgres://ctops:ctops@127.0.0.1:5432/ctops pnpm --filter web build`.
+
 ### Session 75 — Admin ingest and agent health visibility
 
 **System health operations view** (`apps/web/app/(dashboard)/settings/system/`, `apps/web/app/api/system/health/route.ts`)

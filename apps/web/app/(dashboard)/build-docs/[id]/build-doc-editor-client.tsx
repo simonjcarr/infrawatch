@@ -19,15 +19,24 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Download, GripVertical, ImagePlus, Plus, Save, Scissors } from 'lucide-react'
+import { Download, GripVertical, ImagePlus, Maximize2, Plus, Save, Scissors } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MarkdownRenderer } from '@/components/shared/markdown-renderer'
+import { BuildDocMarkdownEditor } from '@/components/build-docs/build-doc-markdown-editor'
 import {
   createBuildDocSection,
   insertBuildDocSnippetAsSection,
@@ -39,6 +48,11 @@ import {
 } from '@/lib/actions/build-docs'
 import type { BuildDocRenderModel } from '@/lib/build-docs/types'
 import type { BuildDocSection, BuildDocSnippet } from '@/lib/db/schema'
+
+type SectionDraft = {
+  title: string
+  body: string
+}
 
 function SortableSection({
   section,
@@ -100,6 +114,10 @@ export function BuildDocEditorClient({
   const [sections, setSections] = useState(detail.sections)
   const [assets, setAssets] = useState(detail.assets)
   const [model, setModel] = useState(renderModel)
+  const [sectionDrafts, setSectionDrafts] = useState<Record<string, SectionDraft>>(() =>
+    Object.fromEntries(detail.sections.map((section) => [section.id, { title: section.title, body: section.body }])),
+  )
+  const [fullscreenSectionId, setFullscreenSectionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const canWrite = userRole !== 'read_only'
@@ -127,6 +145,21 @@ export function BuildDocEditorClient({
       })),
       tableOfContents: nextSections.map((section, index) => ({ id: section.id, number: index + 1, title: section.title })),
     })
+  }
+
+  function draftFor(section: BuildDocSection): SectionDraft {
+    return sectionDrafts[section.id] ?? { title: section.title, body: section.body }
+  }
+
+  function updateSectionDraft(sectionId: string, draft: Partial<SectionDraft>) {
+    setSectionDrafts((current) => ({
+      ...current,
+      [sectionId]: {
+        title: current[sectionId]?.title ?? sections.find((section) => section.id === sectionId)?.title ?? '',
+        body: current[sectionId]?.body ?? sections.find((section) => section.id === sectionId)?.body ?? '',
+        ...draft,
+      },
+    }))
   }
 
   function submitDoc(formData: FormData) {
@@ -165,24 +198,34 @@ export function BuildDocEditorClient({
       else {
         const next = [...sections, result.data]
         setSections(next)
+        setSectionDrafts((current) => ({
+          ...current,
+          [result.data.id]: { title: result.data.title, body: result.data.body },
+        }))
         rebuildModel(next)
       }
     })
   }
 
-  function submitSection(section: BuildDocSection, formData: FormData) {
+  function saveSection(section: BuildDocSection, onSuccess?: () => void) {
+    const draft = draftFor(section)
     setError(null)
     startTransition(async () => {
       const result = await updateBuildDocSection(orgId, section.id, {
-        title: String(formData.get('title') ?? ''),
-        body: String(formData.get('body') ?? ''),
+        title: draft.title,
+        body: draft.body,
         fieldValues: section.fieldValues,
       })
       if ('error' in result) setError(result.error)
       else {
         const next = sections.map((item) => item.id === section.id ? result.data : item)
         setSections(next)
+        setSectionDrafts((current) => ({
+          ...current,
+          [section.id]: { title: result.data.title, body: result.data.body },
+        }))
         rebuildModel(next)
+        onSuccess?.()
       }
     })
   }
@@ -195,6 +238,10 @@ export function BuildDocEditorClient({
       else {
         const next = [...sections, result.data]
         setSections(next)
+        setSectionDrafts((current) => ({
+          ...current,
+          [result.data.id]: { title: result.data.title, body: result.data.body },
+        }))
         rebuildModel(next)
       }
     })
@@ -234,6 +281,10 @@ export function BuildDocEditorClient({
     }
     return counts
   }, [assets])
+
+  const fullscreenSection = fullscreenSectionId
+    ? sections.find((section) => section.id === fullscreenSectionId) ?? null
+    : null
 
   return (
     <div className="space-y-6">
@@ -344,10 +395,44 @@ export function BuildDocEditorClient({
               <div className="space-y-4">
                 {sections.map((section) => (
                   <SortableSection key={section.id} section={section} canWrite={canWrite}>
-                    <form action={(formData) => submitSection(section, formData)} className="space-y-3">
-                      <Input name="title" defaultValue={section.title} disabled={!canWrite} required />
-                      <Textarea name="body" defaultValue={section.body} rows={10} disabled={!canWrite} />
-                      <div className="flex gap-2 items-center flex-wrap">
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        saveSection(section)
+                      }}
+                      className="space-y-4"
+                    >
+                      <div className="grid gap-3 rounded-md border bg-muted/10 p-3">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                          <Input
+                            name="title"
+                            value={draftFor(section).title}
+                            onChange={(event) => updateSectionDraft(section.id, { title: event.target.value })}
+                            disabled={!canWrite}
+                            required
+                            className="font-medium"
+                            aria-label="Section title"
+                          />
+                          {canWrite && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setFullscreenSectionId(section.id)}
+                              disabled={pending}
+                              className="shrink-0"
+                            >
+                              <Maximize2 className="size-4 mr-2" />Full screen editor
+                            </Button>
+                          )}
+                        </div>
+                        <BuildDocMarkdownEditor
+                          name="body"
+                          value={draftFor(section).body}
+                          onChange={(body) => updateSectionDraft(section.id, { body })}
+                          readOnly={!canWrite}
+                        />
+                      </div>
+                      <div className="flex gap-2 items-center flex-wrap border-t pt-3">
                         {canWrite && <Button type="submit" disabled={pending}><Save className="size-4 mr-2" />Save section</Button>}
                         <Badge variant="outline">{assetCountBySection.get(section.id) ?? 0} images</Badge>
                       </div>
@@ -401,6 +486,56 @@ export function BuildDocEditorClient({
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={Boolean(fullscreenSection)} onOpenChange={(open) => !open && setFullscreenSectionId(null)}>
+        {fullscreenSection && (
+          <DialogContent
+            className="grid h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] p-5 sm:max-w-[calc(100vw-2rem)]"
+            data-testid="build-doc-fullscreen-editor"
+          >
+            <DialogHeader>
+              <DialogTitle>Edit section</DialogTitle>
+              <DialogDescription className="sr-only">
+                Edit this build document section in a full-screen Markdown editor.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
+              <div className="space-y-2">
+                <Label htmlFor={`fullscreen-title-${fullscreenSection.id}`}>Section title</Label>
+                <Input
+                  id={`fullscreen-title-${fullscreenSection.id}`}
+                  value={draftFor(fullscreenSection).title}
+                  onChange={(event) => updateSectionDraft(fullscreenSection.id, { title: event.target.value })}
+                  disabled={!canWrite}
+                  required
+                  className="font-medium"
+                />
+              </div>
+              <BuildDocMarkdownEditor
+                value={draftFor(fullscreenSection).body}
+                onChange={(body) => updateSectionDraft(fullscreenSection.id, { body })}
+                readOnly={!canWrite}
+                fullscreen
+                testId="build-doc-fullscreen-markdown-editor"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setFullscreenSectionId(null)} disabled={pending}>
+                Cancel
+              </Button>
+              {canWrite && (
+                <Button
+                  type="button"
+                  onClick={() => saveSection(fullscreenSection, () => setFullscreenSectionId(null))}
+                  disabled={pending}
+                >
+                  <Save className="size-4 mr-2" />Save section
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { Locator } from '@playwright/test'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
@@ -17,9 +18,16 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ or
   return { orgId: rows[0]!.org_id, userId: rows[0]!.user_id }
 }
 
+async function fillMarkdownSource(editor: Locator, markdown: string) {
+  await editor.getByRole('radio', { name: /source mode/i }).click()
+  await editor.locator('.cm-content[contenteditable="true"]').fill(markdown)
+}
+
+test.setTimeout(60_000)
+
 test('admin can create and export a build document from a template and snippet', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { orgId, userId } = await getOrgAndUserIds(sql)
 
   await page.goto('/build-docs')
   await expect(page.getByTestId('build-docs-heading')).toBeVisible()
@@ -44,13 +52,28 @@ test('admin can create and export a build document from a template and snippet',
   await page.getByLabel('Production VM *').check()
   await page.getByRole('button', { name: /create build doc/i }).click()
 
-  await expect(page).toHaveURL(/\/build-docs\/.+/)
+  await page.waitForURL(/\/build-docs\/.+/, { timeout: 15_000 })
   await expect(page.getByTestId('build-doc-editor-heading')).toContainText('E2E production VM build')
 
   await page.getByPlaceholder('Install applications').fill('Provision VM')
-  await page.getByPlaceholder('Commands, decisions, and verification notes').fill('Created the VM and attached the initial OS disk.')
   await page.getByRole('button', { name: /add section/i }).click()
   await expect(page.getByText('Provision VM')).toBeVisible()
+
+  const sectionCard = page.locator('[data-section-title="Provision VM"]')
+  const inlineEditor = sectionCard.getByTestId('build-doc-markdown-editor')
+  await fillMarkdownSource(inlineEditor, '# Build VM\n\nCreated the **VM** and attached the initial OS disk.')
+  await sectionCard.getByRole('button', { name: /full screen editor/i }).click()
+  const fullscreenEditor = page.getByTestId('build-doc-fullscreen-editor')
+  await expect(fullscreenEditor.locator('[contenteditable="true"]')).toContainText('Created the VM')
+  await fillMarkdownSource(page.getByTestId('build-doc-fullscreen-markdown-editor'), [
+    '# Build VM',
+    '',
+    'Created the **VM** and attached the initial OS disk.',
+    '',
+    '- Confirmed console access',
+    '- Captured handover notes',
+  ].join('\n'))
+  await fullscreenEditor.getByRole('button', { name: /^save section$/i }).click()
 
   await page.getByRole('button', { name: /install nginx/i }).click()
   await expect(page.getByText('Snippet v1')).toBeVisible()
@@ -62,7 +85,6 @@ test('admin can create and export a build document from a template and snippet',
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
     'base64',
   ))
-  const sectionCard = page.locator('[data-section-title="Provision VM"]')
   await sectionCard.locator('input[type="file"]').setInputFiles(imagePath)
   await sectionCard.getByRole('button').last().click()
   await expect(sectionCard.getByText('1 images')).toBeVisible()
@@ -70,14 +92,33 @@ test('admin can create and export a build document from a template and snippet',
   await page.getByRole('tab', { name: /preview/i }).click()
   await expect(page.getByTestId('build-doc-preview')).toContainText('Index')
   await expect(page.getByTestId('build-doc-preview')).toContainText('Provision VM')
+  await expect(page.getByTestId('build-doc-preview').getByRole('heading', { name: 'Build VM' })).toBeVisible()
+  await expect(page.getByTestId('build-doc-preview').getByText('Confirmed console access')).toBeVisible()
   await expect(page.getByTestId('build-doc-preview')).toContainText('Install nginx')
   await expect(page.getByRole('link', { name: /pdf/i })).toHaveAttribute('href', /format=pdf/)
   await expect(page.getByRole('link', { name: /word/i })).toHaveAttribute('href', /format=docx/)
+
+  await page.reload()
+  await expect(page.locator('[data-section-title="Provision VM"]').getByTestId('build-doc-markdown-editor')).toContainText('Captured handover notes')
+  const documentUrl = page.url()
 
   await page.goto('/build-docs')
   await page.getByTestId('build-doc-search').fill('nginx')
   await page.getByTestId('build-doc-search-submit').click()
   await expect(page.getByRole('link', { name: 'E2E production VM build' })).toBeVisible()
+
+  await sql`UPDATE "user" SET role = 'read_only', updated_at = NOW() WHERE id = ${userId}`
+  try {
+    await page.goto(documentUrl)
+    const readOnlySection = page.locator('[data-section-title="Provision VM"]')
+    await expect(page.getByRole('button', { name: /^add section$/i })).toHaveCount(0)
+    await expect(readOnlySection.getByRole('button', { name: /full screen editor/i })).toHaveCount(0)
+    await expect(readOnlySection.getByRole('button', { name: /^save section$/i })).toHaveCount(0)
+    await expect(readOnlySection.getByRole('textbox', { name: 'Section title' })).toBeDisabled()
+    await expect(readOnlySection.getByTestId('build-doc-markdown-editor').getByRole('radio', { name: /source mode/i })).toHaveCount(0)
+  } finally {
+    await sql`UPDATE "user" SET role = 'org_admin', updated_at = NOW() WHERE id = ${userId}`
+  }
 
   const docs = await sql<Array<{ doc_count: number; section_count: number; asset_count: number }>>`
     SELECT

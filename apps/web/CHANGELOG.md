@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.75.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.3...web/v0.75.4) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** move host networks tab to infrastructure ([#687](https://github.com/carrtech-dev/ct-ops/issues/687)) ([f4f8cdc](https://github.com/carrtech-dev/ct-ops/commit/f4f8cdcab731b3dcd20a81ea7d0fd25d2c0019f3))
+
 ## [0.75.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.2...web/v0.75.3) (2026-04-28)
 
 

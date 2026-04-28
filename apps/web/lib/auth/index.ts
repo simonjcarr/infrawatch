@@ -4,7 +4,12 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { twoFactor } from 'better-auth/plugins'
 import { db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
-import { sendPasswordResetEmail, sendVerificationEmail } from './email'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import {
+  getAuthEmailConfigFromOrgSettings,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from './email'
 import {
   getBetterAuthOrigin,
   getBetterAuthSecret,
@@ -20,6 +25,24 @@ import { passwordLoginAttemptGuard } from './login-attempts'
 
 const LOGIN_THROTTLED_MESSAGE = 'Too many login attempts — please wait before trying again.'
 const requireEmailVerification = getRequireEmailVerification()
+
+async function getAuthEmailConfigForUser(userId: string) {
+  const user = await db.query.users.findFirst({
+    where: (users, { eq }) => eq(users.id, userId),
+    columns: { organisationId: true },
+  })
+  const organisationId = user?.organisationId
+  if (!organisationId) return null
+
+  const organisation = await db.query.organisations.findFirst({
+    where: (organisations, { eq }) => eq(organisations.id, organisationId),
+    columns: { metadata: true },
+  })
+  if (!organisation) return null
+
+  const metadata = parseOrgMetadata(organisation.metadata)
+  return getAuthEmailConfigFromOrgSettings(metadata.notificationSettings)
+}
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -39,6 +62,7 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url, token }) => {
       const appResetUrl = new URL(`/reset-password/${token}`, getBetterAuthOrigin())
       const callbackURL = new URL(url).searchParams.get('callbackURL')
+      const smtpConfig = await getAuthEmailConfigForUser(user.id)
       if (callbackURL) {
         appResetUrl.searchParams.set('callbackURL', callbackURL)
       }
@@ -47,6 +71,7 @@ export const auth = betterAuth({
         email: user.email,
         name: user.name,
         resetUrl: appResetUrl.toString(),
+        smtpConfig,
       })
     },
     revokeSessionsOnPasswordReset: true,
@@ -54,10 +79,12 @@ export const auth = betterAuth({
   emailVerification: {
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
+      const smtpConfig = await getAuthEmailConfigForUser(user.id)
       await sendVerificationEmail({
         email: user.email,
         name: user.name,
         verificationUrl: url,
+        smtpConfig,
       })
     },
   },

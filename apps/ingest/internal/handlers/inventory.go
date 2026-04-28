@@ -15,6 +15,7 @@ import (
 
 	"github.com/carrtech-dev/ct-ops/ingest/internal/auth"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/vuln"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
@@ -110,6 +111,16 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 		versions := make([]string, len(pkgs))
 		archs := make([]string, len(pkgs))
 		publishers := make([]string, len(pkgs))
+		distroIDs := make([]string, len(pkgs))
+		distroVersionIDs := make([]string, len(pkgs))
+		distroCodenames := make([]string, len(pkgs))
+		distroIDLikes := make([][]string, len(pkgs))
+		sourceNames := make([]string, len(pkgs))
+		sourceVersions := make([]string, len(pkgs))
+		packageEpochs := make([]string, len(pkgs))
+		packageReleases := make([]string, len(pkgs))
+		repositories := make([]string, len(pkgs))
+		origins := make([]string, len(pkgs))
 		installDates := make([]int64, len(pkgs))
 
 		for i, p := range pkgs {
@@ -117,13 +128,27 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 			versions[i] = p.Version
 			archs[i] = p.Architecture
 			publishers[i] = p.Publisher
+			distroIDs[i] = p.DistroId
+			distroVersionIDs[i] = p.DistroVersionId
+			distroCodenames[i] = p.DistroCodename
+			distroIDLikes[i] = p.DistroIdLike
+			sourceNames[i] = p.SourceName
+			sourceVersions[i] = p.SourceVersion
+			packageEpochs[i] = p.PackageEpoch
+			packageReleases[i] = p.PackageRelease
+			repositories[i] = p.Repository
+			origins[i] = p.Origin
 			installDates[i] = p.InstallDateUnix
 		}
 
 		added, err := queries.UpsertSoftwarePackagesBatch(
 			ctx, h.pool,
 			hostOrg.OrgID, hostOrg.HostID, source,
-			names, versions, archs, publishers, installDates,
+			names, versions, archs, publishers,
+			distroIDs, distroVersionIDs, distroCodenames, distroIDLikes,
+			sourceNames, sourceVersions, packageEpochs, packageReleases,
+			repositories, origins,
+			installDates,
 			time.Now(),
 		)
 		if err != nil {
@@ -204,6 +229,13 @@ func (h *InventoryHandler) finalise(
 	if err := queries.UpdateHostLastSoftwareScanAt(streamCtx, h.pool, hostID, completedAt); err != nil {
 		slog.Warn("inventory: updating host lastSoftwareScanAt", "host_id", hostID, "err", err)
 	}
+	go func() {
+		matchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := vuln.MatchHost(matchCtx, h.pool, hostID); err != nil {
+			slog.Warn("inventory: vulnerability match failed", "host_id", hostID, "err", err)
+		}
+	}()
 
 	// Complete the task_run_hosts row.
 	if err := queries.CompleteTaskRunHost(streamCtx, h.pool, taskRunHostID, "success", 0, "", ""); err != nil {

@@ -15,6 +15,22 @@
 
 ## What Has Been Built
 
+### Session 72 — Linux OS package CVE checking
+
+**Vulnerability intelligence and matching** (`agent/internal/tasks/`, `apps/ingest/internal/vuln/`, `proto/agent/v1/ingest.proto`)
+- Added Linux software inventory metadata for distro identity, codename, source package, epoch/release, repository, and origin so CVE matching can use vendor package advisory truth instead of fuzzy package-name or CPE matching.
+- Added ingest-side vulnerability feed sync support for CISA KEV, NVD CVE enrichment, Debian Security Tracker, Ubuntu OSV, Alpine SecDB, and Red Hat security data, with source sync state, ETag/hash handling, retry/backoff, and configurable cadence.
+- Added distro-aware version comparison plus asynchronous host matching after feed syncs and software inventory ingestion; unsupported package sources are left unassessed rather than treated as safe.
+
+**Persistence and reporting** (`apps/web/lib/db/schema/`, `apps/web/lib/actions/vulnerabilities.ts`, `apps/web/app/(dashboard)/reports/vulnerabilities/`)
+- Added normalized CVE catalog, vulnerability source state, affected package ranges, and per-host finding tables, scoped by organisation for host findings.
+- Added the Pro-gated **Reports → Vulnerabilities** page with filters for CVE, package, severity, KEV, fix availability, host group, distro, and package source.
+- Added an **Inventory → Vulnerabilities** host detail tab showing CVE findings for a selected host.
+
+**Validation**
+- Added parser, version comparator, match-rule, agent metadata extraction, and database-backed E2E coverage for report and host vulnerability display.
+- V1 scope is Linux OS packages from `dpkg`, `rpm`, and `apk`; Windows, macOS apps, Homebrew, Snap, Flatpak, Pacman/Arch, and third-party application registry matching remain out of scope and unassessed.
+
 ### Session 71 — Customer support data bundle
 
 **Support diagnostics tooling** (`deploy/customer-bundle/generate_support_data`, `.github/workflows/`, `apps/docs/docs/`)

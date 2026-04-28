@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Server,
   ShieldCheck,
+  ShieldAlert,
   Bell,
   BellPlus,
   Key,
@@ -90,6 +91,7 @@ const reportingNav: NavItem[] = [
     children: [
       { title: 'Installed Software', href: '/reports/software', icon: Package, feature: 'reportsExport' },
       { title: 'Patch Status', href: '/reports/patch-status', icon: ShieldCheck, feature: 'reportsExport' },
+      { title: 'Vulnerabilities', href: '/reports/vulnerabilities', icon: ShieldAlert, feature: 'reportsExport' },
     ],
   },
 ]

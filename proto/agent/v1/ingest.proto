@@ -64,6 +64,16 @@ message SoftwarePackage {
   string architecture = 3;
   string publisher    = 4;
   int64  install_date_unix = 5;  // Unix timestamp; 0 if unknown
+  string distro_id = 6;           // /etc/os-release ID, e.g. "ubuntu"
+  string distro_version_id = 7;   // /etc/os-release VERSION_ID, e.g. "22.04"
+  string distro_codename = 8;     // VERSION_CODENAME or UBUNTU_CODENAME
+  repeated string distro_id_like = 9;
+  string source_name = 10;        // distro source package name where available
+  string source_version = 11;     // distro source package version where available
+  string package_epoch = 12;      // package epoch, if package manager exposes it
+  string package_release = 13;    // package release, if package manager exposes it
+  string repository = 14;
+  string origin = 15;
 }
 
 // SoftwareInventoryAck is returned once the server has processed all chunks.

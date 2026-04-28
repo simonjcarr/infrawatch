@@ -344,6 +344,13 @@
       "when": 1777370000000,
       "tag": "0048_patch_status",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1777375000000,
+      "tag": "0049_linux_cve_checking",
+      "breakpoints": true
     }
   ]
 }

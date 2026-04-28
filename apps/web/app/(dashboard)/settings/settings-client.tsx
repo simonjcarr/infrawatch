@@ -646,6 +646,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 </div>
                 <Switch
                   checked={currentTerminalSettings.terminalEnabled}
+                  data-testid="settings-terminal-enabled-toggle"
                   onCheckedChange={(checked) =>
                     setLocalTerminalSettings({
                       ...currentTerminalSettings,
@@ -669,6 +670,7 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                     </div>
                     <Switch
                       checked={currentTerminalSettings.terminalLoggingEnabled}
+                      data-testid="settings-terminal-logging-toggle"
                       onCheckedChange={(checked) =>
                         setLocalTerminalSettings({ ...currentTerminalSettings, terminalLoggingEnabled: checked })
                       }
@@ -681,11 +683,12 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                   size="sm"
                   disabled={!terminalDirty || terminalMutation.isPending}
                   onClick={() => terminalMutation.mutate(currentTerminalSettings)}
+                  data-testid="settings-terminal-save"
                 >
                   {terminalMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
                 {terminalSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-terminal-success">
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>

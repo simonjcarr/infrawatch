@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/monitoring"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
@@ -45,7 +46,7 @@ func (s *ingestService) RenewCertificate(ctx context.Context, req *agentv1.Renew
 	return s.renew.Renew(ctx, req)
 }
 
-func serverOptions(creds credentials.TransportCredentials) []grpc.ServerOption {
+func serverOptions(creds credentials.TransportCredentials, recorder *monitoring.Recorder) []grpc.ServerOption {
 	// Permit the agent's 30s client pings (with safety margin) and proactively
 	// ping idle agents from the server side too, so a dead peer is detected
 	// within ~80s instead of waiting for the OS TCP timeout.
@@ -64,8 +65,8 @@ func serverOptions(creds credentials.TransportCredentials) []grpc.ServerOption {
 		grpc.MaxRecvMsgSize(maxMessageSizeBytes),
 		grpc.MaxSendMsgSize(maxMessageSizeBytes),
 		grpc.MaxConcurrentStreams(maxConcurrentStreams),
-		grpc.ChainUnaryInterceptor(RecoveryUnaryInterceptor, LoggingUnaryInterceptor, NewMTLSUnaryInterceptor()),
-		grpc.ChainStreamInterceptor(RecoveryStreamInterceptor, LoggingStreamInterceptor, NewMTLSStreamInterceptor()),
+		grpc.ChainUnaryInterceptor(RecoveryUnaryInterceptor, MonitoringUnaryInterceptor(recorder), LoggingUnaryInterceptor, NewMTLSUnaryInterceptor()),
+		grpc.ChainStreamInterceptor(RecoveryStreamInterceptor, MonitoringStreamInterceptor(recorder), LoggingStreamInterceptor, NewMTLSStreamInterceptor()),
 	}
 	if creds != nil {
 		opts = append([]grpc.ServerOption{grpc.Creds(creds)}, opts...)
@@ -73,8 +74,8 @@ func serverOptions(creds credentials.TransportCredentials) []grpc.ServerOption {
 	return opts
 }
 
-func newServer(creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler) *grpc.Server {
-	grpcServer := grpc.NewServer(serverOptions(creds)...)
+func newServer(creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler, recorder *monitoring.Recorder) *grpc.Server {
+	grpcServer := grpc.NewServer(serverOptions(creds, recorder)...)
 	svc := &ingestService{reg: reg, hb: hb, inv: inv, renew: renew}
 	agentv1.RegisterIngestServiceServer(grpcServer, svc)
 	return grpcServer
@@ -86,13 +87,13 @@ func newServer(creds credentials.TransportCredentials, reg *handlers.RegisterHan
 // rather than hitting exponential backoff. If streams don't drain within 30s,
 // the server is force-stopped — this covers the case where a container is
 // killed before context cancellation can propagate.
-func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler) error {
+func Serve(ctx context.Context, port int, creds credentials.TransportCredentials, reg *handlers.RegisterHandler, hb *handlers.HeartbeatHandler, inv *handlers.InventoryHandler, renew *handlers.RenewCertHandler, recorder *monitoring.Recorder) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("listening on :%d: %w", port, err)
 	}
 
-	grpcServer := newServer(creds, reg, hb, inv, renew)
+	grpcServer := newServer(creds, reg, hb, inv, renew, recorder)
 
 	// Graceful shutdown on context cancellation. GracefulStop sends GOAWAY
 	// so agents reconnect immediately; Stop is the hard fallback if streams

@@ -17,11 +17,14 @@ import (
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db"
 	ingestgrpc "github.com/carrtech-dev/ct-ops/ingest/internal/grpc"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/handlers"
+	"github.com/carrtech-dev/ct-ops/ingest/internal/monitoring"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/queue/inprocess"
 	ingesttls "github.com/carrtech-dev/ct-ops/ingest/internal/tls"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/vuln"
 )
+
+var version = "dev"
 
 func main() {
 	configPath := flag.String("config", "/etc/ct-ops/ingest.yaml", "Path to ingest YAML config file")
@@ -86,6 +89,9 @@ func main() {
 	// Set up in-process queue
 	q := inprocess.New()
 	defer q.Close()
+	monitoring.Version = version
+	recorder := monitoring.NewRecorder(q)
+	go recorder.RunStatusReporter(ctx, pool, 30*time.Second)
 
 	// Set up TLS credentials (mTLS with the agent CA as the client trust pool).
 	creds, err := ingesttls.BuildServerCredentials(
@@ -181,7 +187,7 @@ func main() {
 	grpcErr := make(chan error, 1)
 	go func() {
 		slog.Info("gRPC server starting", "port", cfg.GRPCPort)
-		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, inventoryHandler, renewHandler)
+		grpcErr <- ingestgrpc.Serve(ctx, cfg.GRPCPort, creds, regHandler, hbHandler, inventoryHandler, renewHandler, recorder)
 	}()
 
 	select {

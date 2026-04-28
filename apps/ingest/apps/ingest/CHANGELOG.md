@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.4.1...ingest/v0.4.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **ingest:** repair stuck task timeout interval encoding ([#705](https://github.com/carrtech-dev/ct-ops/issues/705)) ([7a47d3a](https://github.com/carrtech-dev/ct-ops/commit/7a47d3ad620701045f9dad7ddfa0a3a7e40fcfa6))
+
 ## [0.4.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.4.0...ingest/v0.4.1) (2026-04-28)
 
 

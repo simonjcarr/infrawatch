@@ -45,6 +45,11 @@ CT_OPS_VERSION=v0.3.0 curl -fsSL ... | bash
 
 It then pulls images from GHCR and starts the stack. Database migrations run in a one-shot migration container before web and ingest start.
 
+The release bundle also includes `./generate_support_data`. Run it from the
+same directory as `docker-compose.yml` when opening a support request; it
+creates a redacted support archive with sanitized settings, Docker status,
+recent logs, host information, file metadata, and TLS certificate fingerprints.
+
 When all containers show `healthy` in `docker compose ps`, continue to [Create your account](#create-your-account).
 
 If ports 80 or 443 are already in use, set `NGINX_HTTP_PORT` and
@@ -212,3 +217,7 @@ docker compose -f docker-compose.single.yml down -v
 | Agent stays in pending state | Approve it in the Hosts page pending panel |
 | Migrations failed | Ensure the `db` container is healthy before running migrations |
 | `certificate signed by unknown authority` | Set `ca_cert_file` to point to `deploy/dev-tls/server.crt` |
+
+For support tickets from a release-bundle install, run `./generate_support_data`
+and review the generated `ct-ops-support-data-<timestamp>.tar.gz` before
+attaching it.

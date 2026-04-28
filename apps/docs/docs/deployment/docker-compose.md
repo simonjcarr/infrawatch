@@ -31,6 +31,13 @@ nano .env
 
 When `docker compose ps` shows all containers as `healthy`, open the web UI at `https://<your-server>`. The bundle ships a self-signed certificate — your browser will warn on first visit. To replace it with a certificate from your own CA, see [Replacing the TLS certificate](#replacing-the-tls-certificate) below.
 
+If you need to open a support request, run `./generate_support_data` from the
+bundle directory. It creates `ct-ops-support-data-<timestamp>.tar.gz` next to
+`docker-compose.yml` with sanitized settings, Docker status, recent logs, host
+information, file metadata, and TLS certificate fingerprints. Raw `.env` files,
+private keys, and database dumps are not included; review the archive before
+attaching it to a ticket.
+
 If ports 80 or 443 are already in use on the host, set `NGINX_HTTP_PORT` and
 `NGINX_HTTPS_PORT` in `.env` before the second `./start.sh` run. Include the
 external HTTPS port in `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, and

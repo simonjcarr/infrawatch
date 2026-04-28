@@ -184,6 +184,7 @@ jobs:
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
+          cp deploy/customer-bundle/generate_support_data dist/ct-ops/generate_support_data
           cp deploy/nginx/nginx.conf          dist/ct-ops/deploy/nginx/nginx.conf
           echo "$VERSION" > dist/ct-ops/VERSION
 
@@ -546,6 +547,9 @@ jobs:
           cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
           chmod +x dist/ct-ops/build-offline-installer.sh
           bash -n dist/ct-ops/build-offline-installer.sh
+
+          chmod +x dist/ct-ops/generate_support_data
+          bash -n dist/ct-ops/generate_support_data
 
           (cd dist && zip -r "../ct-ops-single-${VERSION}.zip" ct-ops)
           cp "ct-ops-single-${VERSION}.zip" ct-ops-single.zip

@@ -7,6 +7,7 @@ on:
       - ".github/workflows/customer-bundle-check.yml"
       - "deploy/customer-bundle/**"
       - "deploy/scripts/test-install.sh"
+      - "deploy/scripts/test-support-data.sh"
       - "deploy/nginx/nginx.conf"
       - "docker-compose.single.yml"
       - ".env.example"
@@ -31,11 +32,12 @@ jobs:
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
           cp deploy/customer-bundle/start.sh dist/ct-ops/start.sh
           cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
+          cp deploy/customer-bundle/generate_support_data dist/ct-ops/generate_support_data
           cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
           echo "test" > dist/ct-ops/VERSION
           perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
           perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
-          chmod +x dist/ct-ops/start.sh dist/ct-ops/build-offline-installer.sh
+          chmod +x dist/ct-ops/start.sh dist/ct-ops/build-offline-installer.sh dist/ct-ops/generate_support_data
 
       - name: Validate scripts and required files
         working-directory: dist/ct-ops
@@ -44,14 +46,17 @@ jobs:
           test -f docker-compose.yml
           test -f deploy/nginx/nginx.conf
           test -f .env.example
+          test -x generate_support_data
           bash -n start.sh
           bash -n build-offline-installer.sh
+          bash -n generate_support_data
 
       - name: Validate installer script
         run: |
           set -euo pipefail
           bash -n install.sh
           bash deploy/scripts/test-install.sh
+          bash deploy/scripts/test-support-data.sh
 
       - name: Render compose config
         working-directory: dist/ct-ops

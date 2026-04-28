@@ -263,7 +263,7 @@ export function DirectoryLookupClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Directory User Lookup</h1>
+        <h1 className="text-2xl font-semibold text-foreground" data-testid="directory-lookup-heading">Directory User Lookup</h1>
         <p className="text-muted-foreground mt-1">
           Search for a user in your connected LDAP or Active Directory. Results are fetched live — nothing is synced or stored.
         </p>

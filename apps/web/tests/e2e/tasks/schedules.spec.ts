@@ -344,3 +344,96 @@ test('admin can create a security-only patch schedule for a host group', async (
       config: { mode: 'security' },
     })
 })
+
+test('admin can create a custom script schedule for a single host', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      last_seen_at
+    )
+    VALUES (
+      'schedule-script-host-1',
+      ${orgId},
+      'schedule-script-host-1',
+      'Schedule Script Host',
+      'Ubuntu 24.04',
+      'x86_64',
+      '["10.60.0.10"]'::jsonb,
+      'online',
+      NOW()
+    )
+  `
+
+  await page.goto('/tasks/schedules/new')
+
+  await expect(page.getByTestId('task-schedule-heading-create')).toBeVisible()
+  await page.getByLabel('Name').fill('Daily diagnostics script')
+  await page.getByLabel('Description (optional)').fill('Collect host diagnostics every morning.')
+
+  await page.getByTestId('task-schedule-task-type').click()
+  await page.getByRole('option', { name: 'Custom script' }).click()
+  await page.getByTestId('task-schedule-script-interpreter').click()
+  await page.getByRole('option', { name: 'python3' }).click()
+  await page.getByTestId('task-schedule-script-body').fill('print(\"diagnostics\")')
+  await page.getByTestId('task-schedule-script-timeout').fill('120')
+
+  await page.getByTestId('task-schedule-target-id').click()
+  await page.getByRole('option', { name: /schedule-script-host-1/i }).click()
+
+  await page.getByLabel('Cron expression (5 fields: minute hour dom month dow)').fill('30 6 * * *')
+  await page.getByTestId('task-schedule-timezone').click()
+  await page.getByRole('option', { name: 'America/New_York' }).click()
+
+  await expect(page.getByTestId('task-schedule-preview-list')).toBeVisible()
+
+  await page.getByTestId('task-schedule-submit-create').click()
+
+  await expect(page).toHaveURL(/\/tasks$/)
+  const scheduleRow = page.getByRole('row', { name: /Daily diagnostics script/i })
+  await expect(scheduleRow).toContainText('Custom script')
+  await expect(scheduleRow).toContainText('schedule-script-host-1')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        name: string
+        cron_expression: string
+        timezone: string
+        target_type: string
+        target_id: string
+        task_type: string
+        config: { script?: string; interpreter?: string; timeout_seconds?: number }
+      }>>`
+        SELECT name, cron_expression, timezone, target_type, target_id, task_type, config
+        FROM task_schedules
+        WHERE organisation_id = ${orgId}
+          AND name = 'Daily diagnostics script'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      name: 'Daily diagnostics script',
+      cron_expression: '30 6 * * *',
+      timezone: 'America/New_York',
+      target_type: 'host',
+      target_id: 'schedule-script-host-1',
+      task_type: 'custom_script',
+      config: {
+        script: 'print("diagnostics")',
+        interpreter: 'python3',
+        timeout_seconds: 120,
+      },
+    })
+})

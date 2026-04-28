@@ -55,6 +55,14 @@ interface Props {
   initialGroups: HostGroupWithCount[]
 }
 
+function toTestIdSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 function GroupForm({
   defaultValues,
   onSubmit,
@@ -81,7 +89,12 @@ function GroupForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>
-        <Input id="name" placeholder="e.g. Production Web Servers" {...register('name')} />
+        <Input
+          id="name"
+          placeholder="e.g. Production Web Servers"
+          data-testid="host-groups-form-name"
+          {...register('name')}
+        />
         {errors.name && (
           <p className="text-destructive text-sm">{errors.name.message}</p>
         )}
@@ -95,6 +108,7 @@ function GroupForm({
           id="description"
           rows={3}
           placeholder="What hosts belong in this group and why?"
+          data-testid="host-groups-form-description"
           className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           {...register('description')}
         />
@@ -106,7 +120,11 @@ function GroupForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending}
+          data-testid={submitLabel === 'Create Group' ? 'host-groups-create-submit' : 'host-groups-edit-submit'}
+        >
           {isPending && <Loader2 className="size-4 mr-1 animate-spin" />}
           {submitLabel}
         </Button>
@@ -162,13 +180,18 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
         <div className="flex items-center gap-3">
           <Layers className="size-6 text-muted-foreground" />
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Host Groups</h1>
+            <h1
+              className="text-2xl font-semibold text-foreground"
+              data-testid="host-groups-heading"
+            >
+              Host Groups
+            </h1>
             <p className="text-sm text-muted-foreground">
               Organise hosts into named groups for batch operations
             </p>
           </div>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)} data-testid="host-groups-create-trigger">
           <Plus className="size-4 mr-1" />
           New Group
         </Button>
@@ -176,7 +199,10 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
 
       {/* Table */}
       {groups.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div
+          className="rounded-lg border border-dashed p-12 text-center"
+          data-testid="host-groups-empty-state"
+        >
           <Layers className="size-8 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-medium text-foreground">No groups yet</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -201,7 +227,10 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
             </TableHeader>
             <TableBody>
               {groups.map((group) => (
-                <TableRow key={group.id}>
+                <TableRow
+                  key={group.id}
+                  data-testid={`host-groups-row-${toTestIdSlug(group.name)}`}
+                >
                   <TableCell>
                     <Link
                       href={`/hosts/groups/${group.id}`}
@@ -229,6 +258,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
                         size="icon"
                         className="size-8"
                         onClick={() => setEditGroup(group)}
+                        data-testid={`host-groups-edit-${group.id}`}
                       >
                         <Pencil className="size-3.5" />
                       </Button>
@@ -237,6 +267,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
                         size="icon"
                         className="size-8 text-destructive hover:text-destructive"
                         onClick={() => setDeleteTarget(group)}
+                        data-testid={`host-groups-delete-${group.id}`}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -255,6 +286,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
           <DialogHeader>
             <DialogTitle>Create Group</DialogTitle>
           </DialogHeader>
+          <div data-testid="host-groups-create-dialog">
           <GroupForm
             defaultValues={{ name: '', description: '' }}
             onSubmit={(d) => doCreate(d)}
@@ -262,6 +294,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
             isPending={isCreating}
             submitLabel="Create Group"
           />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -275,6 +308,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
             <DialogTitle>Edit Group</DialogTitle>
           </DialogHeader>
           {editGroup && (
+            <div data-testid="host-groups-edit-dialog">
             <GroupForm
               defaultValues={{ name: editGroup.name, description: editGroup.description ?? '' }}
               onSubmit={(d) => doUpdate(d)}
@@ -282,6 +316,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
               isPending={isUpdating}
               submitLabel="Save Changes"
             />
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -304,6 +339,7 @@ export function GroupsClient({ orgId, initialGroups }: Props) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteTarget && doDelete(deleteTarget.id)}
               disabled={isDeleting}
+              data-testid="host-groups-delete-confirm"
             >
               {isDeleting && <Loader2 className="size-4 mr-1 animate-spin" />}
               Delete

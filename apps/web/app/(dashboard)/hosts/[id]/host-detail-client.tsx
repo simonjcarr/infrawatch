@@ -935,12 +935,17 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
       {/* Host Networks Tab */}
       {activeTab === 'host-networks' && (
-        <div className="space-y-4">
+        <div className="space-y-4" data-testid="host-networks-tab">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               Networks this host belongs to.
             </p>
-            <Button size="sm" onClick={() => setAddNetworkOpen(true)} disabled={allNetworks.length === hostNetworksList.length}>
+            <Button
+              size="sm"
+              onClick={() => setAddNetworkOpen(true)}
+              disabled={allNetworks.length === hostNetworksList.length}
+              data-testid="host-networks-add-trigger"
+            >
               <Network className="size-4 mr-1" />
               Add to Network
             </Button>
@@ -960,7 +965,11 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
           ) : (
             <div className="rounded-lg border divide-y">
               {hostNetworksList.map((network) => (
-                <div key={network.id} className="flex items-center gap-3 px-4 py-3">
+                <div
+                  key={network.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                  data-testid={`host-network-row-${network.id}`}
+                >
                   <Network className="size-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <Link
@@ -972,12 +981,18 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
                     <div className="flex items-center gap-2 mt-0.5">
                       <code className="text-xs font-mono text-muted-foreground">{network.cidr}</code>
                       {network.autoAssigned ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                          data-testid={`host-network-membership-${network.id}`}
+                        >
                           <Zap className="size-3" />
                           Auto
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                          data-testid={`host-network-membership-${network.id}`}
+                        >
                           <User className="size-3" />
                           Manual
                         </span>
@@ -990,6 +1005,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
                     className="size-8 text-destructive hover:text-destructive shrink-0"
                     disabled={isRemovingFromNetwork}
                     onClick={() => doRemoveFromNetwork(network.id)}
+                    data-testid={`host-networks-remove-${network.id}`}
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
@@ -1026,6 +1042,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
                           variant="outline"
                           disabled={isAddingToNetwork}
                           onClick={() => doAddToNetwork(network.id)}
+                          data-testid={`host-networks-add-${network.id}`}
                         >
                           {isAddingToNetwork ? <Loader2 className="size-3.5 animate-spin" /> : 'Add'}
                         </Button>

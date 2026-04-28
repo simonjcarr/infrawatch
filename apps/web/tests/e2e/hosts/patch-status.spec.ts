@@ -10,7 +10,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   return rows[0]!.id
 }
 
-test('host infrastructure tab shows patch status for the selected host', async ({ authenticatedPage: page }) => {
+test('host infrastructure tab shows network memberships and patch status for the selected host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
 
@@ -92,8 +92,53 @@ test('host infrastructure tab shows patch status for the selected host', async (
       ('patch-update-2', ${orgId}, 'patch-host-1', 'libssl3', '3.0.2-1', '3.0.2-2', 'apt', 'current', NOW(), NOW())
   `
 
+  await sql`
+    INSERT INTO networks (
+      id,
+      organisation_id,
+      name,
+      cidr,
+      description
+    )
+    VALUES
+      ('network-auto-1', ${orgId}, 'Office LAN', '10.20.0.0/24', 'Auto-discovered office subnet'),
+      ('network-manual-1', ${orgId}, 'DMZ', '10.30.0.0/24', 'Manually managed network')
+  `
+
+  await sql`
+    INSERT INTO host_network_memberships (
+      id,
+      organisation_id,
+      network_id,
+      host_id,
+      auto_assigned
+    )
+    VALUES (
+      'membership-auto-1',
+      ${orgId},
+      'network-auto-1',
+      'patch-host-1',
+      true
+    )
+  `
+
   await page.goto('/hosts/patch-host-1')
   await page.getByRole('button', { name: 'Infrastructure' }).click()
+  await page.getByRole('button', { name: 'Networks' }).click()
+
+  await expect(page.getByTestId('host-networks-tab')).toBeVisible()
+  await expect(page.getByTestId('host-network-row-network-auto-1')).toContainText('Office LAN')
+  await expect(page.getByTestId('host-network-membership-network-auto-1')).toContainText('Auto')
+
+  await page.getByTestId('host-networks-add-trigger').click()
+  await page.getByTestId('host-networks-add-network-manual-1').click()
+
+  await expect(page.getByTestId('host-network-row-network-manual-1')).toContainText('DMZ')
+  await expect(page.getByTestId('host-network-membership-network-manual-1')).toContainText('Manual')
+
+  await page.getByTestId('host-networks-remove-network-manual-1').click()
+  await expect(page.getByTestId('host-network-row-network-manual-1')).toHaveCount(0)
+
   await page.getByRole('button', { name: 'Patch Status' }).click()
 
   await expect(page.getByTestId('host-patch-status-tab')).toBeVisible()
@@ -101,4 +146,15 @@ test('host infrastructure tab shows patch status for the selected host', async (
   await expect(page.getByText('2 updates available')).toBeVisible()
   await expect(page.getByText('openssl')).toBeVisible()
   await expect(page.getByText('libssl3')).toBeVisible()
+
+  const membershipRows = await sql<Array<{ deleted_at: string | null }>>`
+    SELECT deleted_at
+    FROM host_network_memberships
+    WHERE network_id = 'network-manual-1'
+      AND host_id = 'patch-host-1'
+    LIMIT 1
+  `
+
+  expect(membershipRows).toHaveLength(1)
+  expect(membershipRows[0]?.deleted_at).not.toBeNull()
 })

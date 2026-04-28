@@ -242,14 +242,14 @@ export function LdapSettingsClient({
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">LDAP / Directory</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="ldap-settings-heading">LDAP / Directory</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Configure LDAP or Active Directory connections for directory lookup and optional domain login.
           </p>
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
-            <Button size="sm">
+            <Button size="sm" data-testid="ldap-settings-add-open">
               <Plus className="size-4 mr-1.5" />
               Add Configuration
             </Button>
@@ -268,6 +268,7 @@ export function LdapSettingsClient({
                   value={addForm.name}
                   onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                   placeholder="e.g. Corporate AD"
+                  data-testid="ldap-settings-add-name"
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -277,6 +278,7 @@ export function LdapSettingsClient({
                     value={addForm.host}
                     onChange={(e) => setAddForm({ ...addForm, host: e.target.value })}
                     placeholder="ldap.example.com"
+                    data-testid="ldap-settings-add-host"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -316,6 +318,7 @@ export function LdapSettingsClient({
                   value={addForm.baseDn}
                   onChange={(e) => setAddForm({ ...addForm, baseDn: e.target.value })}
                   placeholder="dc=example,dc=com"
+                  data-testid="ldap-settings-add-base-dn"
                 />
               </div>
               <div className="space-y-1.5">
@@ -324,6 +327,7 @@ export function LdapSettingsClient({
                   value={addForm.bindDn}
                   onChange={(e) => setAddForm({ ...addForm, bindDn: e.target.value })}
                   placeholder="cn=admin,dc=example,dc=com"
+                  data-testid="ldap-settings-add-bind-dn"
                 />
               </div>
               <div className="space-y-1.5">
@@ -332,6 +336,7 @@ export function LdapSettingsClient({
                   type="password"
                   value={addForm.bindPassword}
                   onChange={(e) => setAddForm({ ...addForm, bindPassword: e.target.value })}
+                  data-testid="ldap-settings-add-bind-password"
                 />
               </div>
               <div className="space-y-1.5">
@@ -364,6 +369,7 @@ export function LdapSettingsClient({
               <Button
                 onClick={() => addMutation.mutate()}
                 disabled={addMutation.isPending || !addForm.name || !addForm.host || !addForm.baseDn || !addForm.bindDn || !addForm.bindPassword}
+                data-testid="ldap-settings-add-submit"
               >
                 {addMutation.isPending ? 'Adding...' : 'Add'}
               </Button>
@@ -374,7 +380,7 @@ export function LdapSettingsClient({
 
       {configs.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center">
+          <CardContent className="py-16 text-center" data-testid="ldap-settings-empty-state">
             <FolderTree className="size-12 mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-muted-foreground font-medium">No LDAP configurations</p>
             <p className="text-sm text-muted-foreground mt-1">
@@ -385,7 +391,7 @@ export function LdapSettingsClient({
       ) : (
         <div className="space-y-4">
           {configs.map((config) => (
-            <Card key={config.id}>
+            <Card key={config.id} data-testid={`ldap-config-row-${config.id}`}>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -404,6 +410,7 @@ export function LdapSettingsClient({
                     <Switch
                       checked={config.enabled}
                       onCheckedChange={(checked) => toggleMutation.mutate({ id: config.id, enabled: checked })}
+                      data-testid={`ldap-config-enabled-${config.id}`}
                     />
                   </div>
                 </div>
@@ -429,6 +436,7 @@ export function LdapSettingsClient({
                     <Switch
                       checked={config.allowLogin}
                       onCheckedChange={(checked) => toggleLoginMutation.mutate({ id: config.id, allowLogin: checked })}
+                      data-testid={`ldap-config-allow-login-${config.id}`}
                     />
                     Allow Web UI Login
                   </label>
@@ -460,6 +468,7 @@ export function LdapSettingsClient({
                     variant="outline"
                     size="sm"
                     onClick={() => openEditDialog(config)}
+                    data-testid={`ldap-config-edit-${config.id}`}
                   >
                     <Pencil className="size-4 mr-1.5" />
                     Edit
@@ -470,6 +479,7 @@ export function LdapSettingsClient({
                     className="text-destructive hover:text-destructive ml-auto"
                     onClick={() => deleteMutation.mutate(config.id)}
                     disabled={deleteMutation.isPending}
+                    data-testid={`ldap-config-delete-${config.id}`}
                   >
                     <Trash2 className="size-4 mr-1.5" />
                     Delete
@@ -502,19 +512,21 @@ export function LdapSettingsClient({
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2 space-y-1.5">
                 <Label>Host</Label>
-                <Input
-                  value={editForm.host}
-                  onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
-                  placeholder="ldap.example.com"
-                />
+              <Input
+                value={editForm.host}
+                onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
+                placeholder="ldap.example.com"
+                data-testid="ldap-settings-edit-host"
+              />
               </div>
               <div className="space-y-1.5">
                 <Label>Port</Label>
-                <Input
-                  type="number"
-                  value={editForm.port}
-                  onChange={(e) => setEditForm({ ...editForm, port: Number(e.target.value) })}
-                />
+              <Input
+                type="number"
+                value={editForm.port}
+                onChange={(e) => setEditForm({ ...editForm, port: Number(e.target.value) })}
+                data-testid="ldap-settings-edit-port"
+              />
               </div>
             </div>
             <div className="flex items-center gap-6">
@@ -578,6 +590,7 @@ export function LdapSettingsClient({
                 value={editForm.userSearchFilter}
                 onChange={(e) => setEditForm({ ...editForm, userSearchFilter: e.target.value })}
                 placeholder="(uid={{username}})"
+                data-testid="ldap-settings-edit-user-filter"
               />
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -633,6 +646,7 @@ export function LdapSettingsClient({
             <Button
               onClick={() => editMutation.mutate()}
               disabled={editMutation.isPending || !editForm.name || !editForm.host || !editForm.baseDn || !editForm.bindDn}
+              data-testid="ldap-settings-edit-save"
             >
               {editMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>

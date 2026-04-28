@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.77.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.76.1...web/v0.77.0) (2026-04-28)
+
+
+### Features
+
+* **web:** add build docs builder ([#713](https://github.com/carrtech-dev/ct-ops/issues/713)) ([07f335d](https://github.com/carrtech-dev/ct-ops/commit/07f335da4969a0cd0da9bb3d7ffe9a28c6d29155))
+
 ## [0.76.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.76.0...web/v0.76.1) (2026-04-28)
 
 

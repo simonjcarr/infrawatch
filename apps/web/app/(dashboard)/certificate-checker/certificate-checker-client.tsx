@@ -96,10 +96,10 @@ function InfoRow({ label, value, mono = false, copyable = false }: {
 
 function StatusBadge({ cert }: { cert: ParsedCertificate }) {
   if (cert.isExpired)
-    return <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100"><ShieldX className="size-3 mr-1" />Expired</Badge>
+    return <Badge data-testid="certificate-checker-status" className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100"><ShieldX className="size-3 mr-1" />Expired</Badge>
   if (cert.isExpiringSoon)
-    return <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100"><ShieldAlert className="size-3 mr-1" />Expiring Soon</Badge>
-  return <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100"><ShieldCheck className="size-3 mr-1" />Valid</Badge>
+    return <Badge data-testid="certificate-checker-status" className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100"><ShieldAlert className="size-3 mr-1" />Expiring Soon</Badge>
+  return <Badge data-testid="certificate-checker-status" className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100"><ShieldCheck className="size-3 mr-1" />Valid</Badge>
 }
 
 function Section({ title, children, defaultOpen = true }: {
@@ -417,12 +417,12 @@ function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
     : `${daysAbs} day${daysAbs !== 1 ? 's' : ''} remaining`
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="certificate-checker-result">
       {/* Header summary */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-xl font-semibold">{cert.commonName || cert.subject}</h2>
+            <h2 className="text-xl font-semibold" data-testid="certificate-checker-result-title">{cert.commonName || cert.subject}</h2>
             <StatusBadge cert={cert} />
             {cert.isSelfSigned && <Badge variant="outline" className="text-xs">Self-Signed</Badge>}
             {cert.isCA && <Badge variant="outline" className="text-xs">CA Certificate</Badge>}
@@ -484,7 +484,7 @@ function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
 
       {/* Key match result */}
       {keyMatch !== undefined && (
-        <div className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium ${
+        <div data-testid="certificate-checker-key-match" className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium ${
           keyMatch
             ? 'border-green-200 bg-green-50 text-green-800'
             : 'border-red-200 bg-red-50 text-red-800'
@@ -575,6 +575,7 @@ function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
       {/* SANs */}
       {cert.sans.length > 0 && (
         <Section title={`Subject Alternative Names (${cert.sans.length})`}>
+          <p className="sr-only" data-testid="certificate-checker-san-count">{cert.sans.length}</p>
           <div className="flex flex-wrap gap-1.5">
             {cert.sans.map((san, i) => (
               <Badge key={i} variant="secondary" className="font-mono text-xs">
@@ -834,6 +835,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
+          data-testid="certificate-checker-url-input"
         />
       </div>
 
@@ -848,6 +850,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
             placeholder="443"
             value={port}
             onChange={(e) => setPort(e.target.value)}
+            data-testid="certificate-checker-port-input"
           />
           <p className="text-xs text-muted-foreground">Allowed TLS ports: {allowedPorts}</p>
         </div>
@@ -858,6 +861,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
             placeholder="Same as hostname"
             value={servername}
             onChange={(e) => setServername(e.target.value)}
+            data-testid="certificate-checker-sni-input"
           />
         </div>
       </div>
@@ -876,7 +880,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
         </div>
       )}
 
-      <Button className="w-full" disabled={!url.trim() || loading} onClick={submit}>
+      <Button className="w-full" disabled={!url.trim() || loading} onClick={submit} data-testid="certificate-checker-url-submit">
         {loading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Globe className="size-4 mr-2" />}
         {loading ? 'Fetching...' : 'Fetch Certificate'}
       </Button>
@@ -936,13 +940,13 @@ export function CertificateCheckerClient({ orgId }: { orgId: string }) {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">SSL Certificate Checker</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="certificate-checker-heading">SSL Certificate Checker</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Inspect, validate, and convert X.509 certificates from files or live endpoints.
           </p>
         </div>
         {cert && (
-          <Button variant="outline" size="sm" onClick={reset}>
+          <Button variant="outline" size="sm" onClick={reset} data-testid="certificate-checker-clear">
             <X className="size-4 mr-2" />
             Clear
           </Button>
@@ -954,11 +958,11 @@ export function CertificateCheckerClient({ orgId }: { orgId: string }) {
         <CardContent className="pt-5">
           <Tabs defaultValue="upload">
             <TabsList className="mb-4">
-              <TabsTrigger value="upload">
+              <TabsTrigger value="upload" data-testid="certificate-checker-tab-upload">
                 <Upload className="size-4 mr-2" />
                 Upload / Paste
               </TabsTrigger>
-              <TabsTrigger value="url">
+              <TabsTrigger value="url" data-testid="certificate-checker-tab-url">
                 <Globe className="size-4 mr-2" />
                 Check URL
               </TabsTrigger>
@@ -976,7 +980,7 @@ export function CertificateCheckerClient({ orgId }: { orgId: string }) {
       {cert ? (
         <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} orgId={orgId} source={source} />
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground" data-testid="certificate-checker-empty-state">
           <ShieldCheck className="size-16 mb-4 opacity-20" />
           <p className="font-medium">No certificate loaded</p>
           <p className="text-sm mt-1">Upload a certificate file, paste PEM text, or enter a URL above to begin.</p>

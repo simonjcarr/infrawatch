@@ -72,6 +72,7 @@ import type {
   HttpCheckConfig,
   CertificateCheckConfig,
   CertFileCheckConfig,
+  PatchStatusCheckConfig,
   AgentQueryStatus,
   PortInfoResult,
   ServiceInfoResult,
@@ -107,6 +108,13 @@ function formatCheckOutput(checkType: string, output: string): string {
       const r = JSON.parse(output) as { keys?: { key_type: string }[]; error?: string }
       if (r.error) return r.error
       return `${r.keys?.length ?? 0} SSH keys discovered`
+    } catch { return output }
+  }
+  if (checkType === 'patch_status') {
+    try {
+      const r = JSON.parse(output) as { patch_age_days?: number; updates_count?: number; error?: string }
+      if (r.error) return r.error
+      return `${r.patch_age_days ?? '—'}d since patch · ${r.updates_count ?? 0} updates`
     } catch { return output }
   }
   if (checkType !== 'certificate' && checkType !== 'cert_file') return output
@@ -177,6 +185,12 @@ function CheckTypeBadge({ type }: { type: string }) {
       return (
         <Badge variant="outline" className="text-indigo-700 border-indigo-300 bg-indigo-50">
           SSH Keys
+        </Badge>
+      )
+    case 'patch_status':
+      return (
+        <Badge variant="outline" className="text-rose-700 border-rose-300 bg-rose-50">
+          Patch Status
         </Badge>
       )
     default:
@@ -325,6 +339,8 @@ function AddCheckDialog({
   const [certFileFormat, setCertFileFormat] = useState<'pem' | 'pkcs12' | 'jks'>('pem')
   const [certFilePassword, setCertFilePassword] = useState('')
   const [certFileAlias, setCertFileAlias] = useState('')
+  const [patchMaxAgeDays, setPatchMaxAgeDays] = useState('30')
+  const [patchMaxPackages, setPatchMaxPackages] = useState('500')
 
   // Ad-hoc agent query ("Query server" button) state
   const [queryId, setQueryId] = useState<string | null>(null)
@@ -388,6 +404,12 @@ function AddCheckDialog({
         config = {}
       } else if (checkType === 'ssh_key_scan') {
         config = {}
+      } else if (checkType === 'patch_status') {
+        const patchConfig: PatchStatusCheckConfig = {
+          max_age_days: parseInt(patchMaxAgeDays, 10) || 30,
+          max_packages: parseInt(patchMaxPackages, 10) || 500,
+        }
+        config = patchConfig
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -423,6 +445,8 @@ function AddCheckDialog({
     setCertFileFormat('pem')
     setCertFilePassword('')
     setCertFileAlias('')
+    setPatchMaxAgeDays('30')
+    setPatchMaxPackages('500')
     setError('')
     setQueryId(null)
     setQueryError(null)
@@ -460,6 +484,7 @@ function AddCheckDialog({
                 <SelectItem value="cert_file">Certificate — File on disk</SelectItem>
                 <SelectItem value="service_account">Service Accounts — discover system users</SelectItem>
                 <SelectItem value="ssh_key_scan">SSH Key Scan — discover SSH keys</SelectItem>
+                <SelectItem value="patch_status">Patch Status — OS patch age and updates</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -738,6 +763,33 @@ function AddCheckDialog({
             </p>
           )}
 
+          {checkType === 'patch_status' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="patch-max-age">Max patch age days</Label>
+                <Input
+                  id="patch-max-age"
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={patchMaxAgeDays}
+                  onChange={(e) => setPatchMaxAgeDays(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="patch-max-packages">Max updates listed</Label>
+                <Input
+                  id="patch-max-packages"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={patchMaxPackages}
+                  onChange={(e) => setPatchMaxPackages(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="interval">Interval (seconds)</Label>
             <Input
@@ -782,7 +834,7 @@ function EditCheckDialog({
   const queryClient = useQueryClient()
 
   const initFields = () => {
-    const cfg = check.config as PortCheckConfig & ProcessCheckConfig & HttpCheckConfig & CertificateCheckConfig & CertFileCheckConfig
+    const cfg = check.config as PortCheckConfig & ProcessCheckConfig & HttpCheckConfig & CertificateCheckConfig & CertFileCheckConfig & PatchStatusCheckConfig
     return {
       name: check.name,
       intervalSeconds: check.intervalSeconds,
@@ -798,6 +850,8 @@ function EditCheckDialog({
       certFileFormat: (cfg.format ?? 'pem') as 'pem' | 'pkcs12' | 'jks',
       certFilePassword: cfg.password ?? '',
       certFileAlias: cfg.alias ?? '',
+      patchMaxAgeDays: cfg.max_age_days != null ? String(cfg.max_age_days) : '30',
+      patchMaxPackages: cfg.max_packages != null ? String(cfg.max_packages) : '500',
     }
   }
 
@@ -815,6 +869,8 @@ function EditCheckDialog({
   const [certFileFormat, setCertFileFormat] = useState<'pem' | 'pkcs12' | 'jks'>(() => initFields().certFileFormat)
   const [certFilePassword, setCertFilePassword] = useState(() => initFields().certFilePassword)
   const [certFileAlias, setCertFileAlias] = useState(() => initFields().certFileAlias)
+  const [patchMaxAgeDays, setPatchMaxAgeDays] = useState(() => initFields().patchMaxAgeDays)
+  const [patchMaxPackages, setPatchMaxPackages] = useState(() => initFields().patchMaxPackages)
   const [error, setError] = useState('')
   const [confirmClearHistory, setConfirmClearHistory] = useState(false)
 
@@ -836,6 +892,8 @@ function EditCheckDialog({
       setCertFileFormat(f.certFileFormat)
       setCertFilePassword(f.certFilePassword)
       setCertFileAlias(f.certFileAlias)
+      setPatchMaxAgeDays(f.patchMaxAgeDays)
+      setPatchMaxPackages(f.patchMaxPackages)
       setError('')
       setConfirmClearHistory(false)
     }
@@ -877,6 +935,12 @@ function EditCheckDialog({
         config = {}
       } else if (check.checkType === 'ssh_key_scan') {
         config = {}
+      } else if (check.checkType === 'patch_status') {
+        const patchConfig: PatchStatusCheckConfig = {
+          max_age_days: parseInt(patchMaxAgeDays, 10) || 30,
+          max_packages: parseInt(patchMaxPackages, 10) || 500,
+        }
+        config = patchConfig
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
@@ -1062,6 +1126,33 @@ function EditCheckDialog({
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {check.checkType === 'patch_status' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-patch-max-age">Max patch age days</Label>
+                <Input
+                  id="edit-patch-max-age"
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={patchMaxAgeDays}
+                  onChange={(e) => setPatchMaxAgeDays(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-patch-max-packages">Max updates listed</Label>
+                <Input
+                  id="edit-patch-max-packages"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={patchMaxPackages}
+                  onChange={(e) => setPatchMaxPackages(e.target.value)}
+                />
+              </div>
             </div>
           )}
 

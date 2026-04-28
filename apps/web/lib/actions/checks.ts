@@ -58,18 +58,23 @@ const sshKeyScanConfigSchema = z.object({
   skip_paths: z.array(z.string()).optional(),
 })
 
+const patchStatusConfigSchema = z.object({
+  max_age_days: z.number().int().min(1).max(3650).default(30),
+  max_packages: z.number().int().min(1).max(1000).default(500).optional(),
+})
+
 const createCheckSchema = z.object({
   hostId: z.string().min(1),
   name: z.string().min(1).max(100),
-  checkType: z.enum(['port', 'process', 'http', 'certificate', 'cert_file', 'service_account', 'ssh_key_scan']),
-  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema, certFileConfigSchema, serviceAccountConfigSchema, sshKeyScanConfigSchema]),
+  checkType: z.enum(['port', 'process', 'http', 'certificate', 'cert_file', 'service_account', 'ssh_key_scan', 'patch_status']),
+  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema, certFileConfigSchema, serviceAccountConfigSchema, sshKeyScanConfigSchema, patchStatusConfigSchema]),
   intervalSeconds: z.number().int().min(10).max(3600).default(60),
 })
 
 const updateCheckSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
-  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema, certFileConfigSchema, serviceAccountConfigSchema, sshKeyScanConfigSchema]).optional(),
+  config: z.union([portConfigSchema, processConfigSchema, httpConfigSchema, certificateConfigSchema, certFileConfigSchema, serviceAccountConfigSchema, sshKeyScanConfigSchema, patchStatusConfigSchema]).optional(),
   intervalSeconds: z.number().int().min(10).max(3600).optional(),
 })
 
@@ -202,4 +207,3 @@ export async function deleteCheck(
 
   return { success: true }
 }
-

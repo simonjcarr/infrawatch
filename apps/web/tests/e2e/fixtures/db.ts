@@ -35,6 +35,8 @@ const APP_TABLES = [
   'host_group_members',
   'host_groups',
   'host_metrics',
+  'host_package_updates',
+  'host_patch_statuses',
   'hosts',
   'identity_events',
   'invitations',

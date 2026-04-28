@@ -41,9 +41,14 @@ export interface SshKeyScanCheckConfig {
   skip_paths?: string[]
 }
 
-export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig | CertFileCheckConfig | ServiceAccountCheckConfig | SshKeyScanCheckConfig
+export interface PatchStatusCheckConfig {
+  max_age_days: number
+  max_packages?: number
+}
 
-export type CheckType = 'port' | 'process' | 'http' | 'certificate' | 'cert_file' | 'service_account' | 'ssh_key_scan'
+export type CheckConfig = PortCheckConfig | ProcessCheckConfig | HttpCheckConfig | CertificateCheckConfig | CertFileCheckConfig | ServiceAccountCheckConfig | SshKeyScanCheckConfig | PatchStatusCheckConfig
+
+export type CheckType = 'port' | 'process' | 'http' | 'certificate' | 'cert_file' | 'service_account' | 'ssh_key_scan' | 'patch_status'
 export type CheckStatus = 'pass' | 'fail' | 'error'
 
 export const checks = pgTable('checks', {

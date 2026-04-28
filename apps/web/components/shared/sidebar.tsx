@@ -89,6 +89,7 @@ const reportingNav: NavItem[] = [
     feature: 'reportsExport',
     children: [
       { title: 'Installed Software', href: '/reports/software', icon: Package, feature: 'reportsExport' },
+      { title: 'Patch Status', href: '/reports/patch-status', icon: ShieldCheck, feature: 'reportsExport' },
     ],
   },
 ]

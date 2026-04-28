@@ -76,6 +76,7 @@ test('authenticated user can search and filter the host inventory', async ({ aut
   await expect(page.getByRole('link', { name: 'Beta Node' })).toBeVisible()
 
   await page.getByTestId('hosts-search-input').fill('10.0.0.20')
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–1 of 1')
   await expect(page.getByRole('link', { name: 'Beta Node' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Alpha Node' })).toHaveCount(0)
   await expect(page.getByTestId('hosts-clear-filters')).toBeVisible()
@@ -265,4 +266,68 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
   expect(revokedRows).toHaveLength(1)
   expect(revokedRows[0]?.serial).toBe('reject-serial-1')
   expect(revokedRows[0]?.reason).toBe('Rejected by admin')
+})
+
+test('authenticated user can sort and paginate the host inventory', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  for (let index = 1; index <= 55; index += 1) {
+    const hostNumber = String(index).padStart(3, '0')
+    const octet = index + 10
+    await sql`
+      INSERT INTO hosts (
+        id,
+        organisation_id,
+        hostname,
+        display_name,
+        os,
+        arch,
+        ip_addresses,
+        status,
+        cpu_percent,
+        memory_percent,
+        disk_percent,
+        last_seen_at
+      )
+      VALUES (
+        ${`host-paged-${hostNumber}`},
+        ${orgId},
+        ${`host-${hostNumber}`},
+        ${`Host ${hostNumber}`},
+        'Ubuntu 24.04',
+        'x86_64',
+        ${JSON.stringify([`10.0.2.${octet}`])}::jsonb,
+        'online',
+        ${index},
+        20,
+        30,
+        NOW() - (${index} * INTERVAL '1 minute')
+      )
+    `
+  }
+
+  await page.goto('/hosts')
+
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–50 of 55')
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 1 of 2')
+  await expect(page.getByRole('link', { name: 'Host 001' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Host 051' })).toHaveCount(0)
+
+  await page.getByTestId('hosts-page-next').click()
+
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 51–55 of 55')
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 2 of 2')
+  await expect(page.getByRole('link', { name: 'Host 051' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Host 055' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Host 001' })).toHaveCount(0)
+
+  await page.getByTestId('hosts-page-first').click()
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 1 of 2')
+
+  await page.getByRole('button', { name: 'CPU' }).click()
+
+  const firstRowAfterSort = page.locator('tbody tr').first()
+  await expect(firstRowAfterSort.getByRole('link')).toHaveText('Host 055')
+  await expect(firstRowAfterSort).toContainText('55.0%')
 })

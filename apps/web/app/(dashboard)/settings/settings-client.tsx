@@ -1,5 +1,6 @@
 'use client'
 
+import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -14,6 +15,7 @@ import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Use
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivationToken } from '@/lib/actions/settings'
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
@@ -29,7 +31,7 @@ import { getOrgDefaultTags, updateOrgDefaultTags } from '@/lib/actions/tags'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import type { TagPair } from '@/lib/db/schema'
 import type { OrgTerminalSettings } from '@/lib/actions/terminal'
-import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput } from '@/lib/actions/notification-settings'
+import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput, SmtpRelayTestLogEntry } from '@/lib/actions/notification-settings'
 import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 import { COMMUNITY_MAX_RETENTION_DAYS, hasFeature, type LicenceTier } from '@/lib/features'
@@ -282,7 +284,14 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
 
   const [smtpSaveSuccess, setSmtpSaveSuccess] = useState(false)
   const [smtpError, setSmtpError] = useState<string | null>(null)
-  const [smtpTestResult, setSmtpTestResult] = useState<{ success?: boolean; error?: string } | null>(null)
+  const [smtpTestDialogOpen, setSmtpTestDialogOpen] = useState(false)
+  const [smtpTestEmail, setSmtpTestEmail] = useState('')
+  const [smtpTestResult, setSmtpTestResult] = useState<{
+    success?: boolean
+    error?: string
+    recipient?: string
+    log?: SmtpRelayTestLogEntry[]
+  } | null>(null)
   const { data: smtpRelayDefaults } = useQuery({
     queryKey: ['org-smtp-relay-settings', org.id],
     queryFn: () => getOrgSmtpRelaySettings(org.id),
@@ -312,11 +321,21 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
   })
 
   const smtpTestMutation = useMutation({
-    mutationFn: () => sendTestSmtpRelaySettings(org.id),
-    onSuccess: (result) => {
-      setSmtpTestResult('error' in result ? { error: result.error } : { success: true })
+    mutationFn: (recipient: string) => sendTestSmtpRelaySettings(org.id, recipient),
+    onSuccess: (result, recipient) => {
+      if ('error' in result) {
+        setSmtpTestResult({ error: result.error, log: result.log })
+        return
+      }
+      setSmtpTestResult({ success: true, recipient, log: result.log })
     },
   })
+
+  function handleSmtpTestSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSmtpTestResult(null)
+    smtpTestMutation.mutate(smtpTestEmail)
+  }
 
   function updateSmtpRelaySetting(patch: Partial<OrgSmtpRelaySettingsInput>) {
     setLocalSmtpRelaySettings({ ...currentSmtpRelaySettings, ...patch })
@@ -950,11 +969,13 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                 </>
               )}
               {smtpError && <p className="text-sm text-destructive">{smtpError}</p>}
-              {smtpTestResult?.error && <p className="text-sm text-destructive">{smtpTestResult.error}</p>}
+              {smtpTestResult?.error && !smtpTestDialogOpen && (
+                <p className="text-sm text-destructive">{smtpTestResult.error}</p>
+              )}
               {smtpTestResult?.success && (
                 <p className="flex items-center gap-1 text-sm text-green-700">
                   <CheckCircle2 className="size-4" />
-                  Test email sent
+                  Test email sent{smtpTestResult.recipient ? ` to ${smtpTestResult.recipient}` : ''}
                 </p>
               )}
               <div className="flex items-center gap-3 pt-2 border-t">
@@ -969,7 +990,11 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                   size="sm"
                   variant="outline"
                   disabled={smtpDirty || smtpTestMutation.isPending || !smtpRelayDefaults?.enabled}
-                  onClick={() => smtpTestMutation.mutate()}
+                  onClick={() => {
+                    setSmtpTestResult(null)
+                    setSmtpTestDialogOpen(true)
+                  }}
+                  data-testid="smtp-relay-test-open"
                 >
                   <FlaskConical className="size-3.5 mr-1" />
                   {smtpTestMutation.isPending ? 'Testing…' : 'Test'}
@@ -981,6 +1006,99 @@ export function SettingsClient({ org, isAdmin }: SettingsClientProps) {
                   </span>
                 )}
               </div>
+              <Dialog
+                open={smtpTestDialogOpen}
+                onOpenChange={(open) => {
+                  if (smtpTestMutation.isPending) return
+                  setSmtpTestDialogOpen(open)
+                  if (!open) {
+                    setSmtpTestEmail('')
+                    setSmtpTestResult(null)
+                  }
+                }}
+              >
+                <DialogContent className="sm:max-w-md">
+                  <form onSubmit={handleSmtpTestSubmit} className="space-y-4">
+                    <DialogHeader>
+                      <DialogTitle>Send SMTP test email</DialogTitle>
+                      <DialogDescription>
+                        Enter the mailbox that should receive this test message.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="smtp-relay-test-recipient">Email address</Label>
+                      <Input
+                        id="smtp-relay-test-recipient"
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        placeholder="ops@example.com"
+                        value={smtpTestEmail}
+                        onChange={(event) => {
+                          setSmtpTestEmail(event.target.value)
+                          setSmtpTestResult(null)
+                        }}
+                        disabled={smtpTestMutation.isPending}
+                        data-testid="smtp-relay-test-recipient"
+                      />
+                    </div>
+                    {smtpTestResult?.error && (
+                      <p className="text-sm text-destructive" data-testid="smtp-relay-test-error">
+                        {smtpTestResult.error}
+                      </p>
+                    )}
+                    {smtpTestResult?.success && (
+                      <p className="flex items-center gap-1 text-sm text-green-700" data-testid="smtp-relay-test-success">
+                        <CheckCircle2 className="size-4" />
+                        Test email sent to {smtpTestResult.recipient}
+                      </p>
+                    )}
+                    {smtpTestResult?.log && smtpTestResult.log.length > 0 && (
+                      <div className="space-y-2 rounded-md border bg-muted/30 p-3" data-testid="smtp-relay-test-log">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <ScrollText className="size-4 text-muted-foreground" />
+                          SMTP log
+                        </div>
+                        <ol className="space-y-1 text-xs">
+                          {smtpTestResult.log.map((entry, index) => (
+                            <li
+                              key={`${entry.level}-${index}-${entry.message}`}
+                              className={
+                                entry.level === 'success'
+                                  ? 'text-green-700'
+                                  : entry.level === 'error'
+                                    ? 'text-destructive'
+                                    : 'text-muted-foreground'
+                              }
+                            >
+                              <span className="font-medium uppercase">{entry.level}</span>
+                              <span className="mx-1">-</span>
+                              <span>{entry.message}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSmtpTestDialogOpen(false)}
+                        disabled={smtpTestMutation.isPending}
+                      >
+                        {smtpTestResult ? 'Close' : 'Cancel'}
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={smtpTestMutation.isPending || smtpTestEmail.trim().length === 0}
+                        data-testid="smtp-relay-test-submit"
+                      >
+                        {smtpTestMutation.isPending ? 'Sending…' : smtpTestResult ? 'Send again' : 'Send test'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </>
           ) : (
             <div className="space-y-2 text-sm">

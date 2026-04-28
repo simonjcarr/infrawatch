@@ -65,6 +65,29 @@ export function normaliseSmtpRecipients(input: string): string[] {
   return recipients
 }
 
+export function normaliseSmtpTestRecipient(input: unknown): string {
+  const parsedInput = z.string().max(320, 'Email address is too long').safeParse(input)
+  if (!parsedInput.success) {
+    throw new Error(parsedInput.error.issues[0]?.message ?? 'Enter a valid email address')
+  }
+
+  const recipient = parsedInput.data.trim()
+  if (!recipient) {
+    throw new Error('Enter an email address')
+  }
+
+  if (recipient.includes(',')) {
+    throw new Error('Enter one email address')
+  }
+
+  const parsedEmail = z.string().email('Enter a valid email address').safeParse(recipient)
+  if (!parsedEmail.success) {
+    throw new Error(parsedEmail.error.issues[0]?.message ?? 'Enter a valid email address')
+  }
+
+  return parsedEmail.data
+}
+
 export function sanitiseSmtpRelayForClient(settings?: SmtpRelaySettings): SmtpRelaySettingsSafe | null {
   if (!settings) return null
   return {

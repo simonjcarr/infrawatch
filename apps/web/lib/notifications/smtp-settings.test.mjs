@@ -5,6 +5,7 @@ import {
   SMTP_ALLOWED_PORTS,
   normaliseSmtpRecipients,
   sanitiseSmtpRelayForClient,
+  normaliseSmtpTestRecipient,
 } from './smtp-settings.ts'
 
 test('normaliseSmtpRecipients trims comma-separated addresses and rejects empty output', () => {
@@ -13,6 +14,12 @@ test('normaliseSmtpRecipients trims comma-separated addresses and rejects empty 
     'team@example.com',
   ])
   assert.throws(() => normaliseSmtpRecipients(' , '), /At least one recipient/)
+})
+
+test('normaliseSmtpTestRecipient accepts one trimmed email address only', () => {
+  assert.equal(normaliseSmtpTestRecipient(' ops@example.com '), 'ops@example.com')
+  assert.throws(() => normaliseSmtpTestRecipient('ops@example.com, team@example.com'), /Enter one email address/)
+  assert.throws(() => normaliseSmtpTestRecipient('not-an-email'), /valid email address/)
 })
 
 test('sanitiseSmtpRelayForClient hides stored password material', () => {

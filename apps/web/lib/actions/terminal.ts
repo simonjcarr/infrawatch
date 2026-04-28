@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { organisations, hosts, terminalSessions } from '@/lib/db/schema'
@@ -11,7 +11,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import { getRequiredSession } from '@/lib/auth/session'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
-import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
+import { hasRole } from '@/lib/auth/guards'
 import { writeAuditEvent } from '@/lib/audit/events'
 
 export interface TerminalAccessResult {
@@ -32,12 +33,11 @@ export async function checkTerminalAccess(
   orgId: string,
   hostId: string,
 ): Promise<TerminalAccessResult | TerminalAccessDenied> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
+  const session = await requireOrgAccess(orgId)
   const { user } = session
 
   // 1. Role check
-  if (user.role === 'read_only') {
+  if (!hasRole(user, MEMBERSHIP_ROLES)) {
     return { allowed: false, reason: 'Terminal access requires at minimum engineer role' }
   }
 
@@ -179,9 +179,10 @@ export async function updateOrgTerminalSettings(
   orgId: string,
   settings: OrgTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  let session
+  try {
+    session = await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -257,9 +258,10 @@ export async function updateHostTerminalSettings(
   hostId: string,
   settings: HostTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  let session
+  try {
+    session = await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 

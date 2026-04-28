@@ -26,6 +26,15 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["lib/actions/**/*.ts", "lib/auth/**/*.ts"],
+    plugins: {
+      local: localRules,
+    },
+    rules: {
+      "local/no-raw-session-checks": "error",
+    },
+  },
+  {
     // Playwright fixtures use a `use()` callback that the react-hooks plugin
     // mistakes for React's `use()` hook. Disable that rule inside the e2e
     // suite — no React code lives here.

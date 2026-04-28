@@ -446,7 +446,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 - [ ] **[I-07] Mixed query styles (`db.query.X.findMany` vs. `db.select().from(X)`) complicate audits**
 - [ ] **[I-08] Consider Row-Level Security (RLS) in Postgres scoped on `organisation_id`** — defence in depth should any server-side check miss its org filter
 - [ ] **[I-09] Response sanitisation layer** — generic utility for stripping secret-shaped fields before returning
-- [ ] **[I-10] Centralised authz helpers** — `requireRole('org_admin')`, `requireSameOrg(session, resource)` — to reduce the number of repeated (and repeatedly forgotten) checks
+- [x] **[I-10] Centralised authz helpers** — shared guards now enforce role/org checks and ESLint flags raw `session.user` authz comparisons in web actions
 
 ---
 

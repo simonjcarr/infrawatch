@@ -87,6 +87,7 @@ export function TerminalPanel({ orgId }: Props) {
     setActivePane,
     setSplitRatio,
     setTabFontSize,
+    clearTabPassword,
   } = useTerminalPanel()
   const { preferences, setFontSize: setGlobalFontSize } = useTerminalPreferences()
 
@@ -293,6 +294,7 @@ export function TerminalPanel({ orgId }: Props) {
                   fontSize={tab.fontSize ?? preferences.fontSize}
                   onSessionStatusChange={handleSessionStatusChange}
                   onFocusPane={(paneId) => setActivePane(tab.id, paneId)}
+                  onSessionEnded={() => clearTabPassword(tab.id)}
                   onSplitPane={(paneId, dir) => splitPane(tab.id, paneId, dir)}
                   onClosePane={(paneId) => closePane(tab.id, paneId)}
                   onSplitRatioChange={(splitId, ratio) =>

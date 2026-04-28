@@ -13,6 +13,7 @@ interface Props {
   isFocused: boolean
   fontSize: number
   onStatusChange?: (paneId: string, status: TerminalSessionStatus) => void
+  onSessionEnded?: () => void
   onFocus?: () => void
 }
 
@@ -23,6 +24,7 @@ export function TerminalSession({
   isFocused,
   fontSize,
   onStatusChange,
+  onSessionEnded,
   onFocus,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -158,7 +160,7 @@ export function TerminalSession({
 
         if (!binding.password) {
           term.writeln('\x1b[31mError: host password is required. Open a new terminal session.\x1b[0m')
-          updateStatus('error')
+          updateStatus('closed')
           return
         }
 
@@ -200,14 +202,11 @@ export function TerminalSession({
           }
         }, 5000)
 
-        const promptReconnect = () => {
+        const endSession = () => {
           if (sessionEnded) return
           sessionEnded = true
-          term.writeln('\r\n\x1b[90mPress any key to reconnect...\x1b[0m')
-          const reconnectDisposable = term.onData(() => {
-            reconnectDisposable.dispose()
-            connectSession()
-          })
+          onSessionEnded?.()
+          term.writeln('\r\n\x1b[90mOpen a new terminal session to reconnect.\x1b[0m')
         }
 
         ws.onopen = () => {
@@ -243,12 +242,11 @@ export function TerminalSession({
               clearTimeout(waitingTimer)
               term.writeln('\r\n\x1b[90mSession ended.\x1b[0m')
               updateStatus('closed')
-              promptReconnect()
+              endSession()
             } else if (msg.type === 'error' && msg.message) {
               clearTimeout(waitingTimer)
               term.writeln(`\r\n\x1b[31mError: ${msg.message}\x1b[0m`)
               updateStatus('error')
-              promptReconnect()
             }
           } catch {
             // ignore malformed messages
@@ -262,7 +260,9 @@ export function TerminalSession({
         ws.onclose = (e) => {
           if (e.code !== 1000) {
             updateStatus('closed')
-            promptReconnect()
+            if (!sessionEnded) {
+              term.writeln('\r\n\x1b[90mConnection closed. Open a new terminal session to reconnect.\x1b[0m')
+            }
           }
         }
 

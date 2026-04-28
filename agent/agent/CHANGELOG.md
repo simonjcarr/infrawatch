@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.8...agent/v0.31.0) (2026-04-28)
+
+
+### Features
+
+* **web:** reorganise administration settings ([#679](https://github.com/carrtech-dev/ct-ops/issues/679)) ([bcdb0ce](https://github.com/carrtech-dev/ct-ops/commit/bcdb0ce05cbbbb167bbdf9322571cd4bc7743521))
+
 ## [0.30.8](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.30.7...agent/v0.30.8) (2026-04-27)
 
 

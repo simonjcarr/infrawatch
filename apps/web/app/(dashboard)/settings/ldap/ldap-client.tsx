@@ -33,7 +33,7 @@ import {
   deleteLdapConfiguration,
   testLdapConnection,
 } from '@/lib/actions/ldap'
-import type { LdapConfiguration } from '@/lib/db/schema'
+import type { LdapConfigurationSafe } from '@/lib/actions/ldap'
 
 const EMPTY_FORM = {
   name: '',
@@ -122,13 +122,13 @@ export function LdapSettingsClient({
   initialConfigs,
 }: {
   orgId: string
-  initialConfigs: LdapConfiguration[]
+  initialConfigs: LdapConfigurationSafe[]
 }) {
   const queryClient = useQueryClient()
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM })
   const [addError, setAddError] = useState<string | null>(null)
-  const [editingConfig, setEditingConfig] = useState<LdapConfiguration | null>(null)
+  const [editingConfig, setEditingConfig] = useState<LdapConfigurationSafe | null>(null)
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM })
   const [editError, setEditError] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success?: boolean; error?: string }>>({})
@@ -187,7 +187,7 @@ export function LdapSettingsClient({
     },
   })
 
-  function openEditDialog(config: LdapConfiguration) {
+  function openEditDialog(config: LdapConfigurationSafe) {
     setEditForm({
       name: config.name,
       host: config.host,

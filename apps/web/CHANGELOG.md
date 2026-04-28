@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.73.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.4...web/v0.73.5) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** enforce LDAP TLS certificate validation ([#662](https://github.com/carrtech-dev/ct-ops/issues/662)) ([8639cf8](https://github.com/carrtech-dev/ct-ops/commit/8639cf8f6bbb97017541df6072a720fa2fdc7cf3))
+* **web:** restore schema metadata unit tests ([#657](https://github.com/carrtech-dev/ct-ops/issues/657)) ([7b404b4](https://github.com/carrtech-dev/ct-ops/commit/7b404b4e6003a9932e838c697a2b9ca86eea7ca7))
+
 ## [0.73.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.3...web/v0.73.4) (2026-04-28)
 
 

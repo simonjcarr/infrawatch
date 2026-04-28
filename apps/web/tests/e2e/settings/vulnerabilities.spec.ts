@@ -55,6 +55,19 @@ test('admin can monitor vulnerability API sources and pulled CVEs', async ({ aut
   await page.getByLabel('CVE or title').fill('1002')
   await expect(page.getByText('CVE-2026-1001')).toBeHidden()
   await expect(page.getByText('CVE-2026-1002')).toBeVisible()
+
+  await page.getByRole('button', { name: 'View CVE-2026-1002 details' }).click()
+  const detailsDialog = page.getByRole('dialog', { name: 'CVE-2026-1002' })
+  await expect(detailsDialog).toBeVisible()
+  await expect(detailsDialog.getByText('A test CVE from CISA KEV')).toBeVisible()
+  await expect(detailsDialog.getByText('Known exploited', { exact: true })).toBeVisible()
+  await expect(detailsDialog.getByText('CVSS 8.7')).toBeVisible()
+  await expect(detailsDialog.getByText('CISA KEV Catalog')).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(page.getByLabel('CVE or title')).toHaveValue('1002')
+  await expect(page.getByText('CVE-2026-1001')).toBeHidden()
+  await expect(page.getByText('CVE-2026-1002')).toBeVisible()
 })
 
 test('admin can store and clear an NVD API key without exposing the value', async ({ authenticatedPage: page }) => {

@@ -104,3 +104,31 @@ test('admin can create and revoke an enrolment token from agent settings', async
     })
     .toBeTruthy()
 })
+
+test('admin can create an auto-approved token that skips TLS verification', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  await page.goto('/settings/agents')
+
+  await expect(page.getByTestId('agent-enrolment-heading')).toBeVisible()
+  await page.getByTestId('agent-enrolment-create-open').click()
+
+  await page.getByTestId('agent-enrolment-label').fill('Remote Edge')
+  await page.getByTestId('agent-enrolment-auto-approve').click()
+  await page.getByTestId('agent-enrolment-max-uses').fill('2')
+  await page.getByTestId('agent-enrolment-expires-days').fill('30')
+  await page.getByTestId('agent-enrolment-create-submit').click()
+
+  await expect(page.getByText('Only super_admin users may create auto-approve enrolment tokens.')).toBeVisible()
+
+  const rows = await sql<Array<{ id: string }>>`
+    SELECT id
+    FROM agent_enrolment_tokens
+    WHERE organisation_id = ${orgId}
+      AND label = 'Remote Edge'
+    LIMIT 1
+  `
+
+  expect(rows).toHaveLength(0)
+})

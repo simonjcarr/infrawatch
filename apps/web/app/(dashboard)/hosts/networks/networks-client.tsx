@@ -121,7 +121,11 @@ function NetworkForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending}
+          data-testid={submitLabel === 'Create Network' ? 'networks-create-submit' : 'networks-edit-submit'}
+        >
           {isPending && <Loader2 className="size-4 mr-1 animate-spin" />}
           {submitLabel}
         </Button>
@@ -192,7 +196,9 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
         <div className="flex items-center gap-3">
           <Network className="size-6 text-muted-foreground" />
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Networks</h1>
+            <h1 className="text-2xl font-semibold text-foreground" data-testid="networks-heading">
+              Networks
+            </h1>
             <p className="text-sm text-muted-foreground">
               Define IP subnets and automatically group hosts by network
             </p>
@@ -206,6 +212,7 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
               variant={viewMode === 'table' ? 'secondary' : 'ghost'}
               className="h-7 px-2 text-xs"
               onClick={() => setViewMode('table')}
+              data-testid="networks-view-table"
             >
               <LayoutGrid className="size-3.5 mr-1" />
               Table
@@ -215,12 +222,13 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
               variant={viewMode === 'graph' ? 'secondary' : 'ghost'}
               className="h-7 px-2 text-xs"
               onClick={() => setViewMode('graph')}
+              data-testid="networks-view-graph"
             >
               <GitBranch className="size-3.5 mr-1" />
               Graph
             </Button>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)} data-testid="networks-create-open">
             <Plus className="size-4 mr-1" />
             New Network
           </Button>
@@ -234,13 +242,13 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
 
       {/* Table */}
       {viewMode === 'table' && (networkList.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="rounded-lg border border-dashed p-12 text-center" data-testid="networks-empty-state">
           <Network className="size-8 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-medium text-foreground">No networks yet</p>
           <p className="text-xs text-muted-foreground mt-1">
             Create a network to automatically group hosts by their IP subnet.
           </p>
-          <Button className="mt-4" onClick={() => setCreateOpen(true)}>
+          <Button className="mt-4" onClick={() => setCreateOpen(true)} data-testid="networks-empty-create-open">
             <Plus className="size-4 mr-1" />
             New Network
           </Button>
@@ -260,7 +268,7 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
             </TableHeader>
             <TableBody>
               {networkList.map((network) => (
-                <TableRow key={network.id}>
+                <TableRow key={network.id} data-testid={`network-row-${network.id}`}>
                   <TableCell>
                     <Link
                       href={`/hosts/networks/${network.id}`}
@@ -293,6 +301,7 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
                         size="icon"
                         className="size-8"
                         onClick={() => setEditNetwork(network)}
+                        data-testid={`network-edit-${network.id}`}
                       >
                         <Pencil className="size-3.5" />
                       </Button>
@@ -301,6 +310,7 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
                         size="icon"
                         className="size-8 text-destructive hover:text-destructive"
                         onClick={() => setDeleteTarget(network)}
+                        data-testid={`network-delete-${network.id}`}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -373,16 +383,17 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && doDelete(deleteTarget.id)}
-              disabled={isDeleting}
-            >
-              {isDeleting && <Loader2 className="size-4 mr-1 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deleteTarget && doDelete(deleteTarget.id)}
+                disabled={isDeleting}
+                data-testid="network-delete-confirm"
+              >
+                {isDeleting && <Loader2 className="size-4 mr-1 animate-spin" />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

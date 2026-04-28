@@ -142,6 +142,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
         <Link
           href="/hosts/networks"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          data-testid="network-detail-back"
         >
           <ArrowLeft className="size-4" />
           All Networks
@@ -152,7 +153,9 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
           <div className="flex items-center gap-3">
             <Network className="size-6 text-muted-foreground shrink-0 mt-0.5" />
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">{network.name}</h1>
+              <h1 className="text-2xl font-semibold text-foreground" data-testid="network-detail-heading">
+                {network.name}
+              </h1>
               <div className="flex items-center gap-2 mt-1">
                 <code className="text-sm bg-muted px-2 py-0.5 rounded font-mono">{network.cidr}</code>
                 {network.description && (
@@ -169,6 +172,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                 variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                 className="h-7 px-2 text-xs"
                 onClick={() => setViewMode('table')}
+                data-testid="network-detail-view-table"
               >
                 <LayoutGrid className="size-3.5 mr-1" />
                 Table
@@ -178,12 +182,13 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                 variant={viewMode === 'graph' ? 'secondary' : 'ghost'}
                 className="h-7 px-2 text-xs"
                 onClick={() => setViewMode('graph')}
+                data-testid="network-detail-view-graph"
               >
                 <GitBranch className="size-3.5 mr-1" />
                 Graph
               </Button>
             </div>
-            <Button onClick={() => setAddOpen(true)}>
+            <Button onClick={() => setAddOpen(true)} data-testid="network-detail-add-open">
               <Plus className="size-4 mr-1" />
               Add Host
             </Button>
@@ -198,14 +203,14 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
         {/* Table view */}
         {viewMode === 'table' && (
           network.members.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-12 text-center">
+            <div className="rounded-lg border border-dashed p-12 text-center" data-testid="network-detail-empty-state">
               <Server className="size-8 mx-auto text-muted-foreground mb-3" />
               <p className="text-sm font-medium text-foreground">No hosts in this network</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Hosts are added automatically when their IP falls within{' '}
                 <code className="font-mono">{network.cidr}</code>, or you can add them manually.
               </p>
-              <Button className="mt-4" onClick={() => setAddOpen(true)}>
+              <Button className="mt-4" onClick={() => setAddOpen(true)} data-testid="network-detail-empty-add-open">
                 <Plus className="size-4 mr-1" />
                 Add Host
               </Button>
@@ -227,7 +232,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                   {network.members.map((host) => {
                     const isAuto = autoAssignedMap.get(host.id) ?? false
                     return (
-                      <TableRow key={host.id}>
+                      <TableRow key={host.id} data-testid={`network-detail-member-${host.id}`}>
                         <TableCell>
                           <Link
                             href={`/hosts/${host.id}`}
@@ -279,6 +284,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                             size="icon"
                             className="size-8 text-destructive hover:text-destructive"
                             onClick={() => setRemoveTarget(host)}
+                            data-testid={`network-detail-remove-${host.id}`}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -314,6 +320,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                   className="pl-8"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  data-testid="network-detail-add-search"
                 />
               </div>
               <div className="max-h-72 overflow-y-auto rounded-md border divide-y">
@@ -330,6 +337,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                       className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => doAdd(host.id)}
                       disabled={isAdding}
+                      data-testid={`network-detail-add-${host.id}`}
                     >
                       <span className="flex items-center gap-2">
                         <HostStatusIcon status={host.status ?? 'unknown'} />
@@ -375,6 +383,7 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => removeTarget && doRemove(removeTarget.id)}
                 disabled={isRemoving}
+                data-testid="network-detail-remove-confirm"
               >
                 {isRemoving && <Loader2 className="size-4 mr-1 animate-spin" />}
                 Remove

@@ -1,7 +1,24 @@
 import { test, expect } from '../fixtures/test'
 import { request as playwrightRequest } from '@playwright/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_USER } from '../fixtures/seed'
+import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
+  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
+    SELECT organisations.id AS org_id, "user".id AS user_id
+    FROM organisations
+    JOIN "user" ON "user".organisation_id = organisations.id
+    WHERE organisations.slug = ${TEST_ORG.slug}
+      AND "user".email = ${TEST_USER.email}
+    LIMIT 1
+  `
+
+  expect(rows).toHaveLength(1)
+  return {
+    orgId: rows[0]!.org_id,
+    userId: rows[0]!.user_id,
+  }
+}
 
 test('authenticated user can update their display name from profile', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
@@ -84,4 +101,53 @@ test('authenticated user can change their password from profile', async ({ authe
   } finally {
     await authRequest.dispose()
   }
+})
+
+test('authenticated user can opt out of in-app notifications when the organisation allows it', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    UPDATE organisations
+    SET metadata = jsonb_build_object(
+      'notificationSettings',
+      jsonb_build_object(
+        'inAppEnabled', true,
+        'allowUserOptOut', true,
+        'inAppRoles', '["owner","admin","member"]'::jsonb
+      )
+    )
+    WHERE id = ${orgId}
+  `
+
+  await sql`
+    UPDATE "user"
+    SET notifications_enabled = true
+    WHERE id = ${userId}
+  `
+
+  await page.goto('/profile')
+
+  await expect(page.getByText('Notifications')).toBeVisible()
+  const toggle = page.getByTestId('profile-notifications-toggle')
+  await expect(toggle).toBeEnabled()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+  await toggle.click()
+
+  await expect(page.getByTestId('profile-notifications-success')).toBeVisible()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ notifications_enabled: boolean }>>`
+        SELECT notifications_enabled
+        FROM "user"
+        WHERE id = ${userId}
+        LIMIT 1
+      `
+
+      return rows[0]?.notifications_enabled ?? null
+    })
+    .toBe(false)
 })

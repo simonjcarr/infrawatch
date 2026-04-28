@@ -344,6 +344,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
               <Switch
                 checked={notificationsEnabled}
                 disabled={!orgNotifSettings.allowUserOptOut || notifMutation.isPending}
+                data-testid="profile-notifications-toggle"
                 onCheckedChange={(checked) => {
                   setNotificationsEnabled(checked)
                   notifMutation.mutate(checked)
@@ -354,7 +355,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
               <p className="text-xs text-destructive">{notifError}</p>
             )}
             {notifSaveSuccess && (
-              <span className="flex items-center gap-1 text-sm text-green-700">
+              <span className="flex items-center gap-1 text-sm text-green-700" data-testid="profile-notifications-success">
                 <CheckCircle2 className="size-4" />
                 Saved
               </span>

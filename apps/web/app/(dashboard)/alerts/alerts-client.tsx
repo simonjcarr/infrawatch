@@ -1388,7 +1388,7 @@ export function AlertsClient({
                   const isActive = start <= now && end >= now
                   const isExpired = end < now
                   return (
-                    <TableRow key={s.id} data-testid="alert-silence-row">
+                    <TableRow key={s.id} data-testid={`alert-silence-row-${s.id}`}>
                       <TableCell className="font-medium">
                         {s.hostname ? (
                           <Link href={`/hosts/${s.hostId}`} className="hover:underline text-foreground">
@@ -1430,6 +1430,7 @@ export function AlertsClient({
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => deleteSilenceMutation.mutate(s.id)}
                           disabled={deleteSilenceMutation.isPending}
+                          data-testid={`alerts-delete-silence-${s.id}`}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>
@@ -1508,7 +1509,7 @@ export function AlertsClient({
               </TableHeader>
               <TableBody>
                 {channels.map((ch) => (
-                  <TableRow key={ch.id} data-testid="alert-channel-row">
+                  <TableRow key={ch.id} data-testid={`alert-channel-row-${ch.id}`}>
                     <TableCell className="font-medium">{ch.name}</TableCell>
                     <TableCell>
                       {ch.type === 'smtp' ? (
@@ -1578,6 +1579,7 @@ export function AlertsClient({
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => deleteChannelMutation.mutate(ch.id)}
                           disabled={deleteChannelMutation.isPending}
+                          data-testid={`alerts-delete-channel-${ch.id}`}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>

@@ -15,7 +15,7 @@
 
 ## What Has Been Built
 
-### Session 76 — Build Docs rich Markdown editor
+### Session 77 — Build Docs rich Markdown editor
 
 **Build Docs editing and exports** (`apps/web/app/(dashboard)/build-docs/[id]/`, `apps/web/components/build-docs/`, `apps/web/lib/build-docs/`)
 - Replaced section body textareas with a larger reusable rich Markdown editor powered by MDXEditor, including document-style spacing, Markdown shortcuts, source mode, headings, emphasis, links, lists, blockquotes, code blocks, tables, undo/redo, and dark-mode styling aligned with the dashboard.
@@ -26,6 +26,17 @@
 - Added Markdown export unit coverage for heading demotion, inline formatting, lists, blockquotes, fenced code blocks, tables, and DOCX formatting output.
 - Extended Build Docs E2E coverage for rich editor source editing, full-screen editing, save/reload behavior, Markdown preview rendering, image upload, search, and export links.
 - Validation run: `pnpm --filter web test:unit`, `pnpm --filter web type-check`, `pnpm --filter web lint` (existing warnings only), `pnpm --filter web db:validate`, `pnpm --filter web test:e2e tests/e2e/build-docs/build-docs.spec.ts`, and `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=... DATABASE_URL=postgres://ctops:ctops@127.0.0.1:5432/ctops pnpm --filter web build`.
+
+### Session 76 — Vulnerability catalog detail modal
+
+**Vulnerability operations UI** (`apps/web/app/(dashboard)/settings/vulnerabilities/`)
+- Added an in-page CVE detail modal to **Administration → Vulnerabilities** so admins can open a catalog vulnerability without leaving the page or losing current catalog filters.
+- The modal shows the full CVE description, title, severity, CVSS score, source, known-exploited/rejected status, affected rule count, open finding count, and published/modified timestamps.
+
+**Validation**
+- Extended database-backed E2E coverage for `/settings/vulnerabilities` to open a filtered CVE detail modal, assert key details, close it, and verify the filter remains applied.
+- Validation run: `pnpm --filter web type-check`, targeted `pnpm --filter web lint -- ...`, and `pnpm --filter web test:e2e tests/e2e/settings/vulnerabilities.spec.ts`.
+- This completes the requested modal-based full vulnerability detail view while preserving user filters on the admin page.
 
 ### Session 75 — Admin ingest and agent health visibility
 

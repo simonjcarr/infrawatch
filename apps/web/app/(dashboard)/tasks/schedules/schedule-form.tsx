@@ -350,7 +350,7 @@ export function ScheduleForm({
                 <div>
                   <Label>Action</Label>
                   <Select value={serviceAction} onValueChange={(v) => setServiceAction(v as typeof serviceAction)}>
-                    <SelectTrigger>
+                    <SelectTrigger data-testid="task-schedule-service-action">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

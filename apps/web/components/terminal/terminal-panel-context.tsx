@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { createId } from '@paralleldrive/cuid2'
+import { clearTerminalPasswordForTab } from '@/lib/terminal/tab-state'
 
 export type TerminalTabColor =
   | 'slate'
@@ -76,6 +77,7 @@ interface TerminalPanelActions {
   setActivePane: (tabId: string, paneId: string) => void
   setSplitRatio: (tabId: string, splitId: string, ratio: number) => void
   setTabFontSize: (tabId: string, fontSize: number | null) => void
+  clearTabPassword: (tabId: string) => void
 }
 
 type TerminalPanelContextValue = TerminalPanelState & TerminalPanelActions
@@ -503,6 +505,13 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
     }))
   }, [])
 
+  const clearTabPassword = useCallback((tabId: string) => {
+    setState((prev) => ({
+      ...prev,
+      tabs: clearTerminalPasswordForTab(prev.tabs, tabId),
+    }))
+  }, [])
+
   return (
     <TerminalPanelContext.Provider
       value={{
@@ -522,6 +531,7 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
         setActivePane,
         setSplitRatio,
         setTabFontSize,
+        clearTabPassword,
       }}
     >
       {children}

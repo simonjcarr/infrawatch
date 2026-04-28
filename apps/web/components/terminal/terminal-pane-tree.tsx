@@ -17,6 +17,7 @@ interface PaneTreeProps {
   activePaneId: string
   fontSize: number
   onSessionStatusChange: (paneId: string, status: TerminalSessionStatus) => void
+  onSessionEnded: () => void
   onFocusPane: (paneId: string) => void
   onSplitPane: (paneId: string, direction: 'row' | 'column') => void
   onClosePane: (paneId: string) => void
@@ -43,6 +44,7 @@ function PaneLeaf({
   fontSize,
   onSessionStatusChange,
   onFocusPane,
+  onSessionEnded,
   onSplitPane,
   onClosePane,
 }: PaneTreeProps & { node: { type: 'leaf'; id: string } }) {
@@ -61,6 +63,7 @@ function PaneLeaf({
         isFocused={isActive}
         fontSize={fontSize}
         onStatusChange={onSessionStatusChange}
+        onSessionEnded={onSessionEnded}
         onFocus={() => onFocusPane(node.id)}
       />
       {/* Per-pane action toolbar (top-right) */}

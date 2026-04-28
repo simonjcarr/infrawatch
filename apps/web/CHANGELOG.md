@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.81.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.80.2...web/v0.81.0) (2026-04-28)
+
+
+### Features
+
+* **web:** add vulnerability detail modal ([#729](https://github.com/carrtech-dev/ct-ops/issues/729)) ([04d92b4](https://github.com/carrtech-dev/ct-ops/commit/04d92b41b0a317a9a7967a5f979e8471ef9ed2f2))
+
+## [0.80.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.80.1...web/v0.80.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** end terminal sessions on logout ([#731](https://github.com/carrtech-dev/ct-ops/issues/731)) ([7ab6f2d](https://github.com/carrtech-dev/ct-ops/commit/7ab6f2d1f13250d01c28cf74866dc7ec76c75fef))
+
 ## [0.80.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.80.0...web/v0.80.1) (2026-04-28)
 
 

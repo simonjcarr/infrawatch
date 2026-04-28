@@ -74,9 +74,11 @@ export interface VulnerabilityCatalogRow {
   openFindingCount: number
 }
 
-export interface VulnerabilitySourceStatus extends VulnerabilitySyncSource {
+export interface VulnerabilitySourceStatus extends Omit<VulnerabilitySyncSource, 'status'> {
+  status: VulnerabilitySyncSource['status'] | 'not_attempted'
   lastModified: string | null
   hasCacheValidator: boolean
+  apiUrl: string
 }
 
 export interface VulnerabilityManagementSnapshot {
@@ -95,6 +97,13 @@ export interface VulnerabilityManagementSnapshot {
     connected: number
     pending: number
     error: number
+    notAttempted: number
+  }
+  syncPolicy: {
+    enabledByDefault: boolean
+    interval: string
+    syncOnStartup: boolean
+    requestTimeout: string
   }
   sources: VulnerabilitySourceStatus[]
   cves: VulnerabilityCatalogRow[]
@@ -144,6 +153,54 @@ const managementFiltersSchema = z.object({
   kevOnly: z.boolean().optional(),
 }).strip()
 
+type ExpectedVulnerabilitySource = {
+  id: string
+  label: string
+  apiUrl: string
+}
+
+const ALPINE_RELEASES = ['v3.18', 'v3.19', 'v3.20', 'v3.21', 'v3.22', 'v3.23']
+
+const EXPECTED_VULNERABILITY_SOURCES: ExpectedVulnerabilitySource[] = [
+  {
+    id: 'nvd',
+    label: 'NVD CVE API',
+    apiUrl: 'https://services.nvd.nist.gov/rest/json/cves/2.0',
+  },
+  {
+    id: 'cisa-kev',
+    label: 'CISA KEV Catalog',
+    apiUrl: 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',
+  },
+  {
+    id: 'debian-tracker',
+    label: 'Debian Security Tracker',
+    apiUrl: 'https://security-tracker.debian.org/tracker/data/json',
+  },
+  {
+    id: 'ubuntu-osv',
+    label: 'Ubuntu OSV Feed',
+    apiUrl: 'https://security-metadata.canonical.com/osv/osv-all.tar.xz',
+  },
+  ...ALPINE_RELEASES.flatMap((release) => ([
+    {
+      id: `alpine-secdb-${release}-main`,
+      label: `Alpine SecDB ${release} main`,
+      apiUrl: `https://secdb.alpinelinux.org/${release}/main.json`,
+    },
+    {
+      id: `alpine-secdb-${release}-community`,
+      label: `Alpine SecDB ${release} community`,
+      apiUrl: `https://secdb.alpinelinux.org/${release}/community.json`,
+    },
+  ])),
+  {
+    id: 'redhat-security-data',
+    label: 'Red Hat Security Data',
+    apiUrl: 'https://access.redhat.com/hydra/rest/securitydata/cve.json',
+  },
+]
+
 export async function getVulnerabilityManagementSnapshot(
   orgId: string,
   filters: VulnerabilityManagementFilters = {},
@@ -178,6 +235,7 @@ export async function getVulnerabilityManagementSnapshot(
         last_success_at AS "lastSuccessAt",
         last_error AS "lastError",
         records_upserted AS "recordsUpserted",
+        COALESCE(metadata->>'url', '') AS "apiUrl",
         (etag IS NOT NULL OR last_modified IS NOT NULL) AS "hasCacheValidator"
       FROM vulnerability_sources
       ORDER BY id ASC
@@ -220,7 +278,7 @@ export async function getVulnerabilityManagementSnapshot(
   ])
 
   const summaryRows = summaryRowsRaw as unknown as Array<VulnerabilityManagementSnapshot['summary']>
-  const sourceRows = sourceRowsRaw as unknown as VulnerabilitySourceStatus[]
+  const sourceRows = sourceRowsRaw as unknown as Array<VulnerabilitySourceStatus & { apiUrl: string | null }>
   const cveRows = cveRowsRaw as unknown as VulnerabilityCatalogRow[]
 
   const summary = summaryRows[0] ?? {
@@ -233,19 +291,25 @@ export async function getVulnerabilityManagementSnapshot(
     openFindings: 0,
   }
 
+  const sources = mergeVulnerabilitySources(sourceRows)
+
   return {
     generatedAt: new Date(),
     summary,
     sourceSummary: {
-      total: sourceRows.length,
-      connected: sourceRows.filter((row) => row.status === 'success').length,
-      pending: sourceRows.filter((row) => row.status === 'pending').length,
-      error: sourceRows.filter((row) => row.status === 'error').length,
+      total: sources.length,
+      connected: sources.filter((row) => row.status === 'success').length,
+      pending: sources.filter((row) => row.status === 'pending').length,
+      error: sources.filter((row) => row.status === 'error').length,
+      notAttempted: sources.filter((row) => row.status === 'not_attempted').length,
     },
-    sources: sourceRows.map((row) => ({
-      ...row,
-      lastError: sanitizeSourceError(row.lastError),
-    })),
+    syncPolicy: {
+      enabledByDefault: true,
+      interval: '6h',
+      syncOnStartup: true,
+      requestTimeout: '45s',
+    },
+    sources,
     cves: cveRows,
   }
 }
@@ -462,4 +526,40 @@ function sanitizeSourceError(value: string | null) {
     return 'Response parsing failed'
   }
   return 'Sync failed'
+}
+
+function mergeVulnerabilitySources(rows: Array<VulnerabilitySourceStatus & { apiUrl: string | null }>): VulnerabilitySourceStatus[] {
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  const merged = EXPECTED_VULNERABILITY_SOURCES.map((source) => {
+    const row = byId.get(source.id)
+    byId.delete(source.id)
+    return normalizeVulnerabilitySource(source, row)
+  })
+
+  for (const row of byId.values()) {
+    merged.push(normalizeVulnerabilitySource({
+      id: row.id,
+      label: row.id,
+      apiUrl: row.apiUrl || 'Configured upstream URL',
+    }, row))
+  }
+
+  return merged
+}
+
+function normalizeVulnerabilitySource(
+  source: ExpectedVulnerabilitySource,
+  row?: VulnerabilitySourceStatus & { apiUrl: string | null },
+): VulnerabilitySourceStatus {
+  return {
+    id: source.id,
+    status: row?.status ?? 'not_attempted',
+    lastAttemptAt: row?.lastAttemptAt ?? null,
+    lastSuccessAt: row?.lastSuccessAt ?? null,
+    lastError: sanitizeSourceError(row?.lastError ?? null),
+    recordsUpserted: row?.recordsUpserted ?? 0,
+    lastModified: row?.lastModified ?? null,
+    hasCacheValidator: row?.hasCacheValidator ?? false,
+    apiUrl: row?.apiUrl || source.apiUrl,
+  }
 }

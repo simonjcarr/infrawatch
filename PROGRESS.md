@@ -38,10 +38,11 @@
 - Added an admin-only **Administration → Vulnerabilities** page that shows vulnerability feed/API connection status, last attempt/success times, pulled record counts, and recent connection errors without exposing configured upstream URLs or secrets.
 - Added a live CVE catalog view backed by `vulnerability_cves`, including pulled CVE counts, severity/KEV summaries, affected-package rule counts, source filtering, and CVE/title search so users can confirm API data is present independently of host findings.
 - Added a bounded, rate-limited server action for the management snapshot, with organisation admin authorization and org-scoped open finding counts.
+- Added sync policy visibility plus expected feed rows for NVD, CISA KEV, Debian, Ubuntu OSV, Alpine SecDB, and Red Hat, so the page shows the APIs CT-Ops is supposed to contact even before the first sync attempt. Ingest now stores the attempted upstream URL in source metadata for accurate display after environment overrides.
 
 **Validation**
 - Added database-backed E2E coverage for seeded API source states and pulled CVEs at `/settings/vulnerabilities`.
-- Validation run: `pnpm --filter web type-check`, targeted `pnpm --filter web lint -- ...`, `pnpm --filter web db:validate`, and `pnpm --filter web test:e2e tests/e2e/settings/vulnerabilities.spec.ts`.
+- Validation run: `pnpm --filter web type-check`, targeted `pnpm --filter web lint -- ...`, `pnpm --filter web db:validate`, `pnpm --filter web test:e2e tests/e2e/settings/vulnerabilities.spec.ts`, and `go test ./apps/ingest/internal/vuln`.
 - This completes the requested visibility for CVEs being pulled from vulnerability APIs and the status of vulnerability API connections. Manual sync triggering remains outside this interface.
 
 ### Session 72 — Linux OS package CVE checking

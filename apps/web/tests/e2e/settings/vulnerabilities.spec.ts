@@ -37,10 +37,15 @@ test('admin can monitor vulnerability API sources and pulled CVEs', async ({ aut
 
   await expect(page.getByRole('heading', { name: 'Vulnerability Management' })).toBeVisible()
   await expect(page.getByText('API Connections')).toBeVisible()
+  await expect(page.getByText('Every 6h')).toBeVisible()
   await expect(page.getByRole('cell', { name: 'NVD CVE API nvd' })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'CISA KEV Catalog cisa-kev' })).toBeVisible()
+  await expect(page.getByText('https://services.nvd.nist.gov/rest/json/cves/2.0')).toBeVisible()
+  await expect(page.getByText('https://security-tracker.debian.org/tracker/data/json')).toBeVisible()
   await expect(page.getByText('Connected').first()).toBeVisible()
   await expect(page.getByText('Error').first()).toBeVisible()
+  await expect(page.getByText('Not attempted').first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: '42' })).toBeVisible()
 
   await expect(page.getByText('CVE Catalog')).toBeVisible()
   await expect(page.getByText('CVE-2026-1001')).toBeVisible()

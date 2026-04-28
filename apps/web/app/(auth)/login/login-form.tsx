@@ -27,13 +27,14 @@ type DomainLoginValues = z.infer<typeof domainLoginSchema>
 
 interface LoginFormProps {
   ldapLoginEnabled?: boolean
+  notice?: string | null
 }
 
 function isEmailNotVerifiedError(message: string, code?: string): boolean {
   return code === 'EMAIL_NOT_VERIFIED' || message.toLowerCase().includes('email not verified')
 }
 
-export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
+export function LoginForm({ ldapLoginEnabled = false, notice = null }: LoginFormProps) {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
   const [canResendVerification, setCanResendVerification] = useState(false)
@@ -150,6 +151,9 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
       {loginMode === 'local' ? (
         <form onSubmit={localForm.handleSubmit(onLocalSubmit)}>
           <CardContent className="space-y-4">
+            {notice && (
+              <p className="text-sm text-foreground" data-testid="login-notice">{notice}</p>
+            )}
             {serverError && (
               <p className="text-sm text-destructive" data-testid="login-error">{serverError}</p>
             )}
@@ -199,6 +203,15 @@ export function LoginForm({ ldapLoginEnabled = false }: LoginFormProps) {
               {localForm.formState.errors.password && (
                 <p className="text-xs text-destructive">{localForm.formState.errors.password.message}</p>
               )}
+            </div>
+            <div className="text-right">
+              <Link
+                href="/forgot-password"
+                className="text-sm text-foreground underline underline-offset-4"
+                data-testid="forgot-password-link"
+              >
+                Forgot password?
+              </Link>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">

@@ -17,6 +17,18 @@ function getCaptureFile(): string {
 }
 
 export async function waitForVerificationUrl(to: string, timeoutMs = 10_000): Promise<string> {
+  return waitForEmailMetadata(to, 'verificationUrl', timeoutMs)
+}
+
+export async function waitForPasswordResetUrl(to: string, timeoutMs = 10_000): Promise<string> {
+  return waitForEmailMetadata(to, 'resetUrl', timeoutMs)
+}
+
+async function waitForEmailMetadata(
+  to: string,
+  key: 'verificationUrl' | 'resetUrl',
+  timeoutMs: number,
+): Promise<string> {
   const deadline = Date.now() + timeoutMs
   const file = getCaptureFile()
 
@@ -30,8 +42,8 @@ export async function waitForVerificationUrl(to: string, timeoutMs = 10_000): Pr
         .map((line) => JSON.parse(line) as CapturedEmail)
 
       const match = [...messages].reverse().find((message) => message.to === to)
-      const verificationUrl = match?.metadata?.verificationUrl
-      if (verificationUrl) return verificationUrl
+      const value = match?.metadata?.[key]
+      if (value) return value
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     }
@@ -39,7 +51,7 @@ export async function waitForVerificationUrl(to: string, timeoutMs = 10_000): Pr
     await new Promise((resolve) => setTimeout(resolve, 200))
   }
 
-  throw new Error(`Timed out waiting for verification email for ${to}`)
+  throw new Error(`Timed out waiting for ${key} email metadata for ${to}`)
 }
 
 export async function countVerificationEmails(to: string): Promise<number> {

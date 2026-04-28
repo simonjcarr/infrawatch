@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { twoFactor } from 'better-auth/plugins'
 import { db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
-import { sendVerificationEmail } from './email'
+import { sendPasswordResetEmail, sendVerificationEmail } from './email'
 import {
   getBetterAuthOrigin,
   getBetterAuthSecret,
@@ -36,6 +36,20 @@ export const auth = betterAuth({
     requireEmailVerification,
     minPasswordLength: 12,
     maxPasswordLength: 128,
+    sendResetPassword: async ({ user, url, token }) => {
+      const appResetUrl = new URL(`/reset-password/${token}`, getBetterAuthOrigin())
+      const callbackURL = new URL(url).searchParams.get('callbackURL')
+      if (callbackURL) {
+        appResetUrl.searchParams.set('callbackURL', callbackURL)
+      }
+
+      await sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        resetUrl: appResetUrl.toString(),
+      })
+    },
+    revokeSessionsOnPasswordReset: true,
   },
   emailVerification: {
     autoSignInAfterVerification: true,

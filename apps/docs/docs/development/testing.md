@@ -55,7 +55,7 @@ Per-test isolation is provided by an auto-running `autoTruncate` fixture that ru
 
 ## Authentication in tests
 
-The canonical pattern is the `authenticatedPage` fixture exported from `tests/e2e/fixtures/test.ts`. It programmatically signs in once per worker by POSTing to Better Auth's `/api/auth/sign-in/email`, captures the cookie via Playwright's `storageState`, and hands back a pre-authenticated page.
+The canonical pattern is the `authenticatedPage` fixture exported from `tests/e2e/fixtures/test.ts`. It creates a real Better Auth session row for the seeded user, writes the matching signed session cookie into Playwright's `storageState`, and hands back a pre-authenticated page. This keeps feature tests out of the sign-in endpoint's brute-force rate limit while still exercising the normal session validation path.
 
 ```ts
 import { test, expect } from '../fixtures/test'

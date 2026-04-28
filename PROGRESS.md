@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 71 — Customer support data bundle
+
+**Support diagnostics tooling** (`deploy/customer-bundle/generate_support_data`, `.github/workflows/`, `apps/docs/docs/`)
+- Added a customer-bundle `generate_support_data` executable that writes a timestamped `ct-ops-support-data-*.tar.gz` beside `docker-compose.yml`.
+- The archive includes sanitized `.env`/compose data, Docker status, recent compose logs, host information, file metadata, and TLS certificate fingerprints while excluding raw `.env` files, private keys, and database dumps.
+- Release and customer-bundle checks now stage and syntax-check the executable so it ships with the install bundle at the same level as `docker-compose.yml`.
+
+**Validation**
+- Added `deploy/scripts/test-support-data.sh` to verify support bundle generation and redaction of env secrets, compose-rendered secrets, and log bearer/password values.
+
 ### Session 70 — Patch status monitoring and management reporting
 
 **Patch status check** (`agent/internal/checks/patch_status.go`, `apps/web/lib/actions/checks.ts`, `apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`)

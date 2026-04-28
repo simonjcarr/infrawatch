@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Collects a best-effort CT-Ops support bundle for customer installations.
+# The output intentionally avoids raw .env files, private keys, database dumps,
+# and docker inspect output. Logs and rendered config are redacted before they
+# are written to disk.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+LOG_LINES="${CT_OPS_SUPPORT_LOG_LINES:-300}"
+OUTPUT_DIR="${CT_OPS_SUPPORT_OUTPUT_DIR:-$SCRIPT_DIR}"
+TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ct-ops-support-data.XXXXXX")"
+BUNDLE_NAME="ct-ops-support-data-${TIMESTAMP}"
+BUNDLE_DIR="${WORK_DIR}/${BUNDLE_NAME}"
+ARCHIVE="${OUTPUT_DIR}/${BUNDLE_NAME}.tar.gz"
+
+cleanup() {
+  rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
+
+mkdir -p "$BUNDLE_DIR" "$OUTPUT_DIR"
+
+redact_stream() {
+  awk '
+    BEGIN { IGNORECASE = 1 }
+    function lower(s) { return tolower(s) }
+    function redact_kv(line,    eq, colon, pos, prefix, suffix) {
+      eq = index(line, "=")
+      colon = index(line, ":")
+      if (eq == 0 || (colon > 0 && colon < eq)) {
+        pos = colon
+      } else {
+        pos = eq
+      }
+      if (pos == 0) {
+        return "[REDACTED]"
+      }
+      prefix = substr(line, 1, pos)
+      suffix = substr(line, pos + 1)
+      if (suffix ~ /^[[:space:]]/) {
+        return prefix " [REDACTED]"
+      }
+      return prefix "[REDACTED]"
+    }
+    {
+      line = $0
+
+      if (line ~ /-----BEGIN .*PRIVATE[[:space:]]+KEY-----/) {
+        private_key = 1
+        print "[REDACTED PEM KEY BLOCK]"
+        next
+      }
+      if (private_key) {
+        if (line ~ /-----END .*PRIVATE[[:space:]]+KEY-----/) {
+          print "[END REDACTED PEM KEY BLOCK]"
+          private_key = 0
+        }
+        next
+      }
+
+      gsub(/Bearer[[:space:]]+[^[:space:]]+/, "Bearer [REDACTED]", line)
+      gsub(/Basic[[:space:]]+[^[:space:]]+/, "Basic [REDACTED]", line)
+      gsub(/:\/\/[^\/@[:space:]]+:[^\/@[:space:]]+@/, "://[REDACTED]@", line)
+
+      lowered = lower(line)
+      if (lowered ~ /(password|secret|token|credential|private|jwt|cookie|session|loadtest_admin_key|encryption_key)/ && line ~ /[:=]/) {
+        print redact_kv(line)
+        next
+      }
+
+      print line
+    }
+  '
+}
+
+write_section() {
+  local title="$1"
+  printf '\n## %s\n\n' "$title"
+}
+
+run_command() {
+  local path="$1"
+  shift
+  {
+    printf '$'
+    printf ' %q' "$@"
+    printf '\n\n'
+    set +e
+    "$@"
+    status=$?
+    set -e
+    printf '\n(exit status: %s)\n' "$status"
+    exit "$status"
+  } 2>&1 | redact_stream > "${BUNDLE_DIR}/${path}" || true
+}
+
+copy_redacted_file() {
+  local source="$1"
+  local target="$2"
+  if [ -f "$source" ]; then
+    redact_stream < "$source" > "${BUNDLE_DIR}/${target}"
+  else
+    printf '%s not found\n' "$source" > "${BUNDLE_DIR}/${target}"
+  fi
+}
+
+collect_manifest() {
+  {
+    echo "CT-Ops support data"
+    echo "Generated UTC: ${TIMESTAMP}"
+    echo "Bundle directory: ${SCRIPT_DIR}"
+    echo "Log lines per service: ${LOG_LINES}"
+    if [ -f VERSION ]; then
+      echo "Bundle version: $(cat VERSION)"
+    else
+      echo "Bundle version: unknown"
+    fi
+    echo ""
+    echo "Redaction policy:"
+    echo "- Raw .env files are not included."
+    echo "- Values whose names contain password, secret, token, key, credential, JWT,"
+    echo "  cookie, session, or load-test admin key markers are replaced with [REDACTED]."
+    echo "- Bearer/Basic authorization values and URL userinfo are replaced with [REDACTED]."
+    echo "- Private key PEM blocks are replaced with redacted placeholders."
+  } > "${BUNDLE_DIR}/manifest.txt"
+}
+
+collect_host_info() {
+  {
+    write_section "Host"
+    echo "Hostname: $(hostname 2>/dev/null || echo unknown)"
+    echo "User: $(id 2>/dev/null || echo unknown)"
+    echo "Date UTC: $(date -u 2>/dev/null || echo unknown)"
+    echo "Uname: $(uname -a 2>/dev/null || echo unknown)"
+
+    if [ -f /etc/os-release ]; then
+      write_section "OS Release"
+      sed -n '1,80p' /etc/os-release
+    fi
+
+    write_section "Disk"
+    df -h 2>/dev/null || true
+
+    write_section "Memory"
+    if command -v free >/dev/null 2>&1; then
+      free -h
+    elif command -v vm_stat >/dev/null 2>&1; then
+      vm_stat
+    else
+      echo "memory command unavailable"
+    fi
+
+    write_section "Uptime"
+    uptime 2>/dev/null || true
+  } | redact_stream > "${BUNDLE_DIR}/host-info.txt"
+}
+
+collect_file_inventory() {
+  {
+    write_section "Bundle Files"
+    find . -maxdepth 3 \
+      \( -path './.git' -o -path './images.tar.gz' -o -name 'ct-ops-support-data-*.tar.gz' \) -prune \
+      -o -type f -printf '%M %s %p\n' 2>/dev/null || find . -maxdepth 3 -type f -print
+
+    write_section "Key Directory Listing"
+    for dir in . deploy deploy/tls deploy/dev-tls deploy/nginx; do
+      [ -e "$dir" ] || continue
+      echo "# ${dir}"
+      ls -la "$dir" 2>/dev/null || true
+      echo ""
+    done
+  } | redact_stream > "${BUNDLE_DIR}/file-inventory.txt"
+}
+
+collect_tls_info() {
+  {
+    for cert in deploy/tls/server.crt deploy/dev-tls/server.crt; do
+      write_section "$cert"
+      if [ ! -f "$cert" ]; then
+        echo "not found"
+        continue
+      fi
+      if command -v openssl >/dev/null 2>&1; then
+        openssl x509 -in "$cert" -noout -subject -issuer -dates -fingerprint -sha256 2>&1 || true
+        openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null || true
+      else
+        echo "openssl not available; certificate metadata not collected"
+      fi
+    done
+  } | redact_stream > "${BUNDLE_DIR}/tls-info.txt"
+}
+
+collect_docker_info() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "docker not found in PATH" > "${BUNDLE_DIR}/docker-info.txt"
+    return 0
+  fi
+
+  run_command docker-info.txt docker version
+
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "docker compose plugin not available" >> "${BUNDLE_DIR}/docker-info.txt"
+    return 0
+  fi
+
+  run_command docker-compose-version.txt docker compose version
+
+  if [ -f docker-compose.yml ]; then
+    # Prevent known required secrets from being interpolated into rendered
+    # config. The rendered file still goes through the generic redactor.
+    (
+      export BETTER_AUTH_SECRET=support-redacted
+      export POSTGRES_PASSWORD=support-redacted
+      export LDAP_ENCRYPTION_KEY=support-redacted
+      export CT_OPS_LOADTEST_ADMIN_KEY=support-redacted
+      docker compose -f docker-compose.yml config
+    ) 2>&1 | redact_stream > "${BUNDLE_DIR}/docker-compose-config.txt" || true
+  else
+    echo "docker-compose.yml not found" > "${BUNDLE_DIR}/docker-compose-config.txt"
+  fi
+
+  run_command docker-compose-ps.txt docker compose ps
+  run_command docker-compose-images.txt docker compose images
+  run_command docker-system-df.txt docker system df
+
+  {
+    echo "$ docker compose logs --no-color --timestamps --tail ${LOG_LINES}"
+    echo ""
+    set +e
+    docker compose logs --no-color --timestamps --tail "$LOG_LINES"
+    status=$?
+    set -e
+    echo ""
+    echo "(exit status: ${status})"
+    exit "$status"
+  } 2>&1 | redact_stream > "${BUNDLE_DIR}/docker-logs.txt" || true
+}
+
+collect_manifest
+collect_host_info
+collect_file_inventory
+collect_tls_info
+copy_redacted_file .env environment.env
+copy_redacted_file .env.example environment-example.env
+copy_redacted_file docker-compose.yml docker-compose.yml.txt
+collect_docker_info
+
+cat > "${BUNDLE_DIR}/README.txt" <<'EOF'
+This archive contains best-effort diagnostic data for CT-Ops support.
+
+Before sending it to support, you may inspect the text files inside the archive.
+The generator redacts common secret formats, but customer environments can use
+custom naming conventions, so review the archive according to your own data
+handling policy.
+EOF
+
+tar -czf "$ARCHIVE" -C "$WORK_DIR" "$BUNDLE_NAME"
+
+echo "Wrote support archive: $ARCHIVE"
+echo "Review the archive before attaching it to a support request."

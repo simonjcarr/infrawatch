@@ -45,6 +45,7 @@ Commands:
   ./start.sh --down      Stop the stack (named volumes are preserved)
   ./start.sh --version   Show bundle version, app version and licence tier
   ./start.sh --help      Show this message
+  ./generate_support_data  Create a redacted support archive for tickets
 
 Documentation: ${DOCS_URL}
 Support:       ${SUPPORT_URL}

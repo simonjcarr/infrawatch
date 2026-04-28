@@ -68,6 +68,7 @@ the external HTTPS port and `9443` to the instance.
 ./start.sh --down     # stop the stack (data is preserved)
 ./start.sh --version  # show bundle version, app version and licence tier
 ./start.sh --help     # links to documentation and support
+./generate_support_data  # create a redacted support archive
 ```
 
 ## Installing the agent
@@ -112,6 +113,18 @@ docker compose ps                       # container status
 docker compose logs web ingest db       # last logs
 cat VERSION                             # bundle version
 ```
+
+When opening a support request, run:
+
+```sh
+./generate_support_data
+```
+
+This creates `ct-ops-support-data-<timestamp>.tar.gz` next to
+`docker-compose.yml`. It includes sanitized settings, Docker status, recent
+logs, host information, file metadata, and TLS certificate fingerprints. It
+does not include raw `.env` files, private keys, or database dumps. Review the
+archive before attaching it to a ticket.
 
 Data lives in named Docker volumes (`db_data`, `ingest_data`, `agent_dist`).
 

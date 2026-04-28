@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.74.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.8...web/v0.74.0) (2026-04-28)
+
+
+### Features
+
+* **web:** prompt for SMTP relay test recipient ([#674](https://github.com/carrtech-dev/ct-ops/issues/674)) ([3582481](https://github.com/carrtech-dev/ct-ops/commit/358248110254cc7d8590cb0e8c3f7ed05008fdb2))
+
 ## [0.73.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.7...web/v0.73.8) (2026-04-28)
 
 

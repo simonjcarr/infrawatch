@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.78.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.77.1...web/v0.78.0) (2026-04-28)
+
+
+### Features
+
+* **web:** add vulnerability management interface ([#717](https://github.com/carrtech-dev/ct-ops/issues/717)) ([ebebd7b](https://github.com/carrtech-dev/ct-ops/commit/ebebd7b142eefcaa35d3923caf1d61a8f21454c6))
+
 ## [0.77.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.77.0...web/v0.77.1) (2026-04-28)
 
 

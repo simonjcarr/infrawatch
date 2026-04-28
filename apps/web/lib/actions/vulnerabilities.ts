@@ -3,7 +3,7 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 import { requireFeature } from '@/lib/actions/licence-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
 
@@ -52,6 +52,54 @@ export interface VulnerabilitySyncSource {
   recordsUpserted: number
 }
 
+export interface VulnerabilityManagementFilters {
+  query?: string
+  severity?: VulnerabilitySeverity | 'all'
+  source?: string
+  kevOnly?: boolean
+}
+
+export interface VulnerabilityCatalogRow {
+  cveId: string
+  title: string | null
+  description: string | null
+  severity: VulnerabilitySeverity
+  cvssScore: number | null
+  publishedAt: Date | null
+  modifiedAt: Date | null
+  knownExploited: boolean
+  rejected: boolean
+  source: string | null
+  affectedPackageCount: number
+  openFindingCount: number
+}
+
+export interface VulnerabilitySourceStatus extends VulnerabilitySyncSource {
+  lastModified: string | null
+  hasCacheValidator: boolean
+}
+
+export interface VulnerabilityManagementSnapshot {
+  generatedAt: Date
+  summary: {
+    totalCves: number
+    criticalCount: number
+    highCount: number
+    knownExploitedCount: number
+    rejectedCount: number
+    affectedPackageRules: number
+    openFindings: number
+  }
+  sourceSummary: {
+    total: number
+    connected: number
+    pending: number
+    error: number
+  }
+  sources: VulnerabilitySourceStatus[]
+  cves: VulnerabilityCatalogRow[]
+}
+
 export interface VulnerabilityReport {
   generatedAt: Date
   summary: {
@@ -72,6 +120,12 @@ const reportLimiter = createRateLimiter({
   max: 20,
 })
 
+const managementLimiter = createRateLimiter({
+  scope: 'vulnerabilities:management',
+  windowMs: 60_000,
+  max: 30,
+})
+
 const filtersSchema = z.object({
   cve: z.string().trim().max(32).optional(),
   packageName: z.string().trim().max(120).optional(),
@@ -82,6 +136,119 @@ const filtersSchema = z.object({
   distro: z.string().trim().max(64).optional(),
   source: z.string().trim().max(64).optional(),
 }).strip()
+
+const managementFiltersSchema = z.object({
+  query: z.string().trim().max(120).optional(),
+  severity: z.enum(['critical', 'high', 'medium', 'low', 'none', 'unknown', 'all']).optional(),
+  source: z.string().trim().max(80).optional(),
+  kevOnly: z.boolean().optional(),
+}).strip()
+
+export async function getVulnerabilityManagementSnapshot(
+  orgId: string,
+  filters: VulnerabilityManagementFilters = {},
+): Promise<VulnerabilityManagementSnapshot> {
+  await requireOrgAdminAccess(orgId)
+  if (!await managementLimiter.check(orgId)) {
+    throw new Error('Too many vulnerability management requests. Please wait before trying again.')
+  }
+
+  const parsed = managementFiltersSchema.parse(filters)
+  const conditions = vulnerabilityCatalogWhere(parsed)
+  const where = sql.join(conditions, sql` AND `)
+
+  const [summaryRowsRaw, sourceRowsRaw, cveRowsRaw] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        cast(count(*) as int) AS "totalCves",
+        cast(count(*) FILTER (WHERE severity = 'critical') as int) AS "criticalCount",
+        cast(count(*) FILTER (WHERE severity = 'high') as int) AS "highCount",
+        cast(count(*) FILTER (WHERE known_exploited = true) as int) AS "knownExploitedCount",
+        cast(count(*) FILTER (WHERE rejected = true) as int) AS "rejectedCount",
+        cast((SELECT count(*) FROM vulnerability_affected_packages) as int) AS "affectedPackageRules",
+        cast((SELECT count(*) FROM host_vulnerability_findings WHERE organisation_id = ${orgId} AND status = 'open') as int) AS "openFindings"
+      FROM vulnerability_cves
+    `),
+    db.execute(sql`
+      SELECT
+        id,
+        status,
+        last_modified AS "lastModified",
+        last_attempt_at AS "lastAttemptAt",
+        last_success_at AS "lastSuccessAt",
+        last_error AS "lastError",
+        records_upserted AS "recordsUpserted",
+        (etag IS NOT NULL OR last_modified IS NOT NULL) AS "hasCacheValidator"
+      FROM vulnerability_sources
+      ORDER BY id ASC
+    `),
+    db.execute(sql`
+      SELECT
+        vc.cve_id AS "cveId",
+        vc.title,
+        vc.description,
+        vc.severity,
+        vc.cvss_score AS "cvssScore",
+        vc.published_at AS "publishedAt",
+        vc.modified_at AS "modifiedAt",
+        vc.known_exploited AS "knownExploited",
+        vc.rejected,
+        vc.source,
+        cast(count(DISTINCT vap.id) as int) AS "affectedPackageCount",
+        cast(count(DISTINCT hvf.id) FILTER (WHERE hvf.status = 'open') as int) AS "openFindingCount"
+      FROM vulnerability_cves vc
+      LEFT JOIN vulnerability_affected_packages vap ON vap.cve_id = vc.cve_id
+      LEFT JOIN host_vulnerability_findings hvf
+        ON hvf.cve_id = vc.cve_id
+       AND hvf.organisation_id = ${orgId}
+      WHERE ${where}
+      GROUP BY
+        vc.cve_id,
+        vc.title,
+        vc.description,
+        vc.severity,
+        vc.cvss_score,
+        vc.published_at,
+        vc.modified_at,
+        vc.known_exploited,
+        vc.rejected,
+        vc.source,
+        vc.updated_at
+      ORDER BY COALESCE(vc.modified_at, vc.published_at, vc.updated_at) DESC, vc.cve_id ASC
+      LIMIT 200
+    `),
+  ])
+
+  const summaryRows = summaryRowsRaw as unknown as Array<VulnerabilityManagementSnapshot['summary']>
+  const sourceRows = sourceRowsRaw as unknown as VulnerabilitySourceStatus[]
+  const cveRows = cveRowsRaw as unknown as VulnerabilityCatalogRow[]
+
+  const summary = summaryRows[0] ?? {
+    totalCves: 0,
+    criticalCount: 0,
+    highCount: 0,
+    knownExploitedCount: 0,
+    rejectedCount: 0,
+    affectedPackageRules: 0,
+    openFindings: 0,
+  }
+
+  return {
+    generatedAt: new Date(),
+    summary,
+    sourceSummary: {
+      total: sourceRows.length,
+      connected: sourceRows.filter((row) => row.status === 'success').length,
+      pending: sourceRows.filter((row) => row.status === 'pending').length,
+      error: sourceRows.filter((row) => row.status === 'error').length,
+    },
+    sources: sourceRows.map((row) => ({
+      ...row,
+      lastError: sanitizeSourceError(row.lastError),
+    })),
+    cves: cveRows,
+  }
+}
 
 export async function getVulnerabilityReport(
   orgId: string,
@@ -253,7 +420,46 @@ function vulnerabilityWhere(orgId: string, filters: z.infer<typeof filtersSchema
   return conditions
 }
 
+function vulnerabilityCatalogWhere(filters: z.infer<typeof managementFiltersSchema>) {
+  const conditions = [sql`true`]
+  if (filters.query) {
+    const value = `%${escapeLike(filters.query)}%`
+    conditions.push(sql`(vc.cve_id ILIKE ${value} OR vc.title ILIKE ${value} OR vc.description ILIKE ${value})`)
+  }
+  if (filters.severity && filters.severity !== 'all') {
+    conditions.push(sql`vc.severity = ${filters.severity}`)
+  }
+  if (filters.source) {
+    conditions.push(sql`vc.source = ${filters.source}`)
+  }
+  if (filters.kevOnly) {
+    conditions.push(sql`vc.known_exploited = true`)
+  }
+  return conditions
+}
+
 function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`)
 }
 
+function sanitizeSourceError(value: string | null) {
+  if (!value) return null
+  const httpStatus = value.match(/\bHTTP\s+(\d{3})\b/i)
+  if (httpStatus) return `Upstream returned HTTP ${httpStatus[1]}`
+
+  const lower = value.toLowerCase()
+  if (lower.includes('timeout') || lower.includes('deadline exceeded')) return 'Request timed out'
+  if (
+    lower.includes('no such host') ||
+    lower.includes('connection refused') ||
+    lower.includes('connection reset') ||
+    lower.includes('dial tcp') ||
+    lower.includes('tls')
+  ) {
+    return 'Connection failed'
+  }
+  if (lower.includes('parse') || lower.includes('invalid') || lower.includes('unexpected end')) {
+    return 'Response parsing failed'
+  }
+  return 'Sync failed'
+}

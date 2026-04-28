@@ -110,6 +110,7 @@ const adminNav: NavItem[] = [
   { title: 'Agents', href: '/settings/agents', icon: Server },
   { title: 'Monitoring', href: '/settings/monitoring', icon: BellPlus },
   { title: 'Integrations', href: '/settings/integrations', icon: Key },
+  { title: 'Vulnerabilities', href: '/settings/vulnerabilities', icon: ShieldAlert },
   { title: 'Security', href: '/settings/security', icon: Lock },
   { title: 'System', href: '/settings/system', icon: HeartPulse },
 ]

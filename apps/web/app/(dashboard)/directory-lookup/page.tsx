@@ -20,12 +20,12 @@ export default async function DirectoryLookupPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Directory User Lookup</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="directory-lookup-heading">Directory User Lookup</h1>
           <p className="text-muted-foreground mt-1">
             Search for a user in your connected LDAP or Active Directory.
           </p>
         </div>
-        <Card>
+        <Card data-testid="directory-lookup-empty-state">
           <CardContent className="py-16 text-center">
             <FolderSearch className="size-12 mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-foreground font-medium">No directory configured</p>
@@ -33,7 +33,7 @@ export default async function DirectoryLookupPage() {
               Add an LDAP or Active Directory configuration to enable directory lookups.
             </p>
             <Button asChild size="sm">
-              <Link href="/settings/integrations">Configure LDAP</Link>
+              <Link href="/settings/integrations" data-testid="directory-lookup-configure-link">Configure LDAP</Link>
             </Button>
           </CardContent>
         </Card>

@@ -298,7 +298,7 @@ export function ScheduleForm({
                 <div>
                   <Label>Interpreter</Label>
                   <Select value={interpreter} onValueChange={(v) => setInterpreter(v as 'sh' | 'bash' | 'python3')}>
-                    <SelectTrigger>
+                    <SelectTrigger data-testid="task-schedule-script-interpreter">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -312,6 +312,7 @@ export function ScheduleForm({
                   <Label htmlFor="script">Script</Label>
                   <Textarea
                     id="script"
+                    data-testid="task-schedule-script-body"
                     value={script}
                     onChange={(e) => setScript(e.target.value)}
                     rows={8}
@@ -323,6 +324,7 @@ export function ScheduleForm({
                   <Label htmlFor="timeout">Timeout in seconds (optional)</Label>
                   <Input
                     id="timeout"
+                    data-testid="task-schedule-script-timeout"
                     type="number"
                     min={1}
                     value={timeoutSeconds}

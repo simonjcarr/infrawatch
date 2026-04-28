@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.76.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.76.0...web/v0.76.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** send auth emails via SMTP relay ([#706](https://github.com/carrtech-dev/ct-ops/issues/706)) ([c8b071f](https://github.com/carrtech-dev/ct-ops/commit/c8b071f7a9ff54273ce6a93e045fc471eb5b4f14))
+
 ## [0.76.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.4...web/v0.76.0) (2026-04-28)
 
 

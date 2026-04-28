@@ -348,7 +348,10 @@ export function NotificationsClient({
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+          <h1
+            className="text-2xl font-semibold text-foreground flex items-center gap-2"
+            data-testid="notifications-heading"
+          >
             <Bell className="size-6" />
             Notifications
           </h1>
@@ -376,6 +379,7 @@ export function NotificationsClient({
       {/* Filter tabs */}
       <div className="flex items-center gap-1 border-b">
         <button
+          data-testid="notifications-tab-all"
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             filter === 'all'
               ? 'border-primary text-foreground'
@@ -386,6 +390,7 @@ export function NotificationsClient({
           All
         </button>
         <button
+          data-testid="notifications-tab-unread"
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
             filter === 'unread'
               ? 'border-primary text-foreground'
@@ -416,6 +421,7 @@ export function NotificationsClient({
           {/* Select all + bulk action toolbar */}
           <div className="flex items-center gap-3 px-1 py-1.5">
             <Checkbox
+              data-testid="notifications-select-all"
               checked={allSelected ? true : someSelected ? 'indeterminate' : false}
               onCheckedChange={(checked) => {
                 if (checked) {
@@ -434,6 +440,7 @@ export function NotificationsClient({
               <>
                 <div className="h-4 w-px bg-border" />
                 <Button
+                  data-testid="notifications-bulk-mark-read"
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs"
@@ -444,6 +451,7 @@ export function NotificationsClient({
                   Mark as read
                 </Button>
                 <Button
+                  data-testid="notifications-bulk-mark-unread"
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs"
@@ -453,6 +461,7 @@ export function NotificationsClient({
                   Mark as unread
                 </Button>
                 <Button
+                  data-testid="notifications-bulk-delete"
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
@@ -478,6 +487,7 @@ export function NotificationsClient({
           {displayed.map((n) => (
             <Card
               key={n.id}
+              data-testid={`notification-card-${n.id}`}
               className={`transition-colors ${!n.read ? 'border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/20' : ''} ${
                 selectedIds.has(n.id) ? 'ring-1 ring-primary' : ''
               }`}

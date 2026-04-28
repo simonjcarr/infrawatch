@@ -200,7 +200,7 @@ async function findOnlineHostCollision(
   ips: string[],
 ): Promise<{ id: string; hostname: string } | null> {
   const ipOverlap = ips.length > 0
-    ? sql`ip_addresses ?| ${ips}::text[]`
+    ? sql`${hosts.ipAddresses} ?| ARRAY[${sql.join(ips.map((ip) => sql`${ip}`), sql`, `)}]::text[]`
     : sql`false`
   const rows = await db
     .select({ id: hosts.id, hostname: hosts.hostname })

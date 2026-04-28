@@ -501,7 +501,7 @@ export function HostsClient({
       </div>
 
       {isAdmin && pendingAgents.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-200 bg-amber-50" data-testid="pending-agent-approvals">
           <CardHeader className="pb-3">
             <CardTitle className="text-base text-amber-900 flex items-center gap-2">
               <Clock className="size-4" />
@@ -524,7 +524,7 @@ export function HostsClient({
               </TableHeader>
               <TableBody>
                 {pendingAgents.map((agent) => (
-                  <TableRow key={agent.id}>
+                  <TableRow key={agent.id} data-testid={`pending-agent-row-${agent.id}`}>
                     <TableCell className="font-medium text-amber-900">{agent.hostname}</TableCell>
                     <TableCell className="text-amber-800">
                       {agent.os ?? '—'} {agent.arch ? `(${agent.arch})` : ''}
@@ -542,6 +542,7 @@ export function HostsClient({
                           className="bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => approveMutation.mutate({ agentId: agent.id })}
                           disabled={approveMutation.isPending}
+                          data-testid={`pending-agent-approve-${agent.id}`}
                         >
                           Approve
                         </Button>
@@ -551,6 +552,7 @@ export function HostsClient({
                           className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
                           onClick={() => rejectMutation.mutate({ agentId: agent.id })}
                           disabled={rejectMutation.isPending}
+                          data-testid={`pending-agent-reject-${agent.id}`}
                         >
                           Reject
                         </Button>

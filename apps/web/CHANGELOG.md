@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.79.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.78.0...web/v0.79.0) (2026-04-28)
+
+
+### Features
+
+* **web:** add admin ingest status ([#721](https://github.com/carrtech-dev/ct-ops/issues/721)) ([135eaff](https://github.com/carrtech-dev/ct-ops/commit/135eaffff8d85bd7fdab1cec7c007b8e6d2c73db))
+
 ## [0.78.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.77.1...web/v0.78.0) (2026-04-28)
 
 

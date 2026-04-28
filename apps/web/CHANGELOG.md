@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.80.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.79.0...web/v0.80.0) (2026-04-28)
+
+
+### Features
+
+* **web:** add NVD API key administration ([#723](https://github.com/carrtech-dev/ct-ops/issues/723)) ([612c346](https://github.com/carrtech-dev/ct-ops/commit/612c346e333902389f1369cea0cffe06e8547560))
+
+
+### Bug Fixes
+
+* **web:** allow certificate checks on private hosts ([#724](https://github.com/carrtech-dev/ct-ops/issues/724)) ([be685be](https://github.com/carrtech-dev/ct-ops/commit/be685befbf5c7d01d28d812e54425a6139239fa2))
+
 ## [0.79.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.78.0...web/v0.79.0) (2026-04-28)
 
 

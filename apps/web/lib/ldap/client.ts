@@ -1,6 +1,7 @@
 import { Client } from 'ldapts'
 import { decrypt } from '@/lib/crypto/encrypt'
 import type { LdapConfiguration } from '@/lib/db/schema'
+import { getTlsOptions } from './tls-options'
 
 export interface LdapUser {
   dn: string
@@ -27,13 +28,6 @@ export function escapeLdapFilterValue(value: string): string {
 
 function safeDecrypt(value: string): string {
   try { return decrypt(value) } catch { return value }
-}
-
-function getTlsOptions(config: LdapConfiguration): Record<string, unknown> | undefined {
-  if (!config.useTls && !config.useStartTls) return undefined
-  return config.tlsCertificate
-    ? { ca: [safeDecrypt(config.tlsCertificate)], rejectUnauthorized: true }
-    : { rejectUnauthorized: false }
 }
 
 function getBindDn(config: LdapConfiguration): string {

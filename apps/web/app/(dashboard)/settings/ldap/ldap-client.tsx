@@ -111,7 +111,7 @@ function CertificateUpload({
         Upload Certificate (.pem, .crt)
       </Button>
       <p className="text-xs text-muted-foreground">
-        Upload a CA certificate to verify the LDAP server identity. Without a certificate, TLS connections will skip server verification.
+        Upload a CA certificate when the LDAP server uses a private CA. Otherwise TLS connections use the platform trust store to verify the server identity.
       </p>
     </div>
   )

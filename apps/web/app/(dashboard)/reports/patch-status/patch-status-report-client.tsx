@@ -39,7 +39,7 @@ export function PatchStatusReportClient({ report }: Props) {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Patch Status</h1>
+          <h1 className="text-2xl font-semibold text-foreground" data-testid="patch-status-report-heading">Patch Status</h1>
           <p className="text-sm text-muted-foreground">
             Estate and network patch compliance generated {formatDistanceToNow(new Date(report.generatedAt), { addSuffix: true })}.
           </p>
@@ -47,31 +47,31 @@ export function PatchStatusReportClient({ report }: Props) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <Card>
+        <Card data-testid="patch-status-summary-compliance">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Compliance</p>
             <p className="text-4xl font-bold tabular-nums">{compliantPercent}%</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="patch-status-summary-hosts">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Hosts</p>
             <p className="text-4xl font-bold tabular-nums">{report.summary.totalHosts}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="patch-status-summary-outside-policy">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Outside Policy</p>
             <p className="text-4xl font-bold tabular-nums text-red-600">{report.summary.failingCount}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="patch-status-summary-oldest-age">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Oldest Patch Age</p>
             <p className="text-4xl font-bold tabular-nums">{age(report.summary.oldestPatchAgeDays)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="patch-status-summary-updates">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Available Updates</p>
             <p className="text-4xl font-bold tabular-nums">{report.summary.totalAvailableUpdates}</p>
@@ -79,7 +79,7 @@ export function PatchStatusReportClient({ report }: Props) {
         </Card>
       </div>
 
-      <Card>
+      <Card data-testid="patch-status-networks-card">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Network className="size-4 text-muted-foreground" />
@@ -102,7 +102,7 @@ export function PatchStatusReportClient({ report }: Props) {
               </TableHeader>
               <TableBody>
                 {report.networks.map((network) => (
-                  <TableRow key={network.networkId}>
+                  <TableRow key={network.networkId} data-testid={`patch-status-network-row-${network.networkId}`}>
                     <TableCell>
                       <Link href={`/hosts/networks/${network.networkId}`} className="font-medium hover:underline">
                         {network.networkName}
@@ -120,7 +120,7 @@ export function PatchStatusReportClient({ report }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-testid="patch-status-hosts-card">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <ShieldAlert className="size-4 text-muted-foreground" />
@@ -145,7 +145,7 @@ export function PatchStatusReportClient({ report }: Props) {
               </TableHeader>
               <TableBody>
                 {report.hosts.map((host) => (
-                  <TableRow key={host.hostId}>
+                  <TableRow key={host.hostId} data-testid={`patch-status-host-row-${host.hostId}`}>
                     <TableCell>
                       <Link href={`/hosts/${host.hostId}`} className="font-medium hover:underline">
                         {host.displayName ?? host.hostname}

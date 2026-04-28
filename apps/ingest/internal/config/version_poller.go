@@ -8,7 +8,7 @@ import (
 )
 
 // VersionPoller holds the current latest agent version and refreshes it from
-// the release-please manifest on a fixed interval. This allows the ingest
+// published release metadata on a fixed interval. This allows the ingest
 // service to pick up new agent releases without restarting.
 type VersionPoller struct {
 	current  atomic.Value // stores string
@@ -29,10 +29,11 @@ func (p *VersionPoller) Get() string {
 	return v
 }
 
-// Start runs a background goroutine that refreshes the version from the
-// manifest on the configured interval. It exits when ctx is cancelled.
+// Start runs a background goroutine that refreshes the version from published
+// release metadata on the configured interval. It exits when ctx is cancelled.
 func (p *VersionPoller) Start(ctx context.Context) {
 	go func() {
+		p.refresh(ctx)
 		ticker := time.NewTicker(p.interval)
 		defer ticker.Stop()
 		for {
@@ -40,14 +41,18 @@ func (p *VersionPoller) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if v := loadAgentVersionFromManifest(); v != "" {
-					prev := p.Get()
-					if v != prev {
-						p.current.Store(v)
-						slog.Info("agent latest version updated", "previous", prev, "current", v)
-					}
-				}
+				p.refresh(ctx)
 			}
 		}
 	}()
+}
+
+func (p *VersionPoller) refresh(ctx context.Context) {
+	if v := discoverLatestAgentVersion(ctx); v != "" {
+		prev := p.Get()
+		if v != prev && shouldStoreCandidateVersion(prev, v) {
+			p.current.Store(v)
+			slog.Info("agent latest version updated", "previous", prev, "current", v)
+		}
+	}
 }

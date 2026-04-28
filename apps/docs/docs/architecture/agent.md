@@ -228,9 +228,7 @@ The host record remains in CT-Ops's database (soft-deleted on revocation). You c
 The agent polls the ingest service for the minimum required version. If the running version is below the minimum:
 
 1. Ingest advertises the newer version on heartbeat responses
-2. The current agent logs that a manual upgrade is required
-3. Operators install the newer binary via the download/install bundle flow
-
-Automatic self-update is currently disabled until signed release verification is implemented.
+2. The agent downloads the replacement binary from the CT-Ops web download endpoint
+3. The agent atomically replaces its current executable and re-execs itself
 
 All updates are served from your CT-Ops server — no internet access required.

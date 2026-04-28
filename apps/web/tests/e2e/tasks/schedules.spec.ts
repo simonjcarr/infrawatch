@@ -203,3 +203,144 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
       config: { mode: 'all' },
     })
 })
+
+test('admin can create a security-only patch schedule for a host group', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      last_seen_at
+    )
+    VALUES
+      (
+        'schedule-group-host-1',
+        ${orgId},
+        'schedule-group-host-1',
+        'Schedule Group Host 1',
+        'Ubuntu 24.04',
+        'x86_64',
+        '["10.50.0.10"]'::jsonb,
+        'online',
+        NOW()
+      ),
+      (
+        'schedule-group-host-2',
+        ${orgId},
+        'schedule-group-host-2',
+        'Schedule Group Host 2',
+        'Ubuntu 24.04',
+        'arm64',
+        '["10.50.0.11"]'::jsonb,
+        'online',
+        NOW()
+      )
+  `
+
+  await sql`
+    INSERT INTO host_groups (
+      id,
+      organisation_id,
+      name,
+      description
+    )
+    VALUES (
+      'schedule-host-group-1',
+      ${orgId},
+      'Production Linux',
+      'Production patch window group'
+    )
+  `
+
+  await sql`
+    INSERT INTO host_group_members (
+      id,
+      organisation_id,
+      group_id,
+      host_id
+    )
+    VALUES
+      (
+        'schedule-group-member-1',
+        ${orgId},
+        'schedule-host-group-1',
+        'schedule-group-host-1'
+      ),
+      (
+        'schedule-group-member-2',
+        ${orgId},
+        'schedule-host-group-1',
+        'schedule-group-host-2'
+      )
+  `
+
+  await page.goto('/tasks/schedules/new')
+
+  await expect(page.getByTestId('task-schedule-heading-create')).toBeVisible()
+  await page.getByLabel('Name').fill('Weekly security patch wave')
+  await page.getByLabel('Description (optional)').fill('Apply security-only updates to the production group.')
+
+  await page.getByTestId('task-schedule-task-type').click()
+  await page.getByRole('option', { name: 'Patch' }).click()
+  await page.getByTestId('task-schedule-patch-mode').click()
+  await page.getByRole('option', { name: 'Security updates only' }).click()
+
+  await page.getByTestId('task-schedule-target-type').click()
+  await page.getByRole('option', { name: 'Host group' }).click()
+  await page.getByTestId('task-schedule-target-id').click()
+  await page.getByRole('option', { name: 'Production Linux' }).click()
+  await page.getByLabel('Max parallel hosts').fill('2')
+
+  await page.getByLabel('Cron expression (5 fields: minute hour dom month dow)').fill('0 1 * * 1')
+  await page.getByTestId('task-schedule-timezone').click()
+  await page.getByRole('option', { name: 'UTC' }).click()
+
+  await expect(page.getByTestId('task-schedule-preview-list')).toBeVisible()
+
+  await page.getByTestId('task-schedule-submit-create').click()
+
+  await expect(page).toHaveURL(/\/tasks$/)
+  const scheduleRow = page.getByRole('row', { name: /Weekly security patch wave/i })
+  await expect(scheduleRow).toContainText('Patch')
+  await expect(scheduleRow).toContainText('Production Linux')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        name: string
+        cron_expression: string
+        timezone: string
+        target_type: string
+        target_id: string
+        max_parallel: number
+        task_type: string
+        config: { mode?: string }
+      }>>`
+        SELECT name, cron_expression, timezone, target_type, target_id, max_parallel, task_type, config
+        FROM task_schedules
+        WHERE organisation_id = ${orgId}
+          AND name = 'Weekly security patch wave'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      name: 'Weekly security patch wave',
+      cron_expression: '0 1 * * 1',
+      timezone: 'UTC',
+      target_type: 'group',
+      target_id: 'schedule-host-group-1',
+      max_parallel: 2,
+      task_type: 'patch',
+      config: { mode: 'security' },
+    })
+})

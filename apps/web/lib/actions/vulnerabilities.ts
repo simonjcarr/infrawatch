@@ -1,8 +1,10 @@
 'use server'
 
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { systemConfig } from '@/lib/db/schema'
+import { encrypt } from '@/lib/crypto/encrypt'
 import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 import { requireFeature } from '@/lib/actions/licence-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
@@ -59,6 +61,11 @@ export interface VulnerabilityManagementFilters {
   kevOnly?: boolean
 }
 
+export interface NvdApiKeySettings {
+  hasKey: boolean
+  updatedAt: Date | null
+}
+
 export interface VulnerabilityCatalogRow {
   cveId: string
   title: string | null
@@ -74,9 +81,11 @@ export interface VulnerabilityCatalogRow {
   openFindingCount: number
 }
 
-export interface VulnerabilitySourceStatus extends VulnerabilitySyncSource {
+export interface VulnerabilitySourceStatus extends Omit<VulnerabilitySyncSource, 'status'> {
+  status: VulnerabilitySyncSource['status'] | 'not_attempted'
   lastModified: string | null
   hasCacheValidator: boolean
+  apiUrl: string
 }
 
 export interface VulnerabilityManagementSnapshot {
@@ -95,6 +104,13 @@ export interface VulnerabilityManagementSnapshot {
     connected: number
     pending: number
     error: number
+    notAttempted: number
+  }
+  syncPolicy: {
+    enabledByDefault: boolean
+    interval: string
+    syncOnStartup: boolean
+    requestTimeout: string
   }
   sources: VulnerabilitySourceStatus[]
   cves: VulnerabilityCatalogRow[]
@@ -126,6 +142,14 @@ const managementLimiter = createRateLimiter({
   max: 30,
 })
 
+const nvdApiKeyUpdateLimiter = createRateLimiter({
+  scope: 'vulnerabilities:nvd-api-key-update',
+  windowMs: 60_000,
+  max: 5,
+})
+
+const NVD_API_KEY_CONFIG_KEY = 'vulnerability_nvd_api_key'
+
 const filtersSchema = z.object({
   cve: z.string().trim().max(32).optional(),
   packageName: z.string().trim().max(120).optional(),
@@ -143,6 +167,60 @@ const managementFiltersSchema = z.object({
   source: z.string().trim().max(80).optional(),
   kevOnly: z.boolean().optional(),
 }).strip()
+
+const nvdApiKeySchema = z.string()
+  .trim()
+  .min(8, 'NVD API key must be at least 8 characters')
+  .max(256, 'NVD API key must be at most 256 characters')
+  .refine((value) => !/\s/.test(value), 'NVD API key must not contain whitespace')
+
+type ExpectedVulnerabilitySource = {
+  id: string
+  label: string
+  apiUrl: string
+}
+
+const ALPINE_RELEASES = ['v3.18', 'v3.19', 'v3.20', 'v3.21', 'v3.22', 'v3.23']
+
+const EXPECTED_VULNERABILITY_SOURCES: ExpectedVulnerabilitySource[] = [
+  {
+    id: 'nvd',
+    label: 'NVD CVE API',
+    apiUrl: 'https://services.nvd.nist.gov/rest/json/cves/2.0',
+  },
+  {
+    id: 'cisa-kev',
+    label: 'CISA KEV Catalog',
+    apiUrl: 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',
+  },
+  {
+    id: 'debian-tracker',
+    label: 'Debian Security Tracker',
+    apiUrl: 'https://security-tracker.debian.org/tracker/data/json',
+  },
+  {
+    id: 'ubuntu-osv',
+    label: 'Ubuntu OSV Feed',
+    apiUrl: 'https://security-metadata.canonical.com/osv/osv-all.tar.xz',
+  },
+  ...ALPINE_RELEASES.flatMap((release) => ([
+    {
+      id: `alpine-secdb-${release}-main`,
+      label: `Alpine SecDB ${release} main`,
+      apiUrl: `https://secdb.alpinelinux.org/${release}/main.json`,
+    },
+    {
+      id: `alpine-secdb-${release}-community`,
+      label: `Alpine SecDB ${release} community`,
+      apiUrl: `https://secdb.alpinelinux.org/${release}/community.json`,
+    },
+  ])),
+  {
+    id: 'redhat-security-data',
+    label: 'Red Hat Security Data',
+    apiUrl: 'https://access.redhat.com/hydra/rest/securitydata/cve.json',
+  },
+]
 
 export async function getVulnerabilityManagementSnapshot(
   orgId: string,
@@ -178,6 +256,7 @@ export async function getVulnerabilityManagementSnapshot(
         last_success_at AS "lastSuccessAt",
         last_error AS "lastError",
         records_upserted AS "recordsUpserted",
+        COALESCE(metadata->>'url', '') AS "apiUrl",
         (etag IS NOT NULL OR last_modified IS NOT NULL) AS "hasCacheValidator"
       FROM vulnerability_sources
       ORDER BY id ASC
@@ -220,7 +299,7 @@ export async function getVulnerabilityManagementSnapshot(
   ])
 
   const summaryRows = summaryRowsRaw as unknown as Array<VulnerabilityManagementSnapshot['summary']>
-  const sourceRows = sourceRowsRaw as unknown as VulnerabilitySourceStatus[]
+  const sourceRows = sourceRowsRaw as unknown as Array<VulnerabilitySourceStatus & { apiUrl: string | null }>
   const cveRows = cveRowsRaw as unknown as VulnerabilityCatalogRow[]
 
   const summary = summaryRows[0] ?? {
@@ -233,20 +312,98 @@ export async function getVulnerabilityManagementSnapshot(
     openFindings: 0,
   }
 
+  const sources = mergeVulnerabilitySources(sourceRows)
+
   return {
     generatedAt: new Date(),
     summary,
     sourceSummary: {
-      total: sourceRows.length,
-      connected: sourceRows.filter((row) => row.status === 'success').length,
-      pending: sourceRows.filter((row) => row.status === 'pending').length,
-      error: sourceRows.filter((row) => row.status === 'error').length,
+      total: sources.length,
+      connected: sources.filter((row) => row.status === 'success').length,
+      pending: sources.filter((row) => row.status === 'pending').length,
+      error: sources.filter((row) => row.status === 'error').length,
+      notAttempted: sources.filter((row) => row.status === 'not_attempted').length,
     },
-    sources: sourceRows.map((row) => ({
-      ...row,
-      lastError: sanitizeSourceError(row.lastError),
-    })),
+    syncPolicy: {
+      enabledByDefault: true,
+      interval: '6h',
+      syncOnStartup: true,
+      requestTimeout: '45s',
+    },
+    sources,
     cves: cveRows,
+  }
+}
+
+export async function getNvdApiKeySettings(orgId: string): Promise<NvdApiKeySettings> {
+  await requireOrgAdminAccess(orgId)
+
+  const row = await db.query.systemConfig.findFirst({
+    where: eq(systemConfig.key, NVD_API_KEY_CONFIG_KEY),
+    columns: { updatedAt: true },
+  })
+
+  return {
+    hasKey: Boolean(row),
+    updatedAt: row?.updatedAt ?? null,
+  }
+}
+
+export async function saveNvdApiKey(
+  orgId: string,
+  apiKey: unknown,
+): Promise<{ success: true } | { error: string }> {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
+    return { error: 'You do not have permission to update vulnerability settings' }
+  }
+  if (!await nvdApiKeyUpdateLimiter.check(orgId)) {
+    return { error: 'Too many NVD API key updates. Please wait before trying again.' }
+  }
+
+  const parsed = nvdApiKeySchema.safeParse(apiKey)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid NVD API key' }
+  }
+
+  try {
+    const encryptedApiKey = encrypt(parsed.data)
+    await db
+      .insert(systemConfig)
+      .values({
+        key: NVD_API_KEY_CONFIG_KEY,
+        value: encryptedApiKey,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: systemConfig.key,
+        set: {
+          value: encryptedApiKey,
+          updatedAt: new Date(),
+        },
+      })
+    return { success: true }
+  } catch {
+    return { error: 'Failed to save NVD API key' }
+  }
+}
+
+export async function clearNvdApiKey(orgId: string): Promise<{ success: true } | { error: string }> {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
+    return { error: 'You do not have permission to update vulnerability settings' }
+  }
+  if (!await nvdApiKeyUpdateLimiter.check(orgId)) {
+    return { error: 'Too many NVD API key updates. Please wait before trying again.' }
+  }
+
+  try {
+    await db.delete(systemConfig).where(eq(systemConfig.key, NVD_API_KEY_CONFIG_KEY))
+    return { success: true }
+  } catch {
+    return { error: 'Failed to clear NVD API key' }
   }
 }
 
@@ -462,4 +619,40 @@ function sanitizeSourceError(value: string | null) {
     return 'Response parsing failed'
   }
   return 'Sync failed'
+}
+
+function mergeVulnerabilitySources(rows: Array<VulnerabilitySourceStatus & { apiUrl: string | null }>): VulnerabilitySourceStatus[] {
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  const merged = EXPECTED_VULNERABILITY_SOURCES.map((source) => {
+    const row = byId.get(source.id)
+    byId.delete(source.id)
+    return normalizeVulnerabilitySource(source, row)
+  })
+
+  for (const row of byId.values()) {
+    merged.push(normalizeVulnerabilitySource({
+      id: row.id,
+      label: row.id,
+      apiUrl: row.apiUrl || 'Configured upstream URL',
+    }, row))
+  }
+
+  return merged
+}
+
+function normalizeVulnerabilitySource(
+  source: ExpectedVulnerabilitySource,
+  row?: VulnerabilitySourceStatus & { apiUrl: string | null },
+): VulnerabilitySourceStatus {
+  return {
+    id: source.id,
+    status: row?.status ?? 'not_attempted',
+    lastAttemptAt: row?.lastAttemptAt ?? null,
+    lastSuccessAt: row?.lastSuccessAt ?? null,
+    lastError: sanitizeSourceError(row?.lastError ?? null),
+    recordsUpserted: row?.recordsUpserted ?? 0,
+    lastModified: row?.lastModified ?? null,
+    hasCacheValidator: row?.hasCacheValidator ?? false,
+    apiUrl: row?.apiUrl || source.apiUrl,
+  }
 }

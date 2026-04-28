@@ -158,13 +158,23 @@ func main() {
 	// Start software inventory sweeper goroutine
 	go handlers.RunSoftwareSweeper(ctx, pool)
 
+	vulnerabilityNVDAPIKey := cfg.Vulnerability.NVDAPIKey
+	if vulnerabilityNVDAPIKey == "" {
+		storedKey, err := vuln.GetStoredNVDAPIKey(ctx, pool)
+		if err != nil {
+			slog.Warn("failed to load stored NVD API key", "err", err)
+		} else if storedKey != "" {
+			vulnerabilityNVDAPIKey = storedKey
+		}
+	}
+
 	// Start vulnerability feed sync and matching goroutine
 	go vuln.RunSyncer(ctx, pool, vuln.SyncConfig{
 		Enabled:        cfg.Vulnerability.Enabled,
 		Interval:       cfg.Vulnerability.Interval,
 		SyncOnStartup:  cfg.Vulnerability.SyncOnStartup,
 		RequestTimeout: cfg.Vulnerability.RequestTimeout,
-		NVDAPIKey:      cfg.Vulnerability.NVDAPIKey,
+		NVDAPIKey:      vulnerabilityNVDAPIKey,
 		NVDDaysBack:    cfg.Vulnerability.NVDDaysBack,
 		CISAURL:        cfg.Vulnerability.CISAURL,
 		DebianURL:      cfg.Vulnerability.DebianURL,

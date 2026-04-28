@@ -6,10 +6,29 @@ import (
 	"encoding/json"
 	"time"
 
+	ctcrypto "github.com/carrtech-dev/ct-ops/ingest/internal/crypto"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const NVDAPIKeyConfigKey = "vulnerability_nvd_api_key"
+
+func GetStoredNVDAPIKey(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+	var encrypted string
+	err := pool.QueryRow(ctx, `SELECT value FROM system_config WHERE key = $1`, NVDAPIKeyConfigKey).Scan(&encrypted)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	plaintext, err := ctcrypto.Decrypt(encrypted)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
+}
 
 func UpsertCVE(ctx context.Context, pool *pgxpool.Pool, record CVERecord) error {
 	const q = `
@@ -132,17 +151,18 @@ func UpsertAffectedPackage(ctx context.Context, pool *pgxpool.Pool, row Affected
 	return id, err
 }
 
-func MarkSourceAttempt(ctx context.Context, pool *pgxpool.Pool, id string) error {
+func MarkSourceAttempt(ctx context.Context, pool *pgxpool.Pool, id, sourceURL string) error {
 	const q = `
-		INSERT INTO vulnerability_sources (id, status, last_attempt_at, created_at, updated_at)
-		VALUES ($1, 'pending', NOW(), NOW(), NOW())
+		INSERT INTO vulnerability_sources (id, status, last_attempt_at, metadata, created_at, updated_at)
+		VALUES ($1, 'pending', NOW(), jsonb_build_object('url', $2::text), NOW(), NOW())
 		ON CONFLICT (id) DO UPDATE SET
 			status = 'pending',
 			last_attempt_at = NOW(),
 			last_error = NULL,
+			metadata = COALESCE(vulnerability_sources.metadata, '{}'::jsonb) || jsonb_build_object('url', $2::text),
 			updated_at = NOW()
 	`
-	_, err := pool.Exec(ctx, q, id)
+	_, err := pool.Exec(ctx, q, id, sourceURL)
 	return err
 }
 
@@ -161,7 +181,7 @@ func MarkSourceSuccess(ctx context.Context, pool *pgxpool.Pool, id, etag, lastMo
 			last_success_at = NOW(),
 			last_error = NULL,
 			records_upserted = $4,
-			metadata = COALESCE($5::jsonb, vulnerability_sources.metadata),
+			metadata = COALESCE(vulnerability_sources.metadata, '{}'::jsonb) || COALESCE($5::jsonb, '{}'::jsonb),
 			updated_at = NOW()
 	`
 	_, err := pool.Exec(ctx, q, id, nullable(etag), nullable(lastModified), records, jsonOrNil(metadata))

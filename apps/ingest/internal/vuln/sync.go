@@ -234,6 +234,10 @@ func syncAlpine(ctx context.Context, pool *pgxpool.Pool, client *http.Client, cf
 
 func syncNVD(ctx context.Context, pool *pgxpool.Pool, client *http.Client, cfg SyncConfig) error {
 	sourceID := "nvd"
+	const sourceURL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+	if err := MarkSourceAttempt(ctx, pool, sourceID, sourceURL); err != nil {
+		return err
+	}
 	state, err := GetSourceState(ctx, pool, sourceID)
 	if err != nil {
 		return err
@@ -247,7 +251,7 @@ func syncNVD(ctx context.Context, pool *pgxpool.Pool, client *http.Client, cfg S
 		start = end.Add(-120 * 24 * time.Hour)
 	}
 
-	base, _ := url.Parse("https://services.nvd.nist.gov/rest/json/cves/2.0")
+	base, _ := url.Parse(sourceURL)
 	values := base.Query()
 	values.Set("lastModStartDate", nvdTime(start))
 	values.Set("lastModEndDate", nvdTime(end))
@@ -350,7 +354,7 @@ type fetchMeta struct {
 }
 
 func fetchSource(ctx context.Context, pool *pgxpool.Pool, client *http.Client, sourceID, sourceURL string) ([]byte, fetchMeta, error) {
-	if err := MarkSourceAttempt(ctx, pool, sourceID); err != nil {
+	if err := MarkSourceAttempt(ctx, pool, sourceID, sourceURL); err != nil {
 		return nil, fetchMeta{}, err
 	}
 	state, err := GetSourceState(ctx, pool, sourceID)

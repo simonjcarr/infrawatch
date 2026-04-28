@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.3.0...ingest/v0.3.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **certificates:** verify tracked refreshes by default ([#652](https://github.com/carrtech-dev/ct-ops/issues/652)) ([5d634bb](https://github.com/carrtech-dev/ct-ops/commit/5d634bb9d917062f35b5cd3b4d63c866f330c6be))
+
 ## [0.3.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.2.1...ingest/v0.3.0) (2026-04-27)
 
 

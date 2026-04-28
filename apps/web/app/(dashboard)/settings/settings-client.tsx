@@ -915,6 +915,7 @@ export function SettingsClient({
                 <Switch
                   checked={currentSmtpRelaySettings.enabled}
                   onCheckedChange={(enabled) => updateSmtpRelaySetting({ enabled })}
+                  data-testid="settings-smtp-enabled-toggle"
                 />
               </div>
               {currentSmtpRelaySettings.enabled && (
@@ -1029,6 +1030,7 @@ export function SettingsClient({
                   size="sm"
                   disabled={!smtpDirty || smtpMutation.isPending}
                   onClick={() => smtpMutation.mutate(currentSmtpRelaySettings)}
+                  data-testid="settings-smtp-save"
                 >
                   {smtpMutation.isPending ? 'Saving…' : 'Save'}
                 </Button>
@@ -1046,7 +1048,7 @@ export function SettingsClient({
                   {smtpTestMutation.isPending ? 'Testing…' : 'Test'}
                 </Button>
                 {smtpSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-smtp-success">
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>

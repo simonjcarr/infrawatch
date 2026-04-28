@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 test('admin can update organisation terminal settings from settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
-  await page.goto('/settings')
+  await page.goto('/settings/security/terminal')
   await expect(page.getByTestId('settings-heading')).toBeVisible()
 
   const terminalEnabledToggle = page.getByTestId('settings-terminal-enabled-toggle')
@@ -71,7 +71,7 @@ test('admin can update organisation terminal settings from settings', async ({ a
 test('admin can update organisation notification settings from settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
-  await page.goto('/settings')
+  await page.goto('/settings/monitoring/notifications')
   await expect(page.getByTestId('settings-heading')).toBeVisible()
 
   const enabledToggle = page.getByTestId('settings-notifications-enabled-toggle')
@@ -142,4 +142,62 @@ test('admin can update organisation notification settings from settings', async 
       inAppRoles: ['super_admin', 'org_admin', 'read_only'],
       allowUserOptOut: false,
     })
+})
+
+test('admin can save SMTP relay settings and sees validation for an invalid test recipient', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+
+  await page.goto('/settings/integrations/smtp')
+  await expect(page.getByTestId('settings-heading')).toBeVisible()
+
+  await page.getByTestId('settings-smtp-enabled-toggle').click()
+  await page.getByLabel('Host').fill('example.com')
+  await page.getByLabel('From address').fill('alerts@example.com')
+  await page.getByLabel('From name').fill('CT-Ops Alerts')
+  await page.getByTestId('settings-smtp-save').click()
+  await expect(page.getByTestId('settings-smtp-success')).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        metadata: {
+          notificationSettings?: {
+            smtpRelay?: {
+              enabled?: boolean
+              host?: string
+              port?: number
+              encryption?: string
+              fromAddress?: string
+              fromName?: string
+            }
+          }
+        } | null
+      }>>`
+        SELECT metadata
+        FROM organisations
+        WHERE slug = 'e2e-test-org'
+        LIMIT 1
+      `
+
+      return rows[0]?.metadata?.notificationSettings?.smtpRelay ?? null
+    })
+    .toEqual({
+      enabled: true,
+      host: 'example.com',
+      port: 587,
+      encryption: 'starttls',
+      fromAddress: 'alerts@example.com',
+      fromName: 'CT-Ops Alerts',
+    })
+
+  await page.getByTestId('smtp-relay-test-open').click()
+  await page.getByTestId('smtp-relay-test-recipient').fill('not-an-email')
+  await page.locator('[role=\"dialog\"] form').evaluate((form) => {
+    form.setAttribute('novalidate', 'novalidate')
+  })
+  await page.getByTestId('smtp-relay-test-submit').click()
+
+  await expect(page.getByTestId('smtp-relay-test-error')).toHaveText('Enter a valid email address')
+  await expect(page.getByTestId('smtp-relay-test-log')).toContainText('error')
+  await expect(page.getByTestId('smtp-relay-test-log')).toContainText('Enter a valid email address')
 })

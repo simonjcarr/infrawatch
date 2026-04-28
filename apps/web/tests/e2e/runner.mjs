@@ -9,6 +9,7 @@
 // with a missing env var. This wrapper inverts the order.
 
 import { spawn } from 'node:child_process'
+import { generateKeyPairSync } from 'node:crypto'
 import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +23,11 @@ const webDir = path.resolve(here, '..', '..')
 const port = Number(process.env.E2E_PORT ?? 3100)
 const appUrl = `http://localhost:${port}`
 const authEmailCaptureFile = path.join(webDir, 'tests', 'e2e', '.tmp', 'auth-emails.ndjson')
+const { privateKey: e2eLicencePrivateKey, publicKey: e2eLicencePublicKey } = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+})
 
 async function main() {
   console.log('[e2e] starting TimescaleDB container (tmpfs)')
@@ -49,6 +55,8 @@ async function main() {
     process.env.E2E_PORT = String(port)
     process.env.AUTH_EMAIL_CAPTURE_FILE = authEmailCaptureFile
     process.env.E2E_DISABLE_AGENT_CACHE_PREWARM = '1'
+    process.env.LICENCE_PUBLIC_KEY = e2eLicencePublicKey
+    process.env.E2E_LICENCE_PRIVATE_KEY = e2eLicencePrivateKey
 
     await mkdir(path.dirname(authEmailCaptureFile), { recursive: true })
     await rm(authEmailCaptureFile, { force: true })

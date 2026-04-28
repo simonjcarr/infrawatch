@@ -1,25 +1,22 @@
 import type { Metadata } from 'next'
-import { getRequiredSession } from '@/lib/auth/session'
-import { listEnrolmentTokens } from '@/lib/actions/agents'
-import { AgentsSettingsClient } from './agents-client'
 import { redirect } from 'next/navigation'
+import { getRequiredSession } from '@/lib/auth/session'
+import { listTagRules } from '@/lib/actions/tag-rules'
 import { AdminTabs } from '@/components/shared/admin-tabs'
+import { TagRulesClient } from '../../tag-rules/tag-rules-client'
 
 export const metadata: Metadata = {
-  title: 'Agent Enrolment',
+  title: 'Agent Tag Rules',
 }
 
-export default async function AgentsSettingsPage() {
+export default async function AgentTagRulesPage() {
   const session = await getRequiredSession()
-
   const isAdmin =
     session.user.role === 'super_admin' || session.user.role === 'org_admin'
   if (!isAdmin) redirect('/dashboard')
 
   const orgId = session.user.organisationId!
-  const tokens = await listEnrolmentTokens(orgId)
-
-  const appUrl = process.env.AGENT_DOWNLOAD_BASE_URL ?? ''
+  const rules = await listTagRules(orgId)
 
   return (
     <div className="space-y-6">
@@ -31,12 +28,7 @@ export default async function AgentsSettingsPage() {
           { title: 'Software inventory', href: '/settings/agents/software' },
         ]}
       />
-      <AgentsSettingsClient
-        orgId={orgId}
-        currentUserId={session.user.id}
-        initialTokens={tokens}
-        appUrl={appUrl}
-      />
+      <TagRulesClient orgId={orgId} initialRules={rules} />
     </div>
   )
 }

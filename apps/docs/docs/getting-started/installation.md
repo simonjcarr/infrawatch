@@ -126,7 +126,7 @@ Open [https://localhost](https://localhost) in a browser. On first visit your br
 
 An enrolment token is what the agent uses to register itself with your organisation.
 
-1. In the sidebar, click **Settings → Agent Enrolment**
+1. In the sidebar, click **Administration → Agents → Enrolment**
 2. Click **New Token**
 3. Give it a label (e.g. `dev-servers`)
 4. Tick **Auto-approve agents** for development — this skips the manual approval step
@@ -208,7 +208,7 @@ docker compose -f docker-compose.single.yml down -v
 | Symptom | Fix |
 |---|---|
 | Agent can't connect to ingest | Check `docker compose ps`, verify port 9443 is reachable, check `ca_cert_file` path |
-| `invalid or expired enrolment token` | Create a new token in Settings → Agent Enrolment |
+| `invalid or expired enrolment token` | Create a new token in Administration → Agents → Enrolment |
 | Agent stays in pending state | Approve it in the Hosts page pending panel |
 | Migrations failed | Ensure the `db` container is healthy before running migrations |
 | `certificate signed by unknown authority` | Set `ca_cert_file` to point to `deploy/dev-tls/server.crt` |

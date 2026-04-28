@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/install.sh
 
 ### Enrol your first agent
 
-Once the stack is running, go to **Settings → Agent Enrolment** in the UI. Copy the one-line install command or download an offline bundle for air-gapped hosts.
+Once the stack is running, go to **Administration → Agents → Enrolment** in the UI. Copy the one-line install command or download an offline bundle for air-gapped hosts.
 
 ---
 

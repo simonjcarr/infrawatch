@@ -1,41 +1,42 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { SettingsClient } from './settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
+import { SettingsClient } from '../../settings-client'
 
 export const metadata: Metadata = {
-  title: 'Organisation Settings',
+  title: 'SMTP Relay Settings',
 }
 
-export default async function SettingsPage() {
+export default async function SmtpRelaySettingsPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
+  if (!isAdmin) redirect('/dashboard')
 
+  const orgId = session.user.organisationId!
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
   })
 
   if (!org) return null
 
-  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
-
   return (
     <div className="space-y-6">
       <AdminTabs
         tabs={[
-          { title: 'Profile', href: '/settings' },
-          { title: 'Licence', href: '/settings/licence' },
+          { title: 'LDAP / Directory', href: '/settings/integrations' },
+          { title: 'SMTP relay', href: '/settings/integrations/smtp' },
         ]}
       />
       <SettingsClient
         org={org}
         isAdmin={isAdmin}
-        sections={['organisation']}
-        title="Organisation"
-        description="Manage your organisation profile."
+        sections={['smtp']}
+        title="SMTP Relay"
+        description="Configure central email delivery for notification channels."
       />
     </div>
   )

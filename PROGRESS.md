@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 67 — Administration information architecture
+
+**Administration layout** (`apps/web/components/shared/sidebar.tsx`, `apps/web/app/(dashboard)/settings/`)
+- Replaced the old Administration sidebar grouping of Team plus nested Settings with high-level areas: People, Organisation, Agents, Monitoring, Integrations, Security, and System.
+- Split the settings UI into focused pages with tabs: Organisation profile/licence, Agents enrolment/defaults/tag rules/software inventory, Monitoring alert defaults/notification policy/metric retention, Integrations LDAP/SMTP, and Security mTLS/terminal access.
+- Kept compatibility redirects for the old Alert Defaults, LDAP, and Tag Rules settings URLs, and updated in-app links plus onboarding/agent docs to point at the new locations.
+
+**Validation**
+- Validation run: `pnpm --filter web type-check` and `pnpm --filter web lint` (lint passed with the repository's existing warnings).
+
 ### Session 66 — SMTP relay test recipient prompt
 
 **SMTP relay testing UX** (`apps/web/app/(dashboard)/settings/settings-client.tsx`, `apps/web/lib/actions/notification-settings.ts`, `apps/web/lib/notifications/smtp-settings.ts`)

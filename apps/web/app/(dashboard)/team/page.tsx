@@ -4,7 +4,7 @@ import { getOrgUsers } from '@/lib/actions/users'
 import { TeamClient } from './team-client'
 
 export const metadata: Metadata = {
-  title: 'Team',
+  title: 'People',
 }
 
 export default async function TeamPage() {

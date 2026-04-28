@@ -1,32 +1,34 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getSecurityOverview } from '@/lib/actions/security'
+import { getLdapConfigurations } from '@/lib/actions/ldap'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
-import { SecuritySettingsClient } from './security-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
+import { LdapSettingsClient } from '../ldap/ldap-client'
 
 export const metadata: Metadata = {
-  title: 'Security — mTLS & Agent CA',
+  title: 'Integration Settings',
 }
 
-export default async function SecuritySettingsPage() {
+export default async function IntegrationsSettingsPage() {
   const session = await getRequiredSession()
+
   if (!ADMIN_ROLES.includes(session.user.role)) {
     redirect('/settings')
   }
 
-  const overview = await getSecurityOverview()
+  const orgId = session.user.organisationId!
+  const configs = await getLdapConfigurations(orgId)
 
   return (
     <div className="space-y-6">
       <AdminTabs
         tabs={[
-          { title: 'Agent CA / mTLS', href: '/settings/security' },
-          { title: 'Terminal access', href: '/settings/security/terminal' },
+          { title: 'LDAP / Directory', href: '/settings/integrations' },
+          { title: 'SMTP relay', href: '/settings/integrations/smtp' },
         ]}
       />
-      <SecuritySettingsClient initialOverview={overview} />
+      <LdapSettingsClient orgId={orgId} initialConfigs={configs} />
     </div>
   )
 }

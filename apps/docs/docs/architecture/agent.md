@@ -216,7 +216,7 @@ When deleting a host from the UI while its agent is **online**, check **"Also un
 
 1. Stop the agent process (or `systemctl stop ct-ops-agent`)
 2. The host transitions to **Offline** in the UI automatically
-3. Optionally revoke the enrolment token in **Settings → Agent Enrolment**
+3. Optionally revoke the enrolment token in **Administration → Agents → Enrolment**
 4. Delete the data directory: `rm -rf /var/lib/ct-ops/agent`
 
 The host record remains in CT-Ops's database (soft-deleted on revocation). You can remove it from the Hosts UI.

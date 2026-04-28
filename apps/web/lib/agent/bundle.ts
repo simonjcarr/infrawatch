@@ -146,7 +146,7 @@ function renderAgentToml(opts: BundleOptions): string {
   const skipVerify = opts.skipVerify ? 'true' : 'false'
   const tokenLine = opts.token
     ? `org_token = "${opts.token}"`
-    : `# Paste the enrolment token from the CT-Ops UI (Settings → Agent Enrolment).
+    : `# Paste the enrolment token from the CT-Ops UI (Administration → Agents → Enrolment).
 # Can also be set via the CT_OPS_ORG_TOKEN environment variable.
 org_token = ""`
 
@@ -299,7 +299,7 @@ ${
 - **Linux / macOS:** \`export CT_OPS_ORG_TOKEN=<token-from-ui>\`
 - **Windows (PowerShell):** \`$env:CT_OPS_ORG_TOKEN = "<token-from-ui>"\`
 
-Create a token in the CT-Ops UI under **Settings → Agent Enrolment**.`
+Create a token in the CT-Ops UI under **Administration → Agents → Enrolment**.`
 
   const installCmd =
     opts.os === 'windows'

@@ -152,7 +152,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
 
   await page.goto('/tasks/schedules/new')
 
-  await expect(page.getByRole('heading', { name: 'New schedule' })).toBeVisible()
+  await expect(page.getByTestId('task-schedule-heading-create')).toBeVisible()
   await page.getByLabel('Name').fill('Nightly patch run')
   await page.getByLabel('Description (optional)').fill('Install all updates every night.')
 
@@ -166,7 +166,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
   await page.getByTestId('task-schedule-timezone').click()
   await page.getByRole('option', { name: 'Europe/London' }).click()
 
-  await expect(page.getByText(/\(in .*?\)/).first()).toBeVisible()
+  await expect(page.getByTestId('task-schedule-preview-list')).toBeVisible()
 
   await page.getByTestId('task-schedule-submit-create').click()
 

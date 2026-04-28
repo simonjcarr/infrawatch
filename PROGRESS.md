@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 64 — Penetration testing scope and rules of engagement
+
+**Security engagement documentation** (`PENTEST.md`)
+- Added a repo-root penetration testing scope document alongside `SECURITY.md` and `SECURITY_DISCLOSURE.md`.
+- Defined the authorised contact paths, in-scope CT-Ops components, allowed testing categories, rules of engagement, and explicit out-of-scope targets/activities for coordinated assessments.
+- This satisfies issue `#365` by giving testers and operators a single source of truth for pentest scope and engagement boundaries.
+
+**Build state**
+- Documentation-only change; tests not run
+
 ### Session 63 — Shared database-backed security throttles
 
 **Distributed auth and abuse controls** (`apps/web/lib/rate-limit.ts`, `apps/web/lib/auth/`, `apps/web/lib/db/schema/security-throttles.ts`)

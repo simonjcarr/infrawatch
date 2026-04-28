@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
@@ -10,10 +10,8 @@ import { organisations } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
 import { encodeActivationToken } from '@/lib/licence-activation-token'
-import { getRequiredSession } from '@/lib/auth/session'
 import { hasLicenceFeature } from '@/lib/actions/licence-guard'
 import { COMMUNITY_MAX_RETENTION_DAYS } from '@/lib/features'
-import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { writeAuditEvent } from '@/lib/audit/events'
 
 const updateOrgNameSchema = z.object({
@@ -24,9 +22,9 @@ export async function updateOrgName(
   orgId: string,
   name: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -56,9 +54,9 @@ export async function updateMetricRetention(
   orgId: string,
   days: number,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -111,9 +109,10 @@ export async function saveLicenceKey(
   orgId: string,
   key: string,
 ): Promise<{ success: true; tier: string } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  let session
+  try {
+    session = await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -163,13 +162,10 @@ export async function saveLicenceKey(
 export async function generateActivationToken(
   orgId: string,
 ): Promise<{ success: true; token: string } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
-  }
-  if (session.user.organisationId !== orgId) {
-    return { error: 'You can only generate activation tokens for your own organisation' }
   }
 
   try {

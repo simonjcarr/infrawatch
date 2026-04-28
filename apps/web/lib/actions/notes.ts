@@ -22,7 +22,7 @@ import {
   or,
 } from 'drizzle-orm'
 import { z } from 'zod'
-import { getRequiredSession } from '@/lib/auth/session'
+import { hasRole } from '@/lib/auth/guards'
 import {
   canReadNote,
   canWriteNote,
@@ -120,16 +120,14 @@ export async function listNotes(
     mineOnly?: boolean
   } = {},
 ): Promise<Note[]> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return []
+  const session = await requireOrgAccess(orgId)
 
   const conditions = [
     eq(notes.organisationId, orgId),
     isNull(notes.deletedAt),
     // Privacy: exclude other users' private notes unless you are the author or
     // super_admin.
-    session.user.role === 'super_admin'
+    hasRole(session.user, 'super_admin')
       ? undefined
       : or(eq(notes.isPrivate, false), eq(notes.authorId, session.user.id)),
   ].filter((c): c is NonNullable<typeof c> => c !== undefined)
@@ -155,14 +153,12 @@ export async function listNotes(
 // truly malformed input — the ILIKE fallback means a user's search box always
 // returns something sensible even if they paste an unbalanced quote.
 export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return []
+  const session = await requireOrgAccess(orgId)
   const trimmed = q.trim()
   if (trimmed.length === 0) return []
 
   const privacyFilter =
-    session.user.role === 'super_admin'
+    hasRole(session.user, 'super_admin')
       ? sql`TRUE`
       : sql`(n.is_private = FALSE OR n.author_id = ${session.user.id})`
 
@@ -200,9 +196,7 @@ export async function getNote(
   orgId: string,
   noteId: string,
 ): Promise<{ note: Note; targets: NoteTarget[] } | null> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return null
+  const session = await requireOrgAccess(orgId)
 
   const note = await db.query.notes.findFirst({
     where: and(
@@ -227,9 +221,7 @@ export async function createNote(
   orgId: string,
   input: z.input<typeof createNoteSchema>,
 ): Promise<{ success: true; note: Note } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
   if (!canCreateNote(session.user)) {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -292,9 +284,7 @@ export async function updateNote(
   noteId: string,
   input: z.input<typeof updateNoteSchema>,
 ): Promise<{ success: true; note: Note } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
 
   const parsed = updateNoteSchema.safeParse(input)
   if (!parsed.success) {
@@ -375,9 +365,7 @@ export async function deleteNote(
   orgId: string,
   noteId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
 
   try {
     const existing = await db.query.notes.findFirst({
@@ -412,9 +400,7 @@ export async function setNoteTargets(
   noteId: string,
   targets: z.input<typeof targetSchema>[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
 
   const parsed = z.array(targetSchema).max(50).safeParse(targets)
   if (!parsed.success) {
@@ -473,9 +459,7 @@ export async function toggleNotePin(
   noteTargetId: string,
   pinned: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
 
   try {
     return await db.transaction(async (tx) => {
@@ -544,9 +528,7 @@ export async function toggleNotePrivate(
   noteId: string,
   isPrivate: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
 
   try {
     const existing = await db.query.notes.findFirst({
@@ -580,9 +562,7 @@ export async function addNoteReaction(
   noteId: string,
   reaction: NoteReactionType,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
   if (!NOTE_REACTIONS.includes(reaction)) return { error: 'Invalid reaction' }
 
   try {
@@ -622,9 +602,7 @@ export async function removeNoteReaction(
   noteId: string,
   reaction: NoteReactionType,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return { error: 'Not found' }
+  const session = await requireOrgAccess(orgId)
 
   try {
     await db
@@ -649,8 +627,6 @@ export async function listNoteReactions(
   noteId: string,
 ): Promise<NoteReaction[]> {
   await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return []
 
   return db.query.noteReactions.findMany({
     where: and(eq(noteReactions.noteId, noteId), eq(noteReactions.organisationId, orgId)),
@@ -663,9 +639,7 @@ export async function listNoteRevisions(
   orgId: string,
   noteId: string,
 ): Promise<NoteRevision[]> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return []
+  const session = await requireOrgAccess(orgId)
 
   const note = await db.query.notes.findFirst({
     where: and(eq(notes.id, noteId), eq(notes.organisationId, orgId)),

@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -23,11 +23,9 @@ import type {
   SavedSoftwareReport,
   SoftwareInventorySettings,
 } from '@/lib/db/schema'
-import { getRequiredSession } from '@/lib/auth/session'
 import { requireFeature } from '@/lib/actions/licence-guard'
 import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
-import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 
@@ -70,9 +68,9 @@ export async function updateSoftwareInventorySettings(
   orgId: string,
   settings: SoftwareInventorySettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -107,9 +105,10 @@ export async function triggerSoftwareScan(
   orgId: string,
   hostId: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  let session
+  try {
+    session = await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
   if (!await triggerScanLimiter.check(orgId)) {
@@ -764,9 +763,8 @@ const saveReportSchema = z.object({
 })
 
 export async function listSavedReports(orgId: string): Promise<SavedSoftwareReport[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
-  const session = await getRequiredSession()
   return db.query.savedSoftwareReports.findMany({
     where: and(
       eq(savedSoftwareReports.organisationId, orgId),
@@ -782,9 +780,8 @@ export async function saveSoftwareReport(
   name: string,
   filters: SoftwareReportFilters,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
-  const session = await getRequiredSession()
   const parsed = saveReportSchema.safeParse({ name, filters })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
@@ -811,9 +808,8 @@ export async function deleteSavedReport(
   orgId: string,
   reportId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   await requireFeature(orgId, 'reportsExport')
-  const session = await getRequiredSession()
   try {
     await db
       .update(savedSoftwareReports)

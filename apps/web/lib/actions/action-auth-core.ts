@@ -1,3 +1,5 @@
+import { requireOrgAdmin, requireSameOrg } from '../auth/guards.ts'
+
 export type OrgScopedUser = {
   organisationId: string | null
   isActive: boolean
@@ -9,19 +11,9 @@ export type OrgAdminScopedUser = OrgScopedUser & {
 }
 
 export function assertOrgAccess(user: OrgScopedUser, orgId: string): void {
-  if (!user.isActive || user.deletedAt) {
-    throw new Error('forbidden: inactive user')
-  }
-
-  if (user.organisationId !== orgId) {
-    throw new Error('forbidden: organisation mismatch')
-  }
+  requireSameOrg(user, orgId)
 }
 
 export function assertOrgAdminAccess(user: OrgAdminScopedUser, orgId: string): void {
-  assertOrgAccess(user, orgId)
-
-  if (user.role !== 'org_admin' && user.role !== 'super_admin') {
-    throw new Error('forbidden: admin role required')
-  }
+  requireOrgAdmin(user, orgId)
 }

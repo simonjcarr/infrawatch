@@ -10,13 +10,12 @@ import { certificateAuthorities } from '@/lib/db/schema/certificate-authorities'
 import { encrypt } from '@/lib/crypto/encrypt'
 import { getRequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { requireRole } from '@/lib/auth/guards'
 import type { SecurityOverview } from './security-types'
 
 async function requireAdmin(): Promise<void> {
   const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
-    throw new Error('forbidden: admin role required')
-  }
+  requireRole(session.user, ADMIN_ROLES)
 }
 
 const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/server.crt'
@@ -141,4 +140,3 @@ export async function uploadAgentCA(
     return { error: err instanceof Error ? err.message : 'An unexpected error occurred' }
   }
 }
-

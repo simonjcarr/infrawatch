@@ -4,7 +4,7 @@ import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
-import { getRequiredSession } from '@/lib/auth/session'
+import { hasRole } from '@/lib/auth/guards'
 import type { Note, NoteCategory } from '@/lib/db/schema'
 
 export type ResolvedNoteSource = 'direct' | 'group' | 'tag_selector'
@@ -39,12 +39,10 @@ export async function resolveNotesForHost(
   hostId: string,
   opts: { includePrivate?: boolean; categories?: NoteCategory[] } = {},
 ): Promise<ResolvedNote[]> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) return []
+  const session = await requireOrgAccess(orgId)
 
   const userId = session.user.id
-  const isSuperAdmin = session.user.role === 'super_admin'
+  const isSuperAdmin = hasRole(session.user, 'super_admin')
   const includePrivateFilter = opts.includePrivate !== false
 
   const categoryFilter =

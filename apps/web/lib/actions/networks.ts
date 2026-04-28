@@ -1,15 +1,16 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { networks, hostNetworkMemberships, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { hasRole } from '@/lib/auth/guards'
 import { getRequiredSession } from '@/lib/auth/session'
 import type { Network, Host } from '@/lib/db/schema'
-import { ADMIN_ROLES, MEMBERSHIP_ROLES } from '@/lib/auth/roles'
+import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
 
 export type NetworkWithCount = Network & { hostCount: number }
 export type NetworkWithMembership = Network & { autoAssigned: boolean }
@@ -66,9 +67,9 @@ export async function createNetwork(
   orgId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true; network: Network } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -101,9 +102,9 @@ export async function updateNetwork(
   networkId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -136,9 +137,9 @@ export async function deleteNetwork(
   orgId: string,
   networkId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -179,7 +180,7 @@ export async function addHostToNetwork(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   const session = await getRequiredSession()
-  if (!MEMBERSHIP_ROLES.includes(session.user.role)) {
+  if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'You do not have permission to perform this action' }
   }
 
@@ -222,7 +223,7 @@ export async function removeHostFromNetwork(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   const session = await getRequiredSession()
-  if (!MEMBERSHIP_ROLES.includes(session.user.role)) {
+  if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'You do not have permission to perform this action' }
   }
 

@@ -7,8 +7,9 @@ import { db } from '@/lib/db'
 import { certificates, certificateEvents } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
 import type { Certificate, CertificateEvent, CertificateStatus, CertificateDetails } from '@/lib/db/schema'
-import { getRequiredSession } from '@/lib/auth/session'
 import { requireFeature } from '@/lib/actions/licence-guard'
+import { hasRole } from '@/lib/auth/guards'
+import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
 import { escapeLikePattern } from '@/lib/utils'
 import { computeExpiryStatus } from '@/lib/certificates/expiry'
 import {
@@ -144,12 +145,8 @@ export async function deleteCertificate(
   orgId: string,
   certId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) {
-    return { error: 'Organisation mismatch' }
-  }
-  if (session.user.role === 'read_only') {
+  const session = await requireOrgAccess(orgId)
+  if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'Insufficient permissions to delete certificates' }
   }
 
@@ -272,10 +269,6 @@ export async function trackCertificateFromUrl(
 ): Promise<TrackCertificateResult> {
   await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) {
-    return { error: 'Organisation mismatch' }
-  }
   if (!await trackFromUrlLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before adding more certificates.' }
   }
@@ -369,10 +362,6 @@ export async function trackCertificateFromUpload(
 ): Promise<TrackCertificateResult> {
   await requireOrgAccess(orgId)
   await requireFeature(orgId, 'certExpiryTracker')
-  const session = await getRequiredSession()
-  if (session.user.organisationId !== orgId) {
-    return { error: 'Organisation mismatch' }
-  }
 
   const parsed = trackFromUploadSchema.safeParse(input)
   if (!parsed.success) {

@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -8,8 +8,7 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import type { OrgNotificationSettings } from '@/lib/db/schema/organisations'
-import { getRequiredSession } from '@/lib/auth/session'
-import { ADMIN_ROLES, DEFAULT_NOTIFICATION_ROLES } from '@/lib/auth/roles'
+import { DEFAULT_NOTIFICATION_ROLES } from '@/lib/auth/roles'
 import { encrypt, decrypt } from '@/lib/crypto/encrypt'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
 import {
@@ -87,15 +86,10 @@ export async function updateOrgNotificationSettings(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to update notification settings' }
-  }
-
-  if (session.user.organisationId !== orgId) {
-    return { error: 'Organisation mismatch' }
   }
 
   const parsed = updateOrgNotificationSettingsSchema.safeParse(input)
@@ -148,15 +142,10 @@ async function getAdminOrgMetadata(orgId: string): Promise<
   | { metadata: ReturnType<typeof parseOrgMetadata>; error?: undefined }
   | { metadata?: undefined; error: string }
 > {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
-
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
     return { error: 'You do not have permission to update SMTP settings' }
-  }
-
-  if (session.user.organisationId !== orgId) {
-    return { error: 'Organisation mismatch' }
   }
 
   const org = await db.query.organisations.findFirst({

@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -9,8 +9,6 @@ import { users, invitations } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
-import { getRequiredSession, type RequiredSession } from '@/lib/auth/session'
-import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { writeAuditEvent } from '@/lib/audit/events'
 
 const inviteSchema = z.object({
@@ -22,35 +20,10 @@ const updateRoleSchema = z.object({
   role: z.enum(['super_admin', 'org_admin', 'engineer', 'read_only']),
 })
 
-async function requireOrgSession(orgId: string): Promise<RequiredSession> {
-  const session = await getRequiredSession()
-
-  if (!session.user.isActive || session.user.deletedAt) {
-    throw new Error('forbidden: inactive user')
-  }
-
-  if (session.user.organisationId !== orgId) {
-    throw new Error('forbidden: organisation mismatch')
-  }
-
-  return session
-}
-
-async function requireOrgAdmin(orgId: string): Promise<RequiredSession> {
-  const session = await requireOrgSession(orgId)
-
-  if (!ADMIN_ROLES.includes(session.user.role)) {
-    throw new Error('forbidden: admin role required')
-  }
-
-  return session
-}
-
 export async function getOrgUsers(
   orgId: string,
 ): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
   await requireOrgAccess(orgId)
-  await requireOrgSession(orgId)
 
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({
@@ -79,7 +52,7 @@ export async function inviteUser(
   }
 
   try {
-    const session = await requireOrgAdmin(orgId)
+    const session = await requireOrgAdminAccess(orgId)
 
     // Check for a previously removed user — restore them rather than re-registering,
     // since their account (and email) still exist in the database.
@@ -158,7 +131,7 @@ export async function updateUserRole(
   }
 
   try {
-    const session = await requireOrgAdmin(orgId)
+    const session = await requireOrgAdminAccess(orgId)
     const targetUser = await db.query.users.findFirst({
       where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId)),
       columns: { id: true, email: true, role: true },
@@ -214,7 +187,7 @@ export async function deactivateUser(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
-    const session = await requireOrgAdmin(orgId)
+    const session = await requireOrgAdminAccess(orgId)
 
     if (session.user.id === targetUserId) {
       return { error: 'You cannot deactivate your own account' }
@@ -250,7 +223,7 @@ export async function reactivateUser(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
-    await requireOrgAdmin(orgId)
+    await requireOrgAdminAccess(orgId)
 
     await db
       .update(users)
@@ -270,7 +243,7 @@ export async function removeUser(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
-    const session = await requireOrgAdmin(orgId)
+    const session = await requireOrgAdminAccess(orgId)
 
     if (session.user.id === targetUserId) {
       return { error: 'You cannot remove your own account' }
@@ -329,7 +302,7 @@ export async function cancelInvite(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
-    await requireOrgAdmin(orgId)
+    await requireOrgAdminAccess(orgId)
 
     await db
       .update(invitations)

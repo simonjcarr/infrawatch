@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 68 — Centralised authz guards
+
+**Shared authz guard layer** (`apps/web/lib/auth/guards.ts`, `apps/web/lib/actions/`, `apps/web/lib/eslint/`, `SECURITY.md`)
+- Added shared web authz helpers for active-user, same-org, admin-role, and writable-role checks so role and organisation enforcement lives in one place instead of being reimplemented ad hoc across server actions.
+- Migrated the remaining raw `session.user` authorisation checks in org settings, networks, notes, certificates, terminal, task schedules, software inventory, notifications, users, and security actions onto the shared helpers or the existing `requireOrgAccess` / `requireOrgAdminAccess` wrappers.
+- Added a local ESLint rule that rejects direct `session.user.organisationId` / `session.user.role` comparisons and role-list `includes()` checks in web auth/action code, and marked security finding `I-10` complete.
+
+**Validation**
+- Added focused unit coverage for the new guards and the new ESLint rule.
+- Validation run: `pnpm --filter web exec node --experimental-strip-types --test lib/actions/action-auth.test.mjs lib/auth/guards.test.mjs lib/eslint/no-single-table-select.test.mjs lib/eslint/no-raw-session-checks.test.mjs`, `pnpm --filter web exec eslint lib/actions/users.ts lib/actions/security.ts lib/actions/notification-settings.ts lib/actions/settings.ts lib/actions/networks.ts lib/actions/software-inventory.ts lib/actions/terminal.ts lib/actions/task-schedules.ts lib/actions/notes.ts lib/actions/notes-resolver.ts lib/actions/certificates.ts lib/actions/action-auth-core.ts lib/auth/guards.ts lib/eslint/no-raw-session-checks.mjs lib/eslint/no-raw-session-checks.test.mjs`, and `pnpm --filter web type-check`.
+
 ### Session 67 — Administration information architecture
 
 **Administration layout** (`apps/web/components/shared/sidebar.tsx`, `apps/web/app/(dashboard)/settings/`)

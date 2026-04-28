@@ -6,6 +6,9 @@ test('authenticated user sees the LDAP setup empty state when no directory is co
   await expect(page.getByTestId('directory-lookup-heading')).toContainText('Directory User Lookup')
   await expect(page.getByTestId('directory-lookup-empty-state')).toBeVisible()
   await expect(page.getByTestId('directory-lookup-empty-state')).toContainText('No directory configured')
+  await expect(page.getByTestId('directory-lookup-empty-description')).toContainText(
+    'Add an LDAP or Active Directory configuration to enable directory lookups.',
+  )
 
   const configureLink = page.getByTestId('directory-lookup-configure-link')
   await expect(configureLink).toHaveAttribute('href', '/settings/integrations')

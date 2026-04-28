@@ -293,6 +293,7 @@ export function DirectoryLookupClient({
               <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
               <Input
                 id="lookup-username"
+                data-testid="directory-lookup-query-input"
                 value={query}
                 onChange={(e) => handleQueryInput(e.target.value)}
                 onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}

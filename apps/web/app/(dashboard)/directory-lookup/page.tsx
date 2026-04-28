@@ -29,7 +29,7 @@ export default async function DirectoryLookupPage() {
           <CardContent className="py-16 text-center">
             <FolderSearch className="size-12 mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-foreground font-medium">No directory configured</p>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">
+            <p className="text-sm text-muted-foreground mt-1 mb-4" data-testid="directory-lookup-empty-description">
               Add an LDAP or Active Directory configuration to enable directory lookups.
             </p>
             <Button asChild size="sm">

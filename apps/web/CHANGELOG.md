@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.74.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.0...web/v0.74.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** avoid e2e auth rate limit ([#676](https://github.com/carrtech-dev/ct-ops/issues/676)) ([4ed54dd](https://github.com/carrtech-dev/ct-ops/commit/4ed54dddac06b636637512cd054d14a449858368))
+
 ## [0.74.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.8...web/v0.74.0) (2026-04-28)
 
 

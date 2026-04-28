@@ -7,8 +7,15 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
-import type { LdapConfiguration } from '@/lib/db/schema'
 import { encrypt, decrypt } from '@/lib/crypto/encrypt'
+import {
+  sanitiseLdapConfigurationForClient,
+  type LdapConfigurationSafe,
+} from '@/lib/ldap/config-client'
+import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
+import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
+
+export type { LdapConfigurationSafe } from '@/lib/ldap/config-client'
 
 function safeDecrypt(value: string): string {
   try { return decrypt(value) } catch { return value }
@@ -21,8 +28,6 @@ function decryptConfigForDisplay<T extends { bindDn: string; tlsCertificate: str
     tlsCertificate: config.tlsCertificate ? safeDecrypt(config.tlsCertificate) : null,
   }
 }
-import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
-import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
 const createLdapConfigSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
@@ -67,7 +72,7 @@ const updateLdapConfigSchema = z.object({
 
 export async function getLdapConfigurations(
   orgId: string,
-): Promise<LdapConfiguration[]> {
+): Promise<LdapConfigurationSafe[]> {
   await requireOrgAdminAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
@@ -76,13 +81,13 @@ export async function getLdapConfigurations(
     ),
     orderBy: ldapConfigurations.createdAt,
   })
-  return rows.map(decryptConfigForDisplay)
+  return rows.map((row) => sanitiseLdapConfigurationForClient(decryptConfigForDisplay(row)))
 }
 
 export async function getLdapConfiguration(
   orgId: string,
   configId: string,
-): Promise<LdapConfiguration | null> {
+): Promise<LdapConfigurationSafe | null> {
   await requireOrgAdminAccess(orgId)
   const result = await db.query.ldapConfigurations.findFirst({
     where: and(
@@ -91,7 +96,7 @@ export async function getLdapConfiguration(
       isNull(ldapConfigurations.deletedAt),
     ),
   })
-  return result ? decryptConfigForDisplay(result) : null
+  return result ? sanitiseLdapConfigurationForClient(decryptConfigForDisplay(result)) : null
 }
 
 export async function createLdapConfiguration(

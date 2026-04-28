@@ -66,7 +66,7 @@ func runCertRefreshTick(ctx context.Context, pool *pgxpool.Pool) {
 }
 
 func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.TrackedCertRow) {
-	leaf, chain, err := fetchLeafAndChain(ctx, row.TrackedURL)
+	leaf, chain, err := fetchLeafAndChain(ctx, row.TrackedURL, row.TLSSkipVerify)
 	if err != nil {
 		slog.Info("cert refresh: fetch failed", "cert_id", row.ID, "url", row.TrackedURL, "err", err)
 		if qErr := queries.MarkCertRefreshFailed(ctx, pool, row.ID, truncateError(err.Error())); qErr != nil {
@@ -174,7 +174,20 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 // fetchLeafAndChain opens a TLS connection to the trackedUrl and returns the
 // peer leaf certificate plus the intermediate chain (everything after the
 // leaf).
-func fetchLeafAndChain(ctx context.Context, trackedURL string) (*x509.Certificate, []*x509.Certificate, error) {
+func fetchLeafAndChain(ctx context.Context, trackedURL string, skipVerify bool) (*x509.Certificate, []*x509.Certificate, error) {
+	return fetchLeafAndChainWithOptions(ctx, trackedURL, fetchLeafAndChainOptions{skipVerify: skipVerify})
+}
+
+type fetchLeafAndChainOptions struct {
+	rootCAs    *x509.CertPool
+	skipVerify bool
+}
+
+func fetchLeafAndChainWithOptions(
+	ctx context.Context,
+	trackedURL string,
+	opts fetchLeafAndChainOptions,
+) (*x509.Certificate, []*x509.Certificate, error) {
 	host, port, serverName, err := parseTrackedURL(trackedURL)
 	if err != nil {
 		return nil, nil, err
@@ -189,7 +202,8 @@ func fetchLeafAndChain(ctx context.Context, trackedURL string) (*x509.Certificat
 
 	tlsConn := tls.Client(rawConn, &tls.Config{
 		ServerName:         serverName,
-		InsecureSkipVerify: true, // we record the cert regardless of trust chain
+		RootCAs:            opts.rootCAs,
+		InsecureSkipVerify: opts.skipVerify,
 	})
 	defer tlsConn.Close()
 

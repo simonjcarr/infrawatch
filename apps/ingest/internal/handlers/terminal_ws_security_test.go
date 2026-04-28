@@ -51,8 +51,7 @@ func TestInsecureSkipVerifyTrueAllowlist(t *testing.T) {
 
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".."))
 	allowed := map[string]struct{}{
-		filepath.Join(repoRoot, "agent", "internal", "checks", "certificate.go"):                     {},
-		filepath.Join(repoRoot, "apps", "ingest", "internal", "handlers", "cert_refresh_sweeper.go"): {},
+		filepath.Join(repoRoot, "agent", "internal", "checks", "certificate.go"): {},
 	}
 
 	var unexpected []string

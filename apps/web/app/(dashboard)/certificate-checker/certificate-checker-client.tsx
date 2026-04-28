@@ -261,6 +261,7 @@ function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }
   const [state, setState] = useState<TrackState>({ status: 'idle' })
   const [dialogOpen, setDialogOpen] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState('3600')
+  const [tlsSkipVerify, setTlsSkipVerify] = useState(false)
 
   async function submitUpload() {
     if (source.kind !== 'upload') return
@@ -276,6 +277,7 @@ function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }
     const result = await trackCertificateFromUrl(orgId, {
       url: source.url,
       refreshIntervalSeconds: parseInt(refreshInterval, 10),
+      tlsSkipVerify,
     })
     applyResult(result)
   }
@@ -375,6 +377,20 @@ function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex items-start gap-3 rounded-lg border px-3 py-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={tlsSkipVerify}
+                onChange={(e) => setTlsSkipVerify(e.target.checked)}
+              />
+              <div className="space-y-1">
+                <span className="text-sm font-medium">Allow insecure re-checks for untrusted/self-signed certs</span>
+                <p className="text-xs text-muted-foreground">
+                  Off by default. Enable only when this endpoint cannot chain to system trust roots.
+                </p>
+              </div>
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

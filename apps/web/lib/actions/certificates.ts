@@ -22,6 +22,10 @@ import { createRateLimiter } from '@/lib/rate-limit'
 
 const trackFromUrlLimiter = createRateLimiter(60_000, 20)
 
+type CertificateTrackingMetadata = {
+  tlsSkipVerify?: boolean
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type CertificateListFilters = {
@@ -173,6 +177,7 @@ const trackFromUrlSchema = z.object({
     (v) => (REFRESH_INTERVAL_OPTIONS as readonly number[]).includes(v),
     { message: 'Refresh interval must be 15m, 1h, 6h, or 24h' },
   ).optional(),
+  tlsSkipVerify: z.boolean().optional(),
 })
 
 // 64 KB is well beyond any real certificate chain; rejects degenerate payloads.
@@ -237,6 +242,26 @@ async function findExistingCertByIdentity(
   })
 }
 
+function asTrackingMetadata(value: unknown): CertificateTrackingMetadata {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  return value as CertificateTrackingMetadata
+}
+
+function buildTrackingMetadata(
+  existing: unknown,
+  tlsSkipVerify: boolean,
+): CertificateTrackingMetadata {
+  const metadata = { ...asTrackingMetadata(existing) }
+  if (tlsSkipVerify) {
+    metadata.tlsSkipVerify = true
+  } else {
+    delete metadata.tlsSkipVerify
+  }
+  return metadata
+}
+
 export async function trackCertificateFromUrl(
   orgId: string,
   input: unknown,
@@ -256,7 +281,7 @@ export async function trackCertificateFromUrl(
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }
 
-  const { url, refreshIntervalSeconds = 3600 } = parsed.data
+  const { url, refreshIntervalSeconds = 3600, tlsSkipVerify = false } = parsed.data
 
   let result
   try {
@@ -277,12 +302,18 @@ export async function trackCertificateFromUrl(
     orgId, host, port, serverName, certificate.fingerprintSha256,
   )
   if (existing) {
-    if (existing.trackedUrl !== url || existing.refreshIntervalSeconds !== refreshIntervalSeconds) {
+    const currentTlsSkipVerify = asTrackingMetadata(existing.metadata).tlsSkipVerify === true
+    if (
+      existing.trackedUrl !== url
+      || existing.refreshIntervalSeconds !== refreshIntervalSeconds
+      || currentTlsSkipVerify !== tlsSkipVerify
+    ) {
       await db
         .update(certificates)
         .set({
           trackedUrl: url,
           refreshIntervalSeconds,
+          metadata: buildTrackingMetadata(existing.metadata, tlsSkipVerify),
           lastRefreshedAt: new Date(),
           lastRefreshError: null,
           updatedAt: new Date(),
@@ -308,6 +339,7 @@ export async function trackCertificateFromUrl(
       fingerprintSha256: certificate.fingerprintSha256,
       status,
       details: buildDetailsFromParsed(certificate),
+      metadata: buildTrackingMetadata(undefined, tlsSkipVerify),
       trackedUrl: url,
       refreshIntervalSeconds,
       lastRefreshedAt: new Date(),

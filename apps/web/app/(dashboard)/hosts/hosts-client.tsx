@@ -617,7 +617,7 @@ export function HostsClient({
               value={String(pageSize)}
               onValueChange={(v) => handlePageSizeChange(Number(v))}
             >
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-32" data-testid="hosts-page-size">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -755,7 +755,7 @@ export function HostsClient({
 
               {/* ─── Pagination footer ───────────────────────────────────── */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-4">
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground" data-testid="hosts-pagination-summary">
                   Showing <span className="tabular-nums font-medium text-foreground">{rangeFrom.toLocaleString()}</span>–
                   <span className="tabular-nums font-medium text-foreground">{rangeTo.toLocaleString()}</span>{' '}
                   of <span className="tabular-nums font-medium text-foreground">{total.toLocaleString()}</span>
@@ -766,6 +766,7 @@ export function HostsClient({
                     size="sm"
                     onClick={() => setPage(0)}
                     disabled={page === 0}
+                    data-testid="hosts-page-first"
                   >
                     First
                   </Button>
@@ -774,10 +775,11 @@ export function HostsClient({
                     size="sm"
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
                     disabled={page === 0}
+                    data-testid="hosts-page-previous"
                   >
                     Previous
                   </Button>
-                  <span className="text-sm text-muted-foreground px-2 tabular-nums">
+                  <span className="text-sm text-muted-foreground px-2 tabular-nums" data-testid="hosts-page-indicator">
                     Page {page + 1} of {pageCount}
                   </span>
                   <Button
@@ -785,6 +787,7 @@ export function HostsClient({
                     size="sm"
                     onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
                     disabled={page + 1 >= pageCount}
+                    data-testid="hosts-page-next"
                   >
                     Next
                   </Button>
@@ -793,6 +796,7 @@ export function HostsClient({
                     size="sm"
                     onClick={() => setPage(pageCount - 1)}
                     disabled={page + 1 >= pageCount}
+                    data-testid="hosts-page-last"
                   >
                     Last
                   </Button>

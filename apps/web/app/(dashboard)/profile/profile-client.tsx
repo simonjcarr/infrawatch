@@ -196,7 +196,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
               <p className="text-sm text-destructive">{passwordError}</p>
             )}
             {passwordSuccess && (
-              <p className="flex items-center gap-1 text-sm text-green-700">
+              <p className="flex items-center gap-1 text-sm text-green-700" data-testid="profile-password-success">
                 <CheckCircle2 className="size-4" />
                 Password updated successfully
               </p>
@@ -207,6 +207,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
                 id="current-password"
                 type="password"
                 autoComplete="current-password"
+                data-testid="profile-password-current"
                 {...passwordForm.register('currentPassword')}
               />
               {passwordForm.formState.errors.currentPassword && (
@@ -221,6 +222,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
                 id="new-password"
                 type="password"
                 autoComplete="new-password"
+                data-testid="profile-password-new"
                 {...passwordForm.register('newPassword')}
               />
               {passwordForm.formState.errors.newPassword && (
@@ -235,6 +237,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
                 id="confirm-password"
                 type="password"
                 autoComplete="new-password"
+                data-testid="profile-password-confirm"
                 {...passwordForm.register('confirmPassword')}
               />
               {passwordForm.formState.errors.confirmPassword && (
@@ -243,7 +246,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
                 </p>
               )}
             </div>
-            <Button type="submit" size="sm" disabled={passwordMutation.isPending}>
+            <Button type="submit" size="sm" disabled={passwordMutation.isPending} data-testid="profile-password-submit">
               {passwordMutation.isPending ? 'Updating…' : 'Update password'}
             </Button>
           </form>

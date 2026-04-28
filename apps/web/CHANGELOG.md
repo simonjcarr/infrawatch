@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.75.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.2...web/v0.75.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** add local account password reset ([#695](https://github.com/carrtech-dev/ct-ops/issues/695)) ([8060e3a](https://github.com/carrtech-dev/ct-ops/commit/8060e3af97bc1292897e12222893d9ba40736367))
+
 ## [0.75.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.1...web/v0.75.2) (2026-04-28)
 
 

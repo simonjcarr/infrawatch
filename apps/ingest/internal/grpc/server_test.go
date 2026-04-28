@@ -74,7 +74,7 @@ func newBufconnClient(t *testing.T, svc registerService) (*grpc.ClientConn, func
 	t.Helper()
 
 	listener := bufconn.Listen(128 * 1024 * 1024)
-	server := grpc.NewServer(serverOptions(nil)...)
+	server := grpc.NewServer(serverOptions(nil, nil)...)
 	server.RegisterService(&registerServiceDesc, svc)
 
 	serveErr := make(chan error, 1)

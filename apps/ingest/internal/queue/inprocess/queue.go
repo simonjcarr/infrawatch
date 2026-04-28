@@ -34,6 +34,16 @@ func (q *Queue) Publish(msg queue.Message) error {
 	}
 }
 
+// Len returns the current buffered message count.
+func (q *Queue) Len() int {
+	return len(q.ch)
+}
+
+// Cap returns the queue buffer capacity.
+func (q *Queue) Cap() int {
+	return cap(q.ch)
+}
+
 // Close drains and closes the queue.
 func (q *Queue) Close() error {
 	close(q.ch)

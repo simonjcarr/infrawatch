@@ -6,11 +6,25 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/carrtech-dev/ct-ops/ingest/internal/monitoring"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
+
+// MonitoringUnaryInterceptor records active unary requests and request message totals.
+func MonitoringUnaryInterceptor(rec *monitoring.Recorder) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		if rec == nil {
+			return handler(ctx, req)
+		}
+		rec.RecordMessageReceived()
+		done := rec.BeginRequest()
+		defer done()
+		return handler(ctx, req)
+	}
+}
 
 // LoggingUnaryInterceptor logs unary RPC calls with timing.
 func LoggingUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
@@ -35,6 +49,31 @@ func RecoveryUnaryInterceptor(ctx context.Context, req interface{}, _ *grpc.Unar
 		}
 	}()
 	return handler(ctx, req)
+}
+
+type monitoredServerStream struct {
+	grpc.ServerStream
+	rec *monitoring.Recorder
+}
+
+func (s *monitoredServerStream) RecvMsg(m interface{}) error {
+	err := s.ServerStream.RecvMsg(m)
+	if err == nil {
+		s.rec.RecordMessageReceived()
+	}
+	return err
+}
+
+// MonitoringStreamInterceptor records active streams and every received stream message.
+func MonitoringStreamInterceptor(rec *monitoring.Recorder) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if rec == nil {
+			return handler(srv, ss)
+		}
+		done := rec.BeginRequest()
+		defer done()
+		return handler(srv, &monitoredServerStream{ServerStream: ss, rec: rec})
+	}
 }
 
 // LoggingStreamInterceptor logs streaming RPC setup.

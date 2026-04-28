@@ -40,6 +40,7 @@ const APP_TABLES = [
   'host_vulnerability_findings',
   'hosts',
   'identity_events',
+  'ingest_server_snapshots',
   'invitations',
   'ldap_configurations',
   'networks',

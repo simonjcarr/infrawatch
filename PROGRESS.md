@@ -15,6 +15,23 @@
 
 ## What Has Been Built
 
+### Session 75 — Admin ingest and agent health visibility
+
+**System health operations view** (`apps/web/app/(dashboard)/settings/system/`, `apps/web/app/api/system/health/route.ts`)
+- Expanded the admin-only **Administration → System** page with ingest server status, live processing counts, last-hour received message totals, queue depth, memory usage, goroutines, and DB connection usage.
+- Added a central Agent Errors table combining recent certificate signing, agent query, software inventory, and task-run failures by host/agent so admins can inspect operational agent failures in one place.
+- Added an agent upgrade summary showing the required agent version and the count of active/offline agents that have not upgraded.
+
+**Ingest telemetry persistence** (`apps/ingest/internal/monitoring/`, `apps/web/lib/db/schema/ingest.ts`)
+- Added `ingest_server_snapshots` and ingest-side periodic reporting so each ingest process writes process identity, active request count, received message total, queue stats, Go runtime memory/goroutines, and pgx pool usage.
+- Added gRPC interceptors to count unary and stream messages and active requests without changing handler behavior.
+
+**Validation**
+- Added unit coverage for ingest and agent health summary calculations.
+- Added database-backed E2E coverage for the System page with seeded ingest snapshots and agent errors.
+- Validation run: `pnpm --filter web exec node --experimental-strip-types --test lib/system/health.test.mjs`, `pnpm --filter web type-check`, `pnpm --filter web lint` (existing warnings only), `pnpm --filter web db:validate`, `go test ./apps/ingest/internal/...`, and `pnpm --filter web test:e2e tests/e2e/settings/system-health.spec.ts`.
+- This satisfies the requested admin visibility for ingest server status, historical message counts, resource usage, central agent errors, and not-upgraded agent counts.
+
 ### Session 74 — Vulnerability management interface
 
 **Vulnerability operations UI** (`apps/web/app/(dashboard)/settings/vulnerabilities/`, `apps/web/lib/actions/vulnerabilities.ts`)

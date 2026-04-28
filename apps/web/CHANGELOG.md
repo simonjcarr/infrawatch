@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.74.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.2...web/v0.74.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** add org-scoped RLS helper ([#681](https://github.com/carrtech-dev/ct-ops/issues/681)) ([08e4b6e](https://github.com/carrtech-dev/ct-ops/commit/08e4b6edb59a2f4a45d3cd70f28b46f9ebaeb0d5))
+
 ## [0.74.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.1...web/v0.74.2) (2026-04-28)
 
 

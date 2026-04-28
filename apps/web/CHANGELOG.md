@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.3...web/v0.73.4) (2026-04-28)
+
+
+### Bug Fixes
+
+* **auth:** bind invite redemption to invited email ([#656](https://github.com/carrtech-dev/ct-ops/issues/656)) ([ff3b469](https://github.com/carrtech-dev/ct-ops/commit/ff3b469473596700426df865f0494c9cc4f9e21c))
+
 ## [0.73.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.2...web/v0.73.3) (2026-04-28)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.5...web/v0.73.6) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** require admin auth for LDAP settings actions ([#664](https://github.com/carrtech-dev/ct-ops/issues/664)) ([4062b53](https://github.com/carrtech-dev/ct-ops/commit/4062b53285ab7bfcbbeada2e2b3b65310506f007))
+
 ## [0.73.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.73.4...web/v0.73.5) (2026-04-28)
 
 

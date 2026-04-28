@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.75.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.75.0...web/v0.75.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** sanitise LDAP configuration responses ([#686](https://github.com/carrtech-dev/ct-ops/issues/686)) ([791c6f7](https://github.com/carrtech-dev/ct-ops/commit/791c6f79f68539e0e65bd04ff8abc2ababab961e))
+
 ## [0.75.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.3...web/v0.75.0) (2026-04-28)
 
 

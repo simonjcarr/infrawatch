@@ -167,6 +167,12 @@ func dispatchCheck(def *agentv1.CheckDefinition) (status, output string) {
 			return "error", "invalid ssh_key_scan config: " + err.Error()
 		}
 		return runSshKeyScanCheck(cfg)
+	case "patch_status":
+		var cfg PatchStatusConfig
+		if err := json.Unmarshal([]byte(def.ConfigJson), &cfg); err != nil {
+			return "error", "invalid patch_status config: " + err.Error()
+		}
+		return runPatchStatusCheck(cfg)
 	default:
 		return "error", "unknown check type: " + def.CheckType
 	}

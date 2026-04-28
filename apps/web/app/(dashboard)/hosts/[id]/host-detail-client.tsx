@@ -65,6 +65,7 @@ import { LocalUsersTab } from './local-users-tab'
 import { TasksTab } from './tasks-tab'
 import { LogsTab } from './logs-tab'
 import { InventoryTab } from './inventory-tab'
+import { PatchStatusTab } from './patch-status-tab'
 import { HostTerminalLauncher } from './host-terminal-launcher'
 import { NotesTab } from '@/components/notes/notes-tab'
 import { PinnedNotesCard } from '@/components/notes/pinned-notes-card'
@@ -1108,6 +1109,11 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Patch Status Tab */}
+      {activeTab === 'patch-status' && (
+        <PatchStatusTab orgId={orgId} hostId={initialHost.id} />
       )}
 
       {/* Inventory Tab */}

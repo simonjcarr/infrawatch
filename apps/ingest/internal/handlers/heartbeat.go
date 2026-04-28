@@ -357,6 +357,10 @@ func (h *HeartbeatHandler) processHeartbeat(
 				if result.Output != "" {
 					persistSshKeyResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
 				}
+			case "patch_status":
+				if result.Output != "" {
+					persistPatchStatusResult(ctx, h.pool, orgID, hostID, result.CheckId, ranAt, result.Output)
+				}
 			}
 		}
 

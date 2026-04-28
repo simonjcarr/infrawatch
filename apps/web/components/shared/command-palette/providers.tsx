@@ -36,6 +36,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-service-accounts', label: 'Service Accounts', icon: Key, href: '/service-accounts' },
   { id: 'nav-reports', label: 'Reports', icon: FileBarChart, href: '/reports' },
   { id: 'nav-reports-software', label: 'Installed Software Report', icon: Package, href: '/reports/software' },
+  { id: 'nav-reports-patch-status', label: 'Patch Status Report', icon: ShieldCheck, href: '/reports/patch-status' },
   { id: 'nav-cert-checker', label: 'SSL Certificate Checker', icon: ScanSearch, href: '/certificate-checker' },
   { id: 'nav-dir-lookup', label: 'Directory User Lookup', icon: FolderSearch, href: '/directory-lookup' },
   { id: 'nav-bundlers', label: 'Air-gap Bundlers', icon: Package, href: '/bundlers' },

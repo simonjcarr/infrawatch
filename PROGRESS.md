@@ -15,6 +15,27 @@
 
 ## What Has Been Built
 
+### Session 70 — Patch status monitoring and management reporting
+
+**Patch status check** (`agent/internal/checks/patch_status.go`, `apps/web/lib/actions/checks.ts`, `apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`)
+- Added a `patch_status` check type with configurable `max_age_days` and capped `max_packages`.
+- Linux agents determine last patch age and list available package updates for apt, dnf/yum, zypper, pacman, and apk using read-only package-manager commands.
+- Windows agents report patch age from hotfix data and mark package update listing unsupported; macOS reports patch age from `softwareupdate --history` where available and marks update listing unsupported.
+- Check pass/fail is based only on patch age; available package updates are reported but do not directly fail the check.
+
+**Persistence and reporting** (`apps/web/lib/db/schema/patch-status.ts`, `apps/ingest/internal/handlers/patch_status.go`, `apps/web/lib/actions/patch-status.ts`)
+- Added `host_patch_statuses` for latest per-host/check patch health and `host_package_updates` for current/resolved available package updates.
+- Ingest now persists structured `patch_status` check output and refreshes current available update rows on every supported result.
+- Added `/reports/patch-status` management report with estate summary, network patch status, and host-level patch status including network memberships.
+
+**Host detail drill-down** (`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`, `apps/web/app/(dashboard)/hosts/[id]/patch-status-tab.tsx`)
+- Added an Infrastructure → Patch Status sub-tab showing the selected host's patch age, policy threshold, last checked time, package manager, warnings/errors, and available package updates where supported.
+
+**Validation**
+- Added agent parser/evaluator unit coverage for apt, rpm, Windows hotfix JSON, and patch-age-only pass/fail behavior.
+- Added database-backed E2E coverage for the host Infrastructure → Patch Status tab with seeded patch status and package updates.
+- Validation run: `go test ./agent/internal/checks ./apps/ingest/internal/...`, `pnpm --filter web type-check`, `pnpm --filter web lint -- ...`, `pnpm --filter web db:validate`, and `pnpm --filter web test:e2e -- tests/e2e/hosts/patch-status.spec.ts`.
+
 ### Session 69 — Local account password reset flow
 
 **Self-service password reset** (`apps/web/app/(auth)/forgot-password/`, `apps/web/app/reset-password/`, `apps/web/lib/auth/`)

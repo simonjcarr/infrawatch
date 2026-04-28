@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.77.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.77.0...web/v0.77.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** add network and enrolment e2e coverage ([966675e](https://github.com/carrtech-dev/ct-ops/commit/966675ee43886ff95f085b5116f437afc72d01d5))
+
 ## [0.77.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.76.1...web/v0.77.0) (2026-04-28)
 
 

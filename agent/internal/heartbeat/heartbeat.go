@@ -22,6 +22,7 @@ import (
 	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
 	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 	"github.com/carrtech-dev/ct-ops/agent/internal/tasks"
+	"github.com/carrtech-dev/ct-ops/agent/internal/updater"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
@@ -121,9 +122,10 @@ type Runner struct {
 	pinnedServerCertPEM []byte
 	pinnedServerCertFpr string
 
-	// lastSkippedUpdateVersion suppresses duplicate warnings when the server
-	// repeatedly advertises the same release while auto-update is disabled.
-	lastSkippedUpdateVersion string
+	selfUpdateMu       sync.Mutex
+	selfUpdateInFlight bool
+	selfUpdateVersion  string
+	updateFunc         func(latestVersion, downloadURL string, pinnedServerCertPEM []byte) error
 }
 
 // New creates a new heartbeat Runner. dialFunc is called once per stream
@@ -144,6 +146,7 @@ func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version s
 		certRotated:  make(chan struct{}, 1),
 		dataDir:      dataDir,
 		keypair:      keypair,
+		updateFunc:   updater.Update,
 	}
 	// Prime the pinned server cert from disk so the first heartbeat sends the
 	// correct fingerprint and preserves any previously pushed trust material.
@@ -389,19 +392,42 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 		}
 	}
 	if resp.UpdateAvailable && resp.DownloadUrl != "" {
-		r.noteSkippedSelfUpdate(resp.LatestVersion)
+		r.startSelfUpdate(resp.LatestVersion, resp.DownloadUrl)
 	}
 }
 
-func (r *Runner) noteSkippedSelfUpdate(latestVersion string) {
-	if latestVersion == "" || latestVersion == r.lastSkippedUpdateVersion {
+func (r *Runner) startSelfUpdate(latestVersion, downloadURL string) {
+	if latestVersion == "" || downloadURL == "" || latestVersion == r.version {
 		return
 	}
-	r.lastSkippedUpdateVersion = latestVersion
-	slog.Warn("agent update available, but automatic self-update is disabled until release signature verification is implemented",
+
+	r.selfUpdateMu.Lock()
+	if r.selfUpdateInFlight {
+		r.selfUpdateMu.Unlock()
+		return
+	}
+	r.selfUpdateInFlight = true
+	r.selfUpdateVersion = latestVersion
+	r.selfUpdateMu.Unlock()
+
+	r.pinnedServerCertMu.Lock()
+	pinnedPEM := append([]byte(nil), r.pinnedServerCertPEM...)
+	r.pinnedServerCertMu.Unlock()
+
+	slog.Info("agent update available, starting self-update",
 		"current", r.version,
 		"latest", latestVersion,
 	)
+
+	go func() {
+		if err := r.updateFunc(latestVersion, downloadURL, pinnedPEM); err != nil {
+			r.selfUpdateMu.Lock()
+			r.selfUpdateInFlight = false
+			r.selfUpdateVersion = ""
+			r.selfUpdateMu.Unlock()
+			slog.Warn("agent self-update failed", "current", r.version, "latest", latestVersion, "err", err)
+		}
+	}()
 }
 
 // maybeRenewCert checks the on-disk leaf cert's expiry. If it's within the

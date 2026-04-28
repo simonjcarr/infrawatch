@@ -1,15 +1,20 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+const agentReleasesURL = "https://api.github.com/repos/simonjcarr/ct-ops/releases?per_page=20"
 
 // Config is the ingest service configuration loaded from a YAML file.
 type Config struct {
@@ -89,11 +94,10 @@ func Load(path string) (*Config, error) {
 
 	applyEnv(cfg)
 
-	// If no explicit LatestVersion was supplied via YAML or env, try reading
-	// it from .release-please-manifest.json. release-please updates this file
-	// automatically when it cuts a new agent release, so this keeps the
-	// ingest service in sync without any manual env-var bookkeeping — exactly
-	// the same source of truth the web app uses (apps/web/lib/agent/version.ts).
+	// If no explicit LatestVersion was supplied via YAML or env, seed from the
+	// baked release-please manifest. The VersionPoller refreshes from published
+	// release metadata after startup so long-running ingest processes converge
+	// with the web UI's latest-agent badge without a restart.
 	if cfg.Agent.LatestVersion == "" {
 		if v := loadAgentVersionFromManifest(); v != "" {
 			cfg.Agent.LatestVersion = v
@@ -130,6 +134,91 @@ func loadAgentVersionFromManifest() string {
 		}
 	}
 	return ""
+}
+
+func discoverLatestAgentVersion(ctx context.Context) string {
+	if v, err := latestAgentVersionFromGitHub(ctx, agentReleasesURL, os.Getenv("GITHUB_TOKEN")); err == nil && v != "" {
+		return v
+	}
+	return loadAgentVersionFromManifest()
+}
+
+func latestAgentVersionFromGitHub(ctx context.Context, releasesURL, token string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("GitHub releases API returned HTTP %d", resp.StatusCode)
+	}
+
+	var releases []struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return "", err
+	}
+	for _, release := range releases {
+		if version, ok := strings.CutPrefix(release.TagName, "agent/"); ok && strings.HasPrefix(version, "v") {
+			return version, nil
+		}
+	}
+	return "", nil
+}
+
+func shouldStoreCandidateVersion(current, candidate string) bool {
+	if candidate == "" {
+		return false
+	}
+	if current == "" {
+		return true
+	}
+	candidateParts, candidateOK := parseAgentVersion(candidate)
+	currentParts, currentOK := parseAgentVersion(current)
+	if !candidateOK || !currentOK {
+		return candidate != current
+	}
+	for i := range candidateParts {
+		if candidateParts[i] > currentParts[i] {
+			return true
+		}
+		if candidateParts[i] < currentParts[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func parseAgentVersion(version string) ([3]int, bool) {
+	var out [3]int
+	version = strings.TrimPrefix(version, "agent/")
+	version = strings.TrimPrefix(version, "v")
+	version, _, _ = strings.Cut(version, "-")
+	parts := strings.Split(version, ".")
+	if len(parts) != len(out) {
+		return out, false
+	}
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			return out, false
+		}
+		out[i] = n
+	}
+	return out, true
 }
 
 func defaults() *Config {

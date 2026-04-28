@@ -4,13 +4,25 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
 )
 
-func TestHandleResponseSkipsSelfUpdate(t *testing.T) {
+func TestHandleResponseStartsSelfUpdate(t *testing.T) {
 	runner := New(nil, "agent-id", "jwt", "v1.0.0", 30, checks.NewExecutor(), "", nil)
+	started := make(chan struct{}, 1)
+	runner.updateFunc = func(latestVersion, downloadURL string, pinnedServerCertPEM []byte) error {
+		if latestVersion != "v2.0.0" {
+			t.Errorf("latestVersion = %q, want %q", latestVersion, "v2.0.0")
+		}
+		if downloadURL != "https://example.com/api/agent/download" {
+			t.Errorf("downloadURL = %q, want %q", downloadURL, "https://example.com/api/agent/download")
+		}
+		started <- struct{}{}
+		return nil
+	}
 
 	runner.handleResponse(context.Background(), &agentv1.HeartbeatResponse{
 		Ok:              true,
@@ -19,13 +31,22 @@ func TestHandleResponseSkipsSelfUpdate(t *testing.T) {
 		DownloadUrl:     "https://example.com/api/agent/download",
 	})
 
-	if got := runner.lastSkippedUpdateVersion; got != "v2.0.0" {
-		t.Fatalf("lastSkippedUpdateVersion = %q, want %q", got, "v2.0.0")
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("self-update was not started")
 	}
 }
 
-func TestHandleResponseOnlyNotesEachSkippedVersionOnce(t *testing.T) {
+func TestHandleResponseDeduplicatesSelfUpdateInFlight(t *testing.T) {
 	runner := New(nil, "agent-id", "jwt", "v1.0.0", 30, checks.NewExecutor(), "", nil)
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	runner.updateFunc = func(latestVersion, downloadURL string, pinnedServerCertPEM []byte) error {
+		started <- struct{}{}
+		<-release
+		return nil
+	}
 
 	runner.handleResponse(context.Background(), &agentv1.HeartbeatResponse{
 		Ok:              true,
@@ -40,20 +61,18 @@ func TestHandleResponseOnlyNotesEachSkippedVersionOnce(t *testing.T) {
 		DownloadUrl:     "https://example.com/api/agent/download",
 	})
 
-	if got := runner.lastSkippedUpdateVersion; got != "v2.0.0" {
-		t.Fatalf("lastSkippedUpdateVersion = %q, want %q", got, "v2.0.0")
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("self-update was not started")
 	}
 
-	runner.handleResponse(context.Background(), &agentv1.HeartbeatResponse{
-		Ok:              true,
-		UpdateAvailable: true,
-		LatestVersion:   "v2.1.0",
-		DownloadUrl:     "https://example.com/api/agent/download",
-	})
-
-	if got := runner.lastSkippedUpdateVersion; got != "v2.1.0" {
-		t.Fatalf("lastSkippedUpdateVersion = %q, want %q", got, "v2.1.0")
+	select {
+	case <-started:
+		t.Fatal("duplicate self-update was started while the first update was in flight")
+	default:
 	}
+	close(release)
 }
 
 func TestBufferTaskProgressTruncatesPerTask(t *testing.T) {

@@ -400,7 +400,10 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
         {/* Selection toolbar */}
         {selectedRunIds.size > 0 && (
-          <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2">
+          <div
+            className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2"
+            data-testid="host-group-task-runs-selection"
+          >
             <span className="text-sm text-muted-foreground">
               {selectedRunIds.size} selected
             </span>
@@ -409,6 +412,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
               size="sm"
               onClick={() => doDeleteRuns()}
               disabled={isDeletingRuns}
+              data-testid="host-group-task-runs-delete-selected"
             >
               {isDeletingRuns ? (
                 <Loader2 className="size-3.5 mr-1.5 animate-spin" />
@@ -421,7 +425,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
         )}
 
         {taskRuns.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center">
+          <div className="rounded-lg border border-dashed p-8 text-center" data-testid="host-group-task-runs-empty">
             <Terminal className="size-7 mx-auto text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-foreground">No task runs yet</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -463,7 +467,11 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
                   const pendingCount = run.hosts.filter((h) => h.status === 'pending').length
 
                   return (
-                    <TableRow key={run.id} data-state={selectedRunIds.has(run.id) ? 'selected' : undefined}>
+                    <TableRow
+                      key={run.id}
+                      data-state={selectedRunIds.has(run.id) ? 'selected' : undefined}
+                      data-testid={`host-group-task-run-row-${run.id}`}
+                    >
                       <TableCell>
                         <Checkbox
                           checked={selectedRunIds.has(run.id)}

@@ -78,11 +78,12 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
 
   await expect(page.getByTestId('notifications-heading')).toBeVisible()
   await expect(page.getByTestId('notifications-tab-unread')).toContainText('2')
-  await expect(page.getByTestId('notification-card-notification-unread-critical')).toBeVisible()
+  const unreadCriticalCard = page.getByTestId('notification-card-notification-unread-critical')
+  await expect(unreadCriticalCard).toBeVisible()
   await expect(page.getByTestId('notification-card-notification-unread-warning')).toBeVisible()
   await expect(page.getByTestId('notification-card-notification-read-info')).toBeVisible()
 
-  await page.getByTestId('notification-card-notification-unread-critical').click()
+  await unreadCriticalCard.getByText('CPU usage is above threshold').click()
 
   await expect
     .poll(async () => {
@@ -129,4 +130,92 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
       deleted_at: expect.any(Date),
     },
   ])
+})
+
+test('authenticated user can mark all unread notifications as read', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO notifications (
+      id,
+      organisation_id,
+      user_id,
+      subject,
+      body,
+      severity,
+      resource_type,
+      resource_id,
+      read,
+      created_at
+    )
+    VALUES
+      (
+        'notification-mark-all-read-1',
+        ${orgId},
+        ${userId},
+        'Certificate expires soon',
+        'api.internal.example expires in three days.',
+        'warning',
+        'certificate',
+        'certificate-mark-all-read-1',
+        false,
+        NOW() - INTERVAL '15 minutes'
+      ),
+      (
+        'notification-mark-all-read-2',
+        ${orgId},
+        ${userId},
+        'Agent heartbeat missed',
+        'worker-01 has not checked in recently.',
+        'critical',
+        'host',
+        'host-mark-all-read-2',
+        false,
+        NOW() - INTERVAL '8 minutes'
+      ),
+      (
+        'notification-mark-all-read-3',
+        ${orgId},
+        ${userId},
+        'Inventory completed',
+        'The overnight inventory sync finished successfully.',
+        'info',
+        'host',
+        'host-mark-all-read-3',
+        true,
+        NOW() - INTERVAL '2 minutes'
+      )
+  `
+
+  await page.goto('/notifications')
+
+  await expect(page.getByTestId('notifications-heading')).toBeVisible()
+  await expect(page.getByTestId('notifications-tab-unread')).toContainText('2')
+
+  await page.getByRole('button', { name: 'Mark all read' }).click()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ id: string; read: boolean }>>`
+        SELECT id, read
+        FROM notifications
+        WHERE id IN (
+          'notification-mark-all-read-1',
+          'notification-mark-all-read-2',
+          'notification-mark-all-read-3'
+        )
+        ORDER BY id ASC
+      `
+
+      return rows
+    })
+    .toEqual([
+      { id: 'notification-mark-all-read-1', read: true },
+      { id: 'notification-mark-all-read-2', read: true },
+      { id: 'notification-mark-all-read-3', read: true },
+    ])
+
+  await page.getByTestId('notifications-tab-unread').click()
+  await expect(page.getByText('No unread notifications')).toBeVisible()
 })

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.75.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.3...web/v0.75.0) (2026-04-28)
+
+
+### Features
+
+* **web:** reorganise administration settings ([#679](https://github.com/carrtech-dev/ct-ops/issues/679)) ([bcdb0ce](https://github.com/carrtech-dev/ct-ops/commit/bcdb0ce05cbbbb167bbdf9322571cd4bc7743521))
+
 ## [0.74.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.2...web/v0.74.3) (2026-04-28)
 
 

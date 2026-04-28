@@ -35,14 +35,15 @@
 ### Session 74 — Vulnerability management interface
 
 **Vulnerability operations UI** (`apps/web/app/(dashboard)/settings/vulnerabilities/`, `apps/web/lib/actions/vulnerabilities.ts`)
-- Added an admin-only **Administration → Vulnerabilities** page that shows vulnerability feed/API connection status, last attempt/success times, pulled record counts, and recent connection errors without exposing configured upstream URLs or secrets.
+- Added an admin-only **Administration → Vulnerabilities** page that shows vulnerability feed/API connection status, upstream API URLs, last attempt/success times, pulled record counts, and recent connection errors without exposing secrets.
 - Added a live CVE catalog view backed by `vulnerability_cves`, including pulled CVE counts, severity/KEV summaries, affected-package rule counts, source filtering, and CVE/title search so users can confirm API data is present independently of host findings.
 - Added a bounded, rate-limited server action for the management snapshot, with organisation admin authorization and org-scoped open finding counts.
 - Added sync policy visibility plus expected feed rows for NVD, CISA KEV, Debian, Ubuntu OSV, Alpine SecDB, and Red Hat, so the page shows the APIs CT-Ops is supposed to contact even before the first sync attempt. Ingest now stores the attempted upstream URL in source metadata for accurate display after environment overrides.
+- Added an admin NVD API key control to **Administration → Vulnerabilities**. The key is stored encrypted in `system_config` as `vulnerability_nvd_api_key`; ingest uses it when `NVD_API_KEY` is not set, while keeping the environment variable as the deployment-level override.
 
 **Validation**
-- Added database-backed E2E coverage for seeded API source states and pulled CVEs at `/settings/vulnerabilities`.
-- Validation run: `pnpm --filter web type-check`, targeted `pnpm --filter web lint -- ...`, `pnpm --filter web db:validate`, `pnpm --filter web test:e2e tests/e2e/settings/vulnerabilities.spec.ts`, and `go test ./apps/ingest/internal/vuln`.
+- Added database-backed E2E coverage for seeded API source states, pulled CVEs, and NVD API key save/clear behavior at `/settings/vulnerabilities`.
+- Validation run: `pnpm --filter web type-check`, targeted `pnpm --filter web lint -- ...`, `pnpm --filter web db:validate`, `pnpm --filter web test:e2e tests/e2e/settings/vulnerabilities.spec.ts`, and `go test ./apps/ingest/internal/vuln ./apps/ingest/internal/crypto ./apps/ingest/internal/config`.
 - This completes the requested visibility for CVEs being pulled from vulnerability APIs and the status of vulnerability API connections. Manual sync triggering remains outside this interface.
 
 ### Session 72 — Linux OS package CVE checking

@@ -1,8 +1,10 @@
 'use server'
 
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { systemConfig } from '@/lib/db/schema'
+import { encrypt } from '@/lib/crypto/encrypt'
 import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 import { requireFeature } from '@/lib/actions/licence-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
@@ -57,6 +59,11 @@ export interface VulnerabilityManagementFilters {
   severity?: VulnerabilitySeverity | 'all'
   source?: string
   kevOnly?: boolean
+}
+
+export interface NvdApiKeySettings {
+  hasKey: boolean
+  updatedAt: Date | null
 }
 
 export interface VulnerabilityCatalogRow {
@@ -135,6 +142,14 @@ const managementLimiter = createRateLimiter({
   max: 30,
 })
 
+const nvdApiKeyUpdateLimiter = createRateLimiter({
+  scope: 'vulnerabilities:nvd-api-key-update',
+  windowMs: 60_000,
+  max: 5,
+})
+
+const NVD_API_KEY_CONFIG_KEY = 'vulnerability_nvd_api_key'
+
 const filtersSchema = z.object({
   cve: z.string().trim().max(32).optional(),
   packageName: z.string().trim().max(120).optional(),
@@ -152,6 +167,12 @@ const managementFiltersSchema = z.object({
   source: z.string().trim().max(80).optional(),
   kevOnly: z.boolean().optional(),
 }).strip()
+
+const nvdApiKeySchema = z.string()
+  .trim()
+  .min(8, 'NVD API key must be at least 8 characters')
+  .max(256, 'NVD API key must be at most 256 characters')
+  .refine((value) => !/\s/.test(value), 'NVD API key must not contain whitespace')
 
 type ExpectedVulnerabilitySource = {
   id: string
@@ -311,6 +332,78 @@ export async function getVulnerabilityManagementSnapshot(
     },
     sources,
     cves: cveRows,
+  }
+}
+
+export async function getNvdApiKeySettings(orgId: string): Promise<NvdApiKeySettings> {
+  await requireOrgAdminAccess(orgId)
+
+  const row = await db.query.systemConfig.findFirst({
+    where: eq(systemConfig.key, NVD_API_KEY_CONFIG_KEY),
+    columns: { updatedAt: true },
+  })
+
+  return {
+    hasKey: Boolean(row),
+    updatedAt: row?.updatedAt ?? null,
+  }
+}
+
+export async function saveNvdApiKey(
+  orgId: string,
+  apiKey: unknown,
+): Promise<{ success: true } | { error: string }> {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
+    return { error: 'You do not have permission to update vulnerability settings' }
+  }
+  if (!await nvdApiKeyUpdateLimiter.check(orgId)) {
+    return { error: 'Too many NVD API key updates. Please wait before trying again.' }
+  }
+
+  const parsed = nvdApiKeySchema.safeParse(apiKey)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid NVD API key' }
+  }
+
+  try {
+    const encryptedApiKey = encrypt(parsed.data)
+    await db
+      .insert(systemConfig)
+      .values({
+        key: NVD_API_KEY_CONFIG_KEY,
+        value: encryptedApiKey,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: systemConfig.key,
+        set: {
+          value: encryptedApiKey,
+          updatedAt: new Date(),
+        },
+      })
+    return { success: true }
+  } catch {
+    return { error: 'Failed to save NVD API key' }
+  }
+}
+
+export async function clearNvdApiKey(orgId: string): Promise<{ success: true } | { error: string }> {
+  try {
+    await requireOrgAdminAccess(orgId)
+  } catch {
+    return { error: 'You do not have permission to update vulnerability settings' }
+  }
+  if (!await nvdApiKeyUpdateLimiter.check(orgId)) {
+    return { error: 'Too many NVD API key updates. Please wait before trying again.' }
+  }
+
+  try {
+    await db.delete(systemConfig).where(eq(systemConfig.key, NVD_API_KEY_CONFIG_KEY))
+    return { success: true }
+  } catch {
+    return { error: 'Failed to clear NVD API key' }
   }
 }
 

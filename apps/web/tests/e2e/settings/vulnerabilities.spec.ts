@@ -56,3 +56,31 @@ test('admin can monitor vulnerability API sources and pulled CVEs', async ({ aut
   await expect(page.getByText('CVE-2026-1001')).toBeHidden()
   await expect(page.getByText('CVE-2026-1002')).toBeVisible()
 })
+
+test('admin can store and clear an NVD API key without exposing the value', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  await sql`DELETE FROM system_config WHERE key = 'vulnerability_nvd_api_key'`
+
+  await page.goto('/settings/vulnerabilities')
+
+  await expect(page.getByLabel('NVD API key')).toBeVisible()
+  await expect(page.getByText('No key stored')).toBeVisible()
+
+  await page.getByLabel('NVD API key').fill('test-nvd-key-123456')
+  await page.getByRole('button', { name: 'Save key' }).click()
+
+  await expect(page.getByText('NVD API key saved. Restart ingest to use it.')).toBeVisible()
+  await expect(page.getByText('Stored in app settings')).toBeVisible()
+  await expect(page.getByLabel('NVD API key')).toHaveValue('')
+  await expect(page.getByText('test-nvd-key-123456')).toHaveCount(0)
+
+  const rows = await sql<Array<{ value: string }>>`
+    SELECT value FROM system_config WHERE key = 'vulnerability_nvd_api_key'
+  `
+  expect(rows).toHaveLength(1)
+  expect(rows[0]!.value).not.toContain('test-nvd-key-123456')
+
+  await page.getByRole('button', { name: 'Clear key' }).click()
+  await expect(page.getByText('NVD API key cleared. Restart ingest to remove it from active sync.')).toBeVisible()
+  await expect(page.getByText('No key stored')).toBeVisible()
+})

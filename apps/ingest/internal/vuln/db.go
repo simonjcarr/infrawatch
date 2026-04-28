@@ -6,10 +6,29 @@ import (
 	"encoding/json"
 	"time"
 
+	ctcrypto "github.com/carrtech-dev/ct-ops/ingest/internal/crypto"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const NVDAPIKeyConfigKey = "vulnerability_nvd_api_key"
+
+func GetStoredNVDAPIKey(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+	var encrypted string
+	err := pool.QueryRow(ctx, `SELECT value FROM system_config WHERE key = $1`, NVDAPIKeyConfigKey).Scan(&encrypted)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	plaintext, err := ctcrypto.Decrypt(encrypted)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
+}
 
 func UpsertCVE(ctx context.Context, pool *pgxpool.Pool, record CVERecord) error {
 	const q = `

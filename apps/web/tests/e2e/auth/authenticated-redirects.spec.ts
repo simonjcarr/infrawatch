@@ -18,7 +18,8 @@ test('pending users are redirected to approval and can sign out', async ({ authe
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
-  const userId = rows[0].user_id
+  const userId = rows[0]?.user_id
+  expect(userId).toBeTruthy()
 
   await sql`UPDATE "user" SET role = 'pending', updated_at = NOW() WHERE id = ${userId}`
 

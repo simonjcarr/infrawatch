@@ -158,3 +158,146 @@ test('host infrastructure tab shows network memberships and patch status for the
   expect(membershipRows).toHaveLength(1)
   expect(membershipRows[0]?.deleted_at).not.toBeNull()
 })
+
+test('deleting a host removes patch status data before checks', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      last_seen_at
+    )
+    VALUES (
+      'patch-delete-host-1',
+      ${orgId},
+      'patch-delete-node-1',
+      'Patch Delete Node 1',
+      'Ubuntu 24.04',
+      'x86_64',
+      '["10.20.0.11"]'::jsonb,
+      'offline',
+      NOW()
+    )
+  `
+
+  await sql`
+    INSERT INTO checks (
+      id,
+      organisation_id,
+      host_id,
+      name,
+      check_type,
+      config,
+      enabled,
+      interval_seconds
+    )
+    VALUES (
+      'patch-delete-check-1',
+      ${orgId},
+      'patch-delete-host-1',
+      'Patch status',
+      'patch_status',
+      '{"max_age_days": 30}'::jsonb,
+      true,
+      3600
+    )
+  `
+
+  await sql`
+    INSERT INTO host_patch_statuses (
+      id,
+      organisation_id,
+      host_id,
+      check_id,
+      status,
+      patch_age_days,
+      max_age_days,
+      package_manager,
+      updates_supported,
+      updates_count,
+      updates_truncated,
+      warnings,
+      checked_at
+    )
+    VALUES (
+      'patch-delete-status-1',
+      ${orgId},
+      'patch-delete-host-1',
+      'patch-delete-check-1',
+      'fail',
+      45,
+      30,
+      'apt',
+      true,
+      1,
+      false,
+      '[]'::jsonb,
+      NOW()
+    )
+  `
+
+  await sql`
+    INSERT INTO host_package_updates (
+      id,
+      organisation_id,
+      host_id,
+      name,
+      current_version,
+      available_version,
+      package_manager,
+      status,
+      first_seen_at,
+      last_seen_at
+    )
+    VALUES (
+      'patch-delete-update-1',
+      ${orgId},
+      'patch-delete-host-1',
+      'openssl',
+      '3.0.2-1',
+      '3.0.2-2',
+      'apt',
+      'current',
+      NOW(),
+      NOW()
+    )
+  `
+
+  await page.goto('/hosts/patch-delete-host-1')
+  await page.getByRole('button', { name: 'Delete Host' }).click()
+  await page.getByRole('button', { name: 'Delete permanently' }).click()
+  await expect(page).toHaveURL(/\/hosts$/)
+
+  const remaining = await sql<Array<{ table_name: string; count: string }>>`
+    SELECT 'hosts' AS table_name, count(*)::text AS count
+      FROM hosts
+      WHERE id = 'patch-delete-host-1' AND organisation_id = ${orgId}
+    UNION ALL
+    SELECT 'checks' AS table_name, count(*)::text AS count
+      FROM checks
+      WHERE id = 'patch-delete-check-1' AND organisation_id = ${orgId}
+    UNION ALL
+    SELECT 'host_patch_statuses' AS table_name, count(*)::text AS count
+      FROM host_patch_statuses
+      WHERE id = 'patch-delete-status-1' AND organisation_id = ${orgId}
+    UNION ALL
+    SELECT 'host_package_updates' AS table_name, count(*)::text AS count
+      FROM host_package_updates
+      WHERE id = 'patch-delete-update-1' AND organisation_id = ${orgId}
+  `
+
+  expect(remaining).toEqual([
+    { table_name: 'hosts', count: '0' },
+    { table_name: 'checks', count: '0' },
+    { table_name: 'host_patch_statuses', count: '0' },
+    { table_name: 'host_package_updates', count: '0' },
+  ])
+})

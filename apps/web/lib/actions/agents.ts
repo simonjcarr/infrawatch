@@ -33,6 +33,8 @@ import {
   softwareScans,
   hostVulnerabilityFindings,
   hostNetworkMemberships,
+  hostPatchStatuses,
+  hostPackageUpdates,
 } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, lte, asc, desc, sql, inArray, ilike, or, count } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
@@ -1023,6 +1025,16 @@ export async function deleteHost(
           where: and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)),
         })
       ).map((c) => c.id)
+
+      // Patch status summaries can reference both the host and its check rows,
+      // so remove them while the check IDs are still available and before the
+      // checks table is deleted.
+      await tx
+        .delete(hostPatchStatuses)
+        .where(and(eq(hostPatchStatuses.hostId, hostId), eq(hostPatchStatuses.organisationId, orgId)))
+      await tx
+        .delete(hostPackageUpdates)
+        .where(and(eq(hostPackageUpdates.hostId, hostId), eq(hostPackageUpdates.organisationId, orgId)))
 
       const hostCerts = await tx.query.certificates.findMany({
         columns: { id: true },

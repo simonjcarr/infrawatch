@@ -134,3 +134,79 @@ test('admin can create an auto-approved token that skips TLS verification', asyn
 
   expect(rows).toHaveLength(0)
 })
+
+test('admin can generate an install bundle with an existing token and bundle tags', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+  let capturedBody: Record<string, unknown> | null = null
+
+  await sql`
+    INSERT INTO agent_enrolment_tokens (
+      id,
+      organisation_id,
+      label,
+      token,
+      created_by_id,
+      auto_approve,
+      skip_verify,
+      max_uses,
+      usage_count,
+      expires_at,
+      metadata
+    )
+    VALUES (
+      'bundle-existing-token-id',
+      ${orgId},
+      'Bundle Existing Token',
+      'bundle-existing-token-value',
+      ${userId},
+      false,
+      false,
+      5,
+      0,
+      NOW() + INTERVAL '14 days',
+      '{}'::jsonb
+    )
+  `
+
+  await page.route('**/api/agent/bundle', async (route) => {
+    capturedBody = route.request().postDataJSON() as Record<string, unknown>
+
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': 'attachment; filename=\"ct-ops-agent-linux-amd64.zip\"',
+      },
+      body: 'bundle-zip-placeholder',
+    })
+  })
+
+  await page.goto('/settings/agents')
+
+  await expect(page.getByTestId('agent-enrolment-heading')).toBeVisible()
+  await page.getByRole('button', { name: 'Download Install Bundle' }).click()
+
+  await page.getByLabel('Ingest address (optional)').fill('ingest.example.internal:7443')
+  await page.getByLabel('Embed an existing token').click()
+  await page.getByLabel('Active token').click()
+  await page.getByRole('option', { name: 'Bundle Existing Token' }).click()
+  await page.getByTestId('tag-editor-key').fill('env')
+  await page.getByTestId('tag-editor-value').fill('prod')
+  await page.getByTestId('tag-editor-add').click()
+  const downloadButton = page.getByRole('dialog').getByRole('button', { name: 'Download' })
+  await downloadButton.scrollIntoViewIfNeeded()
+  await downloadButton.evaluate((button: HTMLButtonElement) => button.click())
+
+  await expect
+    .poll(() => capturedBody)
+    .toMatchObject({
+      os: 'linux',
+      arch: 'amd64',
+      ingestAddress: 'ingest.example.internal:7443',
+      tokenId: 'bundle-existing-token-id',
+      tags: [{ key: 'env', value: 'prod' }],
+    })
+
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})

@@ -8,6 +8,7 @@ import { eq, and, isNull, gt } from 'drizzle-orm'
 import type { Invitation } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
+import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 
 // 10 invite-token lookups per IP per 60 s — prevents token enumeration
 const inviteRateLimit = createRateLimiter({
@@ -86,6 +87,8 @@ export async function acceptInvite(
     const inviteRoles = normalizeAssignedRoles(invite.roles, invite.role)
     const inviteRole = getPrimaryRole(inviteRoles, invite.role)
 
+    await assertCanReserveUserSeat(invite.organisationId, { excludeInviteId: invite.id })
+
     await db
       .update(users)
       .set({
@@ -103,6 +106,10 @@ export async function acceptInvite(
 
     return { success: true }
   } catch (err) {
+    const seatLimitMessage = toSeatLimitErrorMessage(err)
+    if (seatLimitMessage) {
+      return { error: seatLimitMessage }
+    }
     logError('Failed to accept invite:', err)
     return { error: 'An unexpected error occurred' }
   }

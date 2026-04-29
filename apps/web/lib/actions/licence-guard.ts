@@ -79,6 +79,10 @@ export async function getEffectiveLicence(orgId: string): Promise<EffectiveLicen
   return loadEffectiveLicence(orgId)
 }
 
+export async function getTrustedEffectiveLicence(orgId: string): Promise<EffectiveLicence> {
+  return loadEffectiveLicence(orgId)
+}
+
 export async function hasLicenceFeature(orgId: string, feature: Feature): Promise<boolean> {
   await requireOrgAccess(orgId)
   const licence = await loadEffectiveLicence(orgId)

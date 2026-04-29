@@ -5,8 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+func TestAgentReleasesURLUsesCanonicalRepository(t *testing.T) {
+	t.Parallel()
+
+	if !strings.Contains(agentReleasesURL, "github.com/repos/carrtech-dev/ct-ops/") {
+		t.Fatalf("agentReleasesURL = %q, want canonical carrtech-dev/ct-ops repository", agentReleasesURL)
+	}
+}
 
 func TestLatestAgentVersionFromGitHubReleases(t *testing.T) {
 	t.Parallel()

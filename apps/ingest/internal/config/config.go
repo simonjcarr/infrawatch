@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const agentReleasesURL = "https://api.github.com/repos/simonjcarr/ct-ops/releases?per_page=20"
+const agentReleasesURL = "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=20"
 
 // Config is the ingest service configuration loaded from a YAML file.
 type Config struct {

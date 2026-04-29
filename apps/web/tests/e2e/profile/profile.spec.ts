@@ -28,8 +28,7 @@ test('authenticated user can update their display name from profile', async ({ a
 
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
   const nameInput = page.getByLabel('Full name')
-  await nameInput.click()
-  await nameInput.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`)
+  await nameInput.click({ clickCount: 3 })
   await nameInput.fill(updatedName)
   await page.getByRole('button', { name: 'Save' }).click()
 
@@ -103,6 +102,48 @@ test('authenticated user can change their password from profile', async ({ authe
   }
 })
 
+test('authenticated user can switch profile theme preferences and persist the selection', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+
+  await page.goto('/profile')
+
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+
+  await page.getByTestId('profile-theme-dark').click()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ theme: string }>>`
+        SELECT theme
+        FROM "user"
+        WHERE email = ${TEST_USER.email}
+        LIMIT 1
+      `
+      return rows[0]?.theme ?? null
+    })
+    .toBe('dark')
+
+  await page.reload()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+
+  await page.getByTestId('profile-theme-light').click()
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ theme: string }>>`
+        SELECT theme
+        FROM "user"
+        WHERE email = ${TEST_USER.email}
+        LIMIT 1
+      `
+      return rows[0]?.theme ?? null
+    })
+    .toBe('light')
+})
+
 test('authenticated user can opt out of in-app notifications when the organisation allows it', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { orgId, userId } = await getOrgAndUserIds(sql)
@@ -150,4 +191,45 @@ test('authenticated user can opt out of in-app notifications when the organisati
       return rows[0]?.notifications_enabled ?? null
     })
     .toBe(false)
+})
+
+test('authenticated user cannot opt out of in-app notifications when the organisation requires them', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    UPDATE organisations
+    SET metadata = jsonb_build_object(
+      'notificationSettings',
+      jsonb_build_object(
+        'inAppEnabled', true,
+        'allowUserOptOut', false,
+        'inAppRoles', '["owner","admin","member"]'::jsonb
+      )
+    )
+    WHERE id = ${orgId}
+  `
+
+  await sql`
+    UPDATE "user"
+    SET notifications_enabled = true
+    WHERE id = ${userId}
+  `
+
+  await page.goto('/profile')
+
+  await expect(page.getByText('Notifications')).toBeVisible()
+  const toggle = page.getByTestId('profile-notifications-toggle')
+  await expect(toggle).toBeDisabled()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+  const rows = await sql<Array<{ notifications_enabled: boolean }>>`
+    SELECT notifications_enabled
+    FROM "user"
+    WHERE id = ${userId}
+    LIMIT 1
+  `
+
+  expect(rows).toHaveLength(1)
+  expect(rows[0]?.notifications_enabled).toBe(true)
 })

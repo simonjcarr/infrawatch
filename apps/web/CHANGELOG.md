@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.88.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.87.0...web/v0.88.0) (2026-04-29)
+
+
+### Features
+
+* **web:** remove core Pro feature gates ([#803](https://github.com/carrtech-dev/ct-ops/issues/803)) ([241ede6](https://github.com/carrtech-dev/ct-ops/commit/241ede6084bacd0c509f21e477f5d671edc2573a))
+
 ## [0.87.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.86.0...web/v0.87.0) (2026-04-29)
 
 

@@ -31,6 +31,7 @@ type SyncConfig struct {
 	AlpineBaseURL  string
 	AlpineReleases []string
 	RedHatURL      string
+	RedHatCSAFURL  string
 }
 
 func DefaultSyncConfig() SyncConfig {
@@ -46,6 +47,7 @@ func DefaultSyncConfig() SyncConfig {
 		AlpineBaseURL:  "https://secdb.alpinelinux.org",
 		AlpineReleases: []string{"v3.18", "v3.19", "v3.20", "v3.21", "v3.22", "v3.23"},
 		RedHatURL:      "https://access.redhat.com/hydra/rest/securitydata/cve.json",
+		RedHatCSAFURL:  "https://access.redhat.com/hydra/rest/securitydata/csaf.json",
 	}
 }
 
@@ -101,6 +103,7 @@ func SyncOnce(ctx context.Context, pool *pgxpool.Pool, cfg SyncConfig) error {
 		syncAlpine,
 		syncNVD,
 		syncRedHat,
+		syncRedHatCSAF,
 	}
 	for _, source := range sources {
 		if err := source(ctx, pool, client, cfg); err != nil {
@@ -330,6 +333,39 @@ func syncRedHat(ctx context.Context, pool *pgxpool.Pool, client *http.Client, cf
 		return markSourceResult(ctx, pool, sourceID, meta, len(cves)+len(affected), err)
 	}
 	return markSourceResult(ctx, pool, sourceID, meta, len(cves)+len(affected), nil)
+}
+
+func syncRedHatCSAF(ctx context.Context, pool *pgxpool.Pool, client *http.Client, cfg SyncConfig) error {
+	if cfg.RedHatCSAFURL == "" {
+		return nil
+	}
+	sourceID := "redhat-security-data-csaf"
+	sourceURL := redHatCSAFURLWithAfter(cfg.RedHatCSAFURL)
+	body, meta, err := fetchSource(ctx, pool, client, sourceID, sourceURL)
+	if err != nil || body == nil {
+		return markSourceResult(ctx, pool, sourceID, meta, 0, err)
+	}
+	cves, affected, err := ParseRedHatCSAFList(bytes.NewReader(body))
+	if err != nil {
+		return markSourceResult(ctx, pool, sourceID, meta, 0, err)
+	}
+	if err := persistRecords(ctx, pool, cves, affected); err != nil {
+		return markSourceResult(ctx, pool, sourceID, meta, len(cves)+len(affected), err)
+	}
+	return markSourceResult(ctx, pool, sourceID, meta, len(cves)+len(affected), nil)
+}
+
+func redHatCSAFURLWithAfter(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	q := u.Query()
+	if q.Get("after") == "" {
+		q.Set("after", time.Now().AddDate(-1, 0, 0).Format("2006-01-02"))
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func persistRecords(ctx context.Context, pool *pgxpool.Pool, cves []CVERecord, affected []AffectedPackage) error {

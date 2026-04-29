@@ -92,6 +92,7 @@ type VulnerabilityConfig struct {
 	AlpineBaseURL  string        `yaml:"alpine_base_url"`
 	AlpineReleases []string      `yaml:"alpine_releases"`
 	RedHatURL      string        `yaml:"redhat_url"`
+	RedHatCSAFURL  string        `yaml:"redhat_csaf_url"`
 }
 
 // Load reads a YAML config file and applies INGEST_ environment overrides.
@@ -266,6 +267,7 @@ func defaults() *Config {
 			AlpineBaseURL:  "https://secdb.alpinelinux.org",
 			AlpineReleases: []string{"v3.18", "v3.19", "v3.20", "v3.21", "v3.22", "v3.23"},
 			RedHatURL:      "https://access.redhat.com/hydra/rest/securitydata/cve.json",
+			RedHatCSAFURL:  "https://access.redhat.com/hydra/rest/securitydata/csaf.json",
 		},
 	}
 }
@@ -352,6 +354,9 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("INGEST_VULNERABILITY_REDHAT_URL"); v != "" {
 		cfg.Vulnerability.RedHatURL = v
+	}
+	if v := os.Getenv("INGEST_VULNERABILITY_REDHAT_CSAF_URL"); v != "" {
+		cfg.Vulnerability.RedHatCSAFURL = v
 	}
 }
 

@@ -126,3 +126,54 @@ func TestParseRedHatFreeTextAffectedPackageIsProbable(t *testing.T) {
 		t.Fatalf("unexpected affected row: %#v", affected[0])
 	}
 }
+
+func TestParseRedHatCSAFListReleasedPackages(t *testing.T) {
+	t.Parallel()
+
+	doc := `[{
+	  "RHSA": "RHSA-2026:1473",
+	  "severity": "important",
+	  "released_on": "2026-01-28T10:08:56Z",
+	  "CVEs": ["CVE-2025-66199", "CVE-2025-15467"],
+	  "released_packages": [
+	    "openssl-1:3.5.1-7.el9_7.x86_64",
+	    "openssl-libs-1:3.5.1-7.el9_7.x86_64",
+	    "openssl-1:3.5.1-7.el9_7.src",
+	    "openssl-main@x86_64"
+	  ],
+	  "resource_url": "https://access.redhat.com/hydra/rest/securitydata/csaf/RHSA-2026:1473.json"
+	}]`
+
+	records, affected, err := ParseRedHatCSAFList(strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("ParseRedHatCSAFList: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("len(records) = %d, want 2: %#v", len(records), records)
+	}
+	if len(affected) != 6 {
+		t.Fatalf("len(affected) = %d, want 6: %#v", len(affected), affected)
+	}
+	var row AffectedPackage
+	for _, candidate := range affected {
+		if candidate.CVEID == "CVE-2025-15467" && candidate.PackageName == "openssl-libs" {
+			row = candidate
+			break
+		}
+	}
+	if row.CVEID != "CVE-2025-15467" || row.PackageName != "openssl-libs" {
+		t.Fatalf("unexpected affected row identity: %#v", row)
+	}
+	if row.DistroID != "rhel" || row.DistroVersionID != "9" {
+		t.Fatalf("distro = %q %q, want rhel 9", row.DistroID, row.DistroVersionID)
+	}
+	if row.FixedVersion != "1:3.5.1-7.el9_7" {
+		t.Fatalf("FixedVersion = %q, want full RPM EVR", row.FixedVersion)
+	}
+	if row.PackageState != "fixed" || row.Severity != SeverityHigh {
+		t.Fatalf("state/severity = %q/%q, want fixed/high", row.PackageState, row.Severity)
+	}
+	if !strings.Contains(string(row.MetadataJSON), "RHSA-2026:1473") {
+		t.Fatalf("metadata did not include advisory: %s", string(row.MetadataJSON))
+	}
+}

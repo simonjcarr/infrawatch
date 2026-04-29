@@ -772,7 +772,10 @@ function UploadTab({ onResult }: { onResult: (cert: ParsedCertificate, source: T
       />
 
       {error && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div
+          className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          data-testid="certificate-checker-url-error"
+        >
           <AlertCircle className="size-4 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -874,7 +877,10 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
       />
 
       {error && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div
+          className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          data-testid="certificate-checker-url-error"
+        >
           <AlertCircle className="size-4 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>

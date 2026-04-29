@@ -78,7 +78,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
+        <h1 className="text-2xl font-semibold flex items-center gap-2" data-testid="security-settings-heading">
           <ShieldCheck className="size-6" />
           Security — mTLS &amp; Agent CA
         </h1>
@@ -88,7 +88,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
         </p>
       </div>
 
-      <Card>
+      <Card data-testid="security-server-tls-card">
         <CardHeader>
           <CardTitle>Server TLS certificate</CardTitle>
           <CardDescription>
@@ -118,7 +118,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-testid="security-agent-ca-card">
         <CardHeader>
           <CardTitle>Agent CA</CardTitle>
           <CardDescription>
@@ -131,7 +131,10 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
           {data.agentCa ? (
             <>
               <div className="flex gap-2 items-center">
-                <Badge variant={data.agentCa.source === 'byo' ? 'default' : 'secondary'}>
+                <Badge
+                  variant={data.agentCa.source === 'byo' ? 'default' : 'secondary'}
+                  data-testid="security-agent-ca-source"
+                >
                   {data.agentCa.source === 'byo' ? 'Customer-provided' : 'Auto-generated'}
                 </Badge>
                 {data.agentCa.byoEnvConfigured && (
@@ -140,7 +143,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
               </div>
               <dl className="grid grid-cols-[140px,1fr] gap-y-1 mt-2">
                 <dt className="text-muted-foreground">Subject</dt>
-                <dd className="font-mono text-xs">{data.agentCa.subject}</dd>
+                <dd className="font-mono text-xs" data-testid="security-agent-ca-subject">{data.agentCa.subject}</dd>
                 <dt className="text-muted-foreground">Issuer</dt>
                 <dd className="font-mono text-xs">{data.agentCa.issuer}</dd>
                 <dt className="text-muted-foreground">Valid from</dt>
@@ -148,7 +151,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
                 <dt className="text-muted-foreground">Valid to</dt>
                 <dd>{formatIsoDate(data.agentCa.notAfter)}</dd>
                 <dt className="text-muted-foreground">SHA-256</dt>
-                <dd className="font-mono text-xs break-all">{data.agentCa.fingerprintSha256}</dd>
+                <dd className="font-mono text-xs break-all" data-testid="security-agent-ca-fingerprint">{data.agentCa.fingerprintSha256}</dd>
               </dl>
             </>
           ) : (
@@ -157,7 +160,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-testid="security-upload-card">
         <CardHeader>
           <CardTitle>Upload a custom CA</CardTitle>
           <CardDescription>
@@ -177,6 +180,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
               placeholder="-----BEGIN CERTIFICATE-----..."
               rows={8}
               className="font-mono text-xs"
+              data-testid="security-upload-cert"
             />
           </div>
           <div>
@@ -188,6 +192,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
               placeholder="-----BEGIN EC PRIVATE KEY-----..."
               rows={8}
               className="font-mono text-xs"
+              data-testid="security-upload-key"
             />
           </div>
           {uploadError && (
@@ -205,6 +210,7 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
           <Button
             onClick={() => uploadMutation.mutate()}
             disabled={uploadMutation.isPending || !certPem.trim() || !keyPem.trim()}
+            data-testid="security-upload-submit"
           >
             <Upload className="size-4 mr-2" />
             {uploadMutation.isPending ? 'Uploading…' : 'Upload CA'}

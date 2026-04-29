@@ -150,6 +150,9 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
     )
   `
 
+  await page.goto('/tasks')
+
+  await expect(page.getByTestId('task-schedules-empty')).toBeVisible()
   await page.goto('/tasks/schedules/new')
 
   await expect(page.getByTestId('task-schedule-heading-create')).toBeVisible()
@@ -162,7 +165,14 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
   await page.getByTestId('task-schedule-target-id').click()
   await page.getByRole('option', { name: /schedule-create-host-1/i }).click()
 
-  await page.getByLabel('Cron expression (5 fields: minute hour dom month dow)').fill('15 2 * * *')
+  await page.getByLabel('Cron expression (5 fields: minute hour dom month dow)').fill('bad cron')
+  await expect(page.getByTestId('task-schedule-preview-error')).toBeVisible()
+
+  await page.getByTestId('task-schedule-submit-create').click()
+  await expect(page.getByText(/^Invalid cron expression:/)).toBeVisible()
+  await expect(page).toHaveURL(/\/tasks\/schedules\/new$/)
+
+  await page.getByRole('button', { name: 'Every day at 02:00' }).click()
   await page.getByTestId('task-schedule-timezone').click()
   await page.getByRole('option', { name: 'Europe/London' }).click()
 
@@ -171,7 +181,29 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
   await page.getByTestId('task-schedule-submit-create').click()
 
   await expect(page).toHaveURL(/\/tasks$/)
-  const scheduleRow = page.getByRole('row', { name: /Nightly patch run/i })
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ id: string }>>`
+        SELECT id
+        FROM task_schedules
+        WHERE organisation_id = ${orgId}
+          AND name = 'Nightly patch run'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({ id: expect.any(String) })
+  const createdScheduleRows = await sql<Array<{ id: string }>>`
+    SELECT id
+    FROM task_schedules
+    WHERE organisation_id = ${orgId}
+      AND name = 'Nightly patch run'
+      AND deleted_at IS NULL
+    LIMIT 1
+  `
+  expect(createdScheduleRows).toHaveLength(1)
+  const scheduleRow = page.getByTestId(`task-schedule-row-${createdScheduleRows[0]!.id}`)
   await expect(scheduleRow).toContainText('Patch')
   await expect(scheduleRow).toContainText('schedule-create-host-1')
 
@@ -196,7 +228,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
     })
     .toEqual({
       name: 'Nightly patch run',
-      cron_expression: '15 2 * * *',
+      cron_expression: '0 2 * * *',
       timezone: 'Europe/London',
       target_id: 'schedule-create-host-1',
       task_type: 'patch',
@@ -342,6 +374,94 @@ test('admin can create a security-only patch schedule for a host group', async (
       max_parallel: 2,
       task_type: 'patch',
       config: { mode: 'security' },
+    })
+})
+
+test('admin can create a software inventory schedule for a single host', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      last_seen_at
+    )
+    VALUES (
+      'schedule-inventory-host-1',
+      ${orgId},
+      'schedule-inventory-host-1',
+      'Schedule Inventory Host',
+      'Ubuntu 24.04',
+      'x86_64',
+      '["10.61.0.10"]'::jsonb,
+      'online',
+      NOW()
+    )
+  `
+
+  await page.goto('/tasks/schedules/new')
+
+  await expect(page.getByTestId('task-schedule-heading-create')).toBeVisible()
+  await page.getByLabel('Name').fill('Weekly software inventory')
+  await page.getByLabel('Description (optional)').fill('Refresh installed package inventory every week.')
+
+  await page.getByTestId('task-schedule-task-type').click()
+  await page.getByRole('option', { name: 'Software inventory' }).click()
+  await expect(
+    page.getByText('No additional configuration — runs a full package inventory scan on the target.'),
+  ).toBeVisible()
+
+  await page.getByTestId('task-schedule-target-id').click()
+  await page.getByRole('option', { name: /schedule-inventory-host-1/i }).click()
+
+  await page.getByLabel('Cron expression (5 fields: minute hour dom month dow)').fill('0 5 * * 1')
+  await page.getByTestId('task-schedule-timezone').click()
+  await page.getByRole('option', { name: 'America/Chicago' }).click()
+
+  await expect(page.getByTestId('task-schedule-preview-list')).toBeVisible()
+
+  await page.getByTestId('task-schedule-submit-create').click()
+
+  await expect(page).toHaveURL(/\/tasks$/)
+  const scheduleRow = page.getByRole('row', { name: /Weekly software inventory/i })
+  await expect(scheduleRow).toContainText('Software inventory')
+  await expect(scheduleRow).toContainText('schedule-inventory-host-1')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        name: string
+        cron_expression: string
+        timezone: string
+        target_type: string
+        target_id: string
+        task_type: string
+        config: Record<string, never>
+      }>>`
+        SELECT name, cron_expression, timezone, target_type, target_id, task_type, config
+        FROM task_schedules
+        WHERE organisation_id = ${orgId}
+          AND name = 'Weekly software inventory'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      return rows[0] ?? null
+    })
+    .toEqual({
+      name: 'Weekly software inventory',
+      cron_expression: '0 5 * * 1',
+      timezone: 'America/Chicago',
+      target_type: 'host',
+      target_id: 'schedule-inventory-host-1',
+      task_type: 'software_inventory',
+      config: {},
     })
 })
 

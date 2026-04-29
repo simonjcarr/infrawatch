@@ -23,7 +23,6 @@ import type {
   SavedSoftwareReport,
   SoftwareInventorySettings,
 } from '@/lib/db/schema'
-import { requireFeature } from '@/lib/actions/licence-guard'
 import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
 import { createRateLimiter } from '@/lib/rate-limit'
@@ -257,7 +256,6 @@ export async function searchPackageNames(
   q: string,
 ): Promise<PackageNameSuggestion[]> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   if (!q || q.length < 2 || q.length > 100) return []
 
   const escaped = `%${escapeLikePattern(q)}%`
@@ -321,7 +319,6 @@ export async function getSoftwareReport(
   filters: SoftwareReportFilters = {},
 ): Promise<SoftwareReportResult> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   if (!await softwareReportLimiter.check(orgId)) {
     throw new Error('Too many requests — please wait before generating another report.')
   }
@@ -457,7 +454,6 @@ export async function getNewPackages(
   windowDays: 7 | 30 = 7,
 ): Promise<NewPackageRow[]> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - windowDays)
 
@@ -508,7 +504,6 @@ export interface DriftRow {
 
 export async function getPackageDrift(orgId: string): Promise<DriftRow[]> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   const rows = await db
     .select({
       groupId: hostGroupMembers.groupId,
@@ -599,7 +594,6 @@ export async function getPackageDetails(
   osFamily?: string,
 ): Promise<PackageDetailsResult> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   const packages = await db
     .select({
       hostId: softwarePackages.hostId,
@@ -673,7 +667,6 @@ export async function getPackageVersions(
   packageName: string,
 ): Promise<string[]> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   const rows = await db.query.softwarePackages.findMany({
     columns: { version: true },
     where: and(
@@ -764,7 +757,6 @@ const saveReportSchema = z.object({
 
 export async function listSavedReports(orgId: string): Promise<SavedSoftwareReport[]> {
   const session = await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   return db.query.savedSoftwareReports.findMany({
     where: and(
       eq(savedSoftwareReports.organisationId, orgId),
@@ -781,7 +773,6 @@ export async function saveSoftwareReport(
   filters: SoftwareReportFilters,
 ): Promise<{ success: true; id: string } | { error: string }> {
   const session = await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   const parsed = saveReportSchema.safeParse({ name, filters })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
@@ -809,7 +800,6 @@ export async function deleteSavedReport(
   reportId: string,
 ): Promise<{ success: true } | { error: string }> {
   const session = await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   try {
     await db
       .update(savedSoftwareReports)

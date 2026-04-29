@@ -79,6 +79,7 @@ function SummaryCard({
   colorClass,
   onClick,
   active,
+  testId,
 }: {
   title: string
   count: number
@@ -86,11 +87,13 @@ function SummaryCard({
   colorClass: string
   onClick: () => void
   active: boolean
+  testId: string
 }) {
   return (
     <Card
       className={`cursor-pointer transition-colors ${active ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
       onClick={onClick}
+      data-testid={testId}
     >
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -297,6 +300,7 @@ export function ServiceAccountsClient({
           colorClass="text-foreground"
           onClick={() => setStatusFilter('all')}
           active={statusFilter === 'all'}
+          testId="service-accounts-summary-total"
         />
         <SummaryCard
           title="Active"
@@ -305,6 +309,7 @@ export function ServiceAccountsClient({
           colorClass="text-green-600"
           onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
           active={statusFilter === 'active'}
+          testId="service-accounts-summary-active"
         />
         <SummaryCard
           title="Disabled"
@@ -313,6 +318,7 @@ export function ServiceAccountsClient({
           colorClass="text-gray-500"
           onClick={() => setStatusFilter(statusFilter === 'disabled' ? 'all' : 'disabled')}
           active={statusFilter === 'disabled'}
+          testId="service-accounts-summary-disabled"
         />
         <SummaryCard
           title="Locked"
@@ -321,6 +327,7 @@ export function ServiceAccountsClient({
           colorClass="text-red-600"
           onClick={() => setStatusFilter(statusFilter === 'locked' ? 'all' : 'locked')}
           active={statusFilter === 'locked'}
+          testId="service-accounts-summary-locked"
         />
         <SummaryCard
           title="Expired"
@@ -329,6 +336,7 @@ export function ServiceAccountsClient({
           colorClass="text-amber-600"
           onClick={() => setStatusFilter(statusFilter === 'expired' ? 'all' : 'expired')}
           active={statusFilter === 'expired'}
+          testId="service-accounts-summary-expired"
         />
       </div>
 

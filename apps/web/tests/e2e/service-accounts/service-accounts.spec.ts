@@ -54,6 +54,22 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
         'Legacy Service',
         'svc-disabled@example.com',
         'disabled'
+      ),
+      (
+        'svc-account-locked',
+        ${orgId},
+        'svc-locked',
+        'Locked Service',
+        'svc-locked@example.com',
+        'locked'
+      ),
+      (
+        'svc-account-expired',
+        ${orgId},
+        'svc-expired',
+        'Expired Service',
+        'svc-expired@example.com',
+        'expired'
       )
   `
 
@@ -62,6 +78,27 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
   await expect(page.getByTestId('service-accounts-heading')).toBeVisible()
   await expect(page.getByTestId('service-account-row-svc-account-active')).toContainText('svc-active')
   await expect(page.getByTestId('service-account-row-svc-account-disabled')).toContainText('svc-disabled')
+  await expect(page.getByTestId('service-account-row-svc-account-locked')).toContainText('svc-locked')
+  await expect(page.getByTestId('service-account-row-svc-account-expired')).toContainText('svc-expired')
+  await expect(page.getByText('4 service accounts tracked')).toBeVisible()
+
+  await page.getByTestId('service-accounts-summary-locked').click()
+  await expect(page.getByTestId('service-account-row-svc-account-locked')).toBeVisible()
+  await expect(page.getByTestId('service-account-row-svc-account-active')).toHaveCount(0)
+  await expect(page.getByTestId('service-account-row-svc-account-disabled')).toHaveCount(0)
+  await expect(page.getByTestId('service-account-row-svc-account-expired')).toHaveCount(0)
+
+  await page.getByTestId('service-accounts-summary-expired').click()
+  await expect(page.getByTestId('service-account-row-svc-account-expired')).toBeVisible()
+  await expect(page.getByTestId('service-account-row-svc-account-active')).toHaveCount(0)
+  await expect(page.getByTestId('service-account-row-svc-account-disabled')).toHaveCount(0)
+  await expect(page.getByTestId('service-account-row-svc-account-locked')).toHaveCount(0)
+
+  await page.getByTestId('service-accounts-summary-total').click()
+  await expect(page.getByTestId('service-account-row-svc-account-active')).toBeVisible()
+  await expect(page.getByTestId('service-account-row-svc-account-disabled')).toBeVisible()
+  await expect(page.getByTestId('service-account-row-svc-account-locked')).toBeVisible()
+  await expect(page.getByTestId('service-account-row-svc-account-expired')).toBeVisible()
 
   await page.getByTestId('service-accounts-search-input').fill('Legacy Service')
   await expect(page.getByTestId('service-account-row-svc-account-disabled')).toBeVisible()
@@ -84,7 +121,7 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
 
   const newRow = page.getByRole('row').filter({ hasText: 'svc-reporting' })
   await expect(newRow).toContainText('Reporting Service')
-  await expect(page.getByText('3 service accounts tracked')).toBeVisible()
+  await expect(page.getByText('5 service accounts tracked')).toBeVisible()
 
   const rows = await sql<Array<{ username: string; status: string; email: string | null }>>`
     SELECT username, status, email

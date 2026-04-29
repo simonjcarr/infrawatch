@@ -532,7 +532,7 @@ export function NotificationsClient({
               </CardHeader>
 
               {expandedId === n.id && (
-                <CardContent className="pt-0 pb-3 px-4 border-t">
+                <CardContent className="pt-0 pb-3 px-4 border-t" data-testid={`notification-detail-${n.id}`}>
                   <div className="pt-3 space-y-3">
                     <p className="text-sm text-foreground">{n.body}</p>
                     <div className="flex items-center gap-2">
@@ -540,6 +540,7 @@ export function NotificationsClient({
                         size="sm"
                         variant="outline"
                         onClick={() => router.push(getResourceUrl(n.resourceType, n.resourceId))}
+                        data-testid={`notification-view-resource-${n.id}`}
                       >
                         <ExternalLink className="size-3.5 mr-1.5" />
                         View {n.resourceType}
@@ -550,6 +551,7 @@ export function NotificationsClient({
                           variant="ghost"
                           onClick={() => markReadMutation.mutate(n.id)}
                           disabled={markReadMutation.isPending}
+                          data-testid={`notification-mark-read-${n.id}`}
                         >
                           <CheckCircle2 className="size-3.5 mr-1.5" />
                           Mark as read
@@ -563,6 +565,7 @@ export function NotificationsClient({
                             qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
                             qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
                           })}
+                          data-testid={`notification-mark-unread-${n.id}`}
                         >
                           Mark as unread
                         </Button>
@@ -576,6 +579,7 @@ export function NotificationsClient({
                           deleteMutation.mutate(n.id)
                         }}
                         disabled={deleteMutation.isPending}
+                        data-testid={`notification-delete-${n.id}`}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>

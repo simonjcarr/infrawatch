@@ -318,3 +318,91 @@ test('authenticated user can mark selected read notifications as unread', async 
       { id: 'notification-mark-unread-3', read: false },
     ])
 })
+
+test('authenticated user can expand a notification, change its read state, and delete it', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO notifications (
+      id,
+      organisation_id,
+      user_id,
+      subject,
+      body,
+      severity,
+      resource_type,
+      resource_id,
+      read,
+      created_at
+    )
+    VALUES (
+      'notification-row-actions-1',
+      ${orgId},
+      ${userId},
+      'Review the host details',
+      'The host detail page has new inventory data ready to review.',
+      'info',
+      'host',
+      'host-row-actions-1',
+      true,
+      NOW() - INTERVAL '4 minutes'
+    )
+  `
+
+  await page.goto('/notifications')
+
+  const notificationCard = page.getByTestId('notification-card-notification-row-actions-1')
+  await expect(notificationCard).toBeVisible()
+
+  await notificationCard.getByText('Review the host details').click()
+  await expect(page.getByTestId('notification-detail-notification-row-actions-1')).toContainText(
+    'The host detail page has new inventory data ready to review.',
+  )
+
+  await page.getByTestId('notification-mark-unread-notification-row-actions-1').click()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ read: boolean }>>`
+        SELECT read
+        FROM notifications
+        WHERE id = 'notification-row-actions-1'
+        LIMIT 1
+      `
+      return rows[0]?.read ?? null
+    })
+    .toBe(false)
+
+  await expect(page.getByTestId('notifications-tab-unread')).toContainText('1')
+
+  await page.getByTestId('notification-mark-read-notification-row-actions-1').click()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ read: boolean }>>`
+        SELECT read
+        FROM notifications
+        WHERE id = 'notification-row-actions-1'
+        LIMIT 1
+      `
+      return rows[0]?.read ?? null
+    })
+    .toBe(true)
+
+  await page.getByTestId('notification-delete-notification-row-actions-1').click()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ deleted_at: Date | null }>>`
+        SELECT deleted_at
+        FROM notifications
+        WHERE id = 'notification-row-actions-1'
+        LIMIT 1
+      `
+      return rows[0]?.deleted_at ?? null
+    })
+    .toEqual(expect.any(Date))
+
+  await expect(page.getByTestId('notification-card-notification-row-actions-1')).toHaveCount(0)
+})

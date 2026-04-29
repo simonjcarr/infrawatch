@@ -1,7 +1,6 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -39,7 +38,6 @@ function severityDot(severity: string) {
 }
 
 export function NotificationBell({ orgId, userId }: NotificationBellProps) {
-  const router = useRouter()
   const qc = useQueryClient()
 
   const { data: unreadCount = 0 } = useQuery({
@@ -72,18 +70,20 @@ export function NotificationBell({ orgId, userId }: NotificationBellProps) {
     },
   })
 
-  function handleNotificationClick(n: Notification) {
-    markReadMutation.mutate(n.id)
-    router.push(getResourceUrl(n.resourceType, n.resourceId))
+  function navigateTo(path: string) {
+    window.location.assign(path)
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" data-testid="notification-bell-trigger">
           <Bell className="size-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
+            <span
+              className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none"
+              data-testid="notification-bell-unread-count"
+            >
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -98,6 +98,7 @@ export function NotificationBell({ orgId, userId }: NotificationBellProps) {
               variant="ghost"
               size="sm"
               className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+              data-testid="notification-bell-mark-all-read"
               onClick={(e) => {
                 e.preventDefault()
                 markAllMutation.mutate()
@@ -118,20 +119,25 @@ export function NotificationBell({ orgId, userId }: NotificationBellProps) {
               <DropdownMenuItem
                 key={n.id}
                 className="flex items-start gap-2.5 p-3 cursor-pointer"
-                onClick={() => handleNotificationClick(n)}
+                data-testid={`notification-bell-item-${n.id}`}
+                onSelect={(event) => {
+                  event.preventDefault()
+                  markReadMutation.mutate(n.id)
+                  navigateTo(getResourceUrl(n.resourceType, n.resourceId))
+                }}
               >
-                {severityDot(n.severity)}
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm leading-snug truncate ${n.read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>
-                    {n.subject}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                  </p>
-                </div>
-                {!n.read && (
-                  <span className="size-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
-                )}
+                  {severityDot(n.severity)}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm leading-snug truncate ${n.read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>
+                      {n.subject}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                  {!n.read && (
+                    <span className="size-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                  )}
               </DropdownMenuItem>
             ))}
           </div>
@@ -139,7 +145,11 @@ export function NotificationBell({ orgId, userId }: NotificationBellProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="justify-center text-sm text-muted-foreground hover:text-foreground cursor-pointer py-2"
-          onClick={() => router.push('/notifications')}
+          data-testid="notification-bell-view-all"
+          onSelect={(event) => {
+            event.preventDefault()
+            navigateTo('/notifications')
+          }}
         >
           View all notifications
         </DropdownMenuItem>

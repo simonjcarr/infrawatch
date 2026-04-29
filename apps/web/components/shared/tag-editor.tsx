@@ -171,6 +171,7 @@ export function TagEditor({
                 <Input
                   id="tag-editor-key"
                   ref={keyRef}
+                  data-testid="tag-editor-key"
                   value={keyInput}
                   onChange={(e) => {
                     setKeyInput(e.target.value)
@@ -219,6 +220,7 @@ export function TagEditor({
                 <Input
                   id="tag-editor-value"
                   ref={valueRef}
+                  data-testid="tag-editor-value"
                   value={valueInput}
                   onChange={(e) => {
                     setValueInput(e.target.value)
@@ -261,6 +263,7 @@ export function TagEditor({
             size="sm"
             onClick={commitFromInputs}
             disabled={!keyInput.trim() || !valueInput.trim()}
+            data-testid="tag-editor-add"
           >
             Add
           </Button>

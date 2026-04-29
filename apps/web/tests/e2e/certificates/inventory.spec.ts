@@ -101,12 +101,64 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
       )
   `
 
+  await sql`
+    INSERT INTO certificate_events (
+      id,
+      organisation_id,
+      certificate_id,
+      event_type,
+      previous_status,
+      new_status,
+      message,
+      occurred_at
+    )
+    VALUES
+      (
+        'cert-event-discovered',
+        ${orgId},
+        'cert-e2e-valid',
+        'discovered',
+        NULL,
+        'valid',
+        'Discovered certificate from TLS handshake.',
+        NOW() - INTERVAL '10 days'
+      ),
+      (
+        'cert-event-renewed',
+        ${orgId},
+        'cert-e2e-valid',
+        'renewed',
+        'expiring_soon',
+        'valid',
+        'Certificate was renewed and validity extended.',
+        NOW() - INTERVAL '2 days'
+      )
+  `
+
   await page.goto('/certificates')
 
   await expect(page.getByTestId('certificates-heading')).toBeVisible()
   await expect(page.getByTestId('certificate-row-cert-e2e-valid')).toContainText('api.example.com')
   await expect(page.getByTestId('certificate-row-cert-e2e-expiring')).toContainText('edge.example.com')
   await expect(page.getByTestId('certificate-row-cert-e2e-expired')).toContainText('legacy.example.com')
+
+  await page.getByTestId('certificate-row-cert-e2e-valid').click()
+
+  await expect(page.getByTestId('certificate-detail-heading')).toContainText('api.example.com')
+  await expect(page.getByTestId('certificate-detail-host-port')).toContainText('api.example.com:443')
+  await expect(page.getByTestId('certificate-detail-fingerprint')).toContainText('sha256-valid')
+  await expect(page.getByTestId('certificate-detail-san-api.example.com')).toBeVisible()
+  await expect(page.getByTestId('certificate-detail-subject')).toContainText('CN=api.example.com')
+  await expect(page.getByTestId('certificate-detail-event-cert-event-discovered')).toContainText('Discovered')
+  await expect(page.getByTestId('certificate-detail-event-cert-event-discovered')).toContainText(
+    'Discovered certificate from TLS handshake.',
+  )
+  await expect(page.getByTestId('certificate-detail-event-cert-event-renewed')).toContainText('Renewed')
+  await expect(page.getByTestId('certificate-detail-event-cert-event-renewed')).toContainText(
+    'Certificate was renewed and validity extended.',
+  )
+
+  await page.goto('/certificates')
 
   await page.getByTestId('certificates-filter-host').fill('edge')
   await expect(page.getByTestId('certificate-row-cert-e2e-expiring')).toBeVisible()

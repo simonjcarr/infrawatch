@@ -88,6 +88,8 @@ async function main() {
   console.log(`  nbf        : ${!payload.nbf || payload.nbf <= now ? 'OK' : 'NOT YET VALID'}`)
   console.log(`  tier       : ${payload.tier}`)
   console.log(`  features   : ${JSON.stringify(payload.features)}`)
+  console.log(`  maxUsers   : ${payload.maxUsers ?? '(unset)'}`)
+  console.log(`  maxHosts   : ${payload.maxHosts ?? '(unset)'}`)
 
   console.log('--- Signature verification ---')
   await verifyWith('DEV public key', DEV_PUBLIC_KEY_PEM, jwt)

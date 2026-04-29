@@ -1,6 +1,9 @@
 package vuln
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Severity string
 
@@ -100,7 +103,27 @@ func normalizeSeverity(value string) Severity {
 
 func sourceVersionForMatch(pkg InventoryPackage, affected AffectedPackage) string {
 	if pkg.SourceName != "" && pkg.SourceName == affected.PackageName && pkg.SourceVersion != "" {
+		if pkg.Source == "rpm" {
+			return bestRPMVersionForMatch(pkg.Version, pkg.SourceVersion)
+		}
 		return pkg.SourceVersion
 	}
 	return pkg.Version
+}
+
+func bestRPMVersionForMatch(installedVersion, sourceVersion string) string {
+	if sourceVersion == "" {
+		return installedVersion
+	}
+	if installedVersion == "" {
+		return sourceVersion
+	}
+	sourceHasEpoch := strings.Contains(sourceVersion, ":")
+	installedHasEpoch := strings.Contains(installedVersion, ":")
+	sourceHasRelease := strings.Contains(sourceVersion, "-")
+	installedHasRelease := strings.Contains(installedVersion, "-")
+	if (!sourceHasRelease && installedHasRelease) || (!sourceHasEpoch && installedHasEpoch) {
+		return installedVersion
+	}
+	return sourceVersion
 }

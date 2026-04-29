@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 81 — RPM CVE comparison tightening
+
+**RPM match accuracy** (`apps/ingest/internal/vuln/`)
+- Tightened RPM source-package matching so upstream-only `source_version` values from older inventory scans no longer cause false positives against full vendor fixed EVRs.
+- The matcher now prefers the installed package EVR when it contains release/epoch detail missing from the source version, while preserving source-version matching for non-RPM package managers.
+- Added coverage for implicit zero epochs, fixed packages with equal EVR, newer Alma downstream releases, and source-package matches where `source_version` is upstream-only.
+
+**Validation**
+- Validation run: `go test ./internal/vuln` and `go test ./...` from `apps/ingest`.
+
 ### Session 80 — Red Hat CSAF package advisory ingestion
 
 **Confirmed RPM advisory data** (`apps/ingest/internal/vuln/`)

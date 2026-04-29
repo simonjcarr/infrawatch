@@ -125,6 +125,66 @@ func TestRPMBackportReleaseDoesNotMatchFixedPackage(t *testing.T) {
 	}
 }
 
+func TestRPMSourcePackageMatchUsesInstalledEVRWhenSourceVersionIsUpstreamOnly(t *testing.T) {
+	t.Parallel()
+
+	pkg := InventoryPackage{
+		Name:            "libarchive",
+		Version:         "3.5.3-9.el9_7",
+		Source:          "rpm",
+		DistroID:        "almalinux",
+		DistroIDLike:    []string{"rhel", "centos", "fedora"},
+		DistroVersionID: "9.7",
+		SourceName:      "libarchive",
+		SourceVersion:   "3.5.3",
+	}
+	affected := AffectedPackage{
+		Source:          "redhat-security-data",
+		DistroID:        "rhel",
+		DistroVersionID: "9",
+		PackageName:     "libarchive",
+		FixedVersion:    "0:3.5.3-9.el9_7",
+	}
+
+	match, reason := MatchPackage(pkg, affected)
+	if match {
+		t.Fatalf("expected installed RPM package not to match, reason=%q", reason)
+	}
+	if reason != "installed version is fixed" {
+		t.Fatalf("reason = %q, want fixed package reason", reason)
+	}
+}
+
+func TestRPMDownstreamReleaseDoesNotMatchOlderRHELFixedEVR(t *testing.T) {
+	t.Parallel()
+
+	pkg := InventoryPackage{
+		Name:            "openssh",
+		Version:         "8.7p1-48.el9_7.alma.1",
+		Source:          "rpm",
+		DistroID:        "almalinux",
+		DistroIDLike:    []string{"rhel", "centos", "fedora"},
+		DistroVersionID: "9.7",
+		SourceName:      "openssh",
+		SourceVersion:   "8.7p1",
+	}
+	affected := AffectedPackage{
+		Source:          "redhat-security-data",
+		DistroID:        "rhel",
+		DistroVersionID: "9",
+		PackageName:     "openssh",
+		FixedVersion:    "0:8.7p1-48.el9_7",
+	}
+
+	match, reason := MatchPackage(pkg, affected)
+	if match {
+		t.Fatalf("expected downstream RPM release not to match older fixed EVR, reason=%q", reason)
+	}
+	if reason != "installed version is fixed" {
+		t.Fatalf("reason = %q, want fixed package reason", reason)
+	}
+}
+
 func TestRPMRHELCompatibleDistroMatchesRedHatAdvisory(t *testing.T) {
 	t.Parallel()
 

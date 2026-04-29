@@ -30,6 +30,15 @@ func TestCompareRPMVersions(t *testing.T) {
 	if got := CompareDistroVersion("rpm", "2:1.0-1", "1:9.9-9"); got != 1 {
 		t.Fatalf("rpm epoch compare = %d, want 1", got)
 	}
+	if got := CompareDistroVersion("rpm", "3.5.3-9.el9_7", "0:3.5.3-9.el9_7"); got != 0 {
+		t.Fatalf("rpm implicit zero epoch compare = %d, want 0", got)
+	}
+	if got := CompareDistroVersion("rpm", "3.5.3-9.el9_7", "0:3.5.3-7.el9_7"); got != 1 {
+		t.Fatalf("rpm newer release compare = %d, want 1", got)
+	}
+	if got := CompareDistroVersion("rpm", "8.7p1-48.el9_7.alma.1", "0:8.7p1-48.el9_7"); got != 1 {
+		t.Fatalf("rpm downstream release compare = %d, want 1", got)
+	}
 }
 
 func TestCompareAlpineVersions(t *testing.T) {

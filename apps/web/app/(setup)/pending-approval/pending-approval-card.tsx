@@ -15,9 +15,9 @@ export function PendingApprovalCard() {
   }
 
   return (
-    <Card>
+    <Card data-testid="pending-approval-card">
       <CardHeader>
-        <CardTitle>Account pending approval</CardTitle>
+        <CardTitle data-testid="pending-approval-heading">Account pending approval</CardTitle>
         <CardDescription>
           Your account has been created but needs to be approved by an administrator.
           You&apos;ll be able to access the dashboard once a role has been assigned to you.
@@ -29,7 +29,12 @@ export function PendingApprovalCard() {
         </p>
       </CardContent>
       <CardFooter>
-        <Button variant="outline" className="w-full" onClick={handleSignOut}>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleSignOut}
+          data-testid="pending-approval-signout"
+        >
           Sign out
         </Button>
       </CardFooter>

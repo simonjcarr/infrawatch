@@ -24,8 +24,10 @@ test('read-only users cannot access tooling pages or certificate checker API', a
     await expect(page.getByText('Tooling')).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'SSL Certificate Checker' })).toHaveCount(0)
 
-    await page.goto('/certificate-checker')
-    await expect(page).toHaveURL(/\/dashboard$/)
+    for (const path of ['/certificate-checker', '/directory-lookup', '/tasks', '/build-docs']) {
+      await page.goto(path)
+      await expect(page).toHaveURL(/\/dashboard$/)
+    }
 
     const response = await page.request.post(`${baseURL}/api/tools/certificate-checker`, {
       headers: {

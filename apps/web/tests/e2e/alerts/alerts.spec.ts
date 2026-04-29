@@ -228,3 +228,82 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
     },
   ])
 })
+
+test('admin can create a silence and an email notification channel from the alerts page', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status
+    )
+    VALUES (
+      'alert-host-create',
+      ${orgId},
+      'app-edge',
+      'App Edge',
+      'Ubuntu 24.04',
+      'x86_64',
+      '["10.10.1.10"]'::jsonb,
+      'online'
+    )
+  `
+
+  await page.goto('/alerts')
+
+  await expect(page.getByTestId('alerts-heading')).toBeVisible()
+
+  await page.getByTestId('alerts-add-silence').click()
+  await page.getByLabel(/Host/).selectOption('alert-host-create')
+  await page.getByLabel('Reason').fill('E2E maintenance window')
+  await page.getByLabel('Starts at').fill('2026-04-29T09:00')
+  await page.getByLabel('Ends at').fill('2026-04-29T11:00')
+  await page.getByTestId('alert-silence-submit').click()
+
+  const silenceRow = page.getByRole('row').filter({ hasText: 'E2E maintenance window' })
+  await expect(silenceRow).toContainText('app-edge')
+
+  await page.getByTestId('alerts-add-email').click()
+  await page.getByLabel('Name').fill('Escalation Email')
+  await page.getByLabel('Recipients').fill('alerts2@example.com, team@example.com')
+  await page.getByTestId('alert-email-submit').click()
+
+  const channelRow = page.getByRole('row').filter({ hasText: 'Escalation Email' })
+  await expect(channelRow).toContainText('alerts2@example.com')
+  await expect(channelRow).toContainText('team@example.com')
+
+  const createdRows = await sql<Array<{
+    silence_reason: string | null
+    silence_host_id: string | null
+    silence_created_by: string | null
+    channel_name: string | null
+    channel_type: string | null
+    recipients: string[] | null
+  }>>`
+    SELECT
+      (SELECT reason FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_reason,
+      (SELECT host_id FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_host_id,
+      (SELECT created_by FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_created_by,
+      (SELECT name FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_name,
+      (SELECT type FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_type,
+      (SELECT ARRAY(SELECT jsonb_array_elements_text(config->'toAddresses')) FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS recipients
+  `
+
+  expect(createdRows).toEqual([
+    {
+      silence_reason: 'E2E maintenance window',
+      silence_host_id: 'alert-host-create',
+      silence_created_by: userId,
+      channel_name: 'Escalation Email',
+      channel_type: 'smtp',
+      recipients: ['alerts2@example.com', 'team@example.com'],
+    },
+  ])
+})

@@ -26,6 +26,7 @@ export class LicenceRequiredError extends Error {
 export type EffectiveLicence = {
   tier: LicenceTier
   features: Feature[]
+  maxUsers?: number
   maxHosts?: number
   licenceId?: string
   expiresAt?: Date
@@ -66,6 +67,7 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
   return {
     tier: result.payload.tier,
     features: result.payload.features,
+    maxUsers: result.payload.maxUsers,
     maxHosts: result.payload.maxHosts,
     licenceId: result.payload.jti,
     expiresAt: new Date(result.payload.exp * 1000),

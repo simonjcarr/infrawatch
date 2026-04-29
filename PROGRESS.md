@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 82 — Seat-capacity licence payload
+
+**Licence entitlement model** (`apps/web/lib/licence.ts`, `apps/web/lib/actions/licence-guard.ts`)
+- Added validated `maxUsers` support to signed CT-Ops licence payloads and the effective licence object used by trusted server-side guard paths.
+- Tightened capacity claim parsing so `maxUsers` and legacy `maxHosts` are accepted only when they are positive safe integers.
+- Kept `maxHosts` as a legacy optional host cap for compatibility while the migration moves commercial CT-Ops licensing toward user-seat capacity.
+
+**Validation**
+- Added licence validation coverage for `maxUsers`, invalid capacity claims, and expired paid licences.
+- Validation run: `node --experimental-strip-types --test lib/licence.test.mjs` from `apps/web`.
+
 ### Session 81 — RPM CVE comparison tightening
 
 **RPM match accuracy** (`apps/ingest/internal/vuln/`)

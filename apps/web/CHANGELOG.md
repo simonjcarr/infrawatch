@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.2...web/v0.82.3) (2026-04-29)
+
+
+### Bug Fixes
+
+* **web:** avoid build-doc editor hydration mismatch ([#748](https://github.com/carrtech-dev/ct-ops/issues/748)) ([1d8aebb](https://github.com/carrtech-dev/ct-ops/commit/1d8aebbe4cde0e13c5ac0e1f27637d1361f08169))
+
 ## [0.82.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.1...web/v0.82.2) (2026-04-29)
 
 

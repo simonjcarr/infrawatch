@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.6.0...ingest/v0.6.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **ingest:** enforce inventory JWT expiry ([#762](https://github.com/carrtech-dev/ct-ops/issues/762)) ([94603ba](https://github.com/carrtech-dev/ct-ops/commit/94603ba031c0f163f6d04e7c5e097fa70d786b03))
+
 ## [0.6.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.5.0...ingest/v0.6.0) (2026-04-28)
 
 

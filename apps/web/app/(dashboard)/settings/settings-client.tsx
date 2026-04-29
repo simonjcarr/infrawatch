@@ -495,7 +495,7 @@ export function SettingsClient({
                   onValueChange={setRetentionDays}
                   disabled={retentionMutation.isPending}
                 >
-                  <SelectTrigger id="retention-select" className="w-48">
+                  <SelectTrigger id="retention-select" className="w-48" data-testid="settings-retention-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -524,11 +524,12 @@ export function SettingsClient({
                   size="sm"
                   disabled={retentionMutation.isPending || retentionDays === String(org.metricRetentionDays ?? 30)}
                   onClick={() => retentionMutation.mutate(Number(retentionDays))}
+                  data-testid="settings-retention-save"
                 >
                   {retentionMutation.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 {retentionSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-retention-success">
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>
@@ -566,6 +567,7 @@ export function SettingsClient({
                 </div>
                 <Switch
                   checked={currentCollectionSettings.cpu}
+                  data-testid="settings-collection-cpu-toggle"
                   onCheckedChange={(checked) =>
                     setLocalCollectionSettings({ ...currentCollectionSettings, cpu: checked })
                   }
@@ -578,6 +580,7 @@ export function SettingsClient({
                 </div>
                 <Switch
                   checked={currentCollectionSettings.memory}
+                  data-testid="settings-collection-memory-toggle"
                   onCheckedChange={(checked) =>
                     setLocalCollectionSettings({ ...currentCollectionSettings, memory: checked })
                   }
@@ -590,6 +593,7 @@ export function SettingsClient({
                 </div>
                 <Switch
                   checked={currentCollectionSettings.disk}
+                  data-testid="settings-collection-disk-toggle"
                   onCheckedChange={(checked) =>
                     setLocalCollectionSettings({ ...currentCollectionSettings, disk: checked })
                   }
@@ -602,6 +606,7 @@ export function SettingsClient({
                 </div>
                 <Switch
                   checked={currentCollectionSettings.localUsers}
+                  data-testid="settings-collection-local-users-toggle"
                   onCheckedChange={(checked) =>
                     setLocalCollectionSettings({ ...currentCollectionSettings, localUsers: checked })
                   }
@@ -612,11 +617,12 @@ export function SettingsClient({
                   size="sm"
                   disabled={!collectionDirty || collectionMutation.isPending}
                   onClick={() => collectionMutation.mutate(currentCollectionSettings)}
+                  data-testid="settings-collection-save"
                 >
                   {collectionMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
                 {collectionSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-collection-success">
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>
@@ -1188,6 +1194,7 @@ export function SettingsClient({
                 </div>
                 <Switch
                   checked={currentSwInvSettings.enabled}
+                  data-testid="settings-software-enabled-toggle"
                   onCheckedChange={(checked) =>
                     setLocalSwInvSettings({ ...currentSwInvSettings, enabled: checked })
                   }
@@ -1208,6 +1215,7 @@ export function SettingsClient({
                       min={1}
                       max={720}
                       className="w-32"
+                      data-testid="settings-software-interval-input"
                       value={currentSwInvSettings.intervalHours}
                       onChange={(e) => {
                         const n = parseInt(e.target.value, 10)
@@ -1224,6 +1232,7 @@ export function SettingsClient({
                         <Checkbox
                           id="sw-inv-snap"
                           checked={currentSwInvSettings.includeSnapFlatpak ?? false}
+                          data-testid="settings-software-snap-toggle"
                           onCheckedChange={(checked) =>
                             setLocalSwInvSettings({
                               ...currentSwInvSettings,
@@ -1239,6 +1248,7 @@ export function SettingsClient({
                         <Checkbox
                           id="sw-inv-winstore"
                           checked={currentSwInvSettings.includeWindowsStore ?? false}
+                          data-testid="settings-software-windows-store-toggle"
                           onCheckedChange={(checked) =>
                             setLocalSwInvSettings({
                               ...currentSwInvSettings,
@@ -1259,11 +1269,12 @@ export function SettingsClient({
                   size="sm"
                   disabled={!swInvDirty || swInvMutation.isPending}
                   onClick={() => swInvMutation.mutate(currentSwInvSettings)}
+                  data-testid="settings-software-save"
                 >
                   {swInvMutation.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 {swInvSaveSuccess && (
-                  <span className="flex items-center gap-1 text-sm text-green-700">
+                  <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-software-success">
                     <CheckCircle2 className="size-4" />
                     Saved
                   </span>

@@ -296,6 +296,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
                   key={option.value}
                   type="button"
                   disabled={themeSaving}
+                  data-testid={`profile-theme-${option.value}`}
                   onClick={async () => {
                     if (isSelected) return
                     setCurrentTheme(option.value)

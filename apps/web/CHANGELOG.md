@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.86.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.85.0...web/v0.86.0) (2026-04-29)
+
+
+### Features
+
+* **web:** enforce user seat limits ([#798](https://github.com/carrtech-dev/ct-ops/issues/798)) ([731b223](https://github.com/carrtech-dev/ct-ops/commit/731b2232ce2588f9394472553e4cf53fb881c882))
+
 ## [0.85.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.3...web/v0.85.0) (2026-04-29)
 
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"strings"
 	"time"
 
 	ctcrypto "github.com/carrtech-dev/ct-ops/ingest/internal/crypto"
@@ -298,7 +299,8 @@ func loadHostPackages(ctx context.Context, pool *pgxpool.Pool, hostID string) ([
 		SELECT id, organisation_id, host_id, name, version, source,
 		       COALESCE(distro_id, ''), COALESCE(distro_version_id, ''),
 		       COALESCE(distro_codename, ''), COALESCE(source_name, ''),
-		       COALESCE(source_version, ''), COALESCE(repository, '')
+		       COALESCE(source_version, ''), COALESCE(repository, ''),
+		       COALESCE(distro_id_like, '[]'::jsonb)::text
 		FROM software_packages
 		WHERE host_id = $1
 		  AND deleted_at IS NULL
@@ -313,13 +315,15 @@ func loadHostPackages(ctx context.Context, pool *pgxpool.Pool, hostID string) ([
 	var pkgs []InventoryPackage
 	for rows.Next() {
 		var pkg InventoryPackage
+		var distroIDLikeJSON string
 		if err := rows.Scan(
 			&pkg.ID, &pkg.OrganisationID, &pkg.HostID, &pkg.Name, &pkg.Version, &pkg.Source,
 			&pkg.DistroID, &pkg.DistroVersionID, &pkg.DistroCodename,
-			&pkg.SourceName, &pkg.SourceVersion, &pkg.Repository,
+			&pkg.SourceName, &pkg.SourceVersion, &pkg.Repository, &distroIDLikeJSON,
 		); err != nil {
 			return nil, err
 		}
+		_ = json.Unmarshal([]byte(distroIDLikeJSON), &pkg.DistroIDLike)
 		pkgs = append(pkgs, pkg)
 	}
 	return pkgs, rows.Err()
@@ -330,6 +334,8 @@ func loadAffectedCandidates(ctx context.Context, pool *pgxpool.Pool, pkg Invento
 	if pkg.SourceName != "" && pkg.SourceName != pkg.Name {
 		nameCandidates = append(nameCandidates, pkg.SourceName)
 	}
+	distroCandidates := affectedDistroCandidates(pkg)
+	majorVersion := majorRHELDistroVersion(pkg)
 	rows, err := pool.Query(ctx, `
 		SELECT vap.id, vap.cve_id, vap.source, vap.distro_id,
 		       COALESCE(vap.distro_version_id, ''), COALESCE(vap.distro_codename, ''),
@@ -337,11 +343,11 @@ func loadAffectedCandidates(ctx context.Context, pool *pgxpool.Pool, pkg Invento
 		       COALESCE(vap.fixed_version, ''), COALESCE(vap.affected_versions, '[]'::jsonb)::text,
 		       COALESCE(vap.repository, ''), vap.severity, COALESCE(vap.package_state, '')
 		FROM vulnerability_affected_packages vap
-		WHERE vap.distro_id = $1
-		  AND (vap.distro_version_id IS NULL OR vap.distro_version_id = $2)
-		  AND (vap.distro_codename IS NULL OR vap.distro_codename = $3)
-		  AND vap.package_name = ANY($4::text[])
-	`, pkg.DistroID, pkg.DistroVersionID, pkg.DistroCodename, nameCandidates)
+		WHERE vap.distro_id = ANY($1::text[])
+		  AND (vap.distro_version_id IS NULL OR vap.distro_version_id = $2 OR ($3 <> '' AND vap.distro_version_id = $3))
+		  AND (vap.distro_codename IS NULL OR vap.distro_codename = $4)
+		  AND vap.package_name = ANY($5::text[])
+	`, distroCandidates, pkg.DistroVersionID, majorVersion, pkg.DistroCodename, nameCandidates)
 	if err != nil {
 		return nil, err
 	}
@@ -363,6 +369,24 @@ func loadAffectedCandidates(ctx context.Context, pool *pgxpool.Pool, pkg Invento
 		out = append(out, row)
 	}
 	return out, rows.Err()
+}
+
+func affectedDistroCandidates(pkg InventoryPackage) []string {
+	candidates := []string{pkg.DistroID}
+	if pkg.Source == "rpm" && isRHELCompatibleDistro(pkg) && !strings.EqualFold(pkg.DistroID, "rhel") {
+		candidates = append(candidates, "rhel")
+	}
+	return candidates
+}
+
+func majorRHELDistroVersion(pkg InventoryPackage) string {
+	if pkg.Source != "rpm" || !isRHELCompatibleDistro(pkg) || pkg.DistroVersionID == "" {
+		return ""
+	}
+	if idx := strings.Index(pkg.DistroVersionID, "."); idx > 0 {
+		return pkg.DistroVersionID[:idx]
+	}
+	return ""
 }
 
 type findingTx interface {

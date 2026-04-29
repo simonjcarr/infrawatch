@@ -125,6 +125,63 @@ func TestRPMBackportReleaseDoesNotMatchFixedPackage(t *testing.T) {
 	}
 }
 
+func TestRPMRHELCompatibleDistroMatchesRedHatAdvisory(t *testing.T) {
+	t.Parallel()
+
+	pkg := InventoryPackage{
+		Name:            "openssl-libs",
+		Version:         "1:3.5.1-5.el9_7",
+		Source:          "rpm",
+		DistroID:        "almalinux",
+		DistroIDLike:    []string{"rhel", "centos", "fedora"},
+		DistroVersionID: "9.7",
+		SourceName:      "openssl",
+		SourceVersion:   "1:3.5.1-5.el9_7",
+	}
+	affected := AffectedPackage{
+		Source:          "redhat-security-data",
+		DistroID:        "rhel",
+		DistroVersionID: "9",
+		PackageName:     "openssl",
+		FixedVersion:    "1:3.5.1-7.el9_7",
+	}
+
+	match, reason := MatchPackage(pkg, affected)
+	if !match {
+		t.Fatalf("MatchPackage returned false: %s", reason)
+	}
+	if reason != "installed rpm evr is below vendor fixed evr" {
+		t.Fatalf("reason = %q, want RPM EVR-specific reason", reason)
+	}
+}
+
+func TestRPMNonRHELCompatibleDistroDoesNotMatchRedHatAdvisory(t *testing.T) {
+	t.Parallel()
+
+	pkg := InventoryPackage{
+		Name:            "openssl-libs",
+		Version:         "1:3.5.1-5.el9_7",
+		Source:          "rpm",
+		DistroID:        "suse",
+		DistroIDLike:    []string{"suse"},
+		DistroVersionID: "9.7",
+		SourceName:      "openssl",
+		SourceVersion:   "1:3.5.1-5.el9_7",
+	}
+	affected := AffectedPackage{
+		Source:          "redhat-security-data",
+		DistroID:        "rhel",
+		DistroVersionID: "9",
+		PackageName:     "openssl",
+		FixedVersion:    "1:3.5.1-7.el9_7",
+	}
+
+	match, reason := MatchPackage(pkg, affected)
+	if match || reason != "distro mismatch" {
+		t.Fatalf("MatchPackage = %v, %q; want distro mismatch", match, reason)
+	}
+}
+
 func TestUpsertFindingStoresConfirmedConfidenceAndReason(t *testing.T) {
 	t.Parallel()
 

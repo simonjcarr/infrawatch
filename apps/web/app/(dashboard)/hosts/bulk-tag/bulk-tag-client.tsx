@@ -119,7 +119,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Bulk Tag Hosts</h1>
+        <h1 className="text-2xl font-semibold" data-testid="bulk-tag-heading">Bulk Tag Hosts</h1>
         <p className="text-muted-foreground text-sm">
           Select hosts by filter, preview matches, and apply tags. Optionally save the filter as a
           rule that auto-applies to future matching hosts at approval time.
@@ -133,6 +133,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               ? 'border-destructive/50 bg-destructive/10 text-destructive'
               : 'border-secondary bg-secondary text-secondary-foreground'
           }`}
+          data-testid="bulk-tag-message"
         >
           {message.text}
         </div>
@@ -151,6 +152,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               placeholder="web-*.prod"
               value={hostnameGlob}
               onChange={(e) => setHostnameGlob(e.target.value)}
+              data-testid="bulk-tag-filter-hostname-glob"
             />
           </div>
           <div className="space-y-1">
@@ -160,6 +162,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               placeholder="db"
               value={hostnameContains}
               onChange={(e) => setHostnameContains(e.target.value)}
+              data-testid="bulk-tag-filter-hostname-contains"
             />
           </div>
           <div className="space-y-1">
@@ -169,6 +172,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               placeholder="10.0.0.0/8 192.168.1.0/24"
               value={ipCidrs}
               onChange={(e) => setIpCidrs(e.target.value)}
+              data-testid="bulk-tag-filter-ip-cidrs"
             />
           </div>
           <div className="space-y-1">
@@ -178,6 +182,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               placeholder="linux, windows"
               value={osList}
               onChange={(e) => setOsList(e.target.value)}
+              data-testid="bulk-tag-filter-os"
             />
           </div>
           <div className="space-y-1">
@@ -187,6 +192,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               placeholder="amd64, arm64"
               value={archList}
               onChange={(e) => setArchList(e.target.value)}
+              data-testid="bulk-tag-filter-arch"
             />
           </div>
           <div className="space-y-1">
@@ -196,6 +202,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               placeholder="online"
               value={statusList}
               onChange={(e) => setStatusList(e.target.value)}
+              data-testid="bulk-tag-filter-status"
             />
           </div>
         </CardContent>
@@ -219,12 +226,14 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
           variant="outline"
           onClick={() => previewMutation.mutate()}
           disabled={previewMutation.isPending}
+          data-testid="bulk-tag-preview"
         >
           Preview matches
         </Button>
         <Button
           onClick={() => applyMutation.mutate()}
           disabled={!canApply || applyMutation.isPending}
+          data-testid="bulk-tag-apply"
         >
           Apply tags
         </Button>
@@ -232,6 +241,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
           variant="secondary"
           onClick={() => setSaveOpen(true)}
           disabled={tags.length === 0}
+          data-testid="bulk-tag-save-open"
         >
           Save as rule
         </Button>
@@ -240,11 +250,11 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
       {preview && (
         <Card>
           <CardHeader>
-            <CardTitle>Matching hosts ({preview.length})</CardTitle>
+            <CardTitle data-testid="bulk-tag-preview-heading">Matching hosts ({preview.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {preview.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No hosts match the current filter.</p>
+              <p className="text-muted-foreground text-sm" data-testid="bulk-tag-preview-empty">No hosts match the current filter.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -257,7 +267,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
                 </TableHeader>
                 <TableBody>
                   {preview.map((h) => (
-                    <TableRow key={h.id}>
+                    <TableRow key={h.id} data-testid={`bulk-tag-preview-row-${h.id}`}>
                       <TableCell>{h.displayName ?? h.hostname}</TableCell>
                       <TableCell>{h.os ?? '—'}</TableCell>
                       <TableCell>{h.status}</TableCell>
@@ -289,6 +299,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
               value={ruleName}
               onChange={(e) => setRuleName(e.target.value)}
               placeholder="EU prod zone"
+              data-testid="bulk-tag-rule-name"
             />
           </div>
           <DialogFooter>
@@ -298,6 +309,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
             <Button
               onClick={() => saveRuleMutation.mutate()}
               disabled={!ruleName.trim() || saveRuleMutation.isPending}
+              data-testid="bulk-tag-rule-save"
             >
               Save rule
             </Button>

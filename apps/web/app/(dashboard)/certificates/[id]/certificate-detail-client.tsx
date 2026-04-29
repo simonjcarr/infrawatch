@@ -80,10 +80,10 @@ export function CertificateDetailClient({ orgId: _orgId, initialCertificate, ini
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-semibold text-foreground truncate">{cert.commonName}</h1>
+            <h1 className="text-2xl font-semibold text-foreground truncate" data-testid="certificate-detail-heading">{cert.commonName}</h1>
             <CertificateStatusBadge status={cert.status as CertificateStatus} />
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 text-sm" data-testid="certificate-detail-host-port">
             {cert.host}:{cert.port}
             {cert.serverName !== cert.host ? ` (SNI: ${cert.serverName})` : ''}
           </p>
@@ -126,7 +126,7 @@ export function CertificateDetailClient({ orgId: _orgId, initialCertificate, ini
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-1">
-            <code className="text-sm font-mono break-all text-foreground">{cert.fingerprintSha256}</code>
+            <code className="text-sm font-mono break-all text-foreground" data-testid="certificate-detail-fingerprint">{cert.fingerprintSha256}</code>
             <CopyButton value={cert.fingerprintSha256} />
           </div>
         </CardContent>
@@ -141,7 +141,7 @@ export function CertificateDetailClient({ orgId: _orgId, initialCertificate, ini
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {sans.map((san) => (
-                <Badge key={san} variant="secondary" className="font-mono text-xs">
+                <Badge key={san} variant="secondary" className="font-mono text-xs" data-testid={`certificate-detail-san-${san}`}>
                   {san}
                 </Badge>
               ))}
@@ -159,7 +159,7 @@ export function CertificateDetailClient({ orgId: _orgId, initialCertificate, ini
           <CardContent className="space-y-2 text-sm">
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
               <span className="text-muted-foreground font-medium">Subject</span>
-              <span className="font-mono break-all">{details.subject}</span>
+              <span className="font-mono break-all" data-testid="certificate-detail-subject">{details.subject}</span>
               <span className="text-muted-foreground font-medium">Serial Number</span>
               <span className="font-mono break-all">{details.serialNumber}</span>
               <span className="text-muted-foreground font-medium">Signature Algorithm</span>
@@ -219,7 +219,7 @@ export function CertificateDetailClient({ orgId: _orgId, initialCertificate, ini
           ) : (
             <div className="space-y-3">
               {events.map((ev) => (
-                <div key={ev.id} className="flex items-start gap-3">
+                <div key={ev.id} className="flex items-start gap-3" data-testid={`certificate-detail-event-${ev.id}`}>
                   <Clock className="size-4 text-muted-foreground mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

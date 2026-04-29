@@ -20,6 +20,8 @@
   },
   "pnpm": {
     "overrides": {
+      "esbuild": "0.28.0",
+      "postcss": "8.5.12",
       "webpack": "5.99.0"
     }
   }

@@ -29,7 +29,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
 
   if (!hostIdB) {
     return (
-      <div className="max-w-2xl space-y-4">
+      <div className="max-w-2xl space-y-4" data-testid="host-compare-empty-state">
         <Link
           href={`/hosts/${hostIdA}`}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -55,7 +55,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
           <ArrowLeft className="size-3.5" />
           Back
         </Link>
-        <h1 className="text-xl font-semibold flex items-center gap-2">
+        <h1 className="text-xl font-semibold flex items-center gap-2" data-testid="host-compare-heading">
           <GitCompare className="size-5" />
           Package comparison
         </h1>
@@ -73,7 +73,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
       {data && (
         <div className="space-y-6">
           {data.differentVersion.length > 0 && (
-            <div>
+            <div data-testid="host-compare-different-versions">
               <h2 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 Different versions
                 <Badge variant="secondary">{data.differentVersion.length}</Badge>
@@ -89,7 +89,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
                   </TableHeader>
                   <TableBody>
                     {data.differentVersion.map((row) => (
-                      <TableRow key={row.name}>
+                      <TableRow key={row.name} data-testid={`host-compare-different-row-${row.name}`}>
                         <TableCell className="font-mono text-sm">{row.name}</TableCell>
                         <TableCell className="font-mono text-sm text-amber-700">
                           {row.versionA}
@@ -106,7 +106,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
           )}
 
           {data.onlyInA.length > 0 && (
-            <div>
+            <div data-testid="host-compare-only-in-a">
               <h2 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 Only in host A
                 <Badge variant="secondary">{data.onlyInA.length}</Badge>
@@ -121,7 +121,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
                   </TableHeader>
                   <TableBody>
                     {data.onlyInA.map((pkg) => (
-                      <TableRow key={pkg.id}>
+                      <TableRow key={pkg.id} data-testid={`host-compare-only-in-a-row-${pkg.name}`}>
                         <TableCell className="font-mono text-sm">{pkg.name}</TableCell>
                         <TableCell className="font-mono text-sm text-muted-foreground">
                           {pkg.version}
@@ -135,7 +135,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
           )}
 
           {data.onlyInB.length > 0 && (
-            <div>
+            <div data-testid="host-compare-only-in-b">
               <h2 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 Only in host B
                 <Badge variant="secondary">{data.onlyInB.length}</Badge>
@@ -150,7 +150,7 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
                   </TableHeader>
                   <TableBody>
                     {data.onlyInB.map((pkg) => (
-                      <TableRow key={pkg.id}>
+                      <TableRow key={pkg.id} data-testid={`host-compare-only-in-b-row-${pkg.name}`}>
                         <TableCell className="font-mono text-sm">{pkg.name}</TableCell>
                         <TableCell className="font-mono text-sm text-muted-foreground">
                           {pkg.version}
@@ -167,7 +167,9 @@ export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
             data.onlyInA.length === 0 &&
             data.onlyInB.length === 0 && (
               <div className="text-center py-12 text-sm text-muted-foreground">
+                <span data-testid="host-compare-identical-message">
                 These hosts have identical package sets.
+                </span>
               </div>
             )}
         </div>

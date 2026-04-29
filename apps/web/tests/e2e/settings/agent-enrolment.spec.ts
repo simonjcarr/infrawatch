@@ -34,12 +34,14 @@ test('admin can create and revoke an enrolment token from agent settings', async
   await page.getByTestId('agent-enrolment-create-submit').click()
 
   const installCommand = page.getByTestId('agent-enrolment-install-command')
-  await expect(installCommand).toContainText('/api/agent/install?token=')
+  await expect(installCommand).toContainText('/api/agent/install')
+  await expect(installCommand).not.toContainText('token=')
   await expect(installCommand).not.toContainText('skip_verify=true')
 
   await page.getByText('Show raw token (for manual config)').click()
   const rawToken = (await page.getByTestId('agent-enrolment-raw-token').textContent())?.trim()
   expect(rawToken).toBeTruthy()
+  await expect(installCommand).not.toContainText(rawToken!)
 
   await expect
     .poll(async () => {

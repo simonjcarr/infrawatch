@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.0...ingest/v0.8.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **vuln:** prefer full rpm evr for matching ([#788](https://github.com/carrtech-dev/ct-ops/issues/788)) ([4024fc4](https://github.com/carrtech-dev/ct-ops/commit/4024fc40393f55b69c36ffaf8f015c9aa4eac3a8))
+
 ## [0.8.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.7.0...ingest/v0.8.0) (2026-04-29)
 
 

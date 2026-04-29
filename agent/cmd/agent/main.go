@@ -105,11 +105,15 @@ func main() {
 
 	// ── Install mode: self-install as a system service, then exit ─────────────
 	if *installFlag {
-		if *tokenFlag == "" {
-			slog.Error("--token is required when using --install")
+		token := strings.TrimSpace(*tokenFlag)
+		if token == "" {
+			token = strings.TrimSpace(os.Getenv("CT_OPS_ORG_TOKEN"))
+		}
+		if token == "" {
+			slog.Error("--token or CT_OPS_ORG_TOKEN is required when using --install")
 			os.Exit(1)
 		}
-		if err := install.Run(*tokenFlag, strings.TrimSpace(*addressFlag), *tlsSkipVerifyFlag, []string(tagFlags)); err != nil {
+		if err := install.Run(token, strings.TrimSpace(*addressFlag), *tlsSkipVerifyFlag, []string(tagFlags)); err != nil {
 			slog.Error("install failed", "err", err)
 			os.Exit(1)
 		}

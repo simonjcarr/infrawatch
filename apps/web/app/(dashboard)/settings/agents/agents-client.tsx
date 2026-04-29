@@ -47,6 +47,7 @@ import {
   DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,
   DEFAULT_ENROLMENT_TOKEN_MAX_USES,
 } from '@/lib/agent/enrolment-token-policy'
+import { buildAgentInstallCommand } from '@/lib/agent/install-script'
 
 const createTokenSchema = z.object({
   label: z.string().min(1, 'Label is required').max(100),
@@ -83,16 +84,6 @@ function CopyButton({ text }: { text: string }) {
       )}
     </Button>
   )
-}
-
-function buildInstallCommand(token: string, skipVerify: boolean, appUrl: string): string {
-  const origin = appUrl.replace(/\/$/, '') || window.location.origin
-  const installUrl = new URL(`${origin}/api/agent/install`)
-  installUrl.searchParams.set('token', token)
-  if (skipVerify) {
-    installUrl.searchParams.set('skip_verify', 'true')
-  }
-  return `curl -fsSL "${installUrl.toString()}" | sudo bash`
 }
 
 function tokenStatus(token: EnrolmentTokenSafe): { label: string; className: string } {
@@ -164,7 +155,9 @@ export function AgentsSettingsClient({
       if ('error' in result) return
       queryClient.invalidateQueries({ queryKey: ['enrolment-tokens', orgId] })
       setNewTokenValue(result.token)
-      setNewInstallCommand(buildInstallCommand(result.token, variables.skipVerify, appUrl))
+      setNewInstallCommand(
+        buildAgentInstallCommand(appUrl || window.location.origin, variables.skipVerify),
+      )
       reset()
       setTokenTags([])
     },
@@ -344,14 +337,14 @@ export function AgentsSettingsClient({
             <DialogTitle>Create Enrolment Token</DialogTitle>
             <DialogDescription>
               Agents use this token to register with your organisation. You&apos;ll get a
-              ready-to-run install command.
+              bootstrap command that reads the token from <code>CT_OPS_ORG_TOKEN</code>.
             </DialogDescription>
           </DialogHeader>
 
           {newTokenValue && newInstallCommand ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Token created. Run this command on each server you want to enrol:
+                Token created. Export the raw token on the target host, then run this command:
               </p>
 
                 <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
@@ -371,7 +364,7 @@ export function AgentsSettingsClient({
                     <CopyButton text={newTokenValue} />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    This token will not be shown again in full.
+                    This token will not be shown again in full. Export it as <code>CT_OPS_ORG_TOKEN</code> before running the install command.
                   </p>
                 </div>
               </details>

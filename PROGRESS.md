@@ -1541,12 +1541,12 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - Already-cached versions skipped; failures logged but never prevent server start
 - Fresh servers are immediately ready to serve installs without a cold-cache delay on first request
 
-**One-command install** (`apps/web/app/api/agent/install/route.ts`, `agent/cmd/agent/main.go`)
-- `curl -fsSL "https://server/api/agent/install?token=TOKEN" | sh` — complete zero-touch setup
-- Shell script detects OS/arch, downloads versioned binary, runs `--install --token TOKEN`
-- Agent `--install` flag: copies binary to system path, writes TOML config, installs service unit, starts service
+**Bootstrap install script** (`apps/web/app/api/agent/install/route.ts`, `agent/cmd/agent/main.go`)
+- `curl -fsSL "https://server/api/agent/install" | sh` downloads the installer without placing enrolment tokens into URLs
+- Shell script detects OS/arch, downloads the versioned binary, and installs when `CT_OPS_ORG_TOKEN` is present in the runtime environment
+- Agent `--install` accepts either `--token` or `CT_OPS_ORG_TOKEN`, then copies the binary to the system path, writes TOML config, installs the service unit, and starts the service
 - Also supports `-address` CLI flag and `CT_OPS_ORG_TOKEN` / `CT_OPS_INGEST_ADDRESS` env vars for config-less operation
-- Enrolment token dialog shows the ready-to-run curl command as the primary action
+- Enrolment token dialog now keeps the token separate from the installer command so the secret is not reflected into copied URLs
 
 **Multi-platform service install** (`agent/internal/install/install.go`, `agent/cmd/agent/service_windows.go`)
 - **Linux:** systemd unit written to `/etc/systemd/system/ct-ops-agent.service`, `systemctl enable --now`

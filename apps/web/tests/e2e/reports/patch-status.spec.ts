@@ -13,7 +13,6 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 test('patch status report shows organisation compliance by network and host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
-
   await sql`
     INSERT INTO hosts (
       id,

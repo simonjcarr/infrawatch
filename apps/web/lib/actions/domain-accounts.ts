@@ -8,7 +8,6 @@ import { db } from '@/lib/db'
 import { domainAccounts } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
 import type { DomainAccount, DomainAccountStatus } from '@/lib/db/schema'
-import { requireFeature } from '@/lib/actions/licence-guard'
 import { escapeLikePattern } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,7 +52,6 @@ export async function getDomainAccounts(
   filters: DomainAccountListFilters = {},
 ): Promise<DomainAccount[]> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'serviceAccountTracker')
   const {
     status,
     search,
@@ -94,7 +92,6 @@ export async function getDomainAccount(
   accountId: string,
 ): Promise<DomainAccount | null> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'serviceAccountTracker')
   const result = await db.query.domainAccounts.findFirst({
     where: and(
       eq(domainAccounts.id, accountId),
@@ -109,7 +106,6 @@ export async function getDomainAccountCounts(
   orgId: string,
 ): Promise<DomainAccountCounts> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'serviceAccountTracker')
   const statusRows = await db
     .select({
       status: domainAccounts.status,
@@ -145,7 +141,6 @@ export async function createDomainAccount(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'serviceAccountTracker')
   const parsed = createDomainAccountSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -183,7 +178,6 @@ export async function updateDomainAccount(
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'serviceAccountTracker')
   const parsed = updateDomainAccountSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -221,7 +215,6 @@ export async function deleteDomainAccount(
   accountId: string,
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'serviceAccountTracker')
   const existing = await db.query.domainAccounts.findFirst({
     where: and(
       eq(domainAccounts.id, accountId),

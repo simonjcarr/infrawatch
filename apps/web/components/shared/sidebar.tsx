@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { TerminalPanelTrigger } from '@/components/terminal'
-import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
+import type { LicenceTier } from '@/lib/features'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import pkg from '../../package.json'
 
@@ -53,7 +53,6 @@ interface NavChild {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
-  feature?: Feature
 }
 
 interface NavItem {
@@ -61,7 +60,6 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
-  feature?: Feature
   children?: NavChild[]
 }
 
@@ -79,8 +77,8 @@ const primaryNav: NavItem[] = [
   },
   { title: 'Checks & Alerts', href: '/alerts', icon: Bell },
   { title: 'Notifications', href: '/notifications', icon: BellPlus },
-  { title: 'Certificates', href: '/certificates', icon: ShieldCheck, feature: 'certExpiryTracker' },
-  { title: 'Service Accounts', href: '/service-accounts', icon: Key, feature: 'serviceAccountTracker' },
+  { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
+  { title: 'Service Accounts', href: '/service-accounts', icon: Key },
 ]
 
 const reportingNav: NavItem[] = [
@@ -91,7 +89,7 @@ const reportingNav: NavItem[] = [
     children: [
       { title: 'Installed Software', href: '/reports/software', icon: Package },
       { title: 'Patch Status', href: '/reports/patch-status', icon: ShieldCheck },
-      { title: 'Vulnerabilities', href: '/reports/vulnerabilities', icon: ShieldAlert, feature: 'reportsExport' },
+      { title: 'Vulnerabilities', href: '/reports/vulnerabilities', icon: ShieldAlert },
     ],
   },
 ]
@@ -115,14 +113,6 @@ const adminNav: NavItem[] = [
   { title: 'System', href: '/settings/system', icon: HeartPulse },
 ]
 
-function ProBadge() {
-  return (
-    <span className="ml-auto rounded-sm border border-sidebar-border/70 px-1 py-0 text-[9px] font-semibold uppercase tracking-wide text-sidebar-foreground/60">
-      Pro
-    </span>
-  )
-}
-
 function CollapsibleNavItem({
   item,
   tier,
@@ -143,7 +133,6 @@ function CollapsibleNavItem({
   // For /hosts specifically: active when on /hosts exactly or /hosts/groups/* but NOT /hosts/[id]
   // The parent highlight just needs to know if we're somewhere in the subtree
   const defaultOpen = isParentActive || isAnyChildActive
-  const parentLocked = item.feature ? !hasFeature(tier, item.feature) : false
 
   return (
     <CollapsiblePrimitive.Root defaultOpen={defaultOpen}>
@@ -162,11 +151,10 @@ function CollapsibleNavItem({
               )}
             />
             <span>{item.title}</span>
-            {parentLocked ? <ProBadge /> : null}
             <ChevronRight
               className={cn(
                 'size-3 text-sidebar-foreground/50 transition-transform duration-200',
-                parentLocked ? 'ml-1' : 'ml-auto',
+                'ml-auto',
                 defaultOpen && 'rotate-90'
               )}
             />
@@ -181,7 +169,6 @@ function CollapsibleNavItem({
                 child.href === '/hosts' || child.href === '/settings'
                   ? pathname === child.href
                   : pathname.startsWith(child.href)
-              const childLocked = child.feature ? !hasFeature(tier, child.feature) : false
               return (
                 <SidebarMenuSubItem key={child.href}>
                   <SidebarMenuSubButton asChild isActive={isActive}>
@@ -193,7 +180,6 @@ function CollapsibleNavItem({
                         )}
                       />
                       <span>{child.title}</span>
-                      {childLocked ? <ProBadge /> : null}
                     </Link>
                   </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
@@ -225,14 +211,12 @@ function NavGroupItems({ items, tier }: { items: NavItem[]; tier: LicenceTier })
           item.href === '/dashboard' || item.href === '/settings'
             ? pathname === item.href
             : pathname.startsWith(item.href)
-        const locked = item.feature ? !hasFeature(tier, item.feature) : false
         return (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton asChild isActive={isActive}>
               <Link href={item.href}>
                 <item.icon className={cn('size-4', isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/70')} />
                 <span>{item.title}</span>
-                {locked ? <ProBadge /> : null}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

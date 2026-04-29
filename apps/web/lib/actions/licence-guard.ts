@@ -5,12 +5,7 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 import { validateLicenceKey } from '@/lib/licence'
-import {
-  hasFeature,
-  type Feature,
-  type LicenceTier,
-  COMMUNITY_MAX_RETENTION_DAYS,
-} from '@/lib/features'
+import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
 
 export class LicenceRequiredError extends Error {
   constructor(
@@ -101,11 +96,4 @@ export async function requireFeature(orgId: string, feature: Feature): Promise<v
     licence.tier,
     `Feature '${feature}' requires a higher licence tier (current: ${licence.tier})`,
   )
-}
-
-export async function clampRetentionDays(orgId: string, days: number): Promise<number> {
-  await requireOrgAccess(orgId)
-  const extended = await hasLicenceFeature(orgId, 'metricRetentionExtended')
-  if (extended) return days
-  return Math.min(days, COMMUNITY_MAX_RETENTION_DAYS)
 }

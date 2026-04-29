@@ -10,8 +10,6 @@ import { organisations } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
 import { encodeActivationToken } from '@/lib/licence-activation-token'
-import { hasLicenceFeature } from '@/lib/actions/licence-guard'
-import { COMMUNITY_MAX_RETENTION_DAYS } from '@/lib/features'
 import { writeAuditEvent } from '@/lib/audit/events'
 
 const updateOrgNameSchema = z.object({
@@ -63,13 +61,6 @@ export async function updateMetricRetention(
   const parsed = metricRetentionSchema.safeParse({ days })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid value' }
-  }
-
-  const canExtend = await hasLicenceFeature(orgId, 'metricRetentionExtended')
-  if (!canExtend && parsed.data.days > COMMUNITY_MAX_RETENTION_DAYS) {
-    return {
-      error: `Retention above ${COMMUNITY_MAX_RETENTION_DAYS} days requires a Pro or Enterprise licence`,
-    }
   }
 
   try {

@@ -7,7 +7,6 @@ import { systemConfig } from '@/lib/db/schema'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { encrypt } from '@/lib/crypto/encrypt'
 import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
-import { requireFeature } from '@/lib/actions/licence-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
 import {
   deriveHostVulnerabilityAssessmentStatus,
@@ -439,7 +438,6 @@ export async function getVulnerabilityReport(
   filters: VulnerabilityReportFilters = {},
 ): Promise<VulnerabilityReport> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
   if (!await reportLimiter.check(orgId)) {
     throw new Error('Too many vulnerability report requests. Please wait before trying again.')
   }

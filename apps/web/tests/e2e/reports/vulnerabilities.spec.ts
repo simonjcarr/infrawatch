@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
-import { issueTestLicence } from '../fixtures/licence'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
@@ -14,15 +13,6 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 test('vulnerability report filters open findings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
-  const licenceKey = await issueTestLicence({ orgId, tier: 'pro' })
-
-  await sql`
-    UPDATE organisations
-    SET licence_key = ${licenceKey},
-        licence_tier = 'pro'
-    WHERE id = ${orgId}
-  `
-
   await sql`
     INSERT INTO hosts (id, organisation_id, hostname, display_name, os, arch, status)
     VALUES ('report-vuln-host-1', ${orgId}, 'report-vuln-node-1', 'Report Vuln Node', 'linux', 'x86_64', 'online')
@@ -67,15 +57,6 @@ test('vulnerability report filters open findings', async ({ authenticatedPage: p
 test('vulnerability report applies host group, severity, KEV, and fix filters', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
-  const licenceKey = await issueTestLicence({ orgId, tier: 'pro' })
-
-  await sql`
-    UPDATE organisations
-    SET licence_key = ${licenceKey},
-        licence_tier = 'pro'
-    WHERE id = ${orgId}
-  `
-
   await sql`
     INSERT INTO host_groups (
       id,

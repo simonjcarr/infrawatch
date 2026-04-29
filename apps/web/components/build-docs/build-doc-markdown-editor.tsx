@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import {
   BlockTypeSelect,
   BoldItalicUnderlineToggles,
@@ -40,6 +40,10 @@ interface BuildDocMarkdownEditorProps {
   testId?: string
 }
 
+function subscribeToClientSnapshot() {
+  return () => {}
+}
+
 export function BuildDocMarkdownEditor({
   id,
   name,
@@ -53,6 +57,7 @@ export function BuildDocMarkdownEditor({
   const editorRef = useRef<MDXEditorMethods>(null)
   const latestValue = useRef(value)
   const mounted = useRef(false)
+  const isClient = useSyncExternalStore(subscribeToClientSnapshot, () => true, () => false)
 
   const plugins = useMemo(() => {
     const basePlugins = [
@@ -123,21 +128,31 @@ export function BuildDocMarkdownEditor({
       )}
     >
       {name && <textarea name={name} value={value} readOnly hidden />}
-      <MDXEditor
-        ref={editorRef}
-        markdown={value}
-        onChange={handleChange}
-        readOnly={readOnly}
-        placeholder={placeholder}
-        suppressHtmlProcessing
-        trim={false}
-        plugins={plugins}
-        className="build-doc-markdown-editor__root"
-        contentEditableClassName={cn(
-          'build-doc-markdown-editor__content',
-          fullscreen ? 'min-h-[calc(100vh-17rem)]' : 'min-h-[300px]',
-        )}
-      />
+      {isClient ? (
+        <MDXEditor
+          ref={editorRef}
+          markdown={value}
+          onChange={handleChange}
+          readOnly={readOnly}
+          placeholder={placeholder}
+          suppressHtmlProcessing
+          trim={false}
+          plugins={plugins}
+          className="build-doc-markdown-editor__root"
+          contentEditableClassName={cn(
+            'build-doc-markdown-editor__content',
+            fullscreen ? 'min-h-[calc(100vh-17rem)]' : 'min-h-[300px]',
+          )}
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className={cn(
+            'build-doc-markdown-editor__content',
+            fullscreen ? 'min-h-[calc(100vh-17rem)]' : 'min-h-[300px]',
+          )}
+        />
+      )}
     </div>
   )
 }

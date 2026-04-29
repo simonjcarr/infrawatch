@@ -56,7 +56,7 @@ export function SetupEmailForm({ userId, username }: SetupEmailFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Set your email address</CardTitle>
+        <CardTitle data-testid="setup-email-heading">Set your email address</CardTitle>
         <CardDescription>
           Welcome, {username}. Your directory account does not have an email address configured.
           Please provide one to continue.
@@ -65,7 +65,7 @@ export function SetupEmailForm({ userId, username }: SetupEmailFormProps) {
       <form onSubmit={handleSubmit((values) => mutate(values))}>
         <CardContent className="space-y-4">
           {serverError && (
-            <p className="text-sm text-destructive">{serverError}</p>
+            <p className="text-sm text-destructive" data-testid="setup-email-error">{serverError}</p>
           )}
           <div className="space-y-1.5">
             <Label htmlFor="email">Email address</Label>
@@ -74,15 +74,18 @@ export function SetupEmailForm({ userId, username }: SetupEmailFormProps) {
               type="email"
               autoComplete="email"
               placeholder="you@example.com"
+              data-testid="setup-email-input"
               {...register('email')}
             />
             {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
+              <p className="text-xs text-destructive" data-testid="setup-email-validation-error">
+                {errors.email.message}
+              </p>
             )}
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={isPending}>
+          <Button type="submit" className="w-full" disabled={isPending} data-testid="setup-email-submit">
             {isPending ? 'Saving...' : 'Continue'}
           </Button>
         </CardFooter>

@@ -1,28 +1,22 @@
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
-import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { getDomainAccountCounts } from '@/lib/actions/domain-accounts'
 import { LicenceRequiredError } from '@/lib/actions/licence-guard'
+import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-  })
-  if (!user?.organisationId) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  let session
+  try {
+    session = await getApiOrgSession()
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return Response.json({ error: err.message }, { status: err.status })
+    }
+    throw err
   }
 
   try {
-    const counts = await getDomainAccountCounts(user.organisationId)
+    const counts = await getDomainAccountCounts(session.user.organisationId)
     return Response.json(counts)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

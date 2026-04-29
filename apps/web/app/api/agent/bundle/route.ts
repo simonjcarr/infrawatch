@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { and, eq, isNull } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema/auth'
 import { agentEnrolmentTokens, parseAgentEnrolmentTokenMetadata } from '@/lib/db/schema/agents'
 import {
   SUPPORTED_OS,
@@ -17,6 +15,7 @@ import { buildInstallBundle } from '@/lib/agent/bundle'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 import { readFile } from 'node:fs/promises'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
+import { ApiAuthError, getApiOrgAdminSession } from '@/lib/auth/session'
 
 const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/server.crt'
 const WEB_TLS_CERT_PATH = process.env['WEB_TLS_CERT'] ?? '/var/lib/ct-ops/server-tls/server.crt'
@@ -72,20 +71,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  let session
+  try {
+    session = await getApiOrgAdminSession(request.headers)
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
+    throw err
   }
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-  })
-  if (!user || !user.organisationId) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  }
-  if (user.role !== 'super_admin' && user.role !== 'org_admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const user = session.user
 
   const body = await request.json().catch(() => null)
   const parsed = requestSchema.safeParse(body)

@@ -18,6 +18,11 @@ export async function getStorageStatePath(baseURL: string): Promise<string> {
   return createAndCacheStorageState(baseURL)
 }
 
+export async function createStorageStateForUser(baseURL: string, userId: string): Promise<string> {
+  const fileName = `user-${userId}.json`
+  return createStorageState(baseURL, userId, fileName)
+}
+
 async function createAndCacheStorageState(baseURL: string): Promise<string> {
   const sql = getTestDb()
   const rows = await sql<Array<{ id: string }>>`
@@ -27,6 +32,16 @@ async function createAndCacheStorageState(baseURL: string): Promise<string> {
   if (!userId) {
     throw new Error(`E2E test user ${TEST_USER.email} has not been seeded`)
   }
+
+  return createStorageState(baseURL, userId, path.basename(STORAGE_STATE_PATH))
+}
+
+async function createStorageState(
+  baseURL: string,
+  userId: string,
+  fileName: string,
+): Promise<string> {
+  const sql = getTestDb()
 
   const sessionToken = randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -38,10 +53,11 @@ async function createAndCacheStorageState(baseURL: string): Promise<string> {
 
   const cookieValue = await makeSessionCookieValue(sessionToken, getBetterAuthSecret())
   const url = new URL(baseURL)
+  const storageStatePath = path.resolve(__dirname, '..', '.auth', fileName)
 
-  await mkdir(path.dirname(STORAGE_STATE_PATH), { recursive: true })
+  await mkdir(path.dirname(storageStatePath), { recursive: true })
   await writeFile(
-    STORAGE_STATE_PATH,
+    storageStatePath,
     JSON.stringify(
       {
         cookies: [
@@ -63,5 +79,5 @@ async function createAndCacheStorageState(baseURL: string): Promise<string> {
     ),
   )
 
-  return STORAGE_STATE_PATH
+  return storageStatePath
 }

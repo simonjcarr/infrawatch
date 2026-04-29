@@ -16,6 +16,7 @@ import { db } from '@/lib/db'
 import { hosts, taskRunHosts, taskRuns, users } from '@/lib/db/schema'
 import { resolveWarUrl } from '@/lib/jenkins/update-center'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
+import { getApiOrgSession } from '@/lib/auth/session'
 
 export const runtime = 'nodejs'
 export const maxDuration = 900
@@ -645,12 +646,11 @@ async function runTransferJob(job: TransferJob, request: TransferRequest, baseUr
 }
 
 async function getAuthorisedUser(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session) return null
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-  })
-  return user?.organisationId ? user : null
+  try {
+    return (await getApiOrgSession(request.headers)).user
+  } catch {
+    return null
+  }
 }
 
 function getRequestOrigin(request: NextRequest) {

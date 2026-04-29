@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.7.0...ingest/v0.8.0) (2026-04-29)
+
+
+### Features
+
+* **vuln:** ingest red hat csaf package fixes ([#786](https://github.com/carrtech-dev/ct-ops/issues/786)) ([624b52f](https://github.com/carrtech-dev/ct-ops/commit/624b52f79b9a3ce6d22489d8e91ca78d8c30ff3b))
+
 ## [0.7.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.6.2...ingest/v0.7.0) (2026-04-29)
 
 

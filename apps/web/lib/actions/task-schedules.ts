@@ -1,14 +1,12 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgToolingAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { taskSchedules, taskRuns, hostGroups, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, desc, inArray } from 'drizzle-orm'
 import { CronExpressionParser } from 'cron-parser'
-import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
-import { hasRole } from '@/lib/auth/guards'
 import { z } from 'zod'
 import type { TaskSchedule, TaskType, TaskConfig } from '@/lib/db/schema'
 import {
@@ -112,7 +110,7 @@ async function verifyTargetExists(
 // ── Read queries ──────────────────────────────────────────────────────────────
 
 export async function listSchedules(orgId: string): Promise<ScheduleWithTargetName[]> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const rows = await db.query.taskSchedules.findMany({
     where: and(eq(taskSchedules.organisationId, orgId), isNull(taskSchedules.deletedAt)),
     orderBy: [desc(taskSchedules.createdAt)],
@@ -160,7 +158,7 @@ export async function getSchedule(
   orgId: string,
   id: string,
 ): Promise<{ schedule: TaskSchedule; recentRuns: Awaited<ReturnType<typeof recentRunsForSchedule>> } | null> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const schedule = await db.query.taskSchedules.findFirst({
     where: and(
       eq(taskSchedules.id, id),
@@ -192,8 +190,7 @@ export async function createSchedule(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) return { error: 'Insufficient permissions' }
+  const session = await requireOrgToolingAccess(orgId)
 
   const parsed = scheduleInputSchema.safeParse(input)
   if (!parsed.success) {
@@ -244,8 +241,7 @@ export async function updateSchedule(
   id: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) return { error: 'Insufficient permissions' }
+  const session = await requireOrgToolingAccess(orgId)
 
   const existing = await db.query.taskSchedules.findFirst({
     where: and(
@@ -305,8 +301,7 @@ export async function setScheduleEnabled(
   id: string,
   enabled: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) return { error: 'Insufficient permissions' }
+  const session = await requireOrgToolingAccess(orgId)
 
   const existing = await db.query.taskSchedules.findFirst({
     where: and(
@@ -343,8 +338,7 @@ export async function deleteSchedule(
   orgId: string,
   id: string,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) return { error: 'Insufficient permissions' }
+  const session = await requireOrgToolingAccess(orgId)
 
   try {
     await db
@@ -373,8 +367,7 @@ export async function runScheduleNow(
   orgId: string,
   id: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) return { error: 'Insufficient permissions' }
+  const session = await requireOrgToolingAccess(orgId)
 
   const schedule = await db.query.taskSchedules.findFirst({
     where: and(

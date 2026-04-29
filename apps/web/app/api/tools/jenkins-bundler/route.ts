@@ -8,6 +8,8 @@ import {
   resolveWarUrl,
 } from '@/lib/jenkins/update-center'
 import { compareVersions } from '@/lib/version-compare'
+import { ApiAuthError, getApiSession } from '@/lib/auth/session'
+import { requireToolingAccess } from '@/lib/auth/tooling'
 
 export const runtime = 'nodejs'
 
@@ -318,6 +320,19 @@ function resolveTree(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    const session = await getApiSession(req.headers)
+    requireToolingAccess(session.user)
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: err.status })
+    }
+    if (err instanceof Error && err.message === 'forbidden: tooling role required') {
+      return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+    }
+    throw err
+  }
+
   let body: unknown
   try {
     body = await req.json()
@@ -414,6 +429,19 @@ const PluginQuerySchema = z.object({
 const QuerySchema = z.discriminatedUnion('kind', [WarQuerySchema, PluginQuerySchema])
 
 export async function GET(req: NextRequest): Promise<NextResponse | Response> {
+  try {
+    const session = await getApiSession(req.headers)
+    requireToolingAccess(session.user)
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: err.status })
+    }
+    if (err instanceof Error && err.message === 'forbidden: tooling role required') {
+      return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+    }
+    throw err
+  }
+
   const params = Object.fromEntries(req.nextUrl.searchParams.entries())
   const parsed = QuerySchema.safeParse(params)
   if (!parsed.success) {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { compareVersions } from '@/lib/version-compare'
+import { ApiAuthError, getApiSession } from '@/lib/auth/session'
+import { requireToolingAccess } from '@/lib/auth/tooling'
 
 export const runtime = 'nodejs'
 
@@ -387,6 +389,9 @@ function createStep(
 
 export async function POST(req: NextRequest): Promise<NextResponse<GitLabBundlerResponse | GitLabLatestVersionResponse>> {
   try {
+    const session = await getApiSession(req.headers)
+    requireToolingAccess(session.user)
+
     const raw = await req.json()
     const parsed = BodySchema.safeParse(raw)
     if (!parsed.success) {
@@ -503,12 +508,31 @@ export async function POST(req: NextRequest): Promise<NextResponse<GitLabBundler
       steps: deduped,
     })
   } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: err.status })
+    }
+    if (err instanceof Error && err.message === 'forbidden: tooling role required') {
+      return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+    }
     const message = err instanceof Error ? err.message : 'Failed to resolve GitLab packages'
     return NextResponse.json({ ok: false, error: message }, { status: 502 })
   }
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse | Response> {
+  try {
+    const session = await getApiSession(req.headers)
+    requireToolingAccess(session.user)
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: err.status })
+    }
+    if (err instanceof Error && err.message === 'forbidden: tooling role required') {
+      return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+    }
+    throw err
+  }
+
   const params = Object.fromEntries(req.nextUrl.searchParams.entries())
   const parsed = QuerySchema.safeParse(params)
   if (!parsed.success) {

@@ -17,6 +17,7 @@ import { hosts, taskRunHosts, taskRuns, users } from '@/lib/db/schema'
 import { resolveWarUrl } from '@/lib/jenkins/update-center'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 import { getApiOrgSession } from '@/lib/auth/session'
+import { canAccessTooling } from '@/lib/auth/tooling'
 
 export const runtime = 'nodejs'
 export const maxDuration = 900
@@ -647,7 +648,8 @@ async function runTransferJob(job: TransferJob, request: TransferRequest, baseUr
 
 async function getAuthorisedUser(request: NextRequest) {
   try {
-    return (await getApiOrgSession(request.headers)).user
+    const user = (await getApiOrgSession(request.headers)).user
+    return canAccessTooling(user) ? user : null
   } catch {
     return null
   }
@@ -666,6 +668,10 @@ function getRequestOrigin(request: NextRequest) {
 
 async function serveBundleDownload(request: NextRequest) {
   cleanupOldJobs()
+  const user = await getAuthorisedUser(request)
+  if (!user?.organisationId) {
+    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  }
   const jobId = request.nextUrl.searchParams.get('jobId')
   const token = request.nextUrl.searchParams.get('token')
   if (!jobId || !token) {
@@ -673,7 +679,14 @@ async function serveBundleDownload(request: NextRequest) {
   }
 
   const job = transferJobs.get(jobId)
-  if (!job || job.downloadToken !== token || !job.archivePath || job.phase !== 'transferring') {
+  if (
+    !job ||
+    job.userId !== user.id ||
+    job.organisationId !== user.organisationId ||
+    job.downloadToken !== token ||
+    !job.archivePath ||
+    job.phase !== 'transferring'
+  ) {
     return NextResponse.json({ error: 'Bundle download not found' }, { status: 404 })
   }
 

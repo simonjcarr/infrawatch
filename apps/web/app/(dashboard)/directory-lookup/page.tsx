@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { FolderSearch } from 'lucide-react'
 import { getRequiredSession } from '@/lib/auth/session'
+import { canAccessTooling } from '@/lib/auth/tooling'
 import { getLookupConfigOptions } from '@/lib/actions/ldap'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +15,7 @@ export const metadata: Metadata = {
 
 export default async function DirectoryLookupPage() {
   const session = await getRequiredSession()
+  if (!canAccessTooling(session.user)) redirect('/dashboard')
   const orgId = session.user.organisationId!
   const configs = await getLookupConfigOptions(orgId)
 

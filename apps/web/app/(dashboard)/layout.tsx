@@ -26,10 +26,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const licence = await getEffectiveLicence(orgId)
 
   return (
-    <CommandPaletteProvider orgId={orgId}>
+    <CommandPaletteProvider orgId={orgId} userRole={session.user.role}>
       <TerminalProviderWrapper>
         <SidebarProvider className="h-svh overflow-hidden">
-          <AppSidebar orgId={orgId} tier={licence.tier} />
+          <AppSidebar orgId={orgId} tier={licence.tier} userRole={session.user.role} />
           <TerminalContentWrapper orgId={orgId}>
             <Topbar orgId={orgId} />
             <main className="flex-1 p-6 overflow-auto min-h-0">{children}</main>

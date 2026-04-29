@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.84.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.2...web/v0.84.3) (2026-04-29)
+
+
+### Bug Fixes
+
+* **web:** delete patch status rows with hosts ([#782](https://github.com/carrtech-dev/ct-ops/issues/782)) ([4404cf0](https://github.com/carrtech-dev/ct-ops/commit/4404cf0bae257d73ba8b12663e6c60e1c0f02fc9))
+
 ## [0.84.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.1...web/v0.84.2) (2026-04-29)
 
 

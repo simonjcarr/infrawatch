@@ -6,8 +6,6 @@ import { join } from 'node:path'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 
-const E2E_AGENT_CA_FORM_VALUE = 'placeholder'
-
 function createAgentCaFixture() {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'ct-ops-security-ca-'))
   const keyPath = join(fixtureDir, 'agent-ca.key')
@@ -31,10 +29,12 @@ function createAgentCaFixture() {
     ], { stdio: 'ignore' })
 
     const certPem = readFileSync(certPath, 'utf8')
+    const keyPem = readFileSync(keyPath, 'utf8')
     const cert = new X509Certificate(certPem)
 
     return {
       certPem,
+      keyPem,
       subject: cert.subject,
       fingerprintSha256: cert.fingerprint256.replace(/:/g, '').toLowerCase(),
       notBefore: new Date(cert.validFrom).toISOString(),
@@ -46,8 +46,9 @@ function createAgentCaFixture() {
 }
 
 const E2E_AGENT_CA = createAgentCaFixture()
+const E2E_UPLOADED_AGENT_CA = createAgentCaFixture()
 
-test('admin can review the current agent CA and upload form readiness in security settings', async ({ authenticatedPage: page }) => {
+test('admin can review the current agent CA and upload a replacement CA from security settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await sql`
@@ -90,11 +91,60 @@ test('admin can review the current agent CA and upload form readiness in securit
   const uploadButton = page.getByTestId('security-upload-submit')
   await expect(uploadButton).toBeDisabled()
 
-  await page.getByTestId('security-upload-cert').fill(E2E_AGENT_CA.certPem)
+  await page.getByTestId('security-upload-cert').fill(E2E_UPLOADED_AGENT_CA.certPem)
   await expect(uploadButton).toBeDisabled()
 
-  await page.getByTestId('security-upload-key').fill(E2E_AGENT_CA_FORM_VALUE)
+  await page.getByTestId('security-upload-key').fill(E2E_UPLOADED_AGENT_CA.keyPem)
   await expect(uploadButton).toBeEnabled()
+
+  await uploadButton.click()
+
+  await expect(page.getByText('Upload successful')).toBeVisible()
+  await expect(page.getByText('Uploaded. Fingerprint:')).toBeVisible()
+  await expect(page.getByTestId('security-agent-ca-source')).toContainText('Customer-provided')
+  await expect(page.getByTestId('security-agent-ca-subject')).toContainText(E2E_UPLOADED_AGENT_CA.subject)
+  await expect(page.getByTestId('security-agent-ca-fingerprint')).toContainText(
+    E2E_UPLOADED_AGENT_CA.fingerprintSha256,
+  )
+
+  await expect(page.getByTestId('security-upload-cert')).toHaveValue('')
+  await expect(page.getByTestId('security-upload-key')).toHaveValue('')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{
+        id: string
+        source: string
+        fingerprint_sha256: string
+        deleted_at: string | null
+      }>>`
+        SELECT id, source, fingerprint_sha256, deleted_at
+        FROM certificate_authorities
+        WHERE purpose = 'agent_ca'
+        ORDER BY created_at ASC
+      `
+
+      return rows.map((row) => ({
+        id: row.id,
+        source: row.source,
+        fingerprint_sha256: row.fingerprint_sha256,
+        is_deleted: row.deleted_at !== null,
+      }))
+    })
+    .toEqual([
+      {
+        id: 'e2e-agent-ca-current',
+        source: 'auto',
+        fingerprint_sha256: E2E_AGENT_CA.fingerprintSha256,
+        is_deleted: true,
+      },
+      {
+        id: expect.any(String),
+        source: 'byo',
+        fingerprint_sha256: E2E_UPLOADED_AGENT_CA.fingerprintSha256,
+        is_deleted: false,
+      },
+    ])
 
   await expect(page.getByRole('link', { name: 'Terminal access' })).toHaveAttribute(
     'href',

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.83.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.3...web/v0.83.0) (2026-04-29)
+
+
+### Features
+
+* **vuln:** harden confirmed Linux CVE matching ([#764](https://github.com/carrtech-dev/ct-ops/issues/764)) ([6929342](https://github.com/carrtech-dev/ct-ops/commit/6929342bb819dd1a24a66296f0d5504644b0fe93))
+
 ## [0.82.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.2...web/v0.82.3) (2026-04-29)
 
 

@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -264,7 +264,7 @@ export async function searchLdapDirectory(
   configId: string,
   query: string,
 ): Promise<{ success: true; users: LdapUserResult[] } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   if (!query.trim()) return { success: true, users: [] }
 
   const config = await db.query.ldapConfigurations.findFirst({
@@ -294,7 +294,7 @@ export type LookupConfigOption = {
 export async function getLookupConfigOptions(
   orgId: string,
 ): Promise<LookupConfigOption[]> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
       eq(ldapConfigurations.organisationId, orgId),
@@ -316,7 +316,7 @@ export async function lookupDirectoryUser(
   configId: string,
   dn: string,
 ): Promise<{ success: true; user: LdapUserDetailResult } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),

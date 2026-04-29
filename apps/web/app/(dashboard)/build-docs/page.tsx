@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
+import { canAccessTooling } from '@/lib/auth/tooling'
 import {
   listBuildDocs,
   listBuildDocSnippets,
@@ -14,6 +16,7 @@ export const metadata: Metadata = {
 
 export default async function BuildDocsPage() {
   const session = await getRequiredSession()
+  if (!canAccessTooling(session.user)) redirect('/dashboard')
   const orgId = session.user.organisationId!
   const [docs, templates, snippets, storageSettings] = await Promise.all([
     listBuildDocs(orgId),

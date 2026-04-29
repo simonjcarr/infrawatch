@@ -13,6 +13,7 @@ import {
 import { assertAllowedCertificateCheckerTarget } from '@/lib/net/certificate-checker-policy'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 import { ApiAuthError, getApiSession } from '@/lib/auth/session'
+import { requireToolingAccess } from '@/lib/auth/tooling'
 
 export type { ParsedCertificate, ParsedSAN, ChainEntry } from '@/lib/certificates/fetch'
 
@@ -65,12 +66,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await getApiSession(req.headers)
+    const session = await getApiSession(req.headers)
+    requireToolingAccess(session.user)
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return NextResponse.json(
         { ok: false, error: err.message } satisfies CertCheckerResponse,
         { status: err.status },
+      )
+    }
+    if (err instanceof Error && err.message === 'forbidden: tooling role required') {
+      return NextResponse.json(
+        { ok: false, error: 'Forbidden' } satisfies CertCheckerResponse,
+        { status: 403 },
       )
     }
     throw err

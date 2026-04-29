@@ -24,6 +24,7 @@ import {
   Users,
 } from 'lucide-react'
 import { listHosts } from '@/lib/actions/agents'
+import { canAccessTooling } from '@/lib/auth/tooling'
 import type { CommandPaletteItem } from './types'
 
 const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
@@ -53,10 +54,20 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-system-health', label: 'System', icon: HeartPulse, href: '/settings/system', keywords: ['health'] },
 ]
 
-export function useNavigationItems(): CommandPaletteItem[] {
+const TOOLING_ITEM_IDS = new Set([
+  'nav-cert-checker',
+  'nav-dir-lookup',
+  'nav-bundlers',
+  'nav-build-docs',
+  'nav-tasks',
+])
+
+export function useNavigationItems(userRole: string): CommandPaletteItem[] {
   return useMemo(
-    () => NAV_ITEMS.map((item) => ({ ...item, group: 'Navigation' })),
-    [],
+    () => NAV_ITEMS
+      .filter((item) => canAccessTooling({ role: userRole }) || !TOOLING_ITEM_IDS.has(item.id))
+      .map((item) => ({ ...item, group: 'Navigation' })),
+    [userRole],
   )
 }
 

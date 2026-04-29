@@ -43,6 +43,7 @@ import {
 import { cn } from '@/lib/utils'
 import { TerminalPanelTrigger } from '@/components/terminal'
 import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
+import { canAccessTooling } from '@/lib/auth/tooling'
 import pkg from '../../package.json'
 
 const WEB_VERSION = `v${pkg.version}`
@@ -269,7 +270,9 @@ const TIER_LABEL: Record<LicenceTier, string> = {
   enterprise: 'Enterprise Edition',
 }
 
-export function AppSidebar({ orgId, tier }: { orgId: string; tier: LicenceTier }) {
+export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: LicenceTier; userRole: string }) {
+  const showTooling = canAccessTooling({ role: userRole })
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
@@ -283,17 +286,19 @@ export function AppSidebar({ orgId, tier }: { orgId: string; tier: LicenceTier }
       <SidebarContent>
         <NavGroup label="Monitoring" items={primaryNav} tier={tier} />
         <NavGroup label="Reporting" items={reportingNav} tier={tier} />
-        <SidebarGroup>
-          <SidebarGroupLabel>Tooling</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <NavGroupItems items={toolingNav} tier={tier} />
-              <SidebarMenuItem>
-                <TerminalPanelTrigger orgId={orgId} />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {showTooling ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Tooling</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <NavGroupItems items={toolingNav} tier={tier} />
+                <SidebarMenuItem>
+                  <TerminalPanelTrigger orgId={orgId} />
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
         <NavGroup label="Administration" items={adminNav} tier={tier} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-2">

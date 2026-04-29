@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgToolingAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import {
@@ -101,7 +101,7 @@ export async function getTaskRun(
   orgId: string,
   taskRunId: string,
 ): Promise<TaskRunWithHosts | null> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const run = await db.query.taskRuns.findFirst({
     where: and(
       eq(taskRuns.id, taskRunId),
@@ -152,7 +152,7 @@ export async function listTaskRunsForHost(
   hostId: string,
   taskType?: string,
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   // Find task_run_hosts rows for this host
   const hostRunRows = await db.query.taskRunHosts.findMany({
     where: and(
@@ -192,7 +192,7 @@ export async function listAutomatedRunsForHost(
   hostId: string,
   taskType?: string,
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const hostRunRows = await db.query.taskRunHosts.findMany({
     where: and(
       eq(taskRunHosts.hostId, hostId),
@@ -230,7 +230,7 @@ export async function listTaskRunsForGroup(
   groupId: string,
   taskType?: string,
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const runs = await db.query.taskRuns.findMany({
     where: and(
       eq(taskRuns.organisationId, orgId),
@@ -260,7 +260,7 @@ export async function cancelTaskRun(
   orgId: string,
   taskRunId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   try {
     return await db.transaction(async (tx) => {
       // Verify ownership and that the run is still active.
@@ -346,7 +346,7 @@ export async function triggerCustomScriptRun(
   interpreter: 'sh' | 'bash' | 'python3',
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
     return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
   }
@@ -373,7 +373,7 @@ export async function triggerGroupCustomScriptRun(
   maxParallel: number,
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
     return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
   }
@@ -405,7 +405,7 @@ export async function triggerServiceAction(
   serviceName: string,
   action: 'start' | 'stop' | 'restart' | 'status',
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })
@@ -432,7 +432,7 @@ export async function triggerGroupServiceAction(
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),
@@ -503,7 +503,7 @@ export async function triggerAgentUninstall(
   userId: string,
   hostId: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })
@@ -524,7 +524,7 @@ export async function deleteTaskRuns(
   orgId: string,
   taskRunIds: string[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   if (taskRunIds.length === 0) return { success: true }
   try {
     const now = new Date()
@@ -569,7 +569,7 @@ export async function triggerPatchRun(
   hostId: string,
   mode: 'security' | 'all',
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(
       eq(hosts.id, hostId),
@@ -600,7 +600,7 @@ export async function triggerGroupPatchRun(
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   // Fetch all members of the group
   const members = await db.query.hostGroupMembers.findMany({
     where: and(

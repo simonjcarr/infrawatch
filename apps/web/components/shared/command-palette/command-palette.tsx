@@ -65,10 +65,11 @@ function writeRecents(ids: string[]): void {
 
 interface CommandPaletteProviderProps {
   orgId: string
+  userRole: string
   children: React.ReactNode
 }
 
-export function CommandPaletteProvider({ orgId, children }: CommandPaletteProviderProps) {
+export function CommandPaletteProvider({ orgId, userRole, children }: CommandPaletteProviderProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const open = useCallback(() => setIsOpen(true), [])
@@ -96,20 +97,21 @@ export function CommandPaletteProvider({ orgId, children }: CommandPaletteProvid
   return (
     <CommandPaletteContext.Provider value={value}>
       {children}
-      <CommandPaletteDialog orgId={orgId} isOpen={isOpen} onOpenChange={setIsOpen} />
+      <CommandPaletteDialog orgId={orgId} userRole={userRole} isOpen={isOpen} onOpenChange={setIsOpen} />
     </CommandPaletteContext.Provider>
   )
 }
 
 interface CommandPaletteDialogProps {
   orgId: string
+  userRole: string
   isOpen: boolean
   onOpenChange: (next: boolean) => void
 }
 
-function CommandPaletteDialog({ orgId, isOpen, onOpenChange }: CommandPaletteDialogProps) {
+function CommandPaletteDialog({ orgId, userRole, isOpen, onOpenChange }: CommandPaletteDialogProps) {
   const router = useRouter()
-  const navItems = useNavigationItems()
+  const navItems = useNavigationItems(userRole)
   const hostItems = useHostItems(orgId, isOpen)
 
   const allItems = useMemo(() => [...navItems, ...hostItems], [navItems, hostItems])

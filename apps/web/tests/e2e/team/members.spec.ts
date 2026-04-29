@@ -26,6 +26,7 @@ test('admin can change a team member role and manage their lifecycle', async ({ 
       email_verified,
       organisation_id,
       role,
+      roles,
       is_active
     )
     VALUES (
@@ -35,6 +36,7 @@ test('admin can change a team member role and manage their lifecycle', async ({ 
       true,
       ${orgId},
       'engineer',
+      '["engineer"]'::jsonb,
       true
     )
   `
@@ -50,18 +52,27 @@ test('admin can change a team member role and manage their lifecycle', async ({ 
   await page.getByTestId(`team-member-role-trigger-${memberId}`).click()
   await page.getByTestId(`team-member-role-option-${memberId}-read_only`).click()
   await expect(memberRow).toContainText('Read Only')
+  await expect(memberRow).toContainText('Engineer')
 
   await expect
     .poll(async () => {
-      const rows = await sql<Array<{ role: string }>>`
-        SELECT role
+      const rows = await sql<Array<{ role: string; roles: string[] }>>`
+        SELECT role, roles
         FROM "user"
         WHERE id = ${memberId}
         LIMIT 1
       `
-      return rows[0]?.role ?? null
+      return rows[0]
+        ? {
+            role: rows[0].role,
+            roles: rows[0].roles,
+          }
+        : null
     })
-    .toBe('read_only')
+    .toEqual({
+      role: 'engineer',
+      roles: ['engineer', 'read_only'],
+    })
 
   await page.getByTestId(`team-member-deactivate-${memberId}`).click()
   await expect(page.getByTestId(`team-member-status-${memberId}`)).toContainText('Inactive')

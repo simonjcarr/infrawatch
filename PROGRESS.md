@@ -15,6 +15,20 @@
 
 ## What Has Been Built
 
+### Session 79 — Multi-role team membership
+
+**Additive role model** (`apps/web/lib/auth/`, `apps/web/lib/actions/`, `apps/web/lib/db/schema/`, `apps/web/lib/db/migrations/0053_bright_black_cat.sql`)
+- Added persisted `roles` arrays to users and invitations while keeping the legacy single `role` column as a derived compatibility value so existing role-gated flows keep working during the transition.
+- Normalised session/auth loading and guard checks to treat permissions as the union of assigned roles, with explicit precedence preserved for the legacy `role` field and `pending` users continuing to carry no assigned roles.
+- Updated organisation creation, invitation acceptance, invitation restore, and role-update flows to write the new additive role shape and to keep last-super-admin protections working when `super_admin` membership is removed, deactivated, or deleted.
+
+**Team management UI** (`apps/web/app/(dashboard)/team/`, `apps/web/tests/e2e/team/`)
+- Reworked the People page to display all assigned roles as badges, support multi-role assignment from the member role menu, and support multi-role invitations from the invite dialog.
+- Added database migration backfill for existing user and invitation roles and extended coverage for additive-role guard behavior plus database-backed team invitation/member lifecycle flows.
+
+**Validation**
+- Validation run: `node --experimental-strip-types --test lib/auth/guards.test.mjs`, `node --experimental-strip-types --test lib/auth/tooling.test.mjs`, `pnpm --dir apps/web type-check`, `pnpm --dir apps/web db:validate`, `pnpm --dir apps/web test:e2e tests/e2e/auth/invite-acceptance.spec.ts`, and `pnpm --dir apps/web test:e2e tests/e2e/team/members.spec.ts tests/e2e/team/invitations.spec.ts`.
+
 ### Session 78 — Confirmed Linux CVE matching hardening
 
 **Confirmed finding model and reports** (`apps/web/lib/db/schema/vulnerabilities.ts`, `apps/web/lib/actions/vulnerabilities.ts`, `apps/web/app/(dashboard)/reports/vulnerabilities/`)

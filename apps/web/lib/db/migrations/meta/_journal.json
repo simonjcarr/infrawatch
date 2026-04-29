@@ -372,6 +372,13 @@
       "when": 1777390000000,
       "tag": "0052_vulnerability_finding_confidence",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1777446689877,
+      "tag": "0053_bright_black_cat",
+      "breakpoints": true
     }
   ]
 }

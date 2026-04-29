@@ -6,6 +6,7 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { User } from '@/lib/db/schema'
 import { requireActiveUser, requireOrgAdmin } from './guards'
+import { getPrimaryRole, normalizeAssignedRoles } from './roles'
 
 // Re-export User as SessionUser for convenience
 export type { User as SessionUser }
@@ -36,7 +37,13 @@ async function findSessionUser(userId: string): Promise<User | null> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   })
-  return user ?? null
+  if (!user) return null
+
+  return {
+    ...user,
+    role: getPrimaryRole(user.roles, user.role),
+    roles: normalizeAssignedRoles(user.roles, user.role),
+  }
 }
 
 async function loadSessionWithUser(requestHeaders: Headers): Promise<RequiredSession | null> {

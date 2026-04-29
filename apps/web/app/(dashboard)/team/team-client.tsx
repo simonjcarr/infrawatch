@@ -10,19 +10,18 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ChevronDown, UserPlus, Link2, X, UserX, UserCheck, Trash2, Check } from 'lucide-react'
 import { getOrgUsers, inviteUser, updateUserRole, deactivateUser, reactivateUser, removeUser, cancelInvite } from '@/lib/actions/users'
+import { INVITABLE_ROLES, ASSIGNED_ROLES, normalizeAssignedRoles } from '@/lib/auth/roles'
 import type { User, Invitation } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
-
-const ROLES = ['super_admin', 'org_admin', 'engineer', 'read_only'] as const
-const INVITE_ROLES = ['org_admin', 'engineer', 'read_only'] as const
 
 function roleBadgeVariant(role: string): 'destructive' | 'default' | 'secondary' | 'outline' {
   switch (role) {
@@ -45,7 +44,7 @@ function formatRole(role: string) {
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
-  role: z.enum(['org_admin', 'engineer', 'read_only']),
+  roles: z.array(z.enum(INVITABLE_ROLES)).min(1, 'Select at least one role'),
 })
 type InviteValues = z.infer<typeof inviteSchema>
 
@@ -58,6 +57,11 @@ interface TeamClientProps {
 }
 
 const canManage = (role: string) => role === 'super_admin' || role === 'org_admin'
+
+function getDisplayedRoles(entity: Pick<User | Invitation, 'role' | 'roles'>): string[] {
+  const roles = normalizeAssignedRoles(entity.roles, entity.role)
+  return roles.length > 0 ? roles : [entity.role]
+}
 
 export function TeamClient({
   orgId,
@@ -83,11 +87,18 @@ export function TeamClient({
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['org-users', orgId] })
 
   const {
-    register,
     handleSubmit,
     reset,
+    register,
+    setValue,
+    watch,
     formState: { errors },
-  } = useForm<InviteValues>({ resolver: zodResolver(inviteSchema), defaultValues: { role: 'engineer' } })
+  } = useForm<InviteValues>({
+    resolver: zodResolver(inviteSchema),
+    defaultValues: { email: '', roles: [] },
+  })
+
+  const inviteRoles = watch('roles')
 
   const [inviteError, setInviteError] = useState<string | null>(null)
 
@@ -110,9 +121,13 @@ export function TeamClient({
   })
 
   const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) =>
-      updateUserRole(orgId, userId, role),
-    onSuccess: invalidate,
+    mutationFn: ({ userId, roles }: { userId: string; roles: string[] }) =>
+      updateUserRole(orgId, userId, roles),
+    onSuccess: (result) => {
+      if ('success' in result) {
+        invalidate()
+      }
+    },
   })
 
   const deactivateMutation = useMutation({
@@ -147,12 +162,35 @@ export function TeamClient({
     setInviteLink(null)
     setInviteError(null)
     setCopiedLink(false)
-    reset()
+    reset({ email: '', roles: [] })
   }
 
   function onInviteSubmit(values: InviteValues) {
     setInviteError(null)
     inviteMutation.mutate(values)
+  }
+
+  function toggleInviteRole(role: (typeof INVITABLE_ROLES)[number], checked: boolean) {
+    const nextRoles = checked
+      ? [...inviteRoles, role]
+      : inviteRoles.filter((value) => value !== role)
+    setValue(
+      'roles',
+      INVITABLE_ROLES.filter((value) => normalizeAssignedRoles(nextRoles).includes(value)),
+      { shouldValidate: true, shouldDirty: true },
+    )
+  }
+
+  function toggleMemberRole(member: User, role: (typeof ASSIGNED_ROLES)[number], checked: boolean) {
+    const currentRoles = normalizeAssignedRoles(member.roles, member.role)
+    if (!checked && currentRoles.length === 1 && currentRoles[0] === role) {
+      return
+    }
+
+    const nextRoles = checked
+      ? [...currentRoles, role]
+      : currentRoles.filter((value) => value !== role)
+    updateRoleMutation.mutate({ userId: member.id, roles: normalizeAssignedRoles(nextRoles) })
   }
 
   return (
@@ -204,34 +242,34 @@ export function TeamClient({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="flex items-center gap-1 focus:outline-none"
+                            className="flex items-center gap-2 focus:outline-none"
                             data-testid={`team-member-role-trigger-${member.id}`}
                           >
-                            <Badge variant={roleBadgeVariant(member.role)} className={roleBadgeClassName(member.role)}>
-                              {member.role === 'pending' ? 'Pending Approval' : formatRole(member.role)}
-                            </Badge>
+                            <RoleBadgeList roles={getDisplayedRoles(member)} />
                             <ChevronDown className="size-3 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
-                          {ROLES.map((r) => (
-                            <DropdownMenuItem
+                          {ASSIGNED_ROLES.map((r) => {
+                            const memberRoles = normalizeAssignedRoles(member.roles, member.role)
+                            const isChecked = memberRoles.includes(r)
+                            return (
+                            <DropdownMenuCheckboxItem
                               key={r}
-                              onClick={() =>
-                                updateRoleMutation.mutate({ userId: member.id, role: r })
-                              }
-                              className={cn(member.role === r && 'font-medium')}
+                              checked={isChecked}
+                              onCheckedChange={(checked) => toggleMemberRole(member, r, checked === true)}
+                              className={cn(isChecked && 'font-medium')}
                               data-testid={`team-member-role-option-${member.id}-${r}`}
+                              disabled={!isChecked && updateRoleMutation.isPending}
                             >
                               {formatRole(r)}
-                            </DropdownMenuItem>
-                          ))}
+                            </DropdownMenuCheckboxItem>
+                            )
+                          })}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (
-                      <Badge variant={roleBadgeVariant(member.role)} className={roleBadgeClassName(member.role)}>
-                        {member.role === 'pending' ? 'Pending Approval' : formatRole(member.role)}
-                      </Badge>
+                      <RoleBadgeList roles={getDisplayedRoles(member)} />
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -325,9 +363,7 @@ export function TeamClient({
                   <tr key={invite.id} data-testid="team-pending-invite-row">
                     <td className="px-4 py-3 text-foreground">{invite.email}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={roleBadgeVariant(invite.role)}>
-                        {formatRole(invite.role)}
-                      </Badge>
+                      <RoleBadgeList roles={getDisplayedRoles(invite)} />
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {invite.expiresAt.toLocaleDateString()}
@@ -401,21 +437,21 @@ export function TeamClient({
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="invite-role">Role</Label>
-                <select
-                  id="invite-role"
-                  {...register('role')}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  data-testid="team-invite-role"
-                >
-                  {INVITE_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {formatRole(r)}
-                    </option>
+                <Label>Roles</Label>
+                <div className="space-y-2 rounded-md border border-input p-3">
+                  {INVITABLE_ROLES.map((role) => (
+                    <label key={role} className="flex items-center gap-2 text-sm text-foreground">
+                      <Checkbox
+                        checked={inviteRoles.includes(role)}
+                        onCheckedChange={(checked) => toggleInviteRole(role, checked === true)}
+                        data-testid={`team-invite-role-${role}`}
+                      />
+                      <span>{formatRole(role)}</span>
+                    </label>
                   ))}
-                </select>
-                {errors.role && (
-                  <p className="text-xs text-destructive">{errors.role.message}</p>
+                </div>
+                {errors.roles && (
+                  <p className="text-xs text-destructive">{errors.roles.message}</p>
                 )}
               </div>
               <div className="flex gap-2 justify-end">
@@ -449,5 +485,17 @@ function CopyInviteLinkButton({ token }: { token: string }) {
       {copied ? <Check className="size-4 mr-1 text-green-600" /> : <Link2 className="size-4 mr-1" />}
       {copied ? 'Copied' : 'Copy link'}
     </Button>
+  )
+}
+
+function RoleBadgeList({ roles }: { roles: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {roles.map((role) => (
+        <Badge key={role} variant={roleBadgeVariant(role)} className={roleBadgeClassName(role)}>
+          {role === 'pending' ? 'Pending Approval' : formatRole(role)}
+        </Badge>
+      ))}
+    </div>
   )
 }

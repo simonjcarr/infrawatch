@@ -7,6 +7,7 @@ import { invitations, users } from '@/lib/db/schema'
 import { eq, and, isNull, gt } from 'drizzle-orm'
 import type { Invitation } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
 
 // 10 invite-token lookups per IP per 60 s — prevents token enumeration
 const inviteRateLimit = createRateLimiter({
@@ -82,11 +83,15 @@ export async function acceptInvite(
       return { error: 'This invitation was sent to a different email address' }
     }
 
+    const inviteRoles = normalizeAssignedRoles(invite.roles, invite.role)
+    const inviteRole = getPrimaryRole(inviteRoles, invite.role)
+
     await db
       .update(users)
       .set({
         organisationId: invite.organisationId,
-        role: invite.role,
+        role: inviteRole,
+        roles: inviteRoles,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))

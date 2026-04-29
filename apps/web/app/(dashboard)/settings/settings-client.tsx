@@ -34,7 +34,7 @@ import type { OrgTerminalSettings } from '@/lib/actions/terminal'
 import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput, SmtpRelayTestLogEntry } from '@/lib/actions/notification-settings'
 import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
-import { COMMUNITY_MAX_RETENTION_DAYS, hasFeature, type LicenceTier } from '@/lib/features'
+import type { LicenceTier } from '@/lib/features'
 
 const ALL_ROLES = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -126,7 +126,6 @@ export function SettingsClient({
 }: SettingsClientProps) {
   const queryClient = useQueryClient()
   const tier = org.licenceTier as LicenceTier
-  const canExtendRetention = hasFeature(tier, 'metricRetentionExtended')
   const visibleSections = new Set<SettingsSection>(
     sections ?? [
       'organisation',
@@ -499,22 +498,13 @@ export function SettingsClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {RETENTION_OPTIONS.map((opt) => {
-                      const locked = !canExtendRetention && Number(opt.value) > COMMUNITY_MAX_RETENTION_DAYS
-                      return (
-                        <SelectItem key={opt.value} value={opt.value} disabled={locked}>
-                          {opt.label}
-                          {locked ? ' (Pro)' : ''}
-                        </SelectItem>
-                      )
-                    })}
+                    {RETENTION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {!canExtendRetention && (
-                  <p className="text-xs text-muted-foreground">
-                    Retention above {COMMUNITY_MAX_RETENTION_DAYS} days requires a Pro or Enterprise licence.
-                  </p>
-                )}
               </div>
               {retentionError && (
                 <p className="text-sm text-destructive">{retentionError}</p>
@@ -1300,7 +1290,7 @@ export function SettingsClient({
           <CardTitle className="text-base">Licence</CardTitle>
           <CardDescription>
             {isAdmin
-              ? 'Enter a licence key to unlock Pro or Enterprise features'
+              ? 'Enter a licence key to activate paid seats or Enterprise capabilities'
               : 'Your organisation licence'}
           </CardDescription>
         </CardHeader>
@@ -1392,7 +1382,7 @@ export function SettingsClient({
                 <p className="text-sm font-medium text-foreground">Step 2 — Paste the returned licence key</p>
                 <p className="text-xs text-muted-foreground">
                   After completing checkout, the licence key is emailed to your technical contact
-                  and shown in the licence purchase dashboard. Paste it here to activate Pro or Enterprise features.
+                  and shown in the licence purchase dashboard. Paste it here to activate paid seats or Enterprise capabilities.
                 </p>
               </div>
               <div className="space-y-1.5">

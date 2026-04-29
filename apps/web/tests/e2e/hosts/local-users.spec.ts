@@ -1,6 +1,5 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { issueTestLicence } from '../fixtures/licence'
 import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
@@ -17,18 +16,6 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 test('authenticated user can review host local users and open a user detail page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
-  const licenceKey = await issueTestLicence({
-    orgId,
-    features: ['serviceAccountTracker'],
-  })
-
-  await sql`
-    UPDATE organisations
-    SET licence_key = ${licenceKey},
-        licence_tier = 'pro'
-    WHERE id = ${orgId}
-  `
-
   await sql`
     INSERT INTO hosts (
       id,

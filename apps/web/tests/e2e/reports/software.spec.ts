@@ -16,7 +16,6 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 test('software report supports search, saved filters, new packages, and drift views', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
-
   await sql`
     INSERT INTO hosts (
       id,

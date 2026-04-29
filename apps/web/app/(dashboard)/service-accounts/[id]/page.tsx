@@ -2,9 +2,6 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { getDomainAccount } from '@/lib/actions/domain-accounts'
-import { getEffectiveLicence } from '@/lib/actions/licence-guard'
-import { hasFeature } from '@/lib/features'
-import { LockedFeature } from '@/components/shared/locked-feature'
 import { ServiceAccountDetailClient } from './service-account-detail-client'
 
 export const metadata: Metadata = {
@@ -19,11 +16,6 @@ export default async function ServiceAccountDetailPage({
   const session = await getRequiredSession()
   const orgId = session.user.organisationId!
   const { id } = await params
-
-  const licence = await getEffectiveLicence(orgId)
-  if (!hasFeature(licence.tier, 'serviceAccountTracker')) {
-    return <LockedFeature feature="serviceAccountTracker" tier={licence.tier} />
-  }
 
   const account = await getDomainAccount(orgId, id)
   if (!account) notFound()

@@ -7,7 +7,6 @@ import { db } from '@/lib/db'
 import { certificates, certificateEvents } from '@/lib/db/schema'
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
 import type { Certificate, CertificateEvent, CertificateStatus, CertificateDetails } from '@/lib/db/schema'
-import { requireFeature } from '@/lib/actions/licence-guard'
 import { hasRole } from '@/lib/auth/guards'
 import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
 import { escapeLikePattern } from '@/lib/utils'
@@ -56,7 +55,6 @@ export async function getCertificates(
   filters: CertificateListFilters = {},
 ): Promise<Certificate[]> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'certExpiryTracker')
   const {
     status,
     host,
@@ -97,7 +95,6 @@ export async function getCertificate(
   certId: string,
 ): Promise<{ certificate: Certificate; events: CertificateEvent[] } | null> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'certExpiryTracker')
   const certificate = await db.query.certificates.findFirst({
     where: and(
       eq(certificates.id, certId),
@@ -120,7 +117,6 @@ export async function getCertificate(
 
 export async function getCertificateCounts(orgId: string): Promise<CertificateCounts> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'certExpiryTracker')
   const rows = await db
     .select({
       status: certificates.status,
@@ -149,8 +145,6 @@ export async function deleteCertificate(
   if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'Insufficient permissions to delete certificates' }
   }
-
-  await requireFeature(orgId, 'certExpiryTracker')
   const existing = await db.query.certificates.findFirst({
     where: and(
       eq(certificates.id, certId),
@@ -268,7 +262,6 @@ export async function trackCertificateFromUrl(
   input: unknown,
 ): Promise<TrackCertificateResult> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'certExpiryTracker')
   if (!await trackFromUrlLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before adding more certificates.' }
   }
@@ -361,7 +354,6 @@ export async function trackCertificateFromUpload(
   input: unknown,
 ): Promise<TrackCertificateResult> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'certExpiryTracker')
 
   const parsed = trackFromUploadSchema.safeParse(input)
   if (!parsed.success) {

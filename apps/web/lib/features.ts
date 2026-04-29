@@ -1,16 +1,16 @@
 const FEATURE_TIERS = {
-  // Tier 1 (Pro) + Tier 2 (Enterprise)
-  ssoOidc: ['pro', 'enterprise'],
-  auditLog: ['pro', 'enterprise'],
-  certExpiryTracker: ['pro', 'enterprise'],
-  serviceAccountTracker: ['pro', 'enterprise'],
-  reportsExport: ['pro', 'enterprise'],
-  reportsScheduled: ['pro', 'enterprise'],
-  metricRetentionExtended: ['pro', 'enterprise'],
-  scheduledTasks: ['pro', 'enterprise'],
-  alertRouting: ['pro', 'enterprise'],
-  csrInternalCa: ['pro', 'enterprise'],
-  sshKeyInventory: ['pro', 'enterprise'],
+  // Core CT Ops features are available in Community. Pro is a seat-capacity tier.
+  ssoOidc: ['community', 'pro', 'enterprise'],
+  auditLog: ['community', 'pro', 'enterprise'],
+  certExpiryTracker: ['community', 'pro', 'enterprise'],
+  serviceAccountTracker: ['community', 'pro', 'enterprise'],
+  reportsExport: ['community', 'pro', 'enterprise'],
+  reportsScheduled: ['community', 'pro', 'enterprise'],
+  metricRetentionExtended: ['community', 'pro', 'enterprise'],
+  scheduledTasks: ['community', 'pro', 'enterprise'],
+  alertRouting: ['community', 'pro', 'enterprise'],
+  csrInternalCa: ['community', 'pro', 'enterprise'],
+  sshKeyInventory: ['community', 'pro', 'enterprise'],
 
   // Tier 2 (Enterprise) only
   ssoSaml: ['enterprise'],
@@ -23,8 +23,6 @@ const FEATURE_TIERS = {
 
 export type Feature = keyof typeof FEATURE_TIERS
 export type LicenceTier = 'community' | 'pro' | 'enterprise'
-
-export const COMMUNITY_MAX_RETENTION_DAYS = 180
 
 export function hasFeature(tier: LicenceTier, feature: Feature): boolean {
   return (FEATURE_TIERS[feature] as readonly string[]).includes(tier)

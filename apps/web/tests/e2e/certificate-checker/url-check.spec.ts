@@ -3,7 +3,6 @@ import path from 'node:path'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
-import { issueTestLicence } from '../fixtures/licence'
 
 const TRACKING_TEST_CERT_PEM = `-----BEGIN CERTIFICATE-----
 MIIDZTCCAk2gAwIBAgIUGqljnkaJw0tIYv9uPQ+dGmImmaMwDQYJKoZIhvcNAQEL
@@ -249,18 +248,6 @@ test('authenticated user can analyse an uploaded certificate file with a matchin
 test('authenticated user can track an uploaded certificate after analysis', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
-  const licenceKey = await issueTestLicence({
-    orgId,
-    features: ['certExpiryTracker'],
-  })
-
-  await sql`
-    UPDATE organisations
-    SET licence_key = ${licenceKey},
-        licence_tier = 'pro'
-    WHERE id = ${orgId}
-  `
-
   await page.route('**/api/tools/certificate-checker', async (route) => {
     await route.fulfill({
       status: 200,

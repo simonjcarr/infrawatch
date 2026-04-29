@@ -15,6 +15,21 @@
 
 ## What Has Been Built
 
+### Session 84 — Core Pro gate removal
+
+**Seat-based CT-Ops licensing migration** (`apps/web/lib/features.ts`, `apps/web/lib/actions/`, `apps/web/app/(dashboard)/`, `apps/web/components/shared/sidebar.tsx`)
+- Made former Pro-gated core CT-Ops capabilities available to the Community tier while preserving Enterprise-only feature checks.
+- Removed Pro-only page locks, sidebar badges, backend `requireFeature()` checks, and metric-retention clamps from core reports, certificates, service accounts, SSH key inventory, and related report actions.
+- Removed stale locked-feature UI components and stopped E2E tests from issuing Pro licences only to access now-open core pages.
+
+**Validation**
+- Added unit coverage proving Community includes core features and Pro does not grant Enterprise-only capabilities.
+- Validation run: `node --experimental-strip-types --test lib/features.test.mjs`,
+  `pnpm --dir apps/web type-check`, `pnpm --dir apps/web test:unit`, targeted
+  E2E coverage for reports/certificates/service accounts/local users/certificate
+  tracking, and a clean rerun of the initially flaky software report plus
+  service account specs.
+
 ### Session 83 — User-seat enforcement
 
 **Seat enforcement** (`apps/web/lib/actions/seat-enforcement.ts`, `apps/web/lib/licence-seats.ts`)

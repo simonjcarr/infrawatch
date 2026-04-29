@@ -88,10 +88,9 @@ const reportingNav: NavItem[] = [
     title: 'Reports',
     href: '/reports',
     icon: FileBarChart,
-    feature: 'reportsExport',
     children: [
-      { title: 'Installed Software', href: '/reports/software', icon: Package, feature: 'reportsExport' },
-      { title: 'Patch Status', href: '/reports/patch-status', icon: ShieldCheck, feature: 'reportsExport' },
+      { title: 'Installed Software', href: '/reports/software', icon: Package },
+      { title: 'Patch Status', href: '/reports/patch-status', icon: ShieldCheck },
       { title: 'Vulnerabilities', href: '/reports/vulnerabilities', icon: ShieldAlert, feature: 'reportsExport' },
     ],
   },

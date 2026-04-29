@@ -3,7 +3,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
-import { requireFeature } from '@/lib/actions/licence-guard'
 
 export interface PatchPackageUpdate {
   id: string
@@ -174,7 +173,6 @@ export async function getCurrentUpdatesForHost(
 
 export async function getPatchManagementReport(orgId: string): Promise<PatchManagementReport> {
   await requireOrgAccess(orgId)
-  await requireFeature(orgId, 'reportsExport')
 
   const rows = (await db.execute(sql`
     SELECT

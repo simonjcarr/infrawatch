@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.6.1...ingest/v0.6.2) (2026-04-29)
+
+
+### Bug Fixes
+
+* **ingest:** use canonical agent release repository ([#765](https://github.com/carrtech-dev/ct-ops/issues/765)) ([ac68119](https://github.com/carrtech-dev/ct-ops/commit/ac68119aa0775970eb50af054cf04fb12dcbbd61))
+
 ## [0.6.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.6.0...ingest/v0.6.1) (2026-04-29)
 
 

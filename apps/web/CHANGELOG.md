@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.1...web/v0.82.2) (2026-04-29)
+
+
+### Bug Fixes
+
+* **web:** revoke stale sessions for inactive users ([#757](https://github.com/carrtech-dev/ct-ops/issues/757)) ([be66e20](https://github.com/carrtech-dev/ct-ops/commit/be66e20ff04df98c58ca0a49048fd3af6f34f86c))
+
 ## [0.82.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.0...web/v0.82.1) (2026-04-29)
 
 

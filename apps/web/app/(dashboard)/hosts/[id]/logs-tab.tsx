@@ -147,14 +147,17 @@ export function LogsTab({ orgId, hostId }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-base font-semibold text-foreground">Automated Logs</h3>
+        <h3 className="text-base font-semibold text-foreground" data-testid="host-logs-heading">Automated Logs</h3>
         <p className="text-sm text-muted-foreground mt-0.5">
           Runs started automatically by the system — e.g. periodic software inventory scans.
         </p>
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2">
+        <div
+          className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2"
+          data-testid="host-logs-selection"
+        >
           <span className="text-sm text-muted-foreground">
             {selectedIds.size} selected
           </span>
@@ -163,6 +166,7 @@ export function LogsTab({ orgId, hostId }: Props) {
             size="sm"
             onClick={() => doDelete()}
             disabled={isDeleting}
+            data-testid="host-logs-delete-selected"
           >
             {isDeleting ? (
               <Loader2 className="size-3.5 mr-1.5 animate-spin" />
@@ -175,7 +179,7 @@ export function LogsTab({ orgId, hostId }: Props) {
       )}
 
       {runs.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
+        <div className="rounded-lg border border-dashed p-10 text-center" data-testid="host-logs-empty">
           <FileText className="size-7 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-medium text-foreground">No automated runs yet</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -203,7 +207,11 @@ export function LogsTab({ orgId, hostId }: Props) {
             </TableHeader>
             <TableBody>
               {runs.map((run) => (
-                <TableRow key={run.id} data-state={selectedIds.has(run.id) ? 'selected' : undefined}>
+                <TableRow
+                  key={run.id}
+                  data-state={selectedIds.has(run.id) ? 'selected' : undefined}
+                  data-testid={`host-log-row-${run.id}`}
+                >
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(run.id)}

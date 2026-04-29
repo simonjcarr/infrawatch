@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.6.2...ingest/v0.7.0) (2026-04-29)
+
+
+### Features
+
+* **vuln:** match rhel-compatible rpm hosts ([#772](https://github.com/carrtech-dev/ct-ops/issues/772)) ([ff68d4a](https://github.com/carrtech-dev/ct-ops/commit/ff68d4a8b022798b7905b69fd6137cf2320a8a03))
+
 ## [0.6.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.6.1...ingest/v0.6.2) (2026-04-29)
 
 

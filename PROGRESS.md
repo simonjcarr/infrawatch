@@ -27,10 +27,11 @@
 - Hardened Red Hat parsing to prefer structured `affected_release` package data, extracting full RPM EVR from package NEVRA and preserving advisory/product metadata.
 - Marked free-text Red Hat `affected_packages` fallback rows as probable rather than confirmed.
 - Updated RPM matching to report vendor EVR-specific reasons and handle RHEL major-version advisory rules matching minor-version hosts such as `8.9`.
+- Added RHEL-compatible distro matching for RPM hosts, so AlmaLinux/Rocky/CentOS/Oracle-style inventory with `ID_LIKE=rhel` can match structured Red Hat advisory rows by full EVR.
 - Replaced direct unbounded post-scan matching goroutines with a bounded ingest-side vulnerability match scheduler used by inventory completion and feed sync.
 
 **Validation**
-- Added unit coverage for RPM backport release matching, fixed RPM packages resolving, Red Hat structured affected-release parsing, confirmed finding persistence, unsupported package sources, and host assessment status derivation.
+- Added unit coverage for RPM backport release matching, RHEL-compatible distro matching, fixed RPM packages resolving, Red Hat structured affected-release parsing, confirmed finding persistence, unsupported package sources, and host assessment status derivation.
 - Validation run: `go test ./internal/vuln`, `go test ./...` from `apps/ingest`, `node --experimental-strip-types --test lib/vulnerabilities/assessment.test.mjs`, `pnpm --dir apps/web run db:validate`, `pnpm --dir apps/web run type-check`, and `pnpm --dir apps/web run lint` (existing warnings only).
 
 ### Session 77 — Build Docs rich Markdown editor

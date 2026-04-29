@@ -26,6 +26,11 @@ async function fillMarkdownSource(editor: Locator, markdown: string) {
 test.setTimeout(60_000)
 
 test('admin can create and export a build document from a template and snippet', async ({ authenticatedPage: page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => {
+    pageErrors.push(error.message)
+  })
+
   const sql = getTestDb()
   const { orgId, userId } = await getOrgAndUserIds(sql)
 
@@ -100,6 +105,7 @@ test('admin can create and export a build document from a template and snippet',
 
   await page.reload()
   await expect(page.locator('[data-section-title="Provision VM"]').getByTestId('build-doc-markdown-editor')).toContainText('Captured handover notes')
+  expect(pageErrors).toEqual([])
   const documentUrl = page.url()
 
   await page.goto('/build-docs')

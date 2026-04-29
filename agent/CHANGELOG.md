@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.32.2...agent/v0.32.3) (2026-04-29)
+
+
+### Bug Fixes
+
+* **agent:** stop leaking enrolment tokens in install URLs ([#753](https://github.com/carrtech-dev/ct-ops/issues/753)) ([0552877](https://github.com/carrtech-dev/ct-ops/commit/0552877bead30bd864b693f089c853f76b828bf7))
+
 ## [0.32.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.32.1...agent/v0.32.2) (2026-04-28)
 
 

@@ -7,8 +7,18 @@ export function buildAgentInstallUrl(appUrl: string, skipVerify: boolean): strin
   return installUrl.toString()
 }
 
-export function buildAgentInstallCommand(appUrl: string, skipVerify: boolean): string {
-  return `curl -fsSL "${buildAgentInstallUrl(appUrl, skipVerify)}" | sh`
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+export function buildAgentInstallCommand(
+  appUrl: string,
+  skipVerify: boolean,
+  token?: string,
+): string {
+  const curlFlags = skipVerify ? '-fsSLk' : '-fsSL'
+  const tokenPrefix = token ? `env CT_OPS_ORG_TOKEN=${shellSingleQuote(token)} ` : ''
+  return `curl ${curlFlags} "${buildAgentInstallUrl(appUrl, skipVerify)}" | ${tokenPrefix}sh`
 }
 
 export function buildAgentInstallScript(

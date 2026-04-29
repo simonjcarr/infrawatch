@@ -156,7 +156,7 @@ export function AgentsSettingsClient({
       queryClient.invalidateQueries({ queryKey: ['enrolment-tokens', orgId] })
       setNewTokenValue(result.token)
       setNewInstallCommand(
-        buildAgentInstallCommand(appUrl || window.location.origin, variables.skipVerify),
+        buildAgentInstallCommand(appUrl || window.location.origin, variables.skipVerify, result.token),
       )
       reset()
       setTokenTags([])
@@ -337,17 +337,17 @@ export function AgentsSettingsClient({
             <DialogTitle>Create Enrolment Token</DialogTitle>
             <DialogDescription>
               Agents use this token to register with your organisation. You&apos;ll get a
-              bootstrap command that reads the token from <code>CT_OPS_ORG_TOKEN</code>.
+              ready-to-run install command.
             </DialogDescription>
           </DialogHeader>
 
           {newTokenValue && newInstallCommand ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Token created. Export the raw token on the target host, then run this command:
+                Token created. Run this command on each server you want to enrol:
               </p>
 
-                <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
+              <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
                 <code className="text-xs font-mono flex-1 break-all leading-relaxed" data-testid="agent-enrolment-install-command">
                   {newInstallCommand}
                 </code>
@@ -364,7 +364,7 @@ export function AgentsSettingsClient({
                     <CopyButton text={newTokenValue} />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    This token will not be shown again in full. Export it as <code>CT_OPS_ORG_TOKEN</code> before running the install command.
+                    This token will not be shown again in full. The install command passes it via <code>CT_OPS_ORG_TOKEN</code>, not in the URL.
                   </p>
                 </div>
               </details>

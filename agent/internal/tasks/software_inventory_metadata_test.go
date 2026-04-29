@@ -54,3 +54,12 @@ func TestParseRpmSourcePackage(t *testing.T) {
 		t.Fatalf("parseSourceRPM = (%q, %q, %q), want openssl 3.2.2 9.el9_5", name, version, release)
 	}
 }
+
+func TestRPMSourceVersionForMatchKeepsInstalledEVR(t *testing.T) {
+	t.Parallel()
+
+	sourceVersion := rpmSourceVersionForMatch("1:3.5.1-5.el9_7", "3.5.1", "5.el9_7")
+	if sourceVersion != "1:3.5.1-5.el9_7" {
+		t.Fatalf("rpmSourceVersionForMatch = %q, want full installed EVR", sourceVersion)
+	}
+}

@@ -15,6 +15,20 @@
 
 ## What Has Been Built
 
+### Session 80 — Red Hat CSAF package advisory ingestion
+
+**Confirmed RPM advisory data** (`apps/ingest/internal/vuln/`)
+- Added Red Hat CSAF advisory summary ingestion so `released_packages` are normalised into `vulnerability_affected_packages` fixed-version rows under `redhat-security-data`.
+- Derived RHEL major versions from RPM EVR release strings such as `1:3.5.1-7.el9_7`, allowing Alma/Rocky/RHEL-compatible hosts to match advisory rows for RHEL 9.
+- Preserved CVE/advisory metadata on generated fixed rows so confirmed findings carry advisory context.
+
+**RPM inventory accuracy** (`agent/internal/tasks/`)
+- Updated RPM software inventory to retain full installed EVR in `source_version` when the source RPM does not provide an epoch, preventing source-package comparisons from falling back to upstream-only versions.
+
+**Validation**
+- Added unit coverage for Red Hat CSAF released-package parsing, CSAF sync URL windowing, and RPM source-version EVR preservation.
+- Validation run: `go test ./internal/vuln`, `go test ./...` from `apps/ingest`, `go test ./internal/tasks`, and `go test ./...` from `agent`.
+
 ### Session 79 — Multi-role team membership
 
 **Additive role model** (`apps/web/lib/auth/`, `apps/web/lib/actions/`, `apps/web/lib/db/schema/`, `apps/web/lib/db/migrations/0053_bright_black_cat.sql`)

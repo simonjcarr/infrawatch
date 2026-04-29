@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var rpmELVersionPattern = regexp.MustCompile(`(?:^|[._-])el([0-9]+)(?:[._-]|$)`)
 
 func ParseCISAKEV(r io.Reader) ([]KEVEntry, error) {
 	var doc struct {
@@ -473,6 +476,98 @@ func parseRedHatCVEList(r io.Reader) ([]CVERecord, []AffectedPackage, error) {
 	return cves, affected, nil
 }
 
+func ParseRedHatCSAFList(r io.Reader) ([]CVERecord, []AffectedPackage, error) {
+	var rows []struct {
+		RHSA             string   `json:"RHSA"`
+		Severity         string   `json:"severity"`
+		ReleasedOn       string   `json:"released_on"`
+		CVEs             []string `json:"CVEs"`
+		ReleasedPackages []string `json:"released_packages"`
+		ResourceURL      string   `json:"resource_url"`
+	}
+	if err := json.NewDecoder(r).Decode(&rows); err != nil {
+		return nil, nil, err
+	}
+
+	recordsByCVE := make(map[string]CVERecord)
+	var affected []AffectedPackage
+	for _, row := range rows {
+		severity := normalizeSeverity(row.Severity)
+		var releasedAt *time.Time
+		if t := parseRFC3339(row.ReleasedOn); t != nil {
+			releasedAt = t
+		}
+		cveIDs := uniqueNonEmptyStrings(row.CVEs)
+		if len(cveIDs) == 0 {
+			continue
+		}
+		for _, cveID := range cveIDs {
+			if _, ok := recordsByCVE[cveID]; !ok {
+				recordsByCVE[cveID] = CVERecord{
+					CVEID:       cveID,
+					Severity:    severity,
+					PublishedAt: releasedAt,
+					ModifiedAt:  releasedAt,
+					Source:      "redhat-security-data",
+				}
+			}
+		}
+
+		for _, pkg := range row.ReleasedPackages {
+			name, fixed := splitRedHatFixedPackage(pkg)
+			if name == "" || fixed == "" {
+				continue
+			}
+			distroVersion := redHatVersionFromFixedEVR(fixed)
+			if distroVersion == "" {
+				continue
+			}
+			for _, cveID := range cveIDs {
+				affected = append(affected, AffectedPackage{
+					CVEID:           cveID,
+					Source:          "redhat-security-data",
+					DistroID:        "rhel",
+					DistroVersionID: distroVersion,
+					PackageName:     name,
+					FixedVersion:    fixed,
+					Severity:        severity,
+					PackageState:    "fixed",
+					MetadataJSON: encodeMetadata(map[string]string{
+						"advisory":     row.RHSA,
+						"released_on":  row.ReleasedOn,
+						"package":      pkg,
+						"resource_url": row.ResourceURL,
+						"source":       "csaf",
+					}),
+				})
+			}
+		}
+	}
+
+	cves := make([]CVERecord, 0, len(recordsByCVE))
+	for _, record := range recordsByCVE {
+		cves = append(cves, record)
+	}
+	return cves, affected, nil
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
 func parseFloat(value string) (float64, error) {
 	var out float64
 	_, err := fmt.Sscanf(value, "%f", &out)
@@ -538,6 +633,14 @@ func stripRPMArchitecture(value string) string {
 	default:
 		return value
 	}
+}
+
+func redHatVersionFromFixedEVR(fixed string) string {
+	match := rpmELVersionPattern.FindStringSubmatch(fixed)
+	if len(match) != 2 {
+		return ""
+	}
+	return match[1]
 }
 
 func redHatProductVersion(productName string) string {

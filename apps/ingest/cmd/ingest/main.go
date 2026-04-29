@@ -183,6 +183,7 @@ func main() {
 		AlpineBaseURL:  cfg.Vulnerability.AlpineBaseURL,
 		AlpineReleases: cfg.Vulnerability.AlpineReleases,
 		RedHatURL:      cfg.Vulnerability.RedHatURL,
+		RedHatCSAFURL:  cfg.Vulnerability.RedHatCSAFURL,
 	}, vulnerabilityMatcher)
 
 	// Start cert URL refresh sweeper goroutine

@@ -213,10 +213,7 @@ func collectRpm(ctx context.Context, info osReleaseInfo) ([]collectedPackage, er
 			p.SourceName = p.Name
 		}
 		if p.SourceVersion == "" {
-			p.SourceVersion = version
-			if sourceRelease != "" {
-				p.SourceVersion += "-" + sourceRelease
-			}
+			p.SourceVersion = rpmSourceVersionForMatch(fullVersion, version, sourceRelease)
 		}
 		if ts := trimField(fields, 7); ts != "" {
 			if unix, err := strconv.ParseInt(ts, 10, 64); err == nil {
@@ -229,6 +226,19 @@ func collectRpm(ctx context.Context, info osReleaseInfo) ([]collectedPackage, er
 		}
 	}
 	return pkgs, nil
+}
+
+func rpmSourceVersionForMatch(fullVersion, sourceVersion, sourceRelease string) string {
+	if fullVersion != "" {
+		return fullVersion
+	}
+	if sourceVersion == "" {
+		return ""
+	}
+	if sourceRelease != "" {
+		return sourceVersion + "-" + sourceRelease
+	}
+	return sourceVersion
 }
 
 func parseSourceRPM(source string) (name, version, release string) {

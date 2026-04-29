@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
+import { issueTestLicence } from '../fixtures/licence'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
@@ -11,6 +12,25 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
+}
+
+async function setOrgSeatLimit(sql: ReturnType<typeof getTestDb>, orgId: string, maxUsers: number): Promise<void> {
+  const licenceKey = await issueTestLicence({ orgId, tier: 'pro', maxUsers })
+  await sql`
+    UPDATE organisations
+    SET licence_key = ${licenceKey},
+        licence_tier = 'pro'
+    WHERE id = ${orgId}
+  `
+}
+
+async function clearOrgLicence(sql: ReturnType<typeof getTestDb>, orgId: string): Promise<void> {
+  await sql`
+    UPDATE organisations
+    SET licence_key = NULL,
+        licence_tier = 'community'
+    WHERE id = ${orgId}
+  `
 }
 
 test('admin can create and cancel a team invitation', async ({ authenticatedPage: page }) => {
@@ -100,6 +120,36 @@ test('admin cannot create a duplicate pending invitation for the same email addr
   expect(inviteRows[0]?.role).toBe('engineer')
   expect(inviteRows[0]?.roles).toEqual(['engineer'])
   expect(inviteRows[0]?.deleted_at).toBeNull()
+})
+
+test('admin cannot create an invitation when user seats are exhausted', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+
+  try {
+    await setOrgSeatLimit(sql, orgId, 1)
+
+    await page.goto('/team')
+
+    await expect(page.getByTestId('team-heading')).toBeVisible()
+    await page.getByTestId('team-invite-open').click()
+    await page.getByTestId('team-invite-email').fill('seat-limited-teammate@example.com')
+    await page.getByTestId('team-invite-role-engineer').click()
+    await page.getByTestId('team-invite-submit').click()
+
+    await expect(page.getByText('User seat limit reached. This licence allows 1 user.')).toBeVisible()
+    await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
+
+    const inviteRows = await sql<Array<{ id: string }>>`
+      SELECT id
+      FROM invitations
+      WHERE organisation_id = ${orgId}
+        AND email = 'seat-limited-teammate@example.com'
+    `
+    expect(inviteRows).toHaveLength(0)
+  } finally {
+    await clearOrgLicence(sql, orgId)
+  }
 })
 
 test('admin re-inviting a removed user restores their membership instead of creating a pending invite', async ({ authenticatedPage: page }) => {

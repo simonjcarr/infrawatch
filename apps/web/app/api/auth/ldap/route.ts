@@ -10,6 +10,7 @@ import { createRateLimiter } from '@/lib/rate-limit'
 import { getBetterAuthSecret } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
 import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
+import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 
 // 5 attempts per IP per 60 seconds — prevents brute-force and user enumeration
 const ldapRateLimit = createRateLimiter({
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
           userId = existingUser.id
         } else {
           // Create new user
+          await assertCanReserveUserSeat(config.organisationId)
           userId = createId()
           const email = ldapUser.email || `${ldapUser.username}@ldap.local`
 
@@ -206,6 +208,13 @@ export async function POST(request: NextRequest) {
       NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
     )
   } catch (err) {
+    const seatLimitMessage = toSeatLimitErrorMessage(err)
+    if (seatLimitMessage) {
+      return withAuthDelay(
+        requestStart,
+        NextResponse.json({ error: seatLimitMessage }, { status: 403 }),
+      )
+    }
     logError('[LDAP] Unexpected error during login:', err)
     return withAuthDelay(
       requestStart,

@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 83 — User-seat enforcement
+
+**Seat enforcement** (`apps/web/lib/actions/seat-enforcement.ts`, `apps/web/lib/licence-seats.ts`)
+- Added shared seat usage calculation for active non-deleted users plus pending unexpired invitations.
+- Enforced `maxUsers` on admin invites, removed-user restoration, invite acceptance, user reactivation, and LDAP auto-provisioning.
+- Preserved compatibility for licences without `maxUsers` by treating them as unlimited until Community seat rules are finalized.
+
+**Validation**
+- Added unit coverage for seat usage calculations and E2E coverage for invite creation and invite acceptance at the seat limit.
+- Validation run: `npm run type-check`, `npm run test:unit`, and `npm run test:e2e -- tests/e2e/team/invitations.spec.ts tests/e2e/auth/invite-acceptance.spec.ts` from `apps/web`.
+
 ### Session 82 — Seat-capacity licence payload
 
 **Licence entitlement model** (`apps/web/lib/licence.ts`, `apps/web/lib/actions/licence-guard.ts`)

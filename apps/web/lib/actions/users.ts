@@ -11,6 +11,7 @@ import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { ASSIGNED_ROLES, INVITABLE_ROLES, getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
+import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -76,6 +77,7 @@ export async function inviteUser(
       ),
     })
     if (removedUser) {
+      await assertCanReserveUserSeat(orgId)
       await db
         .update(users)
         .set({ deletedAt: null, isActive: true, role: nextRole, roles: nextRoles, updatedAt: new Date() })
@@ -107,6 +109,8 @@ export async function inviteUser(
       return { error: 'An invitation has already been sent to this email address' }
     }
 
+    await assertCanReserveUserSeat(orgId)
+
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
 
@@ -127,6 +131,10 @@ export async function inviteUser(
     const baseUrl = getBetterAuthOrigin()
     return { inviteLink: `${baseUrl}/register?invite=${invite.token}` }
   } catch (err) {
+    const seatLimitMessage = toSeatLimitErrorMessage(err)
+    if (seatLimitMessage) {
+      return { error: seatLimitMessage }
+    }
     logError('Failed to invite user:', err)
     return { error: 'An unexpected error occurred' }
   }
@@ -246,6 +254,18 @@ export async function reactivateUser(
   try {
     await requireOrgAdminAccess(orgId)
 
+    const targetUser = await db.query.users.findFirst({
+      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      columns: { id: true, isActive: true },
+    })
+    if (!targetUser) {
+      return { error: 'User not found' }
+    }
+
+    if (!targetUser.isActive) {
+      await assertCanReserveUserSeat(orgId)
+    }
+
     await db
       .update(users)
       .set({ isActive: true, updatedAt: new Date() })
@@ -253,6 +273,10 @@ export async function reactivateUser(
 
     return { success: true }
   } catch (err) {
+    const seatLimitMessage = toSeatLimitErrorMessage(err)
+    if (seatLimitMessage) {
+      return { error: seatLimitMessage }
+    }
     logError('Failed to reactivate user:', err)
     return { error: 'An unexpected error occurred' }
   }

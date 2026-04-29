@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.85.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.3...web/v0.85.0) (2026-04-29)
+
+
+### Features
+
+* **web:** add seat capacity licence payload ([#796](https://github.com/carrtech-dev/ct-ops/issues/796)) ([7f8725a](https://github.com/carrtech-dev/ct-ops/commit/7f8725a5dee6af3b7d32f19c2938aed1c540acec))
+
 ## [0.84.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.2...web/v0.84.3) (2026-04-29)
 
 

@@ -1,25 +1,22 @@
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
 import { db } from '@/lib/db'
-import { users, agents, certificates, alertInstances } from '@/lib/db/schema'
+import { agents, certificates, alertInstances } from '@/lib/db/schema'
 import { eq, and, isNull, count } from 'drizzle-orm'
+import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  let session
+  try {
+    session = await getApiOrgSession()
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return Response.json({ error: err.message }, { status: err.status })
+    }
+    throw err
   }
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-  })
-  if (!user?.organisationId) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  const orgId = user.organisationId
+  const orgId = session.user.organisationId
 
   const [agentRows, certRows, alertRows] = await Promise.all([
     db

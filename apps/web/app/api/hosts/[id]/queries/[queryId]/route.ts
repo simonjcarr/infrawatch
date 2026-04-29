@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server'
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
 import { db } from '@/lib/db'
-import { users, agentQueries } from '@/lib/db/schema'
+import { agentQueries } from '@/lib/db/schema'
 import { and, eq, isNull } from 'drizzle-orm'
+import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,17 +13,16 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; queryId: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  let session
+  try {
+    session = await getApiOrgSession()
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return Response.json({ error: err.message }, { status: err.status })
+    }
+    throw err
   }
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-  })
-  if (!user?.organisationId) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const user = session.user
 
   const { id: hostId, queryId } = await params
 

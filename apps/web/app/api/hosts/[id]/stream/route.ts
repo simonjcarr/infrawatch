@@ -1,12 +1,8 @@
 import { NextRequest } from 'next/server'
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
-import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { getHost } from '@/lib/actions/agents'
 import { getChecksWithHistory } from '@/lib/actions/checks'
 import { listNotesForHost } from '@/lib/actions/notes'
+import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,16 +10,18 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) return new Response('Unauthorized', { status: 401 })
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-  })
-  if (!user?.organisationId) return new Response('Forbidden', { status: 403 })
+  let session
+  try {
+    session = await getApiOrgSession()
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      return new Response(err.message, { status: err.status })
+    }
+    throw err
+  }
 
   const { id: hostId } = await params
-  const orgId = user.organisationId
+  const orgId = session.user.organisationId
 
   const stream = new ReadableStream({
     async start(controller) {

@@ -5,7 +5,7 @@ import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-au
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { users, invitations } from '@/lib/db/schema'
+import { users, invitations, sessions } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
@@ -210,6 +210,8 @@ export async function deactivateUser(
       .set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
 
+    await db.delete(sessions).where(eq(sessions.userId, targetUserId))
+
     return { success: true }
   } catch (err) {
     logError('Failed to deactivate user:', err)
@@ -274,6 +276,8 @@ export async function removeUser(
         .update(users)
         .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
         .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+
+      await tx.delete(sessions).where(eq(sessions.userId, targetUserId))
 
       await writeAuditEvent(tx, {
         organisationId: orgId,

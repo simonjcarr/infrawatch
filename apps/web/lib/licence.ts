@@ -79,6 +79,7 @@ export type LicencePayload = {
   jti: string
   tier: PaidTier
   features: Feature[]
+  maxUsers?: number
   maxHosts?: number
   customer: LicenceCustomer
 }
@@ -114,6 +115,10 @@ function isCustomer(v: unknown): v is LicenceCustomer {
   if (!v || typeof v !== 'object') return false
   const c = v as Record<string, unknown>
   return typeof c.name === 'string' && typeof c.email === 'string'
+}
+
+function parsePositiveIntegerClaim(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : undefined
 }
 
 function resolveRevocationUrl(env: NodeJS.ProcessEnv = process.env): string | null {
@@ -272,8 +277,8 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
       return { valid: false, error: 'Licence key is missing customer details' }
     }
 
-    const rawMaxHosts = payload['maxHosts']
-    const maxHosts = typeof rawMaxHosts === 'number' && rawMaxHosts > 0 ? rawMaxHosts : undefined
+    const maxUsers = parsePositiveIntegerClaim(payload['maxUsers'])
+    const maxHosts = parsePositiveIntegerClaim(payload['maxHosts'])
 
     if (await isLicenceRevoked(payload.jti)) {
       return { valid: false, error: 'Licence key has been revoked' }
@@ -291,13 +296,14 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
         jti: payload.jti,
         tier: payload['tier'],
         features,
+        maxUsers,
         maxHosts,
         customer: rawCustomer,
       },
     }
   } catch (err) {
     if (err instanceof Error) {
-      if (err.message.includes('expired')) {
+      if (err.name === 'JWTExpired' || err.message.includes('expired')) {
         return { valid: false, error: 'Licence key has expired' }
       }
       if (err.message.includes('signature')) {

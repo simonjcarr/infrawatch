@@ -5,6 +5,7 @@ type TestLicenceOptions = {
   orgId: string
   tier?: 'pro' | 'enterprise'
   features?: string[]
+  maxUsers?: number
   maxHosts?: number
 }
 
@@ -15,6 +16,7 @@ export async function issueTestLicence({
   orgId,
   tier = 'pro',
   features = [],
+  maxUsers = 10,
   maxHosts = 100,
 }: TestLicenceOptions): Promise<string> {
   const privateKeyPem = process.env['E2E_LICENCE_PRIVATE_KEY']
@@ -26,6 +28,7 @@ export async function issueTestLicence({
   return new SignJWT({
     tier,
     features,
+    maxUsers,
     maxHosts,
     customer: {
       name: 'E2E Test Customer',

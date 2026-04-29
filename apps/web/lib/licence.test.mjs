@@ -21,7 +21,7 @@ async function createKeyPair() {
   }
 }
 
-async function signJwt(privateKeyPem, audience, claims = {}) {
+async function signJwt(privateKeyPem, audience, claims = {}, options = {}) {
   const privateKey = await importPKCS8(privateKeyPem, 'RS256')
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
@@ -29,22 +29,27 @@ async function signJwt(privateKeyPem, audience, claims = {}) {
     .setAudience(audience)
     .setIssuedAt()
     .setNotBefore(0)
-    .setExpirationTime('1 hour')
+    .setExpirationTime(options.expirationTime ?? '1 hour')
     .sign(privateKey)
 }
 
-async function signLicence(privateKeyPem, claims = {}) {
-  return signJwt(privateKeyPem, 'install.carrtech.dev', {
-    tier: 'enterprise',
-    features: ['whiteLabel'],
-    customer: {
-      name: 'Example Corp',
-      email: 'ops@example.com',
+async function signLicence(privateKeyPem, claims = {}, options = {}) {
+  return signJwt(
+    privateKeyPem,
+    'install.carrtech.dev',
+    {
+      tier: 'enterprise',
+      features: ['whiteLabel'],
+      customer: {
+        name: 'Example Corp',
+        email: 'ops@example.com',
+      },
+      sub: 'org_123',
+      jti: 'lic_123',
+      ...claims,
     },
-    sub: 'org_123',
-    jti: 'lic_123',
-    ...claims,
-  })
+    options,
+  )
 }
 
 async function signRevocationBundle(privateKeyPem, revoked = []) {
@@ -87,6 +92,55 @@ test('validateLicenceKey accepts a signed licence when the revocation list is un
   const result = await validateLicenceKey(key)
 
   assert.equal(result.valid, true)
+})
+
+test('validateLicenceKey preserves positive integer user seat capacity', async () => {
+  const keys = await createKeyPair()
+  process.env.NODE_ENV = 'production'
+  process.env.LICENCE_PUBLIC_KEY = keys.publicKeyPem
+  process.env.LICENCE_REVOCATION_URL = ''
+
+  const key = await signLicence(keys.privateKeyPem, {
+    maxUsers: 25,
+    maxHosts: 500,
+  })
+  const result = await validateLicenceKey(key)
+
+  assert.equal(result.valid, true)
+  assert.equal(result.payload.maxUsers, 25)
+  assert.equal(result.payload.maxHosts, 500)
+})
+
+test('validateLicenceKey ignores invalid capacity claims', async () => {
+  const keys = await createKeyPair()
+  process.env.NODE_ENV = 'production'
+  process.env.LICENCE_PUBLIC_KEY = keys.publicKeyPem
+  process.env.LICENCE_REVOCATION_URL = ''
+
+  const key = await signLicence(keys.privateKeyPem, {
+    maxUsers: 0,
+    maxHosts: 12.5,
+  })
+  const result = await validateLicenceKey(key)
+
+  assert.equal(result.valid, true)
+  assert.equal(result.payload.maxUsers, undefined)
+  assert.equal(result.payload.maxHosts, undefined)
+})
+
+test('validateLicenceKey rejects expired paid licences', async () => {
+  const keys = await createKeyPair()
+  process.env.NODE_ENV = 'production'
+  process.env.LICENCE_PUBLIC_KEY = keys.publicKeyPem
+  process.env.LICENCE_REVOCATION_URL = ''
+
+  const key = await signLicence(keys.privateKeyPem, {}, { expirationTime: '1 second ago' })
+  const result = await validateLicenceKey(key)
+
+  assert.deepEqual(result, {
+    valid: false,
+    error: 'Licence key has expired',
+  })
 })
 
 test('validateLicenceKey rejects a licence whose jti is present in the signed revocation bundle', async () => {

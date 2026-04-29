@@ -73,6 +73,7 @@ type InventoryPackage struct {
 	Version         string
 	Source          string
 	DistroID        string
+	DistroIDLike    []string
 	DistroVersionID string
 	DistroCodename  string
 	SourceName      string

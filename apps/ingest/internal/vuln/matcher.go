@@ -6,7 +6,7 @@ func MatchPackage(pkg InventoryPackage, affected AffectedPackage) (bool, string)
 	if !supportedInventorySource(pkg.Source) {
 		return false, "unsupported inventory source"
 	}
-	if affected.DistroID != "" && !strings.EqualFold(pkg.DistroID, affected.DistroID) {
+	if affected.DistroID != "" && !distroMatches(pkg, affected) {
 		return false, "distro mismatch"
 	}
 	if affected.DistroVersionID != "" && pkg.DistroVersionID != "" && !distroVersionMatches(pkg, affected) {
@@ -41,12 +41,35 @@ func MatchPackage(pkg InventoryPackage, affected AffectedPackage) (bool, string)
 	return false, "installed version is fixed"
 }
 
+func distroMatches(pkg InventoryPackage, affected AffectedPackage) bool {
+	if strings.EqualFold(pkg.DistroID, affected.DistroID) {
+		return true
+	}
+	if pkg.Source == "rpm" && strings.EqualFold(affected.DistroID, "rhel") {
+		return isRHELCompatibleDistro(pkg)
+	}
+	return false
+}
+
 func distroVersionMatches(pkg InventoryPackage, affected AffectedPackage) bool {
 	if affected.DistroVersionID == pkg.DistroVersionID {
 		return true
 	}
-	if pkg.Source == "rpm" && strings.EqualFold(affected.DistroID, "rhel") {
+	if pkg.Source == "rpm" && strings.EqualFold(affected.DistroID, "rhel") && isRHELCompatibleDistro(pkg) {
 		return !strings.Contains(affected.DistroVersionID, ".") && strings.HasPrefix(pkg.DistroVersionID, affected.DistroVersionID+".")
+	}
+	return false
+}
+
+func isRHELCompatibleDistro(pkg InventoryPackage) bool {
+	switch strings.ToLower(pkg.DistroID) {
+	case "rhel", "redhat", "redhatenterpriseserver", "almalinux", "rocky", "centos", "ol", "oraclelinux", "miraclelinux":
+		return true
+	}
+	for _, like := range pkg.DistroIDLike {
+		if strings.EqualFold(like, "rhel") {
+			return true
+		}
 	}
 	return false
 }

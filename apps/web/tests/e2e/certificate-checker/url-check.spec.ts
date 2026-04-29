@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
@@ -140,6 +142,108 @@ test('authenticated user can analyse a pasted certificate and clear the result',
   await page.getByTestId('certificate-checker-clear').click()
   await expect(page.getByTestId('certificate-checker-result')).toHaveCount(0)
   await expect(page.getByTestId('certificate-checker-empty-state')).toBeVisible()
+})
+
+test('authenticated user can analyse an uploaded certificate file with a matching key', async ({ authenticatedPage: page }) => {
+  let capturedBody: Record<string, unknown> | null = null
+
+  await page.route('**/api/tools/certificate-checker', async (route) => {
+    capturedBody = route.request().postDataJSON() as Record<string, unknown>
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        keyMatch: true,
+        certificate: {
+          pem: TRACKING_TEST_CERT_PEM,
+          subject: 'CN=upload.example.com, O=Example Corp, C=GB',
+          issuer: 'CN=Example Issuing CA, O=Example PKI, C=GB',
+          commonName: 'upload.example.com',
+          organization: 'Example Corp',
+          organizationalUnit: 'Platform',
+          country: 'GB',
+          state: 'London',
+          locality: 'London',
+          issuerCommonName: 'Example Issuing CA',
+          issuerOrganization: 'Example PKI',
+          notBefore: '2026-01-01T00:00:00.000Z',
+          notAfter: '2027-01-01T00:00:00.000Z',
+          daysRemaining: 200,
+          isExpired: false,
+          isExpiringSoon: false,
+          isSelfSigned: false,
+          isCA: false,
+          pathLength: null,
+          serialNumber: 'UPLOAD12345',
+          fingerprintSha256: 'UPLOAD:AA:BB:CC:DD',
+          fingerprintSha512: 'UPLOAD:11:22:33:44',
+          keyAlgorithm: 'RSA',
+          keySize: 2048,
+          curve: null,
+          signatureAlgorithm: 'sha256WithRSAEncryption',
+          subjectKeyId: 'upload-subject-key-id',
+          authorityKeyId: 'upload-authority-key-id',
+          keyUsage: ['Digital Signature', 'Key Encipherment'],
+          extendedKeyUsage: ['TLS Web Server Authentication'],
+          certificatePolicies: ['2.23.140.1.2.1'],
+          sans: [
+            { type: 'DNS', value: 'upload.example.com' },
+          ],
+          ocspUrls: [],
+          caIssuers: [],
+          crlUrls: [],
+          chain: [
+            {
+              subject: 'CN=upload.example.com, O=Example Corp, C=GB',
+              issuer: 'CN=Example Issuing CA, O=Example PKI, C=GB',
+              notBefore: '2026-01-01T00:00:00.000Z',
+              notAfter: '2027-01-01T00:00:00.000Z',
+              isCA: false,
+              fingerprintSha256: 'UPLOAD:AA:BB:CC:DD',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  const tmpDir = path.join(process.cwd(), 'tests', 'e2e', '.tmp')
+  const certPath = path.join(tmpDir, 'certificate-checker-upload.der')
+  const keyPath = path.join(tmpDir, 'certificate-checker-upload.key')
+  const certBytes = Buffer.from([0x30, 0x82, 0x01, 0x0a, 0x02, 0x82, 0x01, 0x01, 0x00, 0xd9, 0xaa, 0x55])
+  const keyPem = [
+    '-----BEGIN PRIVATE KEY-----',
+    'uploaded-test-key',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+
+  await mkdir(tmpDir, { recursive: true })
+  await writeFile(certPath, certBytes)
+  await writeFile(keyPath, keyPem)
+
+  await page.goto('/certificate-checker')
+
+  await expect(page.getByTestId('certificate-checker-heading')).toBeVisible()
+  await page.locator('input[type="file"]').nth(0).setInputFiles(certPath)
+  await page.locator('input[type="file"]').nth(1).setInputFiles(keyPath)
+  await page.getByRole('button', { name: 'Analyse Certificate' }).click()
+
+  await expect
+    .poll(() => capturedBody)
+    .toMatchObject({
+      action: 'parse',
+      data: certBytes.toString('base64'),
+      keyPem,
+    })
+
+  await expect(page.getByTestId('certificate-checker-result')).toBeVisible()
+  await expect(page.getByTestId('certificate-checker-result-title')).toContainText('upload.example.com')
+  await expect(page.getByTestId('certificate-checker-status')).toContainText('Valid')
+  await expect(page.getByTestId('certificate-checker-key-match')).toContainText(
+    'Private key matches this certificate',
+  )
 })
 
 test('authenticated user can track an uploaded certificate after analysis', async ({ authenticatedPage: page }) => {

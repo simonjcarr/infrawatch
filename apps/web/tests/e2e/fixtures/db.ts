@@ -27,6 +27,7 @@ const APP_TABLES = [
   'alert_instances',
   'alert_rules',
   'alert_silences',
+  'certificate_authorities',
   'certificate_events',
   'certificates',
   'check_results',

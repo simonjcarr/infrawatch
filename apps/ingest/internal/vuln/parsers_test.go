@@ -42,8 +42,18 @@ func TestParseDebianTracker(t *testing.T) {
 	if len(affected) != 2 {
 		t.Fatalf("len(affected) = %d, want 2", len(affected))
 	}
-	if affected[0].PackageName != "openssl" || affected[0].DistroCodename != "bookworm" || affected[0].FixedVersion != "3.0.11-1~deb12u2" {
-		t.Fatalf("unexpected affected row: %#v", affected[0])
+	var bookworm *AffectedPackage
+	for i := range affected {
+		if affected[i].DistroCodename == "bookworm" {
+			bookworm = &affected[i]
+			break
+		}
+	}
+	if bookworm == nil {
+		t.Fatalf("bookworm affected row missing: %#v", affected)
+	}
+	if bookworm.PackageName != "openssl" || bookworm.FixedVersion != "3.0.11-1~deb12u2" {
+		t.Fatalf("unexpected bookworm affected row: %#v", *bookworm)
 	}
 }
 

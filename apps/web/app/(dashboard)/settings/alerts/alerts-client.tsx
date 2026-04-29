@@ -129,7 +129,12 @@ function AddDefaultDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-1">
             <Label htmlFor="name">Rule Name</Label>
-            <Input id="name" placeholder="e.g. High CPU Usage" {...register('name')} />
+            <Input
+              id="name"
+              placeholder="e.g. High CPU Usage"
+              data-testid="settings-alert-default-name"
+              {...register('name')}
+            />
             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
 
@@ -141,7 +146,7 @@ function AddDefaultDialog({
                 name="metric"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-testid="settings-alert-default-metric"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cpu">CPU</SelectItem>
                       <SelectItem value="memory">Memory</SelectItem>
@@ -158,7 +163,7 @@ function AddDefaultDialog({
                 name="operator"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-testid="settings-alert-default-operator"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="gt">Above (&gt;)</SelectItem>
                       <SelectItem value="lt">Below (&lt;)</SelectItem>
@@ -174,6 +179,7 @@ function AddDefaultDialog({
                 type="number"
                 min={0}
                 max={100}
+                data-testid="settings-alert-default-threshold"
                 {...register('threshold', { valueAsNumber: true })}
               />
               {errors.threshold && <p className="text-xs text-destructive">{errors.threshold.message}</p>}
@@ -182,15 +188,15 @@ function AddDefaultDialog({
 
           <div className="space-y-1">
             <Label>Severity</Label>
-            <Controller
-              control={control}
-              name="severity"
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="info">Info</SelectItem>
-                    <SelectItem value="warning">Warning</SelectItem>
+              <Controller
+                control={control}
+                name="severity"
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger data-testid="settings-alert-default-severity"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="info">Info</SelectItem>
+                      <SelectItem value="warning">Warning</SelectItem>
                     <SelectItem value="critical">Critical</SelectItem>
                   </SelectContent>
                 </Select>
@@ -202,7 +208,7 @@ function AddDefaultDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} data-testid="settings-alert-default-submit">
               {isSubmitting ? 'Adding…' : 'Add Default'}
             </Button>
           </DialogFooter>
@@ -237,7 +243,7 @@ export function GlobalAlertsClient({ orgId, initialDefaults }: GlobalAlertsClien
   return (
     <div className="space-y-6 p-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Global Alert Defaults</h1>
+        <h1 className="text-2xl font-semibold tracking-tight" data-testid="settings-alert-defaults-heading">Global Alert Defaults</h1>
         <p className="text-sm text-muted-foreground mt-1">
           These metric alert rules are automatically applied to every new host when an agent is approved.
           After a host is added you can remove individual rules from the host&apos;s Alerts tab.
@@ -256,14 +262,14 @@ export function GlobalAlertsClient({ orgId, initialDefaults }: GlobalAlertsClien
               Check-based rules must be configured per host since they reference host-specific checks.
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="settings-alert-defaults-add">
             <Plus className="size-4 mr-1" />
             Add Default
           </Button>
         </CardHeader>
         <CardContent>
           {defaults.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" data-testid="settings-alert-defaults-empty">
               <Bell className="size-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">No global alert defaults configured.</p>
               <p className="text-xs text-muted-foreground">
@@ -282,7 +288,7 @@ export function GlobalAlertsClient({ orgId, initialDefaults }: GlobalAlertsClien
               </TableHeader>
               <TableBody>
                 {defaults.map((rule) => (
-                  <TableRow key={rule.id}>
+                  <TableRow key={rule.id} data-testid={`settings-alert-default-row-${rule.id}`}>
                     <TableCell className="font-medium">{rule.name}</TableCell>
                     <TableCell className="font-mono text-sm">{ruleSummary(rule)}</TableCell>
                     <TableCell>
@@ -295,6 +301,7 @@ export function GlobalAlertsClient({ orgId, initialDefaults }: GlobalAlertsClien
                         className="size-8 text-muted-foreground hover:text-destructive"
                         onClick={() => deleteMutation.mutate(rule.id)}
                         disabled={deleteMutation.isPending}
+                        data-testid={`settings-alert-default-delete-${rule.id}`}
                       >
                         <Trash2 className="size-4" />
                       </Button>

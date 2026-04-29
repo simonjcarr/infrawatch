@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.84.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.1...web/v0.84.2) (2026-04-29)
+
+
+### Bug Fixes
+
+* **web:** restore tokenized agent enrolment command ([#778](https://github.com/carrtech-dev/ct-ops/issues/778)) ([073febe](https://github.com/carrtech-dev/ct-ops/commit/073febe4ff330b65b038fe45c49561af1326afb2))
+
 ## [0.84.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.0...web/v0.84.1) (2026-04-29)
 
 

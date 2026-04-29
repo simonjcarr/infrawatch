@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations.ts'
 
@@ -14,6 +14,7 @@ export const users = pgTable('user', {
   // Extended fields
   organisationId: text('organisation_id').references(() => organisations.id),
   role: text('role').notNull().default('engineer'),
+  roles: jsonb('roles').$type<string[]>().notNull().default([]),
   isActive: boolean('is_active').notNull().default(true),
   twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

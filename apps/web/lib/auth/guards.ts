@@ -1,8 +1,8 @@
-import { ADMIN_ROLES, MEMBERSHIP_ROLES } from './roles.ts'
+import { ADMIN_ROLES, MEMBERSHIP_ROLES, normalizeAssignedRoles } from './roles.ts'
 import type { SessionUser } from './session.ts'
 
 type OrgScopedUser = Pick<SessionUser, 'organisationId' | 'isActive' | 'deletedAt'>
-type GuardUser = OrgScopedUser & Pick<SessionUser, 'role'>
+type GuardUser = OrgScopedUser & Pick<SessionUser, 'role'> & Partial<Pick<SessionUser, 'roles'>>
 type OrgTarget = string | { organisationId: string | null }
 type RoleInput = string | readonly string[]
 
@@ -18,8 +18,9 @@ export function isActiveUser(user: OrgScopedUser): boolean {
   return user.isActive && !user.deletedAt
 }
 
-export function hasRole(user: Pick<SessionUser, 'role'>, roles: RoleInput): boolean {
-  return toRoleList(roles).includes(user.role)
+export function hasRole(user: Pick<SessionUser, 'role'> & Partial<Pick<SessionUser, 'roles'>>, roles: RoleInput): boolean {
+  const userRoles = normalizeAssignedRoles(user.roles, user.role)
+  return toRoleList(roles).some((role) => userRoles.some((userRole) => userRole === role))
 }
 
 export function isSameOrg(user: Pick<SessionUser, 'organisationId'>, target: OrgTarget): boolean {
@@ -41,7 +42,7 @@ export function requireSameOrg(user: OrgScopedUser, target: OrgTarget): void {
 }
 
 export function requireRole(
-  user: Pick<SessionUser, 'role'>,
+  user: Pick<SessionUser, 'role'> & Partial<Pick<SessionUser, 'roles'>>,
   roles: RoleInput,
   message = 'forbidden: admin role required',
 ): void {

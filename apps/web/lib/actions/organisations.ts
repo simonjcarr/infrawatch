@@ -46,7 +46,7 @@ export async function createOrganisation(
     // Link the user to the organisation as super_admin
     await db
       .update(users)
-      .set({ organisationId: organisation.id, role: 'super_admin' })
+      .set({ organisationId: organisation.id, role: 'super_admin', roles: ['super_admin'] })
       .where(eq(users.id, userId))
 
     return { organisation }

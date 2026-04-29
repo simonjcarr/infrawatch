@@ -10,15 +10,24 @@ import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { writeAuditEvent } from '@/lib/audit/events'
+import { ASSIGNED_ROLES, INVITABLE_ROLES, getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
-  role: z.enum(['org_admin', 'engineer', 'read_only']),
+  roles: z.array(z.enum(INVITABLE_ROLES)).min(1, 'Select at least one role'),
 })
 
 const updateRoleSchema = z.object({
-  role: z.enum(['super_admin', 'org_admin', 'engineer', 'read_only']),
+  roles: z.array(z.enum(ASSIGNED_ROLES)).min(1, 'Select at least one role'),
 })
+
+function formatRoles(roles: readonly string[]): string {
+  return roles.join(', ')
+}
+
+function hasSuperAdminRole(role: string | null | undefined, roles: readonly string[] | null | undefined): boolean {
+  return normalizeAssignedRoles(roles, role).includes('super_admin')
+}
 
 export async function getOrgUsers(
   orgId: string,
@@ -43,13 +52,16 @@ export async function getOrgUsers(
 
 export async function inviteUser(
   orgId: string,
-  input: { email: string; role: string },
+  input: { email: string; roles: string[] },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
   await requireOrgAccess(orgId)
   const parsed = inviteSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }
+
+  const nextRoles = normalizeAssignedRoles(parsed.data.roles)
+  const nextRole = getPrimaryRole(nextRoles)
 
   try {
     const session = await requireOrgAdminAccess(orgId)
@@ -66,7 +78,7 @@ export async function inviteUser(
     if (removedUser) {
       await db
         .update(users)
-        .set({ deletedAt: null, isActive: true, role: parsed.data.role, updatedAt: new Date() })
+        .set({ deletedAt: null, isActive: true, role: nextRole, roles: nextRoles, updatedAt: new Date() })
         .where(eq(users.id, removedUser.id))
       return { restored: true }
     }
@@ -102,7 +114,8 @@ export async function inviteUser(
       .insert(invitations)
       .values({
         email: parsed.data.email,
-        role: parsed.data.role,
+        role: nextRole,
+        roles: nextRoles,
         organisationId: orgId,
         invitedById: session.user.id,
         expiresAt,
@@ -122,41 +135,44 @@ export async function inviteUser(
 export async function updateUserRole(
   orgId: string,
   targetUserId: string,
-  role: string,
+  roles: string[],
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
-  const parsed = updateRoleSchema.safeParse({ role })
+  const parsed = updateRoleSchema.safeParse({ roles })
   if (!parsed.success) {
     return { error: 'Invalid role' }
   }
+
+  const nextRoles = normalizeAssignedRoles(parsed.data.roles)
+  const nextRole = getPrimaryRole(nextRoles)
 
   try {
     const session = await requireOrgAdminAccess(orgId)
     const targetUser = await db.query.users.findFirst({
       where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId)),
-      columns: { id: true, email: true, role: true },
+      columns: { id: true, email: true, role: true, roles: true },
     })
     if (!targetUser) {
       return { error: 'User not found' }
     }
 
-    if (parsed.data.role !== 'super_admin') {
-      const superAdmins = await db.query.users.findMany({
-        where: and(
-          eq(users.organisationId, orgId),
-          eq(users.role, 'super_admin'),
-        ),
+    if (hasSuperAdminRole(targetUser.role, targetUser.roles) && !nextRoles.includes('super_admin')) {
+      const orgUsers = await db.query.users.findMany({
+        where: and(eq(users.organisationId, orgId), isNull(users.deletedAt)),
+        columns: { id: true, role: true, roles: true },
       })
-      const isTarget = superAdmins.some((u) => u.id === targetUserId)
-      if (isTarget && superAdmins.length === 1) {
+      const superAdmins = orgUsers.filter((user) => hasSuperAdminRole(user.role, user.roles))
+      if (superAdmins.length === 1 && superAdmins[0]?.id === targetUserId) {
         return { error: 'Cannot demote the last super admin' }
       }
     }
 
+    const previousRoles = normalizeAssignedRoles(targetUser.roles, targetUser.role)
+
     await db.transaction(async (tx) => {
       await tx
         .update(users)
-        .set({ role: parsed.data.role, updatedAt: new Date() })
+        .set({ role: nextRole, roles: nextRoles, updatedAt: new Date() })
         .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
 
       await writeAuditEvent(tx, {
@@ -165,11 +181,13 @@ export async function updateUserRole(
         action: 'user.role.updated',
         targetType: 'user',
         targetId: targetUser.id,
-        summary: `Changed ${targetUser.email} role from ${targetUser.role} to ${parsed.data.role}`,
+        summary: `Changed ${targetUser.email} roles from ${formatRoles(previousRoles)} to ${formatRoles(nextRoles)}`,
         metadata: {
           targetEmail: targetUser.email,
           previousRole: targetUser.role,
-          nextRole: parsed.data.role,
+          previousRoles,
+          nextRole,
+          nextRoles,
         },
       })
     })
@@ -196,12 +214,13 @@ export async function deactivateUser(
     const activeSuperAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
-        eq(users.role, 'super_admin'),
         eq(users.isActive, true),
       ),
+      columns: { id: true, role: true, roles: true },
     })
-    const isTarget = activeSuperAdmins.some((u) => u.id === targetUserId)
-    if (isTarget && activeSuperAdmins.length === 1) {
+    const superAdmins = activeSuperAdmins.filter((user) => hasSuperAdminRole(user.role, user.roles))
+    const isTarget = superAdmins.some((user) => user.id === targetUserId)
+    if (isTarget && superAdmins.length === 1) {
       return { error: 'Cannot deactivate the last active super admin' }
     }
 
@@ -254,18 +273,19 @@ export async function removeUser(
     const superAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
-        eq(users.role, 'super_admin'),
         isNull(users.deletedAt),
       ),
+      columns: { id: true, role: true, roles: true },
     })
-    const isTarget = superAdmins.some((u) => u.id === targetUserId)
-    if (isTarget && superAdmins.length === 1) {
+    const remainingSuperAdmins = superAdmins.filter((user) => hasSuperAdminRole(user.role, user.roles))
+    const isTarget = remainingSuperAdmins.some((user) => user.id === targetUserId)
+    if (isTarget && remainingSuperAdmins.length === 1) {
       return { error: 'Cannot remove the last super admin' }
     }
 
     const targetUser = await db.query.users.findFirst({
       where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
-      columns: { id: true, email: true, role: true },
+      columns: { id: true, email: true, role: true, roles: true },
     })
     if (!targetUser) {
       return { error: 'User not found' }
@@ -289,6 +309,7 @@ export async function removeUser(
         metadata: {
           targetEmail: targetUser.email,
           role: targetUser.role,
+          roles: normalizeAssignedRoles(targetUser.roles, targetUser.role),
         },
       })
     })

@@ -23,7 +23,8 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
   await expect(page.getByTestId('team-heading')).toBeVisible()
   await page.getByTestId('team-invite-open').click()
   await page.getByTestId('team-invite-email').fill(inviteeEmail)
-  await page.getByTestId('team-invite-role').selectOption('read_only')
+  await page.getByTestId('team-invite-role-org_admin').click()
+  await page.getByTestId('team-invite-role-read_only').click()
   await page.getByTestId('team-invite-submit').click()
 
   const inviteLink = page.getByTestId('team-invite-link')
@@ -33,10 +34,11 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
 
   const pendingInviteRow = page.getByTestId('team-pending-invite-row').filter({ hasText: inviteeEmail })
   await expect(pendingInviteRow).toBeVisible()
+  await expect(pendingInviteRow).toContainText('Org Admin')
   await expect(pendingInviteRow).toContainText('Read Only')
 
-  const inviteRows = await sql<Array<{ id: string; role: string; deleted_at: Date | null }>>`
-    SELECT id, role, deleted_at
+  const inviteRows = await sql<Array<{ id: string; role: string; roles: string[]; deleted_at: Date | null }>>`
+    SELECT id, role, roles, deleted_at
     FROM invitations
     WHERE organisation_id = ${orgId}
       AND email = ${inviteeEmail}
@@ -45,7 +47,8 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
   `
 
   expect(inviteRows).toHaveLength(1)
-  expect(inviteRows[0]?.role).toBe('read_only')
+  expect(inviteRows[0]?.role).toBe('org_admin')
+  expect(inviteRows[0]?.roles).toEqual(['org_admin', 'read_only'])
   expect(inviteRows[0]?.deleted_at).toBeNull()
 
   await pendingInviteRow.getByTestId('team-pending-invite-cancel').click()
@@ -72,21 +75,21 @@ test('admin cannot create a duplicate pending invitation for the same email addr
   await expect(page.getByTestId('team-heading')).toBeVisible()
   await page.getByTestId('team-invite-open').click()
   await page.getByTestId('team-invite-email').fill(inviteeEmail)
-  await page.getByTestId('team-invite-role').selectOption('engineer')
+  await page.getByTestId('team-invite-role-engineer').click()
   await page.getByTestId('team-invite-submit').click()
   await expect(page.getByTestId('team-invite-link')).toBeVisible()
   await page.getByTestId('team-invite-done').click()
 
   await page.getByTestId('team-invite-open').click()
   await page.getByTestId('team-invite-email').fill(inviteeEmail)
-  await page.getByTestId('team-invite-role').selectOption('org_admin')
+  await page.getByTestId('team-invite-role-org_admin').click()
   await page.getByTestId('team-invite-submit').click()
 
   await expect(page.getByText('An invitation has already been sent to this email address')).toBeVisible()
   await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
 
-  const inviteRows = await sql<Array<{ role: string; deleted_at: Date | null }>>`
-    SELECT role, deleted_at
+  const inviteRows = await sql<Array<{ role: string; roles: string[]; deleted_at: Date | null }>>`
+    SELECT role, roles, deleted_at
     FROM invitations
     WHERE organisation_id = ${orgId}
       AND email = ${inviteeEmail}
@@ -95,6 +98,7 @@ test('admin cannot create a duplicate pending invitation for the same email addr
 
   expect(inviteRows).toHaveLength(1)
   expect(inviteRows[0]?.role).toBe('engineer')
+  expect(inviteRows[0]?.roles).toEqual(['engineer'])
   expect(inviteRows[0]?.deleted_at).toBeNull()
 })
 
@@ -111,6 +115,7 @@ test('admin re-inviting a removed user restores their membership instead of crea
       email_verified,
       organisation_id,
       role,
+      roles,
       is_active,
       deleted_at
     )
@@ -121,6 +126,7 @@ test('admin re-inviting a removed user restores their membership instead of crea
       true,
       ${orgId},
       'read_only',
+      '["read_only"]'::jsonb,
       false,
       NOW()
     )
@@ -131,16 +137,18 @@ test('admin re-inviting a removed user restores their membership instead of crea
 
   await page.getByTestId('team-invite-open').click()
   await page.getByTestId('team-invite-email').fill(removedEmail)
-  await page.getByTestId('team-invite-role').selectOption('engineer')
+  await page.getByTestId('team-invite-role-engineer').click()
+  await page.getByTestId('team-invite-role-read_only').click()
   await page.getByTestId('team-invite-submit').click()
 
   await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
   await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Restored Member')
   await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Engineer')
+  await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Read Only')
   await expect(page.getByTestId('team-member-status-removed-team-member')).toContainText('Active')
 
-  const restoredUserRows = await sql<Array<{ role: string; is_active: boolean; deleted_at: Date | null }>>`
-    SELECT role, is_active, deleted_at
+  const restoredUserRows = await sql<Array<{ role: string; roles: string[]; is_active: boolean; deleted_at: Date | null }>>`
+    SELECT role, roles, is_active, deleted_at
     FROM "user"
     WHERE email = ${removedEmail}
     LIMIT 1
@@ -149,6 +157,7 @@ test('admin re-inviting a removed user restores their membership instead of crea
   expect(restoredUserRows).toEqual([
     {
       role: 'engineer',
+      roles: ['engineer', 'read_only'],
       is_active: true,
       deleted_at: null,
     },

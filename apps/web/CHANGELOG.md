@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.87.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.86.0...web/v0.87.0) (2026-04-29)
+
+
+### Features
+
+* **web:** open core report pages ([#801](https://github.com/carrtech-dev/ct-ops/issues/801)) ([7d4473c](https://github.com/carrtech-dev/ct-ops/commit/7d4473ca980b0563b1bcc3f7640bf0cf2d43823b))
+
 ## [0.86.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.85.0...web/v0.86.0) (2026-04-29)
 
 

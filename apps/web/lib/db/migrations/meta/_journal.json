@@ -365,6 +365,13 @@
       "when": 1777386000000,
       "tag": "0051_ingest_status",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1777390000000,
+      "tag": "0052_vulnerability_finding_confidence",
+      "breakpoints": true
     }
   ]
 }

@@ -49,7 +49,7 @@ func DefaultSyncConfig() SyncConfig {
 	}
 }
 
-func RunSyncer(ctx context.Context, pool *pgxpool.Pool, cfg SyncConfig) {
+func RunSyncer(ctx context.Context, pool *pgxpool.Pool, cfg SyncConfig, matcher *MatchScheduler) {
 	if !cfg.Enabled {
 		slog.Info("vulnerability sync disabled")
 		return
@@ -66,8 +66,14 @@ func RunSyncer(ctx context.Context, pool *pgxpool.Pool, cfg SyncConfig) {
 			slog.Warn("vulnerability sync failed", "err", err)
 			return
 		}
-		if err := MatchAllHosts(ctx, pool); err != nil {
-			slog.Warn("vulnerability matching after sync failed", "err", err)
+		if matcher == nil {
+			if err := MatchAllHosts(ctx, pool); err != nil {
+				slog.Warn("vulnerability matching after sync failed", "err", err)
+			}
+			return
+		}
+		if !matcher.EnqueueAllHosts() {
+			slog.Warn("vulnerability matching after sync skipped: matcher queue full")
 		}
 	}
 	if cfg.SyncOnStartup {

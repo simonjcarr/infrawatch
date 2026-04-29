@@ -10,6 +10,7 @@ import { requireFeature } from '@/lib/actions/licence-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
 
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low' | 'none' | 'unknown'
+export type VulnerabilityFindingConfidence = 'confirmed' | 'probable' | 'unsupported'
 
 export interface VulnerabilityReportFilters {
   cve?: string
@@ -20,6 +21,7 @@ export interface VulnerabilityReportFilters {
   hostGroupId?: string
   distro?: string
   source?: string
+  confidence?: VulnerabilityFindingConfidence | 'all'
 }
 
 export interface VulnerabilityFindingRow {
@@ -41,6 +43,8 @@ export interface VulnerabilityFindingRow {
   severity: VulnerabilitySeverity
   cvssScore: number | null
   knownExploited: boolean
+  confidence: VulnerabilityFindingConfidence
+  matchReason: string | null
   firstSeenAt: Date
   lastSeenAt: Date
 }
@@ -159,6 +163,7 @@ const filtersSchema = z.object({
   hostGroupId: z.string().trim().max(64).optional(),
   distro: z.string().trim().max(64).optional(),
   source: z.string().trim().max(64).optional(),
+  confidence: z.enum(['confirmed', 'probable', 'unsupported', 'all']).optional(),
 }).strip()
 
 const managementFiltersSchema = z.object({
@@ -244,7 +249,7 @@ export async function getVulnerabilityManagementSnapshot(
         cast(count(*) FILTER (WHERE known_exploited = true) as int) AS "knownExploitedCount",
         cast(count(*) FILTER (WHERE rejected = true) as int) AS "rejectedCount",
         cast((SELECT count(*) FROM vulnerability_affected_packages) as int) AS "affectedPackageRules",
-        cast((SELECT count(*) FROM host_vulnerability_findings WHERE organisation_id = ${orgId} AND status = 'open') as int) AS "openFindings"
+        cast((SELECT count(*) FROM host_vulnerability_findings WHERE organisation_id = ${orgId} AND status = 'open' AND confidence = 'confirmed') as int) AS "openFindings"
       FROM vulnerability_cves
     `),
     db.execute(sql`
@@ -280,6 +285,7 @@ export async function getVulnerabilityManagementSnapshot(
       LEFT JOIN host_vulnerability_findings hvf
         ON hvf.cve_id = vc.cve_id
        AND hvf.organisation_id = ${orgId}
+       AND hvf.confidence = 'confirmed'
       WHERE ${where}
       GROUP BY
         vc.cve_id,
@@ -441,6 +447,8 @@ export async function getVulnerabilityReport(
       hvf.severity,
       hvf.cvss_score AS "cvssScore",
       hvf.known_exploited AS "knownExploited",
+      hvf.confidence,
+      hvf.match_reason AS "matchReason",
       hvf.first_seen_at AS "firstSeenAt",
       hvf.last_seen_at AS "lastSeenAt"
     FROM host_vulnerability_findings hvf
@@ -515,6 +523,8 @@ export async function getHostVulnerabilities(
       hvf.severity,
       hvf.cvss_score AS "cvssScore",
       hvf.known_exploited AS "knownExploited",
+      hvf.confidence,
+      hvf.match_reason AS "matchReason",
       hvf.first_seen_at AS "firstSeenAt",
       hvf.last_seen_at AS "lastSeenAt"
     FROM host_vulnerability_findings hvf
@@ -524,6 +534,7 @@ export async function getHostVulnerabilities(
     WHERE hvf.organisation_id = ${orgId}
       AND hvf.host_id = ${hostId}
       AND hvf.status = 'open'
+      AND hvf.confidence = 'confirmed'
     ORDER BY
       CASE hvf.severity
         WHEN 'critical' THEN 0
@@ -543,6 +554,11 @@ function vulnerabilityWhere(orgId: string, filters: z.infer<typeof filtersSchema
     sql`hvf.organisation_id = ${orgId}`,
     sql`hvf.status = 'open'`,
   ]
+  if (!filters.confidence || filters.confidence === 'confirmed') {
+    conditions.push(sql`hvf.confidence = 'confirmed'`)
+  } else if (filters.confidence !== 'all') {
+    conditions.push(sql`hvf.confidence = ${filters.confidence}`)
+  }
   if (filters.cve) {
     conditions.push(sql`hvf.cve_id ILIKE ${`%${escapeLike(filters.cve)}%`}`)
   }

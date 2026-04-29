@@ -22,15 +22,20 @@ import (
 
 // InventoryHandler implements the SubmitSoftwareInventory client-streaming RPC.
 type InventoryHandler struct {
-	pool   *pgxpool.Pool
-	issuer *auth.JWTIssuer
+	pool    *pgxpool.Pool
+	issuer  *auth.JWTIssuer
+	matcher *vuln.MatchScheduler
 }
 
 const maxInventoryPackagesPerChunk = 1000
 
 // NewInventoryHandler creates an InventoryHandler.
-func NewInventoryHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer) *InventoryHandler {
-	return &InventoryHandler{pool: pool, issuer: issuer}
+func NewInventoryHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, matcher ...*vuln.MatchScheduler) *InventoryHandler {
+	var scheduler *vuln.MatchScheduler
+	if len(matcher) > 0 {
+		scheduler = matcher[0]
+	}
+	return &InventoryHandler{pool: pool, issuer: issuer, matcher: scheduler}
 }
 
 // SubmitSoftwareInventory receives package chunks from the agent, upserts them
@@ -230,13 +235,19 @@ func (h *InventoryHandler) finalise(
 	if err := queries.UpdateHostLastSoftwareScanAt(streamCtx, h.pool, hostID, completedAt); err != nil {
 		slog.Warn("inventory: updating host lastSoftwareScanAt", "host_id", hostID, "err", err)
 	}
-	go func() {
-		matchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		if err := vuln.MatchHost(matchCtx, h.pool, hostID); err != nil {
-			slog.Warn("inventory: vulnerability match failed", "host_id", hostID, "err", err)
+	if h.matcher != nil {
+		if !h.matcher.EnqueueHost(hostID) {
+			slog.Warn("inventory: vulnerability match skipped because matcher queue is full", "host_id", hostID)
 		}
-	}()
+	} else {
+		go func() {
+			matchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			if err := vuln.MatchHost(matchCtx, h.pool, hostID); err != nil {
+				slog.Warn("inventory: vulnerability match failed", "host_id", hostID, "err", err)
+			}
+		}()
+	}
 
 	// Complete the task_run_hosts row.
 	if err := queries.CompleteTaskRunHost(streamCtx, h.pool, taskRunHostID, "success", 0, "", ""); err != nil {

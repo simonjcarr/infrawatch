@@ -15,6 +15,23 @@
 
 ## What Has Been Built
 
+### Session 78 — Confirmed Linux CVE matching hardening
+
+**Confirmed finding model and reports** (`apps/web/lib/db/schema/vulnerabilities.ts`, `apps/web/lib/actions/vulnerabilities.ts`, `apps/web/app/(dashboard)/reports/vulnerabilities/`)
+- Added explicit vulnerability finding confidence and match-reason persistence so confirmed Linux package matches are distinguishable from probable/future best-effort matches.
+- Defaulted host and global vulnerability reports to confirmed findings while adding a report confidence filter for operators who want to inspect probable matches.
+- Added a migration for `host_vulnerability_findings.confidence`, `match_reason`, and supporting org/status/confidence lookup.
+
+**Red Hat and matcher accuracy** (`apps/ingest/internal/vuln/`)
+- Hardened Red Hat parsing to prefer structured `affected_release` package data, extracting full RPM EVR from package NEVRA and preserving advisory/product metadata.
+- Marked free-text Red Hat `affected_packages` fallback rows as probable rather than confirmed.
+- Updated RPM matching to report vendor EVR-specific reasons and handle RHEL major-version advisory rules matching minor-version hosts such as `8.9`.
+- Replaced direct unbounded post-scan matching goroutines with a bounded ingest-side vulnerability match scheduler used by inventory completion and feed sync.
+
+**Validation**
+- Added unit coverage for RPM backport release matching, fixed RPM packages resolving, Red Hat structured affected-release parsing, confirmed finding persistence, and unsupported package sources.
+- Validation run: `go test ./internal/vuln`, `go test ./...` from `apps/ingest`, `pnpm --dir apps/web run db:validate`, `pnpm --dir apps/web run type-check`, and `pnpm --dir apps/web run lint` (existing warnings only).
+
 ### Session 77 — Build Docs rich Markdown editor
 
 **Build Docs editing and exports** (`apps/web/app/(dashboard)/build-docs/[id]/`, `apps/web/components/build-docs/`, `apps/web/lib/build-docs/`)

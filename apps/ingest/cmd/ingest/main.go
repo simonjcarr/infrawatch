@@ -115,12 +115,13 @@ func main() {
 	versionPoller := config.NewVersionPoller(cfg.Agent.LatestVersion, 5*time.Minute)
 	versionPoller.Start(ctx)
 	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, agentCA, webServerCert)
+	vulnerabilityMatcher := vuln.StartMatchScheduler(ctx, pool, 2, 1000)
 	terminalWSHandler, err := handlers.NewTerminalWSHandler(pool, cfg.Terminal.TrustedOrigins)
 	if err != nil {
 		slog.Error("initialising terminal websocket handler", "err", err)
 		os.Exit(1)
 	}
-	inventoryHandler := handlers.NewInventoryHandler(pool, issuer)
+	inventoryHandler := handlers.NewInventoryHandler(pool, issuer, vulnerabilityMatcher)
 	renewHandler := handlers.NewRenewCertHandler(pool, agentCA)
 
 	// Start the CSR sweeper so admin-approved agents get their certs signed.
@@ -182,7 +183,7 @@ func main() {
 		AlpineBaseURL:  cfg.Vulnerability.AlpineBaseURL,
 		AlpineReleases: cfg.Vulnerability.AlpineReleases,
 		RedHatURL:      cfg.Vulnerability.RedHatURL,
-	})
+	}, vulnerabilityMatcher)
 
 	// Start cert URL refresh sweeper goroutine
 	go handlers.RunCertRefreshSweeper(ctx, pool, 60*time.Second)

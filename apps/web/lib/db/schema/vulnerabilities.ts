@@ -7,6 +7,7 @@ import { softwarePackages } from './software.ts'
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low' | 'none' | 'unknown'
 export type VulnerabilityFindingStatus = 'open' | 'resolved'
 export type VulnerabilitySyncStatus = 'pending' | 'success' | 'error'
+export type VulnerabilityFindingConfidence = 'confirmed' | 'probable' | 'unsupported'
 
 export const vulnerabilityCves = pgTable('vulnerability_cves', {
   cveId: text('cve_id').primaryKey(),
@@ -92,6 +93,8 @@ export const hostVulnerabilityFindings = pgTable('host_vulnerability_findings', 
   severity: text('severity').notNull().default('unknown').$type<VulnerabilitySeverity>(),
   cvssScore: real('cvss_score'),
   knownExploited: boolean('known_exploited').notNull().default(false),
+  confidence: text('confidence').notNull().default('confirmed').$type<VulnerabilityFindingConfidence>(),
+  matchReason: text('match_reason'),
   firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
@@ -103,10 +106,10 @@ export const hostVulnerabilityFindings = pgTable('host_vulnerability_findings', 
   index('host_vuln_findings_org_status_idx').on(t.organisationId, t.status, t.severity),
   index('host_vuln_findings_host_status_idx').on(t.hostId, t.status),
   index('host_vuln_findings_cve_idx').on(t.cveId),
+  index('host_vuln_findings_confidence_idx').on(t.organisationId, t.status, t.confidence),
 ])
 
 export type VulnerabilityCve = typeof vulnerabilityCves.$inferSelect
 export type VulnerabilitySource = typeof vulnerabilitySources.$inferSelect
 export type VulnerabilityAffectedPackage = typeof vulnerabilityAffectedPackages.$inferSelect
 export type HostVulnerabilityFinding = typeof hostVulnerabilityFindings.$inferSelect
-

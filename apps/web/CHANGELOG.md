@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.84.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.84.0...web/v0.84.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **web:** isolate host network e2e state ([#779](https://github.com/carrtech-dev/ct-ops/issues/779)) ([c6771ad](https://github.com/carrtech-dev/ct-ops/commit/c6771ad1f31f40d924e9d1d84c00890b2cbb5457))
+
 ## [0.84.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.83.0...web/v0.84.0) (2026-04-29)
 
 

@@ -97,3 +97,69 @@ test('admin cannot create a duplicate pending invitation for the same email addr
   expect(inviteRows[0]?.role).toBe('engineer')
   expect(inviteRows[0]?.deleted_at).toBeNull()
 })
+
+test('admin re-inviting a removed user restores their membership instead of creating a pending invite', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+  const removedEmail = 'restored-member@example.com'
+
+  await sql`
+    INSERT INTO "user" (
+      id,
+      name,
+      email,
+      email_verified,
+      organisation_id,
+      role,
+      is_active,
+      deleted_at
+    )
+    VALUES (
+      'removed-team-member',
+      'Restored Member',
+      ${removedEmail},
+      true,
+      ${orgId},
+      'read_only',
+      false,
+      NOW()
+    )
+  `
+
+  await page.goto('/team')
+  await expect(page.getByTestId('team-heading')).toBeVisible()
+
+  await page.getByTestId('team-invite-open').click()
+  await page.getByTestId('team-invite-email').fill(removedEmail)
+  await page.getByTestId('team-invite-role').selectOption('engineer')
+  await page.getByTestId('team-invite-submit').click()
+
+  await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
+  await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Restored Member')
+  await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Engineer')
+  await expect(page.getByTestId('team-member-status-removed-team-member')).toContainText('Active')
+
+  const restoredUserRows = await sql<Array<{ role: string; is_active: boolean; deleted_at: Date | null }>>`
+    SELECT role, is_active, deleted_at
+    FROM "user"
+    WHERE email = ${removedEmail}
+    LIMIT 1
+  `
+
+  expect(restoredUserRows).toEqual([
+    {
+      role: 'engineer',
+      is_active: true,
+      deleted_at: null,
+    },
+  ])
+
+  const inviteRows = await sql<Array<{ id: string }>>`
+    SELECT id
+    FROM invitations
+    WHERE organisation_id = ${orgId}
+      AND email = ${removedEmail}
+  `
+
+  expect(inviteRows).toHaveLength(0)
+})

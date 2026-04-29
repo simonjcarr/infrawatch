@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.84.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.83.0...web/v0.84.0) (2026-04-29)
+
+
+### Features
+
+* **web:** support multi-role team membership ([#771](https://github.com/carrtech-dev/ct-ops/issues/771)) ([db57845](https://github.com/carrtech-dev/ct-ops/commit/db5784500bfa560c7655161ffcd329cd12955065))
+
+
+### Bug Fixes
+
+* **web:** restrict tooling access to engineer roles ([#768](https://github.com/carrtech-dev/ct-ops/issues/768)) ([9a7d607](https://github.com/carrtech-dev/ct-ops/commit/9a7d6071b85b2f16b73ac1f5d5c10df7db0f8057))
+
 ## [0.83.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.82.3...web/v0.83.0) (2026-04-29)
 
 

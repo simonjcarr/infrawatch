@@ -181,12 +181,23 @@ function AddWebhookDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="webhook-name">Name</Label>
-            <Input id="webhook-name" placeholder="e.g. PagerDuty" {...register('name')} />
+            <Input
+              id="webhook-name"
+              placeholder="e.g. PagerDuty"
+              data-testid="alert-webhook-name"
+              {...register('name')}
+            />
             {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="webhook-url">URL</Label>
-            <Input id="webhook-url" placeholder="https://..." type="url" {...register('url')} />
+            <Input
+              id="webhook-url"
+              placeholder="https://..."
+              type="url"
+              data-testid="alert-webhook-url"
+              {...register('url')}
+            />
             {errors.url && <p className="text-sm text-red-600">{errors.url.message}</p>}
           </div>
           <div className="space-y-1.5">
@@ -197,6 +208,7 @@ function AddWebhookDialog({
               id="webhook-secret"
               placeholder="Used for HMAC-SHA256 signature"
               type="password"
+              data-testid="alert-webhook-secret"
               {...register('secret')}
             />
           </div>
@@ -204,7 +216,7 @@ function AddWebhookDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} data-testid="alert-webhook-submit">
               Add Channel
             </Button>
           </DialogFooter>
@@ -1461,6 +1473,7 @@ export function AlertsClient({
               size="sm"
               variant="outline"
               onClick={() => setAddWebhookOpen(true)}
+              data-testid="alerts-add-webhook"
             >
               <Plus className="size-3.5 mr-1" />
               Add Webhook

@@ -229,7 +229,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
   ])
 })
 
-test('admin can create a silence and an email notification channel from the alerts page', async ({ authenticatedPage: page }) => {
+test('admin can create a silence, email channel, and webhook channel from the alerts page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { orgId, userId } = await getOrgAndUserIds(sql)
 
@@ -279,6 +279,15 @@ test('admin can create a silence and an email notification channel from the aler
   await expect(channelRow).toContainText('alerts2@example.com')
   await expect(channelRow).toContainText('team@example.com')
 
+  await page.getByTestId('alerts-add-webhook').click()
+  await page.getByTestId('alert-webhook-name').fill('PagerDuty Webhook')
+  await page.getByTestId('alert-webhook-url').fill('https://alerts.example.com/hooks/pagerduty')
+  await page.getByTestId('alert-webhook-secret').fill('super-secret-token')
+  await page.getByTestId('alert-webhook-submit').click()
+
+  const webhookRow = page.getByRole('row').filter({ hasText: 'PagerDuty Webhook' })
+  await expect(webhookRow).toContainText('https://alerts.example.com/hooks/pagerduty')
+
   const createdRows = await sql<Array<{
     silence_reason: string | null
     silence_host_id: string | null
@@ -286,6 +295,10 @@ test('admin can create a silence and an email notification channel from the aler
     channel_name: string | null
     channel_type: string | null
     recipients: string[] | null
+    webhook_name: string | null
+    webhook_type: string | null
+    webhook_url: string | null
+    webhook_secret: string | null
   }>>`
     SELECT
       (SELECT reason FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_reason,
@@ -293,7 +306,11 @@ test('admin can create a silence and an email notification channel from the aler
       (SELECT created_by FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_created_by,
       (SELECT name FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_name,
       (SELECT type FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_type,
-      (SELECT ARRAY(SELECT jsonb_array_elements_text(config->'toAddresses')) FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS recipients
+      (SELECT ARRAY(SELECT jsonb_array_elements_text(config->'toAddresses')) FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS recipients,
+      (SELECT name FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_name,
+      (SELECT type FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_type,
+      (SELECT config->>'url' FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_url,
+      (SELECT config->>'secret' FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_secret
   `
 
   expect(createdRows).toEqual([
@@ -304,6 +321,10 @@ test('admin can create a silence and an email notification channel from the aler
       channel_name: 'Escalation Email',
       channel_type: 'smtp',
       recipients: ['alerts2@example.com', 'team@example.com'],
+      webhook_name: 'PagerDuty Webhook',
+      webhook_type: 'webhook',
+      webhook_url: 'https://alerts.example.com/hooks/pagerduty',
+      webhook_secret: 'super-secret-token',
     },
   ])
 })

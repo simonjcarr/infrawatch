@@ -19,6 +19,7 @@ import {
   Layers,
   Zap,
   User,
+  ShieldAlert,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -72,6 +73,8 @@ import { NotesTab } from '@/components/notes/notes-tab'
 import { PinnedNotesCard } from '@/components/notes/pinned-notes-card'
 import { checkTerminalAccess } from '@/lib/actions/terminal'
 import { getAlertInstances } from '@/lib/actions/alerts'
+import { getHostVulnerabilityAssessment } from '@/lib/actions/vulnerabilities'
+import type { HostVulnerabilityAssessmentStatus } from '@/lib/vulnerabilities/assessment'
 import { getHostCollectionSettings } from '@/lib/actions/host-settings'
 import { getServiceAccounts } from '@/lib/actions/service-accounts'
 import { listGroupsForHost, listGroups, addHostToGroup, removeHostFromGroup } from '@/lib/actions/host-groups'
@@ -158,6 +161,11 @@ function formatLastSeen(date: Date | string | null | undefined): string {
   return formatDistanceToNow(new Date(date), { addSuffix: true })
 }
 
+function formatOptionalDate(date: Date | string | null | undefined): string {
+  if (!date) return '—'
+  return formatDistanceToNow(new Date(date), { addSuffix: true })
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -184,6 +192,39 @@ function MetricCard({ label, value, colorClass }: { label: string; value: string
         <p className={`text-4xl font-bold tabular-nums ${colorClass}`}>{value}</p>
       </CardContent>
     </Card>
+  )
+}
+
+function VulnerabilityStatusBadge({ status }: { status: HostVulnerabilityAssessmentStatus }) {
+  if (status === 'affected') {
+    return (
+      <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100">
+        <ShieldAlert className="size-3 mr-1" />
+        Affected
+      </Badge>
+    )
+  }
+  if (status === 'clear') {
+    return (
+      <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">
+        <CheckCircle className="size-3 mr-1" />
+        Clear
+      </Badge>
+    )
+  }
+  if (status === 'stale') {
+    return (
+      <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+        <Clock className="size-3 mr-1" />
+        Stale
+      </Badge>
+    )
+  }
+  return (
+    <Badge className="bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-100">
+      <AlertTriangle className="size-3 mr-1" />
+      Not assessed
+    </Badge>
   )
 }
 
@@ -308,6 +349,12 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
     refetchInterval: 30_000,
   })
   const activeAlertCount = activeAlerts.length
+
+  const { data: vulnerabilityAssessment } = useQuery({
+    queryKey: ['host-vulnerability-assessment', orgId, initialHost.id],
+    queryFn: () => getHostVulnerabilityAssessment(orgId, initialHost.id),
+    refetchInterval: 60_000,
+  })
 
   const { data: collectionSettings } = useQuery({
     queryKey: ['host-collection-settings', orgId, initialHost.id],
@@ -539,6 +586,67 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
             <MetricCard label="Memory Usage" value={formatPercent(host.memoryPercent)} colorClass={memColor} />
             <MetricCard label="Disk Usage (root)" value={formatPercent(host.diskPercent)} colorClass={diskColor} />
           </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldAlert className="size-4 text-muted-foreground" />
+                Vulnerability Assessment
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!vulnerabilityAssessment ? (
+                <p className="text-sm text-muted-foreground">Loading vulnerability assessment…</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <VulnerabilityStatusBadge status={vulnerabilityAssessment.status} />
+                      <span className="text-sm text-muted-foreground">
+                        {vulnerabilityAssessment.reason}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                      <div>
+                        <p className="text-muted-foreground">Confirmed findings</p>
+                        <p className="font-semibold tabular-nums text-foreground">
+                          {vulnerabilityAssessment.openConfirmedFindings}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Critical / High</p>
+                        <p className="font-semibold tabular-nums text-foreground">
+                          {vulnerabilityAssessment.criticalCount} / {vulnerabilityAssessment.highCount}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Last inventory scan</p>
+                        <p className="font-medium text-foreground">
+                          {formatOptionalDate(vulnerabilityAssessment.lastInventoryScanAt)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Last feed sync</p>
+                        <p className="font-medium text-foreground">
+                          {formatOptionalDate(vulnerabilityAssessment.lastFeedSyncAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActiveParentTab('inventory')
+                      setActiveTab('vulnerabilities')
+                    }}
+                  >
+                    View findings
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Info cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

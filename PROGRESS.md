@@ -21,6 +21,7 @@
 - Added explicit vulnerability finding confidence and match-reason persistence so confirmed Linux package matches are distinguishable from probable/future best-effort matches.
 - Defaulted host and global vulnerability reports to confirmed findings while adding a report confidence filter for operators who want to inspect probable matches.
 - Added a migration for `host_vulnerability_findings.confidence`, `match_reason`, and supporting org/status/confidence lookup.
+- Added a host Overview vulnerability assessment card showing affected/clear/stale/not-assessed status, confirmed finding counts, critical/high split, last inventory scan time, last vulnerability feed sync time, and a direct link to host findings.
 
 **Red Hat and matcher accuracy** (`apps/ingest/internal/vuln/`)
 - Hardened Red Hat parsing to prefer structured `affected_release` package data, extracting full RPM EVR from package NEVRA and preserving advisory/product metadata.
@@ -29,8 +30,8 @@
 - Replaced direct unbounded post-scan matching goroutines with a bounded ingest-side vulnerability match scheduler used by inventory completion and feed sync.
 
 **Validation**
-- Added unit coverage for RPM backport release matching, fixed RPM packages resolving, Red Hat structured affected-release parsing, confirmed finding persistence, and unsupported package sources.
-- Validation run: `go test ./internal/vuln`, `go test ./...` from `apps/ingest`, `pnpm --dir apps/web run db:validate`, `pnpm --dir apps/web run type-check`, and `pnpm --dir apps/web run lint` (existing warnings only).
+- Added unit coverage for RPM backport release matching, fixed RPM packages resolving, Red Hat structured affected-release parsing, confirmed finding persistence, unsupported package sources, and host assessment status derivation.
+- Validation run: `go test ./internal/vuln`, `go test ./...` from `apps/ingest`, `node --experimental-strip-types --test lib/vulnerabilities/assessment.test.mjs`, `pnpm --dir apps/web run db:validate`, `pnpm --dir apps/web run type-check`, and `pnpm --dir apps/web run lint` (existing warnings only).
 
 ### Session 77 — Build Docs rich Markdown editor
 

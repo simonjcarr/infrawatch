@@ -192,14 +192,21 @@ export function TeamClient({
             </thead>
             <tbody className="divide-y divide-border">
               {members.map((member) => (
-                <tr key={member.id} className={cn(!member.isActive && 'opacity-60')}>
+                <tr
+                  key={member.id}
+                  className={cn(!member.isActive && 'opacity-60')}
+                  data-testid={`team-member-row-${member.id}`}
+                >
                   <td className="px-4 py-3 font-medium text-foreground">{member.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{member.email}</td>
                   <td className="px-4 py-3">
                     {canManage(currentUserRole) && member.id !== currentUserId ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex items-center gap-1 focus:outline-none">
+                          <button
+                            className="flex items-center gap-1 focus:outline-none"
+                            data-testid={`team-member-role-trigger-${member.id}`}
+                          >
                             <Badge variant={roleBadgeVariant(member.role)} className={roleBadgeClassName(member.role)}>
                               {member.role === 'pending' ? 'Pending Approval' : formatRole(member.role)}
                             </Badge>
@@ -214,6 +221,7 @@ export function TeamClient({
                                 updateRoleMutation.mutate({ userId: member.id, role: r })
                               }
                               className={cn(member.role === r && 'font-medium')}
+                              data-testid={`team-member-role-option-${member.id}-${r}`}
                             >
                               {formatRole(r)}
                             </DropdownMenuItem>
@@ -234,6 +242,7 @@ export function TeamClient({
                           ? 'border-green-600 text-green-700'
                           : 'border-border text-muted-foreground'
                       }
+                      data-testid={`team-member-status-${member.id}`}
                     >
                       {member.isActive ? 'Active' : 'Inactive'}
                     </Badge>
@@ -249,6 +258,7 @@ export function TeamClient({
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               onClick={() => deactivateMutation.mutate(member.id)}
                               disabled={deactivateMutation.isPending}
+                              data-testid={`team-member-deactivate-${member.id}`}
                             >
                               <UserX className="size-4 mr-1" />
                               Deactivate
@@ -261,6 +271,7 @@ export function TeamClient({
                                 className="text-green-700 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
                                 onClick={() => reactivateMutation.mutate(member.id)}
                                 disabled={reactivateMutation.isPending}
+                                data-testid={`team-member-reactivate-${member.id}`}
                               >
                                 <UserCheck className="size-4 mr-1" />
                                 Reactivate
@@ -271,6 +282,7 @@ export function TeamClient({
                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => removeMutation.mutate(member.id)}
                                 disabled={removeMutation.isPending}
+                                data-testid={`team-member-remove-${member.id}`}
                               >
                                 <Trash2 className="size-4 mr-1" />
                                 Remove

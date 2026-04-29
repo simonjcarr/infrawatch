@@ -98,6 +98,71 @@ test('authenticated user can search and filter the host inventory', async ({ aut
   await expect(page.getByRole('link', { name: 'Alpha Node' })).toHaveCount(0)
 })
 
+test('authenticated user can paginate through the host inventory', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (
+      id,
+      organisation_id,
+      hostname,
+      display_name,
+      os,
+      arch,
+      ip_addresses,
+      status,
+      cpu_percent,
+      memory_percent,
+      disk_percent,
+      last_seen_at
+    )
+    SELECT
+      'paged-host-' || lpad(gs::text, 3, '0'),
+      ${orgId},
+      'paged-node-' || lpad(gs::text, 3, '0'),
+      'Paged Node ' || lpad(gs::text, 3, '0'),
+      'Ubuntu 24.04',
+      'x86_64',
+      jsonb_build_array('10.60.0.' || gs::text),
+      'online',
+      10,
+      20,
+      30,
+      NOW() - make_interval(mins => gs)
+    FROM generate_series(1, 55) AS gs
+  `
+
+  await page.goto('/hosts')
+
+  await expect(page.getByTestId('hosts-heading')).toBeVisible()
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–50 of 55')
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 1 of 2')
+  await expect(page.getByRole('link', { name: 'Paged Node 001' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Paged Node 055' })).toHaveCount(0)
+
+  await page.getByTestId('hosts-page-next').click()
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 51–55 of 55')
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 2 of 2')
+  await expect(page.getByRole('link', { name: 'Paged Node 055' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Paged Node 001' })).toHaveCount(0)
+
+  await page.getByTestId('hosts-page-first').click()
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–50 of 55')
+  await expect(page.getByRole('link', { name: 'Paged Node 001' })).toBeVisible()
+
+  await page.getByTestId('hosts-page-size').click()
+  await page.getByRole('option', { name: '25 / page' }).click()
+
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–25 of 55')
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 1 of 3')
+
+  await page.getByTestId('hosts-page-last').click()
+  await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 51–55 of 55')
+  await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 3 of 3')
+  await expect(page.getByRole('link', { name: 'Paged Node 055' })).toBeVisible()
+})
+
 test('admin can approve a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { orgId, userId } = await getOrgAndUserIds(sql)

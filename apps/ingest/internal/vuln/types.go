@@ -13,6 +13,14 @@ const (
 	SeverityUnknown  Severity = "unknown"
 )
 
+type FindingConfidence string
+
+const (
+	FindingConfidenceConfirmed   FindingConfidence = "confirmed"
+	FindingConfidenceProbable    FindingConfidence = "probable"
+	FindingConfidenceUnsupported FindingConfidence = "unsupported"
+)
+
 type CVERecord struct {
 	CVEID             string
 	Title             string

@@ -4,12 +4,18 @@ import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { systemConfig } from '@/lib/db/schema'
+import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { encrypt } from '@/lib/crypto/encrypt'
 import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 import { requireFeature } from '@/lib/actions/licence-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
+import {
+  deriveHostVulnerabilityAssessmentStatus,
+  type HostVulnerabilityAssessmentStatus,
+} from '@/lib/vulnerabilities/assessment'
 
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low' | 'none' | 'unknown'
+export type VulnerabilityFindingConfidence = 'confirmed' | 'probable' | 'unsupported'
 
 export interface VulnerabilityReportFilters {
   cve?: string
@@ -20,6 +26,7 @@ export interface VulnerabilityReportFilters {
   hostGroupId?: string
   distro?: string
   source?: string
+  confidence?: VulnerabilityFindingConfidence | 'all'
 }
 
 export interface VulnerabilityFindingRow {
@@ -41,6 +48,8 @@ export interface VulnerabilityFindingRow {
   severity: VulnerabilitySeverity
   cvssScore: number | null
   knownExploited: boolean
+  confidence: VulnerabilityFindingConfidence
+  matchReason: string | null
   firstSeenAt: Date
   lastSeenAt: Date
 }
@@ -130,6 +139,22 @@ export interface VulnerabilityReport {
   sources: VulnerabilitySyncSource[]
 }
 
+export interface HostVulnerabilityAssessment {
+  status: HostVulnerabilityAssessmentStatus
+  reason: string
+  openConfirmedFindings: number
+  criticalCount: number
+  highCount: number
+  knownExploitedCount: number
+  fixAvailableCount: number
+  inventoryStale: boolean
+  feedStale: boolean
+  lastInventoryScanAt: Date | null
+  lastFeedSyncAt: Date | null
+  lastFindingSeenAt: Date | null
+  lastAssessedAt: Date | null
+}
+
 const reportLimiter = createRateLimiter({
   scope: 'vulnerabilities:report',
   windowMs: 60_000,
@@ -159,6 +184,7 @@ const filtersSchema = z.object({
   hostGroupId: z.string().trim().max(64).optional(),
   distro: z.string().trim().max(64).optional(),
   source: z.string().trim().max(64).optional(),
+  confidence: z.enum(['confirmed', 'probable', 'unsupported', 'all']).optional(),
 }).strip()
 
 const managementFiltersSchema = z.object({
@@ -244,7 +270,7 @@ export async function getVulnerabilityManagementSnapshot(
         cast(count(*) FILTER (WHERE known_exploited = true) as int) AS "knownExploitedCount",
         cast(count(*) FILTER (WHERE rejected = true) as int) AS "rejectedCount",
         cast((SELECT count(*) FROM vulnerability_affected_packages) as int) AS "affectedPackageRules",
-        cast((SELECT count(*) FROM host_vulnerability_findings WHERE organisation_id = ${orgId} AND status = 'open') as int) AS "openFindings"
+        cast((SELECT count(*) FROM host_vulnerability_findings WHERE organisation_id = ${orgId} AND status = 'open' AND confidence = 'confirmed') as int) AS "openFindings"
       FROM vulnerability_cves
     `),
     db.execute(sql`
@@ -280,6 +306,7 @@ export async function getVulnerabilityManagementSnapshot(
       LEFT JOIN host_vulnerability_findings hvf
         ON hvf.cve_id = vc.cve_id
        AND hvf.organisation_id = ${orgId}
+       AND hvf.confidence = 'confirmed'
       WHERE ${where}
       GROUP BY
         vc.cve_id,
@@ -441,6 +468,8 @@ export async function getVulnerabilityReport(
       hvf.severity,
       hvf.cvss_score AS "cvssScore",
       hvf.known_exploited AS "knownExploited",
+      hvf.confidence,
+      hvf.match_reason AS "matchReason",
       hvf.first_seen_at AS "firstSeenAt",
       hvf.last_seen_at AS "lastSeenAt"
     FROM host_vulnerability_findings hvf
@@ -515,6 +544,8 @@ export async function getHostVulnerabilities(
       hvf.severity,
       hvf.cvss_score AS "cvssScore",
       hvf.known_exploited AS "knownExploited",
+      hvf.confidence,
+      hvf.match_reason AS "matchReason",
       hvf.first_seen_at AS "firstSeenAt",
       hvf.last_seen_at AS "lastSeenAt"
     FROM host_vulnerability_findings hvf
@@ -524,6 +555,7 @@ export async function getHostVulnerabilities(
     WHERE hvf.organisation_id = ${orgId}
       AND hvf.host_id = ${hostId}
       AND hvf.status = 'open'
+      AND hvf.confidence = 'confirmed'
     ORDER BY
       CASE hvf.severity
         WHEN 'critical' THEN 0
@@ -538,11 +570,109 @@ export async function getHostVulnerabilities(
   `)) as unknown as VulnerabilityFindingRow[]
 }
 
+export async function getHostVulnerabilityAssessment(
+  orgId: string,
+  hostId: string,
+): Promise<HostVulnerabilityAssessment> {
+  await requireOrgAccess(orgId)
+
+  const [hostRowsRaw, findingRowsRaw, scanRowsRaw, sourceRowsRaw] = await Promise.all([
+    db.execute(sql`
+      SELECT metadata
+      FROM hosts
+      WHERE id = ${hostId}
+        AND organisation_id = ${orgId}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `),
+    db.execute(sql`
+      SELECT
+        cast(count(*) as int) AS "openConfirmedFindings",
+        cast(count(*) FILTER (WHERE severity = 'critical') as int) AS "criticalCount",
+        cast(count(*) FILTER (WHERE severity = 'high') as int) AS "highCount",
+        cast(count(*) FILTER (WHERE known_exploited = true) as int) AS "knownExploitedCount",
+        cast(count(*) FILTER (WHERE fixed_version IS NOT NULL) as int) AS "fixAvailableCount",
+        max(last_seen_at) AS "lastFindingSeenAt"
+      FROM host_vulnerability_findings
+      WHERE organisation_id = ${orgId}
+        AND host_id = ${hostId}
+        AND status = 'open'
+        AND confidence = 'confirmed'
+    `),
+    db.execute(sql`
+      SELECT completed_at AS "completedAt"
+      FROM software_scans
+      WHERE organisation_id = ${orgId}
+        AND host_id = ${hostId}
+        AND status = 'success'
+      ORDER BY completed_at DESC NULLS LAST, created_at DESC
+      LIMIT 1
+    `),
+    db.execute(sql`
+      SELECT max(last_success_at) AS "lastFeedSyncAt"
+      FROM vulnerability_sources
+      WHERE status = 'success'
+        AND last_success_at IS NOT NULL
+    `),
+  ])
+
+  const hostRows = hostRowsRaw as unknown as Array<{ metadata: unknown }>
+  const findingRows = findingRowsRaw as unknown as Array<{
+    openConfirmedFindings: number
+    criticalCount: number
+    highCount: number
+    knownExploitedCount: number
+    fixAvailableCount: number
+    lastFindingSeenAt: Date | string | null
+  }>
+  const scanRows = scanRowsRaw as unknown as Array<{ completedAt: Date | string | null }>
+  const sourceRows = sourceRowsRaw as unknown as Array<{ lastFeedSyncAt: Date | string | null }>
+
+  const metadata = parseHostMetadata(hostRows[0]?.metadata)
+  const lastInventoryScanAt = coerceDate(scanRows[0]?.completedAt) ?? coerceDate(metadata.lastSoftwareScanAt)
+  const lastFeedSyncAt = coerceDate(sourceRows[0]?.lastFeedSyncAt)
+  const summary = findingRows[0] ?? {
+    openConfirmedFindings: 0,
+    criticalCount: 0,
+    highCount: 0,
+    knownExploitedCount: 0,
+    fixAvailableCount: 0,
+    lastFindingSeenAt: null,
+  }
+  const lastFindingSeenAt = coerceDate(summary.lastFindingSeenAt)
+  const derived = deriveHostVulnerabilityAssessmentStatus({
+    openConfirmedFindings: summary.openConfirmedFindings,
+    lastInventoryScanAt,
+    lastFeedSyncAt,
+  })
+
+  return {
+    status: derived.status,
+    reason: derived.reason,
+    openConfirmedFindings: summary.openConfirmedFindings,
+    criticalCount: summary.criticalCount,
+    highCount: summary.highCount,
+    knownExploitedCount: summary.knownExploitedCount,
+    fixAvailableCount: summary.fixAvailableCount,
+    inventoryStale: derived.inventoryStale,
+    feedStale: derived.feedStale,
+    lastInventoryScanAt,
+    lastFeedSyncAt,
+    lastFindingSeenAt,
+    lastAssessedAt: lastFindingSeenAt ?? lastInventoryScanAt,
+  }
+}
+
 function vulnerabilityWhere(orgId: string, filters: z.infer<typeof filtersSchema>) {
   const conditions = [
     sql`hvf.organisation_id = ${orgId}`,
     sql`hvf.status = 'open'`,
   ]
+  if (!filters.confidence || filters.confidence === 'confirmed') {
+    conditions.push(sql`hvf.confidence = 'confirmed'`)
+  } else if (filters.confidence !== 'all') {
+    conditions.push(sql`hvf.confidence = ${filters.confidence}`)
+  }
   if (filters.cve) {
     conditions.push(sql`hvf.cve_id ILIKE ${`%${escapeLike(filters.cve)}%`}`)
   }
@@ -597,6 +727,12 @@ function vulnerabilityCatalogWhere(filters: z.infer<typeof managementFiltersSche
 
 function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`)
+}
+
+function coerceDate(value: Date | string | null | undefined) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 function sanitizeSourceError(value: string | null) {

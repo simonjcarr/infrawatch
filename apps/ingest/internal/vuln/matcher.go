@@ -9,7 +9,7 @@ func MatchPackage(pkg InventoryPackage, affected AffectedPackage) (bool, string)
 	if affected.DistroID != "" && !strings.EqualFold(pkg.DistroID, affected.DistroID) {
 		return false, "distro mismatch"
 	}
-	if affected.DistroVersionID != "" && pkg.DistroVersionID != "" && affected.DistroVersionID != pkg.DistroVersionID {
+	if affected.DistroVersionID != "" && pkg.DistroVersionID != "" && !distroVersionMatches(pkg, affected) {
 		return false, "distro version mismatch"
 	}
 	if affected.DistroCodename != "" && pkg.DistroCodename != "" && affected.DistroCodename != pkg.DistroCodename {
@@ -33,9 +33,22 @@ func MatchPackage(pkg InventoryPackage, affected AffectedPackage) (bool, string)
 		return false, "no fixed version"
 	}
 	if CompareDistroVersion(pkg.Source, installed, affected.FixedVersion) < 0 {
+		if pkg.Source == "rpm" {
+			return true, "installed rpm evr is below vendor fixed evr"
+		}
 		return true, "installed version is below fixed version"
 	}
 	return false, "installed version is fixed"
+}
+
+func distroVersionMatches(pkg InventoryPackage, affected AffectedPackage) bool {
+	if affected.DistroVersionID == pkg.DistroVersionID {
+		return true
+	}
+	if pkg.Source == "rpm" && strings.EqualFold(affected.DistroID, "rhel") {
+		return !strings.Contains(affected.DistroVersionID, ".") && strings.HasPrefix(pkg.DistroVersionID, affected.DistroVersionID+".")
+	}
+	return false
 }
 
 func supportedInventorySource(source string) bool {

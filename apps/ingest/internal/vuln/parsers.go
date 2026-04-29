@@ -401,6 +401,11 @@ func parseRedHatCVEList(r io.Reader) ([]CVERecord, []AffectedPackage, error) {
 		PublicDate          string   `json:"public_date"`
 		CVSS3Score          string   `json:"cvss3_score"`
 		AffectedPackages    []string `json:"affected_packages"`
+		AffectedRelease     []struct {
+			ProductName string `json:"product_name"`
+			Package     string `json:"package"`
+			Advisory    string `json:"advisory"`
+		} `json:"affected_release"`
 	}
 	if err := json.NewDecoder(r).Decode(&rows); err != nil {
 		return nil, nil, err
@@ -424,6 +429,27 @@ func parseRedHatCVEList(r io.Reader) ([]CVERecord, []AffectedPackage, error) {
 			record.PublishedAt = t
 		}
 		cves = append(cves, record)
+		for _, rel := range row.AffectedRelease {
+			name, fixed := splitRedHatFixedPackage(rel.Package)
+			if name == "" || fixed == "" {
+				continue
+			}
+			affected = append(affected, AffectedPackage{
+				CVEID:           row.CVE,
+				Source:          "redhat-security-data",
+				DistroID:        "rhel",
+				DistroVersionID: redHatProductVersion(rel.ProductName),
+				PackageName:     name,
+				FixedVersion:    fixed,
+				Severity:        record.Severity,
+				PackageState:    "fixed",
+				MetadataJSON: encodeMetadata(map[string]string{
+					"advisory":     rel.Advisory,
+					"product_name": rel.ProductName,
+					"package":      rel.Package,
+				}),
+			})
+		}
 		for _, pkg := range row.AffectedPackages {
 			name, fixed := splitRedHatAffectedPackage(pkg)
 			if name == "" || fixed == "" {
@@ -436,6 +462,11 @@ func parseRedHatCVEList(r io.Reader) ([]CVERecord, []AffectedPackage, error) {
 				PackageName:  name,
 				FixedVersion: fixed,
 				Severity:     record.Severity,
+				PackageState: "probable",
+				MetadataJSON: encodeMetadata(map[string]string{
+					"source": "affected_packages",
+					"raw":    pkg,
+				}),
 			})
 		}
 	}
@@ -460,6 +491,77 @@ func splitRedHatAffectedPackage(value string) (name, fixed string) {
 	name = fields[0]
 	if idx := strings.LastIndex(value, "fixed in "); idx >= 0 {
 		fixed = strings.TrimSpace(value[idx+len("fixed in "):])
+		if parsedName, parsedFixed := splitRedHatFixedPackage(fixed); parsedName != "" && parsedFixed != "" {
+			name = parsedName
+			fixed = parsedFixed
+		}
 	}
 	return name, fixed
+}
+
+func splitRedHatFixedPackage(value string) (name, fixed string) {
+	value = strings.TrimSpace(value)
+	value = strings.TrimSuffix(value, ".src.rpm")
+	value = strings.TrimSuffix(value, ".rpm")
+	value = stripRPMArchitecture(value)
+	if value == "" {
+		return "", ""
+	}
+
+	releaseDash := strings.LastIndex(value, "-")
+	if releaseDash <= 0 || releaseDash == len(value)-1 {
+		return "", ""
+	}
+	release := value[releaseDash+1:]
+	beforeRelease := value[:releaseDash]
+
+	versionDash := strings.LastIndex(beforeRelease, "-")
+	if versionDash <= 0 || versionDash == len(beforeRelease)-1 {
+		return "", ""
+	}
+	name = strings.TrimSpace(beforeRelease[:versionDash])
+	version := strings.TrimSpace(beforeRelease[versionDash+1:])
+	if name == "" || version == "" || release == "" {
+		return "", ""
+	}
+	return name, version + "-" + release
+}
+
+func stripRPMArchitecture(value string) string {
+	idx := strings.LastIndex(value, ".")
+	if idx <= 0 || idx == len(value)-1 {
+		return value
+	}
+	switch value[idx+1:] {
+	case "aarch64", "i386", "i486", "i586", "i686", "noarch", "ppc64le", "s390x", "src", "x86_64":
+		return value[:idx]
+	default:
+		return value
+	}
+}
+
+func redHatProductVersion(productName string) string {
+	fields := strings.Fields(productName)
+	for i := len(fields) - 1; i >= 0; i-- {
+		field := strings.Trim(fields[i], "(),")
+		if field == "" {
+			continue
+		}
+		if isVersionLike(field) {
+			return field
+		}
+	}
+	return ""
+}
+
+func isVersionLike(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && r != '.' {
+			return false
+		}
+	}
+	return true
 }

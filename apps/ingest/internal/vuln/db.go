@@ -379,7 +379,8 @@ func upsertFinding(ctx context.Context, tx findingTx, pkg InventoryPackage, affe
 		INSERT INTO host_vulnerability_findings (
 			id, organisation_id, host_id, software_package_id, cve_id, affected_package_id,
 			status, package_name, installed_version, fixed_version, source, severity,
-			cvss_score, known_exploited, first_seen_at, last_seen_at, resolved_at,
+			cvss_score, known_exploited, confidence, match_reason,
+			first_seen_at, last_seen_at, resolved_at,
 			metadata, created_at, updated_at
 		)
 		SELECT
@@ -388,8 +389,9 @@ func upsertFinding(ctx context.Context, tx findingTx, pkg InventoryPackage, affe
 			COALESCE(NULLIF((SELECT severity FROM cve), 'unknown'), $11),
 			(SELECT cvss_score FROM cve),
 			COALESCE((SELECT known_exploited FROM cve), false),
+			$12, $13,
 			NOW(), NOW(), NULL,
-			$12::jsonb, NOW(), NOW()
+			$14::jsonb, NOW(), NOW()
 		ON CONFLICT (organisation_id, host_id, software_package_id, cve_id)
 		DO UPDATE SET
 			affected_package_id = EXCLUDED.affected_package_id,
@@ -401,6 +403,8 @@ func upsertFinding(ctx context.Context, tx findingTx, pkg InventoryPackage, affe
 			severity = EXCLUDED.severity,
 			cvss_score = EXCLUDED.cvss_score,
 			known_exploited = EXCLUDED.known_exploited,
+			confidence = EXCLUDED.confidence,
+			match_reason = EXCLUDED.match_reason,
 			last_seen_at = NOW(),
 			resolved_at = NULL,
 			metadata = EXCLUDED.metadata,
@@ -418,9 +422,21 @@ func upsertFinding(ctx context.Context, tx findingTx, pkg InventoryPackage, affe
 		nullable(affected.FixedVersion),
 		pkg.Source,
 		string(affected.Severity),
-		jsonOrNil(encodeMetadata(map[string]string{"reason": reason})),
+		string(findingConfidenceForAffected(affected)),
+		reason,
+		jsonOrNil(encodeMetadata(map[string]string{
+			"confidence": string(findingConfidenceForAffected(affected)),
+			"reason":     reason,
+		})),
 	)
 	return err
+}
+
+func findingConfidenceForAffected(affected AffectedPackage) FindingConfidence {
+	if affected.PackageState == "probable" {
+		return FindingConfidenceProbable
+	}
+	return FindingConfidenceConfirmed
 }
 
 func nullable(value string) any {

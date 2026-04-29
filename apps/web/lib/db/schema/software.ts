@@ -49,7 +49,7 @@ export const softwarePackages = pgTable(
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     // Set when a later scan no longer reports this package. Cleared on re-appearance.
     removedAt: timestamp('removed_at', { withTimezone: true }),
-    // Reserved for a future CVE matcher; always null in v1.
+    // Legacy per-package CVE cache slot; current findings live in host_vulnerability_findings.
     cveMatches: jsonb('cve_matches'),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

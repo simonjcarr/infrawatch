@@ -62,3 +62,67 @@ func TestParseAlpineSecDB(t *testing.T) {
 		t.Fatalf("unexpected affected row: %#v", affected[0])
 	}
 }
+
+func TestParseRedHatStructuredAffectedRelease(t *testing.T) {
+	t.Parallel()
+
+	doc := `[{
+	  "CVE": "CVE-2025-0001",
+	  "bugzilla_description": "openssl backport fix",
+	  "severity": "important",
+	  "affected_release": [{
+	    "product_name": "Red Hat Enterprise Linux 8",
+	    "package": "openssl-1:1.1.1k-12.el8_9.6.x86_64",
+	    "advisory": "RHSA-2025:0001"
+	  }]
+	}]`
+	records, affected, err := parseRedHatCVEList(strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("parseRedHatCVEList: %v", err)
+	}
+	if len(records) != 1 || records[0].CVEID != "CVE-2025-0001" || records[0].Severity != SeverityHigh {
+		t.Fatalf("unexpected CVE records: %#v", records)
+	}
+	if len(affected) != 1 {
+		t.Fatalf("len(affected) = %d, want 1: %#v", len(affected), affected)
+	}
+	row := affected[0]
+	if row.PackageName != "openssl" {
+		t.Fatalf("PackageName = %q, want openssl", row.PackageName)
+	}
+	if row.FixedVersion != "1:1.1.1k-12.el8_9.6" {
+		t.Fatalf("FixedVersion = %q, want full RPM EVR", row.FixedVersion)
+	}
+	if row.DistroID != "rhel" || row.DistroVersionID != "8" {
+		t.Fatalf("distro = %q %q, want rhel 8", row.DistroID, row.DistroVersionID)
+	}
+	if row.PackageState != "fixed" {
+		t.Fatalf("PackageState = %q, want fixed", row.PackageState)
+	}
+	if !strings.Contains(string(row.MetadataJSON), "RHSA-2025:0001") {
+		t.Fatalf("metadata did not include advisory: %s", string(row.MetadataJSON))
+	}
+}
+
+func TestParseRedHatFreeTextAffectedPackageIsProbable(t *testing.T) {
+	t.Parallel()
+
+	doc := `[{
+	  "CVE": "CVE-2025-0002",
+	  "severity": "moderate",
+	  "affected_packages": ["openssl fixed in openssl-1:1.1.1k-12.el8_9.6.x86_64"]
+	}]`
+	_, affected, err := parseRedHatCVEList(strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("parseRedHatCVEList: %v", err)
+	}
+	if len(affected) != 1 {
+		t.Fatalf("len(affected) = %d, want 1: %#v", len(affected), affected)
+	}
+	if affected[0].PackageState != "probable" {
+		t.Fatalf("PackageState = %q, want probable", affected[0].PackageState)
+	}
+	if affected[0].PackageName != "openssl" || affected[0].FixedVersion != "1:1.1.1k-12.el8_9.6" {
+		t.Fatalf("unexpected affected row: %#v", affected[0])
+	}
+}

@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 86 — CT-CVE inbound connector boundary
+
+**CT-CVE connector foundation** (`apps/web/lib/integrations/ct-cve/service-token.ts`, `apps/web/app/api/integrations/ct-cve/v1/connection-health/route.ts`)
+- Added signed CT-CVE service-token verification for inbound CT Ops connector requests, including `Authorization: CT-ServiceToken`, body SHA-256 checks, HMAC signatures, timestamp skew enforcement, nonce replay protection, token revocation, org binding, and scope checks.
+- Added the first signed CT Ops connector endpoint, `GET /api/integrations/ct-cve/v1/connection-health?orgId=...`, with per-token rate limiting and contract-shaped status output.
+- Documented the `CT_CVE_SERVICE_TOKENS` configuration shape for early connector deployments.
+
+**Validation**
+- Added focused unit coverage for valid signatures, stale timestamps, content hash mismatches, invalid signatures, replayed nonces, scope checks, and org binding.
+- Validation run: `node --experimental-strip-types --test lib/integrations/ct-cve/service-token.test.mjs`, targeted ESLint for the new connector files, `pnpm --dir apps/web type-check`, `pnpm --dir apps/web db:validate`, and `pnpm --dir apps/web test:unit`.
+
 ### Session 85 — Licensing UI and docs
 
 **Seat-based CT-Ops licensing migration** (`apps/web/app/(dashboard)/settings/licence/page.tsx`, `apps/web/app/(dashboard)/settings/settings-client.tsx`, `apps/docs/docs/licensing.md`)

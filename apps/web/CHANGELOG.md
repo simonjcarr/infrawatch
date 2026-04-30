@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.92.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.91.0...web/v0.92.0) (2026-04-30)
+
+
+### Features
+
+* **web:** persist CT-CVE connection status ([#825](https://github.com/carrtech-dev/ct-ops/issues/825)) ([a7af2ea](https://github.com/carrtech-dev/ct-ops/commit/a7af2ea62ebd51df77415c03e6fcd0ab21a837dd))
+
 ## [0.91.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.90.0...web/v0.91.0) (2026-04-30)
 
 

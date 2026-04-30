@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getRequireEmailVerification } from '@/lib/auth/env'
+import { getAuthenticatedRedirectPath } from '@/lib/auth/redirects'
 import { RegisterForm } from './register-form'
 
 export const metadata: Metadata = {
@@ -17,7 +18,8 @@ export default async function RegisterPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (session) {
     const user = await db.query.users.findFirst({ where: eq(users.id, session.user.id) })
-    redirect(user?.organisationId ? '/dashboard' : '/onboarding')
+    const redirectPath = getAuthenticatedRedirectPath(user)
+    if (redirectPath) redirect(redirectPath)
   }
 
   return (

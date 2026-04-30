@@ -104,6 +104,23 @@ function repo() {
   }
 }
 
+function statusRepo() {
+  let stored = null
+  return {
+    repository: {
+      async get(orgId) {
+        assert.equal(orgId, 'org_1')
+        return stored
+      },
+      async save(status) {
+        assert.equal(status.orgId, 'org_1')
+        stored = status
+      },
+    },
+    stored: () => stored,
+  }
+}
+
 test('builds an org-scoped CT-CVE inventory snapshot without deleted or removed rows', async () => {
   const snapshot = await buildCtCveInventorySnapshot({
     orgId: 'org_1',
@@ -157,12 +174,14 @@ test('pushes a snapshot to CT-CVE with the inventory service-token signature', a
   })
 
   let captured
+  const status = statusRepo()
   const result = await pushCtCveInventorySnapshot({
     baseUrl: 'https://ct-cve.example.invalid',
     token,
     snapshot,
     nonce: 'nonce_inventory_1',
     timestamp: '2026-04-30T10:16:00.000Z',
+    statusRepository: status.repository,
     fetchImpl: async (url, init) => {
       captured = { url, init }
       return new Response(JSON.stringify({
@@ -192,4 +211,26 @@ test('pushes a snapshot to CT-CVE with the inventory service-token signature', a
     ].join('\n'))
     .digest('base64url')
   assert.equal(captured.init.headers['x-ct-signature'], `v1=${expectedSignature}`)
+  assert.equal(status.stored().lastInventoryPushAt.length, '2026-04-30T10:16:00.000Z'.length)
+  assert.equal(status.stored().lastErrorCode, null)
+})
+
+test('records a CT-CVE inventory connection error when the push fails', async () => {
+  const snapshot = await buildCtCveInventorySnapshot({
+    orgId: 'org_1',
+    repository: repo(),
+    generatedAt,
+  })
+  const status = statusRepo()
+
+  await assert.rejects(() => pushCtCveInventorySnapshot({
+    baseUrl: 'https://ct-cve.example.invalid',
+    token,
+    snapshot,
+    statusRepository: status.repository,
+    fetchImpl: async () => new Response(JSON.stringify({ error: 'unavailable' }), { status: 503 }),
+  }), /HTTP 503/)
+
+  assert.equal(status.stored().lastErrorCode, 'inventory_push_failed')
+  assert.equal(status.stored().lastErrorAt.length, '2026-04-30T10:16:00.000Z'.length)
 })

@@ -10,6 +10,10 @@ import {
   CtCveFindingBatchValidationError,
   ingestCtCveFindingBatch,
 } from '@/lib/integrations/ct-cve/finding-ingest'
+import {
+  recordCtCveConnectionError,
+  recordCtCveFindingIngest,
+} from '@/lib/integrations/ct-cve/connection-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,9 +102,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await ingestCtCveFindingBatch(payload)
+    await recordCtCveFindingIngest(auth.token.orgId)
     return NextResponse.json(result, { status: result.accepted ? 202 : 207 })
   } catch (error) {
     if (error instanceof CtCveFindingBatchValidationError) {
+      await recordCtCveConnectionError(auth.token.orgId, 'invalid_finding_batch')
       return errorResponse({
         code: 'invalid_payload',
         message: error.issues.join('; '),

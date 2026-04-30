@@ -6,6 +6,7 @@ import {
   verifyCtCveServiceRequest,
   type CtCveServiceAuthError,
 } from '@/lib/integrations/ct-cve/service-token'
+import { recordCtCveConnectionHealth } from '@/lib/integrations/ct-cve/connection-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,15 +88,6 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  return NextResponse.json({
-    contractVersion: '2026-04-30',
-    orgId: auth.token.orgId,
-    configured: true,
-    enabled: true,
-    lastInventoryPushAt: null,
-    lastFindingIngestAt: null,
-    lastHealthCheckAt: new Date().toISOString(),
-    lastErrorCode: null,
-    lastErrorAt: null,
-  })
+  const status = await recordCtCveConnectionHealth(auth.token.orgId)
+  return NextResponse.json(status)
 }

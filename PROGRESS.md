@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 88 — CT-CVE durable connection status
+
+**CT-CVE connector status persistence** (`apps/web/lib/integrations/ct-cve/connection-status.ts`, `apps/web/app/api/integrations/ct-cve/v1/connection-health/route.ts`)
+- Added durable, org-scoped CT-CVE connector status persisted through `system_config`, including last inventory push, finding ingest, health check, and connector error timestamps.
+- Updated signed connection health to return and refresh the stored status instead of returning process-local placeholder timestamps.
+- Updated CT-CVE finding ingestion and inventory snapshot pushes to maintain the durable status and clear stale connector errors after successful data flow.
+
+**Validation**
+- Validation run: `pnpm install --frozen-lockfile`, targeted CT-CVE integration unit tests, `npm run type-check`, `npm run db:validate`, and `npm run test:unit` from `apps/web`.
+
 ### Session 87 — CT-CVE inventory export connector
 
 **CT-CVE outbound inventory snapshots** (`apps/web/lib/integrations/ct-cve/inventory-export.ts`)

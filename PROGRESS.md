@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 87 — CT-CVE inventory export connector
+
+**CT-CVE outbound inventory snapshots** (`apps/web/lib/integrations/ct-cve/inventory-export.ts`)
+- Added CT Ops inventory snapshot construction for CT-CVE, scoped by organisation and limited to active hosts plus current software package rows.
+- Included contract metadata, stable package fingerprints, Linux distro/package manager metadata, bounded host/package page sizes, and opaque cursors for follow-up inventory pages.
+- Added a signed outbound push helper for `POST /api/v1/ct-ops/inventory-snapshots` using the CT-CVE `inventory:write` service-token contract.
+- Corrected CT Ops connection health to require `connection:read` rather than `findings:write`.
+
+**Validation**
+- Validation run: `pnpm install --frozen-lockfile`, `pnpm --dir apps/web run type-check`, `pnpm --dir apps/web run test:unit`, and targeted ESLint for the connector files.
+
 ### Session 86 — CT-CVE inbound connector boundary
 
 **CT-CVE connector foundation** (`apps/web/lib/integrations/ct-cve/service-token.ts`, `apps/web/app/api/integrations/ct-cve/v1/connection-health/route.ts`)

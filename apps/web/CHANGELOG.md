@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.89.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.88.0...web/v0.89.0) (2026-04-30)
+
+
+### Features
+
+* **web:** add ct-cve service token boundary ([#818](https://github.com/carrtech-dev/ct-ops/issues/818)) ([ffd7529](https://github.com/carrtech-dev/ct-ops/commit/ffd75292ce9d95417ebbbf79766488981e00dc46))
+
 ## [0.88.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.87.0...web/v0.88.0) (2026-04-29)
 
 

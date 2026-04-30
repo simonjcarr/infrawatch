@@ -23,6 +23,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `INGEST_WS_URL` | — | *(empty)* | WebSocket URL of the ingest service. Empty = same-origin via the bundled nginx (recommended). Set to an absolute `wss://` URL only to bypass the bundled proxy |
 | `WEB_TLS_CERT` | — | `/var/lib/ct-ops/server-tls/server.crt` | Path to the nginx-facing server cert. The enrolment bundle route reads this file and embeds it so agents can verify the HTTPS download URL |
 | `CT_CVE_SERVICE_TOKENS` | — 🔒 | *(empty)* | JSON allow-list of signed CT-CVE service tokens that can deliver findings or call CT Ops connection health; use `findings:write` and `connection:read` scopes for the initial inbound connector |
+| `CT_CVE_INVENTORY_PUSH_TARGETS` | — 🔒 | *(empty)* | JSON list of outbound CT-CVE inventory targets. Each entry contains `name`, `baseUrl`, and a token object with `id`, `secret`, `orgId`, and `scopes:["inventory:write"]`; schedule `pnpm --dir apps/web ct-cve:push-inventory` to send snapshots |
 
 ### Licence verification
 

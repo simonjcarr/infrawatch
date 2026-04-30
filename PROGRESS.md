@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 90 — CT-CVE inventory push scheduling
+
+**CT-CVE outbound inventory push job** (`apps/web/lib/integrations/ct-cve/inventory-push-job.ts`, `apps/web/scripts/push-ct-cve-inventory.mjs`)
+- Added env-configured CT-CVE inventory push targets for outbound `inventory:write` tokens.
+- Added a reusable push job that builds paged full inventory snapshots, signs and pushes every page to CT-CVE, accumulates accepted row counts, and reports per-target failures without stopping later targets.
+- Added the `ct-cve:push-inventory` web package script so operators can run the push job from cron, systemd timers, or Kubernetes CronJobs.
+
+**Validation**
+- Validation run: targeted inventory push job unit test, CT-CVE integration unit tests, targeted ESLint, `pnpm --dir apps/web type-check`, `pnpm --dir apps/web db:validate`, `pnpm --dir apps/web test:unit`, and a no-target `pnpm --dir apps/web ct-cve:push-inventory` smoke test.
+
 ### Session 89 — Auth redirect loop hardening
 
 **Stale session redirect handling** (`apps/web/lib/auth/redirects.ts`, `apps/web/lib/auth/session.ts`, `apps/web/app/(auth)/login/page.tsx`)

@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "ct-cve:push-inventory": "node --experimental-strip-types scripts/push-ct-cve-inventory.mjs",
     "test:e2e": "node tests/e2e/runner.mjs",
     "test:e2e:no-email-verification": "REQUIRE_EMAIL_VERIFICATION=false node tests/e2e/runner.mjs tests/e2e/auth/register.spec.ts",
     "test:e2e:ui": "node tests/e2e/runner.mjs --ui",

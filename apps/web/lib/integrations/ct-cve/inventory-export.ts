@@ -2,6 +2,11 @@ import { createHash, createHmac, randomUUID } from 'node:crypto'
 
 import type { Database } from '../../db/index.ts'
 import type { PackageSource } from '../../db/schema/software.ts'
+import {
+  recordCtCveConnectionError,
+  recordCtCveInventoryPush,
+  type CtCveConnectionStatusRepository,
+} from './connection-status.ts'
 
 export interface CtCveInventoryHostRecord {
   id: string
@@ -235,6 +240,7 @@ export async function pushCtCveInventorySnapshot(options: {
   nonce?: string
   timestamp?: string
   fetchImpl?: typeof fetch
+  statusRepository?: CtCveConnectionStatusRepository
 }): Promise<CtCveInventoryPushResult> {
   if (options.token.orgId !== options.snapshot.orgId || !options.token.scopes.includes('inventory:write')) {
     throw new Error('CT-CVE inventory token is not scoped to this snapshot')
@@ -264,8 +270,14 @@ export async function pushCtCveInventorySnapshot(options: {
 
   const payload = await response.json().catch(() => null) as CtCveInventoryPushResult | null
   if (!response.ok || !payload || typeof payload.accepted !== 'boolean') {
+    await recordCtCveConnectionError(options.snapshot.orgId, 'inventory_push_failed', {
+      repository: options.statusRepository,
+    })
     throw new Error(`CT-CVE inventory snapshot push failed with HTTP ${response.status}`)
   }
+  await recordCtCveInventoryPush(options.snapshot.orgId, {
+    repository: options.statusRepository,
+  })
   return payload
 }
 

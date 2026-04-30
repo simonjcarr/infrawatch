@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 85 — Licensing UI and docs
+
+**Seat-based CT-Ops licensing migration** (`apps/web/app/(dashboard)/settings/licence/page.tsx`, `apps/web/app/(dashboard)/settings/settings-client.tsx`, `apps/docs/docs/licensing.md`)
+- Updated the licence settings page to show the trusted effective tier, active users, pending invitations, seat limit, licence expiry, and Enterprise capability status.
+- Rewrote licensing docs around Community core features, Pro user-seat capacity, Enterprise-only capabilities, offline licence validation, activation, expiry, and revocation.
+- Updated air-gap and docs introduction copy so paid licences are described as seat and Enterprise entitlements rather than feature-unlock licences.
+
+**Validation**
+- Validation run: `pnpm --dir apps/web type-check`.
+
 ### Session 84 — Core Pro gate removal
 
 **Seat-based CT-Ops licensing migration** (`apps/web/lib/features.ts`, `apps/web/lib/actions/`, `apps/web/app/(dashboard)/`, `apps/web/components/shared/sidebar.tsx`)

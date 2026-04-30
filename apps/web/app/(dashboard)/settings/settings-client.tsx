@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, Bell, ScanLine, Tag as TagIcon, Copy, Check, Mail, FlaskConical } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Database, Cpu, HardDrive, MemoryStick, Users, TerminalSquare, ScrollText, Bell, ScanLine, Tag as TagIcon, Copy, Check, Mail, FlaskConical, ShieldCheck } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -70,6 +70,18 @@ interface SettingsClientProps {
   sections?: SettingsSection[]
   title?: string
   description?: string
+  effectiveLicence?: {
+    tier: LicenceTier
+    maxUsers?: number
+    expiresAt?: string
+  }
+  seatUsage?: {
+    activeUsers: number
+    pendingInvites: number
+    usedSeats: number
+    remainingSeats?: number
+    maxUsers?: number
+  }
 }
 
 function tierBadgeVariant(tier: string): 'outline' | 'default' | 'secondary' {
@@ -80,6 +92,11 @@ function tierBadgeVariant(tier: string): 'outline' | 'default' | 'secondary' {
 
 function formatTier(tier: string) {
   return tier.charAt(0).toUpperCase() + tier.slice(1)
+}
+
+function formatLicenceDate(value?: string) {
+  if (!value) return 'No paid licence expiry'
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 }
 
 const RETENTION_OPTIONS = [
@@ -123,9 +140,11 @@ export function SettingsClient({
   sections,
   title = 'Settings',
   description = 'Manage your organisation settings',
+  effectiveLicence,
+  seatUsage,
 }: SettingsClientProps) {
   const queryClient = useQueryClient()
-  const tier = org.licenceTier as LicenceTier
+  const tier = effectiveLicence?.tier ?? (org.licenceTier as LicenceTier)
   const visibleSections = new Set<SettingsSection>(
     sections ?? [
       'organisation',
@@ -1290,16 +1309,82 @@ export function SettingsClient({
           <CardTitle className="text-base">Licence</CardTitle>
           <CardDescription>
             {isAdmin
-              ? 'Enter a licence key to activate paid seats or Enterprise capabilities'
+              ? 'Manage user seats, expiry, and Enterprise capabilities'
               : 'Your organisation licence'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Current tier:</span>
-            <Badge variant={tierBadgeVariant(org.licenceTier)}>
-              {formatTier(org.licenceTier)}
-            </Badge>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-md border p-3">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                <ShieldCheck className="size-3.5" />
+                Current tier
+              </div>
+              <div className="mt-2">
+                <Badge variant={tierBadgeVariant(tier)}>
+                  {formatTier(tier)}
+                </Badge>
+              </div>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                <Users className="size-3.5" />
+                Seats used
+              </div>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {seatUsage ? (
+                  <>
+                    {seatUsage.usedSeats}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {' / '}
+                      {seatUsage.maxUsers ?? 'Unlimited'}
+                    </span>
+                  </>
+                ) : (
+                  'Unavailable'
+                )}
+              </p>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-xs font-medium uppercase text-muted-foreground">Seat detail</div>
+              <p className="mt-2 text-sm text-foreground">
+                {seatUsage
+                  ? `${seatUsage.activeUsers} active, ${seatUsage.pendingInvites} pending`
+                  : 'Seat usage could not be loaded'}
+              </p>
+              {seatUsage ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {seatUsage.remainingSeats === undefined
+                    ? 'Seats remaining: unlimited'
+                    : `Seats remaining: ${seatUsage.remainingSeats}`}
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-xs font-medium uppercase text-muted-foreground">Expiry</div>
+              <p className="mt-2 text-sm text-foreground">
+                {formatLicenceDate(effectiveLicence?.expiresAt)}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-foreground">Enterprise capabilities</p>
+                <p className="text-xs text-muted-foreground">
+                  SAML, advanced RBAC, compliance packs, white labelling, air-gap bundlers, and HA deployment.
+                </p>
+              </div>
+              <Badge variant={tier === 'enterprise' ? 'default' : 'outline'}>
+                {tier === 'enterprise' ? 'Enabled' : 'Not enabled'}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+            CT Ops Community includes core fleet, reporting, certificate, service-account, terminal, alerting, and task features.
+            Paid licences add user-seat capacity, and Enterprise licences add Enterprise-only capabilities.
           </div>
 
           {isAdmin && (

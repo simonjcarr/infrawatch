@@ -29,7 +29,7 @@ Every feature works in a fully air-gapped environment. No cloud APIs, no CDNs, n
 The agent is Apache 2.0 licensed and always will be. Security teams must be able to audit what runs on their hosts.
 
 ### Offline-Capable Licensing
-Enterprise licence validation uses a signed JWT verified against a bundled public key. No external service required.
+Paid licence validation uses a signed JWT verified against a bundled public key. No external service required.
 
 ---
 

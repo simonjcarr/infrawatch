@@ -135,4 +135,4 @@ docker compose -f docker-compose.single.yml up -d  # restarts with new images
 
 ## Licence Validation
 
-CT-Ops validates enterprise licences offline using a signed JWT verified against a public key that is bundled with the binary. No network request is made. To update a licence, paste the new licence key into **Settings → Licence**.
+CT-Ops validates paid licences offline using a signed JWT verified against a public key that is bundled with the web application. No network request is made. To update user-seat capacity or Enterprise capabilities, paste the new licence key into **Settings -> Licence**.

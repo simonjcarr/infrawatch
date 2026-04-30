@@ -1,123 +1,135 @@
-# Licensing & Tiers
+# Licensing
 
-CT-Ops is available in three tiers:
+CT-Ops uses open-source, seat-based licensing. Core CT-Ops functionality is
+available in Community installs; paid CT-Ops tiers are based on user seats, and
+Enterprise adds Enterprise-only capabilities.
 
-- **Community** — free, open source (Apache 2.0). Everything an engineer or small team needs day-to-day.
-- **Pro** — the bulk of paid value: expiry tracking, reports, governance basics, and common corporate IdP integration.
-- **Enterprise** — a small set of enterprise-scale capabilities: SAML, advanced RBAC, compliance packs, white labelling, and the operations bundlers.
+## Tiers
 
-LDAP / AD login is included in **Community** — it is expected in any serious open-source platform used by corporate engineering teams.
+### Community
 
-## Tier contents
+Community is open source and includes core CT-Ops functionality:
 
-### Community (free)
+- Agent registration, approval, heartbeat, self-update, and install bundles
+- Host inventory, networks, tags, notes, and host groups
+- Monitoring checks, metric graphs, alerts, silences, and notifications
+- Certificate tracking and service-account tracking
+- Software inventory, patch status, and report export
+- Interactive terminal, scheduled tasks, service management, and script runs
+- LDAP / Active Directory login and directory lookup
+- Air-gap deployment support
 
-- Email / password auth + TOTP MFA
-- LDAP / AD login (live bind authentication)
-- LDAP Directory User Lookup tool
-- Organisations, teams, user management, 4 built-in roles
-- Agent registration, approval, heartbeat, self-update, install bundles
-- Host inventory, host deduplication, networks with topology graphs
-- Check definitions (port, process, HTTP)
-- Alerts, acknowledge / silence
-- Notification channels: in-app, webhook, SMTP, Slack, Telegram
-- Interactive terminal (multi-tab, split-pane)
-- Custom script runner, service management
-- SSL Certificate Checker tool (one-off URL lookup)
-- Metric graphs + retention up to **180 days**
-- Air-gap deployment
+Community capacity is governed by the included user seats for the install.
 
-### Pro (Tier 1)
+### Pro
 
-Everything in Community, plus:
+Pro is the paid CT-Ops tier for teams that need additional user-seat capacity.
+It uses the same core CT-Ops feature set as Community, with a signed licence
+that can carry a `maxUsers` seat limit and expiry date.
 
-- **Certificate expiry tracker** — dashboards, scheduled expiry notifications, bulk export
-- **Service account tracker** — password / token expiry warnings
-- CSR generation, approval workflow, internal CA
-- SSH key inventory and rotation tracking
-- **Reports** — scheduled delivery and CSV / PDF export
-- **Extended metric retention** (up to 365 days) and metric export API
-- **OIDC single sign-on** (Google, Entra, Okta, Keycloak)
-- **Audit log** (user + admin actions, export, retention)
-- Scheduled task runner
-- Alert routing policies (on-call rotations, escalation)
-- Advanced notification templating
-- Business-hours email support
+### Enterprise
 
-### Enterprise (Tier 2)
+Enterprise is seat-based and includes Enterprise-only capabilities:
 
-Everything in Pro, plus:
-
-- **SAML 2.0** single sign-on
-- **Advanced RBAC** — tag-based resource scoping, custom role definitions
-- **Compliance packs** (SOC 2, ISO 27001, HIPAA-style evidence templates)
-- **White labelling** — custom logo, theme, login page, email sender
-- Air-gap bundlers for Jenkins, Docker, Ansible, Terraform
+- SAML 2.0 single sign-on
+- Advanced RBAC and custom role definitions
+- Compliance packs
+- White labelling
+- Air-gap bundlers for enterprise toolchains
 - HA deployment profile and migration tooling
-- 24 / 7 support with incident SLA and a dedicated CSM
+- Enterprise support commitments
 
-## How licensing works
+Enterprise restrictions are enforced on trusted backend paths. UI indicators are
+only a convenience and are not the source of authority.
 
-CT-Ops uses an **offline-capable** licence model. There is no phone-home, no activation server, and no network dependency for validation. This is essential for air-gapped deployments.
+## Seat Limits
 
-### Key format
+The `maxUsers` licence claim defines the paid user-seat limit.
 
-A licence key is a signed JSON Web Token (JWT, RS256). The public key is bundled into every CT-Ops build. The private signing key is held only by the licence issuance service.
+Seats are consumed by:
 
-Every key encodes:
+- Active, non-deleted users
+- Pending, unexpired invitations
 
-- **Install organisation** (`sub`) — the id of the specific CT-Ops install the key was minted for. Verified on activation; a key issued for one install cannot be activated on a different install.
-- **Tier** — `pro` or `enterprise`
-- **Feature list** — the explicit features unlocked by this key (allows custom bundles and à-la-carte add-ons)
-- **Expiry** (`exp`) — licence term end date
-- **Licence ID** (`jti`) — unique identifier, used for revocation
-- **Customer details** — name and email, shown in Settings
-- **Seat cap** (`maxHosts`, optional) — maximum number of approved hosts
+Seats are not consumed by:
 
-### Activation
+- Deactivated users
+- Deleted or removed users
+- Expired or accepted invitations
 
-Licences are bound to the specific install that purchases them via an **activation token** the customer copies from their install into the purchase flow. This prevents a single licence key being reused across unrelated installs.
+CT-Ops enforces seats on trusted backend flows including invitation creation,
+invite acceptance, user restoration, user reactivation, and LDAP
+auto-provisioning.
 
-1. In your CT-Ops install, go to **Settings → Licence** and click **Generate activation token**. Copy the token (starts with `infw-act_…`).
-2. Visit the licence purchase site and paste the activation token into the checkout. The site shows the install name decoded from the token so you can confirm you pasted the right one.
-3. Complete payment. The issuance service mints a licence key whose `sub` claim is your install's organisation id, and emails it to your technical contact.
-4. Paste the returned key into **Settings → Licence → Licence key**.
-5. The server validates the signature, issuer, audience, expiry, and that the `sub` matches this install. All checks are local — no outbound request is made.
+Licences without a `maxUsers` claim are treated as unlimited for compatibility
+with earlier licence payloads.
 
-For air-gapped installs: generate the activation token inside the air-gapped network, transfer it out, complete purchase on a connected machine, and transfer the returned licence key back in. No network path between the install and the licence service is required.
+## Licence Keys
 
-### Renewal & expiry
+CT-Ops uses an offline-capable licence model. A licence key is a signed JSON Web
+Token verified locally against the public key bundled with the CT-Ops web
+application. Validation does not require an outbound network connection.
 
-Licences are time-limited via the `exp` claim. When a licence expires, CT-Ops silently falls back to the **Community** tier — no hard shutdown. Paid features become unavailable until a new key is pasted in. Renew at least a few days before expiry to avoid interruption.
+Every paid key can encode:
 
-### Revocation
+- Install organisation (`sub`)
+- Tier (`pro` or `enterprise`)
+- User-seat limit (`maxUsers`)
+- Expiry (`exp`)
+- Licence ID (`jti`)
+- Optional Enterprise feature claims
+- Customer details for display and support
 
-Connected installs may opportunistically check a signed revocation list published by the issuance service. Air-gapped installs rely exclusively on the `exp` claim — licence terms are therefore sized short enough (typically one year) for revocation-by-expiry to be acceptable.
+The legacy `maxHosts` claim may still appear in older keys for compatibility,
+but CT-Ops commercial licensing is moving to user-seat capacity.
 
-When `LICENCE_REVOCATION_URL` is unset, CT-Ops defaults to `https://licence.carrtech.dev/.well-known/ct-ops-licence-revocations.jwt` and refreshes that signed bundle periodically. If the install is offline or the endpoint is unreachable, the last known list is reused; if no list has ever been fetched, validation falls back to the JWT `exp` claim only.
+## Activation
 
-### Seat limits
+1. Open **Settings -> Licence**.
+2. Generate an activation token.
+3. Paste the activation token into the licence checkout flow.
+4. Complete purchase or renewal.
+5. Paste the returned licence key into **Settings -> Licence**.
 
-If a licence includes a `maxHosts` cap, agent approval is blocked once that count is reached. Remove or archive decommissioned hosts to free up seats.
+The activation token binds the issued licence to the specific CT-Ops install.
+The server validates the licence signature, issuer, audience, expiry, and
+organisation binding locally before saving the key.
 
-## Enforcement
+For air-gapped installs, generate the activation token inside the air-gapped
+network, transfer it out to complete checkout, then transfer the returned
+licence key back in.
 
-The authoritative licence check happens server-side on every gated action. UI controls for paid features are disabled on Community and hidden or badged appropriately, but the server never trusts the client — attempting to invoke a gated action without a valid licence returns an error.
+## Expiry And Degraded State
 
-Currently enforced on Community tier:
+When a paid licence expires or becomes invalid, CT-Ops degrades to Community
+without shutting down the install. Core CT-Ops functionality remains available.
+Enterprise-only capabilities are disabled unless a valid Enterprise entitlement
+is present.
 
-- Certificate tracker (`/certificates`) — requires `certExpiryTracker`
-- Service account tracker (`/service-accounts`) — requires `serviceAccountTracker`
-- Reports (`/reports/*`) — requires `reportsExport`; scheduled software scans require `reportsScheduled`
+Renew before the expiry date shown in **Settings -> Licence** to avoid losing
+paid seat capacity or Enterprise capabilities.
 
-Community installs see a **"Pro"** badge on each locked entry in the sidebar and an "Upgrade required" screen when the page is visited.
+## Revocation
 
-## Circumvention and support
+Connected installs may check a signed revocation bundle published by the
+licence service. Air-gapped installs rely on the JWT expiry date.
 
-CT-Ops is source-available. A determined engineer with build access can, technically, patch out licence checks. We rely on:
+When `LICENCE_REVOCATION_URL` is unset, CT-Ops uses the default signed bundle
+URL. If the endpoint cannot be reached, CT-Ops reuses the last known valid
+bundle; if no bundle has been fetched, validation falls back to the JWT expiry
+claim.
 
-- **Legal** — the commercial licence agreement forbids removal or modification of licence checks.
-- **Detection** — tampered builds log telltale signals that are visible to our support team.
-- **Support gating** — we do not provide support for builds that do not validate against an issued licence.
+## Settings Display
 
-If you believe a feature you paid for is not unlocking, contact support before modifying source — it is almost always an issue we can resolve with a new key.
+The **Settings -> Licence** page shows:
+
+- Current effective tier
+- Active users
+- Pending invitations
+- Seat limit
+- Seats remaining
+- Licence expiry
+- Enterprise capability status
+
+If the saved tier in the database disagrees with the validated key, CT-Ops uses
+the validated effective licence for enforcement and display.

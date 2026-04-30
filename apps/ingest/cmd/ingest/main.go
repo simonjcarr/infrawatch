@@ -21,7 +21,6 @@ import (
 	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/queue/inprocess"
 	ingesttls "github.com/carrtech-dev/ct-ops/ingest/internal/tls"
-	"github.com/carrtech-dev/ct-ops/ingest/internal/vuln"
 )
 
 var version = "dev"
@@ -115,13 +114,12 @@ func main() {
 	versionPoller := config.NewVersionPoller(cfg.Agent.LatestVersion, 5*time.Minute)
 	versionPoller.Start(ctx)
 	hbHandler := handlers.NewHeartbeatHandler(pool, issuer, q, versionPoller, cfg.Agent.DownloadBaseURL, agentCA, webServerCert)
-	vulnerabilityMatcher := vuln.StartMatchScheduler(ctx, pool, 2, 1000)
 	terminalWSHandler, err := handlers.NewTerminalWSHandler(pool, cfg.Terminal.TrustedOrigins)
 	if err != nil {
 		slog.Error("initialising terminal websocket handler", "err", err)
 		os.Exit(1)
 	}
-	inventoryHandler := handlers.NewInventoryHandler(pool, issuer, vulnerabilityMatcher)
+	inventoryHandler := handlers.NewInventoryHandler(pool, issuer)
 	renewHandler := handlers.NewRenewCertHandler(pool, agentCA)
 
 	// Start the CSR sweeper so admin-approved agents get their certs signed.
@@ -158,33 +156,6 @@ func main() {
 
 	// Start software inventory sweeper goroutine
 	go handlers.RunSoftwareSweeper(ctx, pool)
-
-	vulnerabilityNVDAPIKey := cfg.Vulnerability.NVDAPIKey
-	if vulnerabilityNVDAPIKey == "" {
-		storedKey, err := vuln.GetStoredNVDAPIKey(ctx, pool)
-		if err != nil {
-			slog.Warn("failed to load stored NVD API key", "err", err)
-		} else if storedKey != "" {
-			vulnerabilityNVDAPIKey = storedKey
-		}
-	}
-
-	// Start vulnerability feed sync and matching goroutine
-	go vuln.RunSyncer(ctx, pool, vuln.SyncConfig{
-		Enabled:        cfg.Vulnerability.Enabled,
-		Interval:       cfg.Vulnerability.Interval,
-		SyncOnStartup:  cfg.Vulnerability.SyncOnStartup,
-		RequestTimeout: cfg.Vulnerability.RequestTimeout,
-		NVDAPIKey:      vulnerabilityNVDAPIKey,
-		NVDDaysBack:    cfg.Vulnerability.NVDDaysBack,
-		CISAURL:        cfg.Vulnerability.CISAURL,
-		DebianURL:      cfg.Vulnerability.DebianURL,
-		UbuntuOSVURL:   cfg.Vulnerability.UbuntuOSVURL,
-		AlpineBaseURL:  cfg.Vulnerability.AlpineBaseURL,
-		AlpineReleases: cfg.Vulnerability.AlpineReleases,
-		RedHatURL:      cfg.Vulnerability.RedHatURL,
-		RedHatCSAFURL:  cfg.Vulnerability.RedHatCSAFURL,
-	}, vulnerabilityMatcher)
 
 	// Start cert URL refresh sweeper goroutine
 	go handlers.RunCertRefreshSweeper(ctx, pool, 60*time.Second)

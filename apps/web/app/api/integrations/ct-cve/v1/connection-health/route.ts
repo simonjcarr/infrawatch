@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     path: request.nextUrl.pathname,
     body: '',
     headers: request.headers,
-    requiredScope: 'findings:write',
+    requiredScope: 'connection:read',
     orgId,
     tokens,
   })
@@ -99,4 +99,3 @@ export async function GET(request: NextRequest) {
     lastErrorAt: null,
   })
 }
-

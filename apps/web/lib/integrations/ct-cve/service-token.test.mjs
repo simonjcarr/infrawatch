@@ -12,7 +12,7 @@ const TOKEN = {
   id: 'ctcve_test_token',
   secret: Buffer.from('ct-cve unit test signing key only').toString('base64url'),
   orgId: 'org_123',
-  scopes: ['findings:write'],
+  scopes: ['findings:write', 'connection:read'],
 }
 
 function sha256(body) {
@@ -73,6 +73,32 @@ test('rejects replayed nonces within the replay window', async () => {
   const replay = await verifyCtCveServiceRequest(request)
   assert.equal(replay.ok, false)
   assert.equal(!replay.ok && replay.error.code, 'replayed_nonce')
+})
+
+test('accepts connection-health requests with the connection read scope', async () => {
+  const result = await verifyCtCveServiceRequest({
+    method: 'GET',
+    path: '/api/integrations/ct-cve/v1/connection-health',
+    body: '',
+    headers: signedHeaders({
+      body: '',
+      nonce: 'nonce_connection_health',
+      signature: sign({
+        method: 'GET',
+        path: '/api/integrations/ct-cve/v1/connection-health',
+        timestamp: '2026-04-30T09:20:00.000Z',
+        nonce: 'nonce_connection_health',
+        bodyHash: sha256(''),
+      }),
+    }),
+    requiredScope: 'connection:read',
+    orgId: TOKEN.orgId,
+    now: new Date('2026-04-30T09:20:30.000Z'),
+    tokens: [TOKEN],
+    nonceStore: createInMemoryCtCveNonceStore(),
+  })
+
+  assert.equal(result.ok, true)
 })
 
 test('rejects stale timestamps', async () => {
@@ -182,7 +208,7 @@ test('parses configured CT-CVE service tokens and rejects weak secrets', () => {
       id: TOKEN.id,
       secret: TOKEN.secret,
       orgId: TOKEN.orgId,
-      scopes: ['findings:write', 'unsupported'],
+      scopes: ['findings:write', 'connection:read', 'unsupported'],
     },
   ]))
 

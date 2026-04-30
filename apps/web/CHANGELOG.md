@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.90.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.89.0...web/v0.90.0) (2026-04-30)
+
+
+### Features
+
+* **web:** ingest CT-CVE finding batches ([#820](https://github.com/carrtech-dev/ct-ops/issues/820)) ([85a38ec](https://github.com/carrtech-dev/ct-ops/commit/85a38ecb5cee9ca0d08296f6279431c891b22d46))
+
 ## [0.89.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.88.0...web/v0.89.0) (2026-04-30)
 
 

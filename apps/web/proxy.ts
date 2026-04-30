@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Cookie set by Better Auth on sign-in
-const SESSION_COOKIE = 'better-auth.session_token'
+import { hasBetterAuthSessionCookie } from '@/lib/auth/session-cookie-names'
 
 const AUTH_ROUTES = ['/login', '/register']
 
@@ -40,8 +38,7 @@ function checkAuthRateLimit(ip: string, now = Date.now()): boolean {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value
-  const isAuthenticated = !!sessionToken
+  const isAuthenticated = hasBetterAuthSessionCookie(request.cookies)
 
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r))
   const isProtectedRoute = PROTECTED_PATHS.some(

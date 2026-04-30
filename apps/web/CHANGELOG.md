@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.92.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.92.1...web/v0.92.2) (2026-04-30)
+
+
+### Bug Fixes
+
+* **web:** recognise secure auth session cookies ([#829](https://github.com/carrtech-dev/ct-ops/issues/829)) ([a3e30c1](https://github.com/carrtech-dev/ct-ops/commit/a3e30c1c50b218daecf99ccd20f0cf1c34fb9ba3))
+
 ## [0.92.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.92.0...web/v0.92.1) (2026-04-30)
 
 

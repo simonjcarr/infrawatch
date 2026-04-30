@@ -6,6 +6,7 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { User } from '@/lib/db/schema'
 import { requireActiveUser, requireOrgAdmin } from './guards'
+import { EXPIRED_SESSION_LOGIN_PATH } from './redirects'
 import { getPrimaryRole, normalizeAssignedRoles } from './roles'
 
 // Re-export User as SessionUser for convenience
@@ -64,12 +65,12 @@ async function loadSessionWithUser(requestHeaders: Headers): Promise<RequiredSes
 
 export async function getRequiredSession(): Promise<RequiredSession> {
   const session = await loadSessionWithUser(await headers())
-  if (!session) redirect('/login')
+  if (!session) redirect(EXPIRED_SESSION_LOGIN_PATH)
 
   try {
     requireActiveUser(session.user)
   } catch {
-    redirect('/login')
+    redirect(EXPIRED_SESSION_LOGIN_PATH)
   }
 
   return session

@@ -7,6 +7,10 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { LoginForm } from './login-form'
 import { hasLdapLoginEnabled } from '@/lib/actions/ldap'
+import {
+  getAuthenticatedRedirectPath,
+  shouldBypassAuthenticatedRedirect,
+} from '@/lib/auth/redirects'
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -24,9 +28,10 @@ function readParam(value: string | string[] | undefined): string | null {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams
   const session = await auth.api.getSession({ headers: await headers() })
-  if (session) {
+  if (session && !shouldBypassAuthenticatedRedirect(params)) {
     const user = await db.query.users.findFirst({ where: eq(users.id, session.user.id) })
-    redirect(user?.organisationId ? '/dashboard' : '/onboarding')
+    const redirectPath = getAuthenticatedRedirectPath(user)
+    if (redirectPath) redirect(redirectPath)
   }
 
   const ldapEnabled = await hasLdapLoginEnabled()

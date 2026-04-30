@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 89 — Auth redirect loop hardening
+
+**Stale session redirect handling** (`apps/web/lib/auth/redirects.ts`, `apps/web/lib/auth/session.ts`, `apps/web/app/(auth)/login/page.tsx`)
+- Fixed a stale/invalid auth-state redirect loop where a protected route could send the browser to `/login` while the auth page immediately sent session-looking state back to `/dashboard`.
+- Protected-page session rejection now redirects to `/login?session=expired`, and auth pages bypass their authenticated redirect on that explicit expired-session path.
+- Shared auth-page redirect decisions now require an active, non-deleted user before redirecting away from login/register.
+
+**Validation**
+- Validation run: `pnpm install --frozen-lockfile`, targeted auth redirect unit test, `npm run type-check`, targeted ESLint for changed auth files, and `npm run test:unit` from `apps/web`.
+
 ### Session 88 — CT-CVE durable connection status
 
 **CT-CVE connector status persistence** (`apps/web/lib/integrations/ct-cve/connection-status.ts`, `apps/web/app/api/integrations/ct-cve/v1/connection-health/route.ts`)

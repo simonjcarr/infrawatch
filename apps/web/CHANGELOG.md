@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.92.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.92.0...web/v0.92.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* **web:** prevent stale auth redirect loops ([#827](https://github.com/carrtech-dev/ct-ops/issues/827)) ([614de18](https://github.com/carrtech-dev/ct-ops/commit/614de18cfbf5b395821832a87cb9cb40eba9061e))
+
 ## [0.92.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.91.0...web/v0.92.0) (2026-04-30)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.91.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.90.0...web/v0.91.0) (2026-04-30)
+
+
+### Features
+
+* **web:** add CT-CVE inventory export helper ([#823](https://github.com/carrtech-dev/ct-ops/issues/823)) ([85676e2](https://github.com/carrtech-dev/ct-ops/commit/85676e2f0594355f3765c68d551e6c01f7af6228))
+
 ## [0.90.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.89.0...web/v0.90.0) (2026-04-30)
 
 

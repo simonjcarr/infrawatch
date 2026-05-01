@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 94 — Complete CT-CVE final residue audit
+
+**CT-CVE migration audit** (`docs/ct-cve-final-residue-audit.md`, `docs/ct-cve-migration-plan.md`)
+- Added the final CT Ops residue audit for the CT-CVE migration, including the required CVE/feature/licence searches and targeted checks for source-state, affected-package, NVD/CISA, feed, and matcher residue.
+- Classified remaining matches as intended connector, imported-finding storage, reporting/display, historical migration/changelog, or seat-licensing code.
+- Confirmed no moved CT-CVE feed sync, package matching, source configuration, NVD key storage, source-management UI, or source-only E2E coverage remains in live CT Ops code.
+
+**Validation**
+- Documentation-only change validated by rerunning the recorded `rg`/`find`
+  audit commands and reviewing the remaining match classes.
+
 ### Session 93 — Complete CT Ops CVE ownership cleanup
 
 **CT-CVE ownership cleanup** (`apps/web/lib/actions/vulnerabilities.ts`, `apps/web/lib/db/schema/vulnerabilities.ts`)

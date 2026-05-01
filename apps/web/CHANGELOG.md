@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.93.0...web/v0.94.0) (2026-05-01)
+
+
+### Features
+
+* **web:** add CT-CVE connector setup UI ([#834](https://github.com/carrtech-dev/ct-ops/issues/834)) ([50c0d98](https://github.com/carrtech-dev/ct-ops/commit/50c0d98cec667cbfe6d3849af22e58fa19b42e4c))
+
 ## [0.93.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.92.2...web/v0.93.0) (2026-05-01)
 
 

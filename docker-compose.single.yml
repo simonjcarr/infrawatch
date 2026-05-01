@@ -34,7 +34,11 @@ services:
       # exposing plaintext HTTP externally.
       - "127.0.0.1:3000:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ctops}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-ctops}
+      POSTGRES_USER: ${POSTGRES_USER:-ctops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ctops}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in your .env file}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://localhost}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-https://localhost}
@@ -83,7 +87,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ctops}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-ctops}
+      POSTGRES_USER: ${POSTGRES_USER:-ctops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ctops}
     command: ["node", "migrate.js"]
 
   ingest:
@@ -101,7 +109,11 @@ services:
       # no reason to expose plaintext JWKS/healthz/WS externally.
       - "127.0.0.1:8080:8080"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ctops}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-ctops}
+      POSTGRES_USER: ${POSTGRES_USER:-ctops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ctops}
       INGEST_TLS_CERT: /etc/ct-ops/tls/server.crt
       INGEST_TLS_KEY: /etc/ct-ops/tls/server.key
       INGEST_JWT_KEY_FILE: /var/lib/ct-ops/jwt_key.pem

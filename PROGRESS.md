@@ -15,6 +15,16 @@
 
 ## What Has Been Built
 
+### Session 91 — CT-CVE connector setup UI
+
+**CT-CVE connector setup/status surface** (`apps/web/app/(dashboard)/settings/integrations/ct-cve/page.tsx`, `apps/web/lib/integrations/ct-cve/setup-status.ts`)
+- Added an admin-only Settings -> Integrations -> CT-CVE page showing connector configured state, inbound signed-token scopes/counts, outbound inventory targets, recent health/finding/inventory timestamps, and connector errors without exposing token ids or secrets.
+- Added a sanitised setup overview helper that summarises `CT_CVE_SERVICE_TOKENS`, `CT_CVE_INVENTORY_PUSH_TARGETS`, and durable connection status for the active organisation.
+- Added the CT-CVE tab alongside LDAP and SMTP integration settings.
+
+**Validation**
+- Validation run: CT-CVE integration unit tests, full web unit suite, targeted ESLint for the new connector UI/helper files, `pnpm --filter web type-check`, and `pnpm --filter web db:validate`.
+
 ### Session 90 — CT-CVE inventory push scheduling
 
 **CT-CVE outbound inventory push job** (`apps/web/lib/integrations/ct-cve/inventory-push-job.ts`, `apps/web/scripts/push-ct-cve-inventory.mjs`)

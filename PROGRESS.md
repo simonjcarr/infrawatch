@@ -15,6 +15,18 @@
 
 ## What Has Been Built
 
+### Session 92 — Remove CT Ops vulnerability source settings
+
+**CT-CVE ownership cleanup** (`apps/web/app/(dashboard)/settings/vulnerabilities/`, `apps/web/lib/actions/vulnerabilities.ts`)
+- Removed the legacy admin **Settings -> Vulnerabilities** page that monitored external vulnerability feed/API sources and managed the CT Ops-stored NVD API key.
+- Removed the sidebar entry, NVD key server actions, and E2E coverage tied to that CT Ops-owned source-management surface.
+- CT Ops still keeps imported vulnerability finding display in host details and vulnerability reports; CT-CVE owns feed/source configuration and status.
+
+**Validation**
+- Validation run: `pnpm install --frozen-lockfile`, `pnpm --filter web type-check`,
+  `pnpm --filter web db:validate`, targeted `pnpm --filter web lint -- ...`,
+  and `pnpm --filter web test:unit`.
+
 ### Session 91 — CT-CVE connector setup UI
 
 **CT-CVE connector setup/status surface** (`apps/web/app/(dashboard)/settings/integrations/ct-cve/page.tsx`, `apps/web/lib/integrations/ct-cve/setup-status.ts`)

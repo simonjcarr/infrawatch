@@ -108,17 +108,14 @@ const adminNav: NavItem[] = [
   { title: 'Agents', href: '/settings/agents', icon: Server },
   { title: 'Monitoring', href: '/settings/monitoring', icon: BellPlus },
   { title: 'Integrations', href: '/settings/integrations', icon: Key },
-  { title: 'Vulnerabilities', href: '/settings/vulnerabilities', icon: ShieldAlert },
   { title: 'Security', href: '/settings/security', icon: Lock },
   { title: 'System', href: '/settings/system', icon: HeartPulse },
 ]
 
 function CollapsibleNavItem({
   item,
-  tier,
 }: {
   item: NavItem & { children: NavChild[] }
-  tier: LicenceTier
 }) {
   const pathname = usePathname()
 
@@ -192,7 +189,7 @@ function CollapsibleNavItem({
   )
 }
 
-function NavGroupItems({ items, tier }: { items: NavItem[]; tier: LicenceTier }) {
+function NavGroupItems({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
   return (
     <>
@@ -202,7 +199,6 @@ function NavGroupItems({ items, tier }: { items: NavItem[]; tier: LicenceTier })
             <CollapsibleNavItem
               key={item.href}
               item={item as NavItem & { children: NavChild[] }}
-              tier={tier}
             />
           )
         }
@@ -229,18 +225,16 @@ function NavGroupItems({ items, tier }: { items: NavItem[]; tier: LicenceTier })
 function NavGroup({
   label,
   items,
-  tier,
 }: {
   label: string
   items: NavItem[]
-  tier: LicenceTier
 }) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          <NavGroupItems items={items} tier={tier} />
+          <NavGroupItems items={items} />
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
@@ -267,14 +261,14 @@ export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: Lic
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavGroup label="Monitoring" items={primaryNav} tier={tier} />
-        <NavGroup label="Reporting" items={reportingNav} tier={tier} />
+        <NavGroup label="Monitoring" items={primaryNav} />
+        <NavGroup label="Reporting" items={reportingNav} />
         {showTooling ? (
           <SidebarGroup>
             <SidebarGroupLabel>Tooling</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <NavGroupItems items={toolingNav} tier={tier} />
+                <NavGroupItems items={toolingNav} />
                 <SidebarMenuItem>
                   <TerminalPanelTrigger orgId={orgId} />
                 </SidebarMenuItem>
@@ -282,7 +276,7 @@ export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: Lic
             </SidebarGroupContent>
           </SidebarGroup>
         ) : null}
-        <NavGroup label="Administration" items={adminNav} tier={tier} />
+        <NavGroup label="Administration" items={adminNav} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-2">
         <p className="text-xs text-muted-foreground px-2 py-1">

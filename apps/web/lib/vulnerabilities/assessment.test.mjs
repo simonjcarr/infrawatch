@@ -32,19 +32,22 @@ test('host assessment is clear when scans are fresh and no confirmed findings ar
 })
 
 test('host assessment is not assessed without inventory or finding import data', () => {
-  assert.equal(deriveHostVulnerabilityAssessmentStatus({
+  const missingInventory = deriveHostVulnerabilityAssessmentStatus({
     openConfirmedFindings: 0,
     lastInventoryScanAt: null,
     lastFindingImportAt: recentFindingImport,
     now,
-  }).status, 'not_assessed')
+  })
+  assert.equal(missingInventory.status, 'not_assessed')
 
-  assert.equal(deriveHostVulnerabilityAssessmentStatus({
+  const missingFindingImport = deriveHostVulnerabilityAssessmentStatus({
     openConfirmedFindings: 0,
     lastInventoryScanAt: recentInventory,
     lastFindingImportAt: null,
     now,
-  }).status, 'not_assessed')
+  })
+  assert.equal(missingFindingImport.status, 'not_assessed')
+  assert.equal(missingFindingImport.reason, 'CT-CVE has not imported vulnerability findings into CT Ops yet.')
 })
 
 test('host assessment is stale when inventory or finding import data is too old', () => {

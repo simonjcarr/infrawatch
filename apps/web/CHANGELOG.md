@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.0...web/v0.94.1) (2026-05-01)
+
+
+### Bug Fixes
+
+* **web:** release cve cleanup ([#839](https://github.com/carrtech-dev/ct-ops/issues/839)) ([6cd1b0c](https://github.com/carrtech-dev/ct-ops/commit/6cd1b0c9e6805d47379b7fac722aeaffc6b6a87b))
+
 ## [0.94.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.93.0...web/v0.94.0) (2026-05-01)
 
 

@@ -73,7 +73,7 @@ These charts help you quickly assess fleet homogeneity and identify hosts that h
 
 ## Vulnerabilities
 
-Navigate to **Reports → Vulnerabilities** to see open Linux OS package CVE findings across the fleet. Findings are created by ingest after it downloads vendor/distro advisory feeds and compares them with agent-reported software inventory.
+Navigate to **Reports → Vulnerabilities** to see open Linux OS package CVE findings across the fleet. Findings are imported from CT-CVE after CT Ops exports host and software inventory through the CT-CVE connector.
 
 ### Scope
 
@@ -81,7 +81,7 @@ V1 assesses Linux packages collected from `dpkg`, `rpm`, and `apk`. Agents conti
 
 ### Matching model
 
-CT-Ops uses vendor package feeds for affected-package truth and treats NVD/CISA as enrichment. The matcher does not create findings from fuzzy package-name matches or NVD CPE guesses. A host is marked affected only when its package manager, distro/source package, release metadata, and installed version match an advisory range or fixed-version rule.
+CT-CVE uses vendor package feeds for affected-package truth and treats NVD/CISA as enrichment. CT Ops stores and reports the findings CT-CVE imports; it does not run local feed sync or package matching.
 
 ### Filtering
 

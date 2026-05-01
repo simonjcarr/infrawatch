@@ -379,6 +379,13 @@
       "when": 1777446689877,
       "tag": "0053_bright_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1777627223101,
+      "tag": "0054_heavy_magdalene",
+      "breakpoints": true
     }
   ]
 }

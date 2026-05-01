@@ -639,9 +639,9 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
                         </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Last feed sync</p>
+                        <p className="text-muted-foreground">Last CT-CVE import</p>
                         <p className="font-medium text-foreground">
-                          {formatOptionalDate(vulnerabilityAssessment.lastFeedSyncAt)}
+                          {formatOptionalDate(vulnerabilityAssessment.lastFindingImportAt)}
                         </p>
                       </div>
                     </div>

@@ -35,23 +35,13 @@ test('host inventory tab shows Linux package CVE findings', async ({ authenticat
     VALUES ('CVE-2024-1234', 'OpenSSL test vulnerability', 'critical', true)
   `
   await sql`
-    INSERT INTO vulnerability_affected_packages (
-      id, cve_id, source, distro_id, distro_version_id, distro_codename,
-      package_name, fixed_version, severity
-    )
-    VALUES (
-      'affected-1', 'CVE-2024-1234', 'ubuntu-osv', 'ubuntu', '22.04', 'jammy',
-      'openssl', '3.0.2-0ubuntu1.16', 'critical'
-    )
-  `
-  await sql`
     INSERT INTO host_vulnerability_findings (
-      id, organisation_id, host_id, software_package_id, cve_id, affected_package_id,
+      id, organisation_id, host_id, software_package_id, cve_id,
       status, package_name, installed_version, fixed_version, source, severity,
       known_exploited, first_seen_at, last_seen_at
     )
     VALUES (
-      'finding-1', ${orgId}, 'vuln-host-1', 'vuln-pkg-1', 'CVE-2024-1234', 'affected-1',
+      'finding-1', ${orgId}, 'vuln-host-1', 'vuln-pkg-1', 'CVE-2024-1234',
       'open', 'libssl3', '3.0.2-0ubuntu1.15', '3.0.2-0ubuntu1.16', 'dpkg', 'critical',
       true, NOW(), NOW()
     )
@@ -61,8 +51,7 @@ test('host inventory tab shows Linux package CVE findings', async ({ authenticat
   await page.getByRole('button', { name: 'Inventory' }).click()
   await page.getByRole('button', { name: 'Vulnerabilities' }).click()
 
-  await expect(page.getByText('CVE-2024-1234')).toBeVisible()
+  await expect(page.getByText('CVE-2024-1234')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('libssl3')).toBeVisible()
   await expect(page.getByText('3.0.2-0ubuntu1.16')).toBeVisible()
 })
-

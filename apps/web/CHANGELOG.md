@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.93.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.92.2...web/v0.93.0) (2026-05-01)
+
+
+### Features
+
+* **web:** schedule CT-CVE inventory pushes ([#831](https://github.com/carrtech-dev/ct-ops/issues/831)) ([a7434ab](https://github.com/carrtech-dev/ct-ops/commit/a7434ab2b7282dad1309f1b2f3f21ff01a1c3520))
+
 ## [0.92.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.92.1...web/v0.92.2) (2026-04-30)
 
 

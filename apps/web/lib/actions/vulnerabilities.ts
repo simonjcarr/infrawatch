@@ -10,6 +10,7 @@ import {
   deriveHostVulnerabilityAssessmentStatus,
   type HostVulnerabilityAssessmentStatus,
 } from '@/lib/vulnerabilities/assessment'
+import { getCtCveConnectionStatus } from '@/lib/integrations/ct-cve/connection-status'
 
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low' | 'none' | 'unknown'
 export type VulnerabilityFindingConfidence = 'confirmed' | 'probable' | 'unsupported'
@@ -51,15 +52,6 @@ export interface VulnerabilityFindingRow {
   lastSeenAt: Date
 }
 
-export interface VulnerabilitySyncSource {
-  id: string
-  status: 'pending' | 'success' | 'error'
-  lastAttemptAt: Date | null
-  lastSuccessAt: Date | null
-  lastError: string | null
-  recordsUpserted: number
-}
-
 export interface VulnerabilityReport {
   generatedAt: Date
   summary: {
@@ -71,7 +63,6 @@ export interface VulnerabilityReport {
     fixAvailableCount: number
   }
   findings: VulnerabilityFindingRow[]
-  sources: VulnerabilitySyncSource[]
 }
 
 export interface HostVulnerabilityAssessment {
@@ -83,9 +74,9 @@ export interface HostVulnerabilityAssessment {
   knownExploitedCount: number
   fixAvailableCount: number
   inventoryStale: boolean
-  feedStale: boolean
+  findingImportStale: boolean
   lastInventoryScanAt: Date | null
-  lastFeedSyncAt: Date | null
+  lastFindingImportAt: Date | null
   lastFindingSeenAt: Date | null
   lastAssessedAt: Date | null
 }
@@ -163,18 +154,6 @@ export async function getVulnerabilityReport(
     LIMIT 1000
   `)) as unknown as VulnerabilityFindingRow[]
 
-  const sources = (await db.execute(sql`
-    SELECT
-      id,
-      status,
-      last_attempt_at AS "lastAttemptAt",
-      last_success_at AS "lastSuccessAt",
-      last_error AS "lastError",
-      records_upserted AS "recordsUpserted"
-    FROM vulnerability_sources
-    ORDER BY id ASC
-  `)) as unknown as VulnerabilitySyncSource[]
-
   const hostIds = new Set(findings.map((row) => row.hostId))
   return {
     generatedAt: new Date(),
@@ -187,7 +166,6 @@ export async function getVulnerabilityReport(
       fixAvailableCount: findings.filter((row) => Boolean(row.fixedVersion)).length,
     },
     findings,
-    sources,
   }
 }
 
@@ -249,7 +227,7 @@ export async function getHostVulnerabilityAssessment(
 ): Promise<HostVulnerabilityAssessment> {
   await requireOrgAccess(orgId)
 
-  const [hostRowsRaw, findingRowsRaw, scanRowsRaw, sourceRowsRaw] = await Promise.all([
+  const [hostRowsRaw, findingRowsRaw, scanRowsRaw, connectionStatus] = await Promise.all([
     db.execute(sql`
       SELECT metadata
       FROM hosts
@@ -281,12 +259,7 @@ export async function getHostVulnerabilityAssessment(
       ORDER BY completed_at DESC NULLS LAST, created_at DESC
       LIMIT 1
     `),
-    db.execute(sql`
-      SELECT max(last_success_at) AS "lastFeedSyncAt"
-      FROM vulnerability_sources
-      WHERE status = 'success'
-        AND last_success_at IS NOT NULL
-    `),
+    getCtCveConnectionStatus(orgId, { configured: false }),
   ])
 
   const hostRows = hostRowsRaw as unknown as Array<{ metadata: unknown }>
@@ -299,11 +272,10 @@ export async function getHostVulnerabilityAssessment(
     lastFindingSeenAt: Date | string | null
   }>
   const scanRows = scanRowsRaw as unknown as Array<{ completedAt: Date | string | null }>
-  const sourceRows = sourceRowsRaw as unknown as Array<{ lastFeedSyncAt: Date | string | null }>
 
   const metadata = parseHostMetadata(hostRows[0]?.metadata)
   const lastInventoryScanAt = coerceDate(scanRows[0]?.completedAt) ?? coerceDate(metadata.lastSoftwareScanAt)
-  const lastFeedSyncAt = coerceDate(sourceRows[0]?.lastFeedSyncAt)
+  const lastFindingImportAt = coerceDate(connectionStatus.lastFindingIngestAt)
   const summary = findingRows[0] ?? {
     openConfirmedFindings: 0,
     criticalCount: 0,
@@ -316,7 +288,7 @@ export async function getHostVulnerabilityAssessment(
   const derived = deriveHostVulnerabilityAssessmentStatus({
     openConfirmedFindings: summary.openConfirmedFindings,
     lastInventoryScanAt,
-    lastFeedSyncAt,
+    lastFindingImportAt,
   })
 
   return {
@@ -328,9 +300,9 @@ export async function getHostVulnerabilityAssessment(
     knownExploitedCount: summary.knownExploitedCount,
     fixAvailableCount: summary.fixAvailableCount,
     inventoryStale: derived.inventoryStale,
-    feedStale: derived.feedStale,
+    findingImportStale: derived.findingImportStale,
     lastInventoryScanAt,
-    lastFeedSyncAt,
+    lastFindingImportAt,
     lastFindingSeenAt,
     lastAssessedAt: lastFindingSeenAt ?? lastInventoryScanAt,
   }

@@ -15,6 +15,18 @@
 
 ## What Has Been Built
 
+### Session 93 — Complete CT Ops CVE ownership cleanup
+
+**CT-CVE ownership cleanup** (`apps/web/lib/actions/vulnerabilities.ts`, `apps/web/lib/db/schema/vulnerabilities.ts`)
+- Removed the remaining CT Ops report UI/API dependency on vulnerability source sync status.
+- Switched host vulnerability assessment freshness from local feed sync state to the CT-CVE finding-import timestamp stored by the connector.
+- Added a migration that drops obsolete CT Ops source-state and affected-package match-rule storage while retaining imported CVE/finding storage and reports.
+
+**Validation**
+- Validation run: web migration generation/validation, full web unit suite,
+  web type-check, targeted lint for changed web files, and targeted E2E
+  coverage for host and report vulnerability displays.
+
 ### Session 92 — Remove CT Ops vulnerability source settings
 
 **CT-CVE ownership cleanup** (`apps/web/app/(dashboard)/settings/vulnerabilities/`, `apps/web/lib/actions/vulnerabilities.ts`)

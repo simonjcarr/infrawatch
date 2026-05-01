@@ -3,67 +3,67 @@ export type HostVulnerabilityAssessmentStatus = 'affected' | 'clear' | 'stale' |
 export interface HostVulnerabilityAssessmentInput {
   openConfirmedFindings: number
   lastInventoryScanAt: Date | null
-  lastFeedSyncAt: Date | null
+  lastFindingImportAt: Date | null
   now?: Date
   scanStaleAfterMs?: number
-  feedStaleAfterMs?: number
+  findingImportStaleAfterMs?: number
 }
 
 export interface HostVulnerabilityAssessmentStatusResult {
   status: HostVulnerabilityAssessmentStatus
   reason: string
   inventoryStale: boolean
-  feedStale: boolean
+  findingImportStale: boolean
 }
 
 const DEFAULT_SCAN_STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
-const DEFAULT_FEED_STALE_AFTER_MS = 2 * 24 * 60 * 60 * 1000
+const DEFAULT_FINDING_IMPORT_STALE_AFTER_MS = 2 * 24 * 60 * 60 * 1000
 
 export function deriveHostVulnerabilityAssessmentStatus(
   input: HostVulnerabilityAssessmentInput,
 ): HostVulnerabilityAssessmentStatusResult {
   const now = input.now ?? new Date()
   const scanStaleAfterMs = input.scanStaleAfterMs ?? DEFAULT_SCAN_STALE_AFTER_MS
-  const feedStaleAfterMs = input.feedStaleAfterMs ?? DEFAULT_FEED_STALE_AFTER_MS
+  const findingImportStaleAfterMs = input.findingImportStaleAfterMs ?? DEFAULT_FINDING_IMPORT_STALE_AFTER_MS
 
   if (!input.lastInventoryScanAt) {
     return {
       status: 'not_assessed',
       reason: 'No successful software inventory scan has completed for this host.',
       inventoryStale: false,
-      feedStale: false,
+      findingImportStale: false,
     }
   }
 
-  if (!input.lastFeedSyncAt) {
+  if (!input.lastFindingImportAt) {
     return {
       status: 'not_assessed',
-      reason: 'Vulnerability feeds have not completed a successful sync yet.',
+      reason: 'CT-CVE has not imported vulnerability findings into CT Ops yet.',
       inventoryStale: false,
-      feedStale: false,
+      findingImportStale: false,
     }
   }
 
   const inventoryStale = now.getTime() - input.lastInventoryScanAt.getTime() > scanStaleAfterMs
-  const feedStale = now.getTime() - input.lastFeedSyncAt.getTime() > feedStaleAfterMs
+  const findingImportStale = now.getTime() - input.lastFindingImportAt.getTime() > findingImportStaleAfterMs
 
   if (input.openConfirmedFindings > 0) {
     return {
       status: 'affected',
       reason: 'Confirmed Linux package CVE findings are open for this host.',
       inventoryStale,
-      feedStale,
+      findingImportStale,
     }
   }
 
-  if (inventoryStale || feedStale) {
+  if (inventoryStale || findingImportStale) {
     return {
       status: 'stale',
       reason: inventoryStale
         ? 'The last software inventory scan is stale.'
-        : 'The vulnerability feed data is stale.',
+        : 'The last CT-CVE finding import is stale.',
       inventoryStale,
-      feedStale,
+      findingImportStale,
     }
   }
 
@@ -71,6 +71,6 @@ export function deriveHostVulnerabilityAssessmentStatus(
     status: 'clear',
     reason: 'No confirmed Linux package CVE findings are open for the latest assessed inventory.',
     inventoryStale,
-    feedStale,
+    findingImportStale,
   }
 }

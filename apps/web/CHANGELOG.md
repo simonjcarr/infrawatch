@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.2...web/v0.94.3) (2026-05-02)
+
+
+### Bug Fixes
+
+* **web:** accept postgres env in entrypoint ([#847](https://github.com/carrtech-dev/ct-ops/issues/847)) ([271c05c](https://github.com/carrtech-dev/ct-ops/commit/271c05c46b7ca4fa10d71cadccd0f50659fea54b))
+
 ## [0.94.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.1...web/v0.94.2) (2026-05-02)
 
 

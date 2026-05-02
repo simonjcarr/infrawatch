@@ -228,7 +228,16 @@ gen_cert() {
     echo "ERROR: 'openssl' is required to generate TLS certificates." >&2
     exit 1
   fi
-  mkdir -p "$out_dir"
+  if ! mkdir -p "$out_dir"; then
+    echo "ERROR: could not create TLS directory: $out_dir" >&2
+    exit 1
+  fi
+  if [ ! -w "$out_dir" ]; then
+    echo "ERROR: TLS directory is not writable: $out_dir" >&2
+    echo "Fix ownership or permissions, for example:" >&2
+    echo "  sudo chown -R $(id -u):$(id -g) $out_dir" >&2
+    exit 1
+  fi
 
   local local_ips=""
   if command -v ip >/dev/null 2>&1; then
@@ -239,12 +248,20 @@ gen_cert() {
   local san="DNS:ingest,DNS:localhost,IP:127.0.0.1"
   [ -n "$local_ips" ] && san="${san},${local_ips}"
 
-  openssl req -x509 -newkey rsa:4096 \
+  local openssl_err
+  openssl_err="$(mktemp -t ct-ops-openssl.XXXXXX)"
+  if ! openssl req -x509 -newkey rsa:4096 \
     -keyout "$out_dir/server.key" \
     -out "$out_dir/server.crt" \
     -sha256 -days 365 -nodes \
     -subj "/CN=${cn}" \
-    -addext "subjectAltName=${san}" 2>/dev/null
+    -addext "subjectAltName=${san}" 2>"$openssl_err"; then
+    echo "ERROR: failed to generate TLS certificate in $out_dir" >&2
+    sed 's/^/  /' "$openssl_err" >&2
+    rm -f "$openssl_err"
+    exit 1
+  fi
+  rm -f "$openssl_err"
   chmod 600 "$out_dir/server.key"
   chmod 644 "$out_dir/server.crt"
   echo "Wrote ${out_dir}/server.{crt,key} (CN=${cn}, SANs: ${san})"

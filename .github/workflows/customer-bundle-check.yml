@@ -7,6 +7,7 @@ on:
       - ".github/workflows/customer-bundle-check.yml"
       - "deploy/customer-bundle/**"
       - "deploy/scripts/test-install.sh"
+      - "deploy/scripts/test-start.sh"
       - "deploy/scripts/test-web-entrypoint.sh"
       - "deploy/scripts/test-upgrade.sh"
       - "deploy/scripts/test-support-data.sh"
@@ -62,6 +63,7 @@ jobs:
           set -euo pipefail
           bash -n install.sh
           bash deploy/scripts/test-install.sh
+          bash deploy/scripts/test-start.sh
           bash deploy/scripts/test-web-entrypoint.sh
           bash deploy/scripts/test-upgrade.sh
           bash deploy/scripts/test-support-data.sh

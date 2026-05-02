@@ -264,10 +264,16 @@ install_new_bundle_files() {
 
 refresh_release_image_env_refs() {
   local var new_value current_value
+  local refreshed=()
 
   for var in WEB_IMAGE INGEST_IMAGE; do
     new_value="$(sed -n "s/^${var}=//p" .env.example | head -n1)"
-    if [ -z "$new_value" ] || ! grep -q "^${var}=" .env; then
+    if [ -z "$new_value" ]; then
+      echo "ERROR: upgraded bundle is missing ${var} in .env.example." >&2
+      echo "Refusing to leave this install with stale or unmatched image pins." >&2
+      exit 1
+    fi
+    if ! grep -q "^${var}=" .env; then
       continue
     fi
 
@@ -280,6 +286,7 @@ refresh_release_image_env_refs() {
         ' .env > .env.tmp
         mv .env.tmp .env
         chmod 600 .env
+        refreshed+=("$var")
         ;;
       *)
         echo "WARN: preserving custom ${var} override in .env." >&2
@@ -287,6 +294,10 @@ refresh_release_image_env_refs() {
         ;;
     esac
   done
+
+  if [ ${#refreshed[@]} -gt 0 ]; then
+    echo "Refreshed release-managed image pins in .env: ${refreshed[*]}"
+  fi
 }
 
 start_stack() {

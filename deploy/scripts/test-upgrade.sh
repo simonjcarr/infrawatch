@@ -30,13 +30,25 @@ EOF
 write_bundle() {
   local dir="$1"
   local version="$2"
+  local web_ref ingest_ref
+
+  web_ref="$(printf 'ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d' "${version//[^0-9]/}")"
+  ingest_ref="$(printf 'ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d' "${version//[^0-9]/}")"
 
   mkdir -p "${dir}/ct-ops/deploy/nginx"
-  printf 'services:\n  web:\n    image: example/web:%s\n' "$version" > "${dir}/ct-ops/docker-compose.yml"
+  cat > "${dir}/ct-ops/docker-compose.yml" <<EOF
+services:
+  web:
+    image: ${web_ref}
+  migrate:
+    image: ${web_ref}
+  ingest:
+    image: ${ingest_ref}
+EOF
   {
     printf 'BETTER_AUTH_URL=https://example.test\n'
-    printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' "${version//[^0-9]/}"
-    printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' "${version//[^0-9]/}"
+    printf 'WEB_IMAGE=%s\n' "$web_ref"
+    printf 'INGEST_IMAGE=%s\n' "$ingest_ref"
   } > "${dir}/ct-ops/.env.example"
   printf '# README %s\n' "$version" > "${dir}/ct-ops/README.md"
   printf '#!/usr/bin/env bash\necho start %s\n' "$version" > "${dir}/ct-ops/start.sh"
@@ -87,7 +99,10 @@ main() {
       ./upgrade.sh --from-zip "$bundle_zip" --no-start
   )
 
-  grep -q 'example/web:v9.9.9' "${old_install}/docker-compose.yml"
+  grep -q 'ghcr.io/carrtech-dev/ct-ops/web@sha256:.*999' "${old_install}/docker-compose.yml"
+  grep -q 'ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/docker-compose.yml"
+  grep -q 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:.*999' "${old_install}/.env.example"
+  grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env.example"
   grep -q 'customer-secret=true' "${old_install}/.env"
   grep -q 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:.*999' "${old_install}/.env"
   grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env"

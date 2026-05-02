@@ -86,7 +86,9 @@ binary from your ct-ops server using `AGENT_DOWNLOAD_BASE_URL`.
 
 backs up the current install, downloads the latest release bundle, stops the
 stack without deleting named volumes, installs the new release files in place,
-preserves `.env` and TLS material, and starts the upgraded stack. Database
+preserves operator settings in `.env` and TLS material, refreshes the
+release-managed pinned image references in `.env`, `.env.example`, and
+`docker-compose.yml` as a matched set, and starts the upgraded stack. Database
 migrations run before web and ingest start.
 
 To upgrade to a specific version:
@@ -101,8 +103,9 @@ For air-gapped hosts, copy the new air-gap zip to the server and run:
 ./upgrade.sh --from-zip /path/to/ct-ops-single-v0.3.0-airgap.zip
 ```
 
-Do not edit only one image reference. `web` and `ingest` are released as a
-matched pair in each bundle.
+Do not edit image references by hand for normal upgrades. `upgrade.sh` installs
+the matching `web` and `ingest` image digests from the selected release while
+preserving the existing Docker volumes and customer-owned configuration.
 
 ## Air-gap installs
 

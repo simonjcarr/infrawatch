@@ -2,9 +2,11 @@
 set -e
 
 # Fail fast if critical environment variables are missing.
-# Silent fallbacks (empty DATABASE_URL, empty auth secret, etc.) produce
-# subtle, hard-to-diagnose failures that surface only at first use.
-: "${DATABASE_URL:?DATABASE_URL must be set}"
+# Silent fallbacks (empty auth secret, missing database credentials, etc.)
+# produce subtle, hard-to-diagnose failures that surface only at first use.
+if [ -z "${DATABASE_URL:-}" ]; then
+  : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set when DATABASE_URL is not set}"
+fi
 : "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}"
 : "${BETTER_AUTH_URL:?BETTER_AUTH_URL must be set}"
 

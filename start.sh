@@ -230,7 +230,7 @@ if $DB_ONLY; then
   echo "  INGEST_TLS_CERT=$CERT_DIR/server.crt \\"
   echo "  INGEST_TLS_KEY=$CERT_DIR/server.key \\"
   echo "  INGEST_JWT_KEY_FILE=$SCRIPT_DIR/deploy/dev-ingest-data/jwt_key.pem \\"
-  echo "  DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB} \\"
+  echo "  POSTGRES_USER=$POSTGRES_USER POSTGRES_PASSWORD=<redacted> POSTGRES_HOST=localhost POSTGRES_PORT=$POSTGRES_PORT POSTGRES_DB=$POSTGRES_DB \\"
   echo "  ./dist/ingest"
   echo ""
   echo "Run the Next.js dev server manually:  cd apps/web && pnpm dev"
@@ -259,7 +259,11 @@ echo "Starting ingest service (native process)..."
 INGEST_TLS_CERT="$CERT_DIR/server.crt" \
 INGEST_TLS_KEY="$CERT_DIR/server.key" \
 INGEST_JWT_KEY_FILE="$INGEST_DATA_DIR/jwt_key.pem" \
-DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" \
+POSTGRES_USER="$POSTGRES_USER" \
+POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+POSTGRES_HOST="localhost" \
+POSTGRES_PORT="$POSTGRES_PORT" \
+POSTGRES_DB="$POSTGRES_DB" \
 INGEST_AGENT_DOWNLOAD_BASE_URL="${AGENT_DOWNLOAD_BASE_URL:-http://localhost:3000}" \
 INGEST_RELEASE_MANIFEST_PATH="$SCRIPT_DIR/.release-please-manifest.json" \
 "$SCRIPT_DIR/dist/ingest" &

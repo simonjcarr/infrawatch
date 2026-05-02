@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -242,6 +244,9 @@ func defaults() *Config {
 }
 
 func applyEnv(cfg *Config) {
+	if v := databaseURLFromPostgresEnv(); v != "" {
+		cfg.DatabaseURL = v
+	}
 	if v := os.Getenv("INGEST_DATABASE_URL"); v != "" {
 		cfg.DatabaseURL = v
 	}
@@ -282,6 +287,33 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("INGEST_TERMINAL_TRUSTED_ORIGINS"); v != "" {
 		cfg.Terminal.TrustedOrigins = splitCSV(v)
 	}
+}
+
+func databaseURLFromPostgresEnv() string {
+	password := os.Getenv("POSTGRES_PASSWORD")
+	if password == "" {
+		return ""
+	}
+
+	user := getenvDefault("POSTGRES_USER", "ctops")
+	host := getenvDefault("POSTGRES_HOST", "localhost")
+	port := getenvDefault("POSTGRES_PORT", "5432")
+	database := getenvDefault("POSTGRES_DB", "ctops")
+
+	u := &url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(user, password),
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/" + database,
+	}
+	return u.String()
+}
+
+func getenvDefault(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func splitCSV(raw string) []string {

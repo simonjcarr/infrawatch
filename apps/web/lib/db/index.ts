@@ -2,11 +2,9 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema/index.ts'
 import { runWithOrgDatabaseScope } from './rls.ts'
+import { getDatabaseUrl } from './connection-string.ts'
 
-const connectionString = process.env['DATABASE_URL']
-if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is required')
-}
+const connectionString = getDatabaseUrl()
 
 // Disable prefetch as it is not supported for "transaction" pool mode
 export const client = postgres(connectionString, { prepare: false })

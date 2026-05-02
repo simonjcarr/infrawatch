@@ -3,18 +3,36 @@
 // inside the standalone Docker image without drizzle-kit.
 //
 // Usage: node migrate.js
-// Requires: DATABASE_URL environment variable
+// Requires either DATABASE_URL or POSTGRES_* environment variables.
 
 const { drizzle } = require('drizzle-orm/postgres-js')
 const { migrate } = require('drizzle-orm/postgres-js/migrator')
 const postgres = require('postgres')
 const path = require('path')
 
-async function main() {
-  const connectionString = process.env['DATABASE_URL']
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required')
+function getDatabaseUrl(env = process.env) {
+  if (env['DATABASE_URL']) {
+    return env['DATABASE_URL']
   }
+
+  const user = env['POSTGRES_USER'] || 'ctops'
+  const password = env['POSTGRES_PASSWORD']
+  const host = env['POSTGRES_HOST'] || 'localhost'
+  const port = env['POSTGRES_PORT'] || '5432'
+  const database = env['POSTGRES_DB'] || 'ctops'
+
+  if (!password) {
+    throw new Error('POSTGRES_PASSWORD environment variable is required when DATABASE_URL is not set')
+  }
+
+  const url = new URL(`postgresql://${host}:${port}/${database}`)
+  url.username = user
+  url.password = password
+  return url.toString()
+}
+
+async function main() {
+  const connectionString = getDatabaseUrl()
 
   const client = postgres(connectionString, { prepare: false, max: 1 })
   const db = drizzle(client)

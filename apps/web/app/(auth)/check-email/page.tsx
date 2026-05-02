@@ -19,6 +19,7 @@ function readParam(value: string | string[] | undefined): string | null {
 export default async function CheckEmailPage({ searchParams }: CheckEmailPageProps) {
   const params = await searchParams
   const email = readParam(params.email)
+  const callbackURL = readParam(params.callbackURL)
 
   return (
     <Card>
@@ -37,7 +38,7 @@ export default async function CheckEmailPage({ searchParams }: CheckEmailPagePro
             new verification link.
           </p>
         </div>
-        <VerificationResendForm initialEmail={email} />
+        <VerificationResendForm initialEmail={email} callbackURL={callbackURL} />
       </CardContent>
       <CardFooter>
         <Link href="/login" className="text-sm text-foreground underline underline-offset-4">

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/card'
 import { signIn, signUp } from '@/lib/auth/client'
 import { getInviteByToken } from '@/lib/actions/auth'
+import { getInviteAcceptPath, getInviteLoginPath } from '@/lib/auth/invite-redirects'
 
 const registerSchema = z
   .object({
@@ -68,9 +69,8 @@ export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
 
   async function onSubmit(values: RegisterValues) {
     setServerError(null)
-    const callbackURL = inviteToken
-      ? `/accept-invite?token=${encodeURIComponent(inviteToken)}`
-      : '/onboarding'
+    const inviteAcceptPath = getInviteAcceptPath(inviteToken)
+    const callbackURL = inviteAcceptPath ?? '/onboarding'
     const result = await signUp.email({
       name: values.name,
       email: values.email,
@@ -84,7 +84,9 @@ export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
     }
 
     if (requireEmailVerification) {
-      router.push(`/check-email?email=${encodeURIComponent(values.email)}`)
+      const params = new URLSearchParams({ email: values.email })
+      if (inviteAcceptPath) params.set('callbackURL', inviteAcceptPath)
+      router.push(`/check-email?${params.toString()}`)
       return
     }
 
@@ -168,7 +170,7 @@ export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
           <p className="text-sm text-muted-foreground text-center">
             Already have an account?{' '}
             <Link
-              href="/login"
+              href={getInviteLoginPath(inviteToken)}
               className="text-foreground font-medium underline underline-offset-4"
             >
               Sign in

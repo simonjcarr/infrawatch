@@ -38,26 +38,17 @@ test('community tier does not include enterprise-only features', () => {
   }
 })
 
-test('pro tier is a seat capacity tier and does not add enterprise-only features', () => {
-  for (const feature of enterpriseFeatures) {
-    assert.equal(hasFeature('pro', feature), false, feature)
-  }
-})
-
 test('featuresForTier reflects core community access and enterprise restrictions', () => {
   const communityFeatures = featuresForTier('community')
-  const proFeatures = featuresForTier('pro')
   const enterpriseTierFeatures = featuresForTier('enterprise')
 
   for (const feature of coreFeatures) {
     assert.equal(communityFeatures.includes(feature), true, feature)
-    assert.equal(proFeatures.includes(feature), true, feature)
     assert.equal(enterpriseTierFeatures.includes(feature), true, feature)
   }
 
   for (const feature of enterpriseFeatures) {
     assert.equal(communityFeatures.includes(feature), false, feature)
-    assert.equal(proFeatures.includes(feature), false, feature)
     assert.equal(enterpriseTierFeatures.includes(feature), true, feature)
   }
 })

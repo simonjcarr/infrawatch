@@ -6,11 +6,12 @@ import { requireOrgAdminAccess } from '@/lib/actions/action-auth'
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { organisations, parseOrgMetadata, users } from '@/lib/db/schema'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
 import { encodeActivationToken } from '@/lib/licence-activation-token'
 import { writeAuditEvent } from '@/lib/audit/events'
+import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
 
 const updateOrgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -176,6 +177,87 @@ export async function generateActivationToken(
     return { success: true, token }
   } catch (err) {
     logError('Failed to generate activation token:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
+const freeSeatUsersSchema = z.object({
+  userIds: z.array(z.string()).max(FREE_INCLUDED_USER_SEATS),
+})
+
+export async function updateFreeSeatUsers(
+  orgId: string,
+  userIds: string[],
+): Promise<{ success: true; userIds: string[] } | { error: string }> {
+  let session
+  try {
+    session = await requireOrgAdminAccess(orgId)
+  } catch {
+    return { error: 'You do not have permission to perform this action' }
+  }
+
+  const parsed = freeSeatUsersSchema.safeParse({ userIds })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid free-seat users' }
+  }
+
+  const uniqueUserIds = Array.from(new Set(parsed.data.userIds))
+  if (uniqueUserIds.length > FREE_INCLUDED_USER_SEATS) {
+    return { error: `Select up to ${FREE_INCLUDED_USER_SEATS} included-seat users` }
+  }
+
+  try {
+    const [org, activeUsers] = await Promise.all([
+      db.query.organisations.findFirst({
+        where: eq(organisations.id, orgId),
+        columns: { metadata: true },
+      }),
+      uniqueUserIds.length === 0
+        ? Promise.resolve([])
+        : db.query.users.findMany({
+            where: and(
+              eq(users.organisationId, orgId),
+              eq(users.isActive, true),
+              isNull(users.deletedAt),
+              inArray(users.id, uniqueUserIds),
+            ),
+            columns: { id: true },
+          }),
+    ])
+
+    if (!org) {
+      return { error: 'Organisation not found' }
+    }
+
+    const activeIds = new Set(activeUsers.map((user) => user.id))
+    const invalidUserId = uniqueUserIds.find((userId) => !activeIds.has(userId))
+    if (invalidUserId) {
+      return { error: 'Included-seat users must be active members of this organisation' }
+    }
+
+    const metadata = {
+      ...parseOrgMetadata(org.metadata),
+      freeSeatUserIds: uniqueUserIds,
+    }
+
+    await db
+      .update(organisations)
+      .set({ metadata, updatedAt: new Date() })
+      .where(eq(organisations.id, orgId))
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'licence.free_seats.updated',
+      targetType: 'organisation',
+      targetId: orgId,
+      summary: 'Updated included free-seat users',
+      metadata: { freeSeatUserIds: uniqueUserIds },
+    })
+
+    return { success: true, userIds: uniqueUserIds }
+  } catch (err) {
+    logError('Failed to update free-seat users:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

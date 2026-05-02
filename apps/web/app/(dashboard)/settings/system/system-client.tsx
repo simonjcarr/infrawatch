@@ -62,7 +62,6 @@ interface HealthData {
 
 function tierBadgeVariant(tier: string): 'outline' | 'default' | 'secondary' {
   if (tier === 'enterprise') return 'default'
-  if (tier === 'pro') return 'secondary'
   return 'outline'
 }
 

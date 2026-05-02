@@ -3,7 +3,7 @@ import { createId } from '@paralleldrive/cuid2'
 
 type TestLicenceOptions = {
   orgId: string
-  tier?: 'pro' | 'enterprise'
+  tier?: 'community' | 'enterprise'
   features?: string[]
   maxUsers?: number
   maxHosts?: number
@@ -14,7 +14,7 @@ const LICENCE_AUDIENCE = 'install.carrtech.dev'
 
 export async function issueTestLicence({
   orgId,
-  tier = 'pro',
+  tier = 'community',
   features = [],
   maxUsers = 10,
   maxHosts = 100,

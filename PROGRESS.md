@@ -15,6 +15,19 @@
 
 ## What Has Been Built
 
+### Session 96 — CT-Ops included-seat admission
+
+**Install-bound seat enforcement** (`apps/web/lib/seat-admission.ts`, `apps/web/lib/seat-selection.ts`, `apps/web/lib/auth/session.ts`)
+- Removed Pro as a valid CT-Ops tier; Community now carries core CT-Ops access and Enterprise remains the only feature add-on tier.
+- Missing, expired, invalid, revoked, or non-CT-Ops licences now degrade to Community with 3 included user seats.
+- Added trusted session admission checks so over-capacity users outside the selected seats are blocked from login/API use without being deleted or deactivated.
+- Added deterministic included-seat selection with admin-pinned users, preserving an active super admin where possible, then pinned/admin users, then oldest active users.
+- Added licence settings controls so admins can pin up to 3 included-seat users for expiry fallback.
+- Updated licensing docs and the CT-Ops/CT-CVE product decision record for the 3 included seats, paid extra seats, Enterprise add-on, and expiry behavior.
+
+**Validation**
+- Validation run: `pnpm --dir apps/web type-check`, `pnpm --dir apps/web test:unit`, `pnpm --dir apps/web db:validate`, targeted ESLint for changed web files, and `pnpm --dir apps/web test:e2e tests/e2e/team/invitations.spec.ts`.
+
 ### Session 95 — Customer bundle upgrade helper
 
 **Release bundle upgrades** (`deploy/customer-bundle/upgrade.sh`, `deploy/customer-bundle/README.md`)
@@ -153,7 +166,7 @@
 **Seat enforcement** (`apps/web/lib/actions/seat-enforcement.ts`, `apps/web/lib/licence-seats.ts`)
 - Added shared seat usage calculation for active non-deleted users plus pending unexpired invitations.
 - Enforced `maxUsers` on admin invites, removed-user restoration, invite acceptance, user reactivation, and LDAP auto-provisioning.
-- Preserved compatibility for licences without `maxUsers` by treating them as unlimited until Community seat rules are finalized.
+- Community seat rules are now finalized: missing `maxUsers` falls back to the 3 included seats.
 
 **Validation**
 - Added unit coverage for seat usage calculations and E2E coverage for invite creation and invite acceptance at the seat limit.

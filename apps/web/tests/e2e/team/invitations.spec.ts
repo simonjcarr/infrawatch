@@ -15,11 +15,11 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 }
 
 async function setOrgSeatLimit(sql: ReturnType<typeof getTestDb>, orgId: string, maxUsers: number): Promise<void> {
-  const licenceKey = await issueTestLicence({ orgId, tier: 'pro', maxUsers })
+  const licenceKey = await issueTestLicence({ orgId, tier: 'community', maxUsers })
   await sql`
     UPDATE organisations
     SET licence_key = ${licenceKey},
-        licence_tier = 'pro'
+        licence_tier = 'community'
     WHERE id = ${orgId}
   `
 }
@@ -31,6 +31,64 @@ async function clearOrgLicence(sql: ReturnType<typeof getTestDb>, orgId: string)
         licence_tier = 'community'
     WHERE id = ${orgId}
   `
+}
+
+async function insertActiveMember(
+  sql: ReturnType<typeof getTestDb>,
+  orgId: string,
+  id: string,
+  email: string,
+): Promise<void> {
+  await sql`
+    INSERT INTO "user" (
+      id,
+      name,
+      email,
+      email_verified,
+      organisation_id,
+      role,
+      roles,
+      is_active,
+      deleted_at
+    )
+    VALUES (
+      ${id},
+      ${email},
+      ${email},
+      true,
+      ${orgId},
+      'engineer',
+      '["engineer"]'::jsonb,
+      true,
+      NULL
+    )
+  `
+}
+
+async function countActiveMembers(sql: ReturnType<typeof getTestDb>, orgId: string): Promise<number> {
+  const [row] = await sql<Array<{ count: string }>>`
+    SELECT COUNT(*)::text AS count
+    FROM "user"
+    WHERE organisation_id = ${orgId}
+      AND is_active = true
+      AND deleted_at IS NULL
+  `
+  return Number.parseInt(row?.count ?? '0', 10)
+}
+
+async function ensureAtLeastActiveMembers(
+  sql: ReturnType<typeof getTestDb>,
+  orgId: string,
+  targetCount: number,
+  idPrefix: string,
+): Promise<number> {
+  let activeCount = await countActiveMembers(sql, orgId)
+  for (let index = activeCount; index < targetCount; index += 1) {
+    const id = `${idPrefix}-${index + 1}`
+    await insertActiveMember(sql, orgId, id, `${id}@example.com`)
+    activeCount += 1
+  }
+  return activeCount
 }
 
 test('admin can create and cancel a team invitation', async ({ authenticatedPage: page }) => {
@@ -122,6 +180,53 @@ test('admin cannot create a duplicate pending invitation for the same email addr
   expect(inviteRows[0]?.deleted_at).toBeNull()
 })
 
+test('admin cannot create a fourth user invite on free Community seats', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+  const suffix = Date.now().toString()
+  const inviteeEmail = `community-fourth-seat-${suffix}@example.com`
+
+  await clearOrgLicence(sql, orgId)
+  await ensureAtLeastActiveMembers(sql, orgId, 3, `community-seat-member-${suffix}`)
+
+  await page.goto('/team')
+
+  await expect(page.getByTestId('team-heading')).toBeVisible()
+  await page.getByTestId('team-invite-open').click()
+  await page.getByTestId('team-invite-email').fill(inviteeEmail)
+  await page.getByTestId('team-invite-role-engineer').click()
+  await page.getByTestId('team-invite-submit').click()
+
+  await expect(page.getByText('User seat limit reached. This licence allows 3 users.')).toBeVisible()
+  await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
+})
+
+test('an extra paid seat allows one more active user invitation', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+  const suffix = Date.now().toString()
+  const inviteeEmail = `paid-fourth-seat-${suffix}@example.com`
+
+  try {
+    const activeCount = await ensureAtLeastActiveMembers(sql, orgId, 3, `paid-seat-member-${suffix}`)
+    await setOrgSeatLimit(sql, orgId, activeCount + 1)
+
+    await page.goto('/team')
+
+    await expect(page.getByTestId('team-heading')).toBeVisible()
+    await page.getByTestId('team-invite-open').click()
+    await page.getByTestId('team-invite-email').fill(inviteeEmail)
+    await page.getByTestId('team-invite-role-engineer').click()
+    await page.getByTestId('team-invite-submit').click()
+
+    await expect(page.getByTestId('team-invite-link')).toBeVisible()
+    await page.getByTestId('team-invite-done').click()
+    await expect(page.getByTestId('team-pending-invite-row').filter({ hasText: inviteeEmail })).toBeVisible()
+  } finally {
+    await clearOrgLicence(sql, orgId)
+  }
+})
+
 test('admin cannot create an invitation when user seats are exhausted', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const orgId = await getOrgId(sql)
@@ -157,68 +262,76 @@ test('admin re-inviting a removed user restores their membership instead of crea
   const orgId = await getOrgId(sql)
   const removedEmail = 'restored-member@example.com'
 
-  await sql`
-    INSERT INTO "user" (
-      id,
-      name,
-      email,
-      email_verified,
-      organisation_id,
-      role,
-      roles,
-      is_active,
-      deleted_at
-    )
-    VALUES (
-      'removed-team-member',
-      'Restored Member',
-      ${removedEmail},
-      true,
-      ${orgId},
-      'read_only',
-      '["read_only"]'::jsonb,
-      false,
-      NOW()
-    )
-  `
+  const activeCount = await countActiveMembers(sql, orgId)
 
-  await page.goto('/team')
-  await expect(page.getByTestId('team-heading')).toBeVisible()
+  try {
+    await setOrgSeatLimit(sql, orgId, activeCount + 1)
 
-  await page.getByTestId('team-invite-open').click()
-  await page.getByTestId('team-invite-email').fill(removedEmail)
-  await page.getByTestId('team-invite-role-engineer').click()
-  await page.getByTestId('team-invite-role-read_only').click()
-  await page.getByTestId('team-invite-submit').click()
+    await sql`
+      INSERT INTO "user" (
+        id,
+        name,
+        email,
+        email_verified,
+        organisation_id,
+        role,
+        roles,
+        is_active,
+        deleted_at
+      )
+      VALUES (
+        'removed-team-member',
+        'Restored Member',
+        ${removedEmail},
+        true,
+        ${orgId},
+        'read_only',
+        '["read_only"]'::jsonb,
+        false,
+        NOW()
+      )
+    `
 
-  await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
-  await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Restored Member')
-  await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Engineer')
-  await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Read Only')
-  await expect(page.getByTestId('team-member-status-removed-team-member')).toContainText('Active')
+    await page.goto('/team')
+    await expect(page.getByTestId('team-heading')).toBeVisible()
 
-  const restoredUserRows = await sql<Array<{ role: string; roles: string[]; is_active: boolean; deleted_at: Date | null }>>`
-    SELECT role, roles, is_active, deleted_at
-    FROM "user"
-    WHERE email = ${removedEmail}
-    LIMIT 1
-  `
+    await page.getByTestId('team-invite-open').click()
+    await page.getByTestId('team-invite-email').fill(removedEmail)
+    await page.getByTestId('team-invite-role-engineer').click()
+    await page.getByTestId('team-invite-role-read_only').click()
+    await page.getByTestId('team-invite-submit').click()
 
-  expect(restoredUserRows).toEqual([
-    {
-      role: 'engineer',
-      roles: ['engineer', 'read_only'],
-      is_active: true,
-      deleted_at: null,
-    },
-  ])
+    await expect(page.getByTestId('team-invite-link')).toHaveCount(0)
+    await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Restored Member')
+    await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Engineer')
+    await expect(page.getByTestId('team-member-row-removed-team-member')).toContainText('Read Only')
+    await expect(page.getByTestId('team-member-status-removed-team-member')).toContainText('Active')
 
-  const inviteRows = await sql<Array<{ id: string }>>`
-    SELECT id
-    FROM invitations
-    WHERE organisation_id = ${orgId}
-      AND email = ${removedEmail}
-  `
+    const restoredUserRows = await sql<Array<{ role: string; roles: string[]; is_active: boolean; deleted_at: Date | null }>>`
+      SELECT role, roles, is_active, deleted_at
+      FROM "user"
+      WHERE email = ${removedEmail}
+      LIMIT 1
+    `
 
-  expect(inviteRows).toHaveLength(0)
+    expect(restoredUserRows).toEqual([
+      {
+        role: 'engineer',
+        roles: ['engineer', 'read_only'],
+        is_active: true,
+        deleted_at: null,
+      },
+    ])
+
+    const inviteRows = await sql<Array<{ id: string }>>`
+      SELECT id
+      FROM invitations
+      WHERE organisation_id = ${orgId}
+        AND email = ${removedEmail}
+    `
+
+    expect(inviteRows).toHaveLength(0)
+  } finally {
+    await clearOrgLicence(sql, orgId)
+  }
 })

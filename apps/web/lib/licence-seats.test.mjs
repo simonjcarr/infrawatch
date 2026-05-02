@@ -44,12 +44,13 @@ test('canReserveSeats blocks reservations that would exceed maxUsers', () => {
   assert.equal(formatSeatLimitError(usage), 'User seat limit reached. This licence allows 3 users.')
 })
 
-test('canReserveSeats treats a missing maxUsers claim as unlimited for this compatibility phase', () => {
+test('canReserveSeats falls back to the included Community seats when maxUsers is missing', () => {
   const usage = calculateSeatUsage({
-    activeUsers: 200,
-    pendingInvites: 40,
+    activeUsers: 2,
+    pendingInvites: 1,
   })
 
-  assert.equal(canReserveSeats(usage, 1), true)
-  assert.equal(usage.remainingSeats, undefined)
+  assert.equal(canReserveSeats(usage, 1), false)
+  assert.equal(usage.maxUsers, 3)
+  assert.equal(usage.remainingSeats, 0)
 })

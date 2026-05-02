@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { organisations, parseOrgMetadata, users } from '@/lib/db/schema'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { SettingsClient } from '../settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { getEffectiveLicence } from '@/lib/actions/licence-guard'
@@ -16,9 +16,14 @@ export default async function LicenceSettingsPage() {
   const session = await getRequiredSession()
   const orgId = session.user.organisationId!
 
-  const [org, effectiveLicence, seatUsage] = await Promise.all([
+  const [org, activeUsers, effectiveLicence, seatUsage] = await Promise.all([
     db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+      where: eq(organisations.id, orgId),
+    }),
+    db.query.users.findMany({
+      where: and(eq(users.organisationId, orgId), eq(users.isActive, true), isNull(users.deletedAt)),
+      columns: { id: true, name: true, email: true, role: true, roles: true },
+      orderBy: [asc(users.createdAt), asc(users.email)],
     }),
     getEffectiveLicence(orgId),
     getOrgSeatUsage(orgId),
@@ -48,6 +53,10 @@ export default async function LicenceSettingsPage() {
           expiresAt: effectiveLicence.expiresAt?.toISOString(),
         }}
         seatUsage={seatUsage}
+        freeSeatUsers={{
+          users: activeUsers,
+          selectedUserIds: parseOrgMetadata(org.metadata).freeSeatUserIds ?? [],
+        }}
       />
     </div>
   )

@@ -5,7 +5,8 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 import { validateLicenceKey } from '@/lib/licence'
-import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
+import { featuresForTier, hasFeature, type Feature, type LicenceTier } from '@/lib/features'
+import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
 
 export class LicenceRequiredError extends Error {
   constructor(
@@ -39,11 +40,11 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
   })
 
   if (!org) {
-    return { tier: 'community', features: [] }
+    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
   }
 
   if (!org.licenceKey) {
-    return { tier: 'community', features: [] }
+    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
   }
 
   const result = await validateLicenceKey(org.licenceKey)
@@ -51,18 +52,18 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
     // Invalid or expired keys silently degrade to community. The licenceTier
     // column still reflects what was last saved; the guard trusts only the
     // validated JWT, not the cached column.
-    return { tier: 'community', features: [] }
+    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
   }
 
   if (result.payload.sub !== orgId) {
     // Key belongs to a different organisation — reject it entirely.
-    return { tier: 'community', features: [] }
+    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
   }
 
   return {
     tier: result.payload.tier,
     features: result.payload.features,
-    maxUsers: result.payload.maxUsers,
+    maxUsers: result.payload.maxUsers ?? FREE_INCLUDED_USER_SEATS,
     maxHosts: result.payload.maxHosts,
     licenceId: result.payload.jti,
     expiresAt: new Date(result.payload.exp * 1000),

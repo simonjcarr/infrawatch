@@ -16,6 +16,29 @@ set -euo pipefail
 REPO_OWNER="carrtech-dev"
 REPO_NAME="ct-ops"
 
+latest_web_tag() {
+  local releases_tmp
+  releases_tmp="$(mktemp -t ct-ops.XXXXXX.releases.json)"
+
+  if ! curl -fsSL \
+    -o "$releases_tmp" \
+    "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases?per_page=100"; then
+    rm -f "$releases_tmp"
+    return 1
+  fi
+
+  local tag
+  tag="$(awk -F '"' '/"tag_name":[[:space:]]*"web\/v[0-9][^"]*"/ { print $4; exit }' "$releases_tmp")"
+  rm -f "$releases_tmp"
+
+  if [ -z "$tag" ]; then
+    echo "ERROR: could not find a published web release for ${REPO_OWNER}/${REPO_NAME}." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$tag"
+}
+
 if [ "$(id -u)" = "0" ]; then
   echo "ERROR: do not run this installer as root." >&2
   echo "Run it as the user that will operate ct-ops (must be in the docker group)." >&2
@@ -39,13 +62,20 @@ if [ -d "ct-ops" ]; then
 fi
 
 if [ -n "${CT_OPS_VERSION:-}" ]; then
-  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/web/${CT_OPS_VERSION}/ct-ops-single-${CT_OPS_VERSION}.zip"
+  WEB_TAG="${CT_OPS_VERSION}"
+  if [[ "$WEB_TAG" != web/* ]]; then
+    WEB_TAG="web/${WEB_TAG}"
+  fi
+  VERSION="${WEB_TAG#web/}"
+  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${WEB_TAG}/ct-ops-single-${VERSION}.zip"
   CHECKSUM_URL="${URL}.sha256"
-  echo "Downloading ct-ops ${CT_OPS_VERSION}..."
+  echo "Downloading ct-ops ${VERSION}..."
 else
-  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/ct-ops-single.zip"
+  WEB_TAG="$(latest_web_tag)"
+  VERSION="${WEB_TAG#web/}"
+  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${WEB_TAG}/ct-ops-single.zip"
   CHECKSUM_URL="${URL}.sha256"
-  echo "Downloading the latest ct-ops release..."
+  echo "Downloading the latest ct-ops release (${VERSION})..."
 fi
 
 TMP=$(mktemp -t ct-ops.XXXXXX.zip)

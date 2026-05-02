@@ -40,7 +40,13 @@ if [[ -z "$out" || -z "$url" ]]; then
   exit 2
 fi
 
-if [[ "$url" == *.sha256 ]]; then
+if [[ -n "${MOCK_CURL_LOG:-}" ]]; then
+  printf '%s\n' "$url" >> "$MOCK_CURL_LOG"
+fi
+
+if [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100" ]]; then
+  printf '%s' "${MOCK_RELEASES_JSON}" > "$out"
+elif [[ "$url" == *.sha256 ]]; then
   printf '%s  ct-ops-single.zip\n' "${MOCK_CHECKSUM}" > "$out"
 else
   printf '%s' "${MOCK_PAYLOAD}" > "$out"
@@ -70,6 +76,11 @@ run_match_case() {
   make_mock_bin "$mockbin"
 
   export MOCK_PAYLOAD="verified bundle payload"
+  export MOCK_RELEASES_JSON='[
+    { "tag_name": "ingest/v9.9.9" },
+    { "tag_name": "web/v1.2.3" }
+  ]'
+  export MOCK_CURL_LOG="${workspace}/curl.log"
   export MOCK_CHECKSUM
   MOCK_CHECKSUM="$(printf '%s' "$MOCK_PAYLOAD" | openssl dgst -sha256 | awk '{print $NF}')"
 
@@ -79,6 +90,13 @@ run_match_case() {
   )
 
   test -d "${workspace}/ct-ops"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v1.2.3/ct-ops-single.zip" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v1.2.3/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
+  if grep -Fq "/releases/latest/" "$MOCK_CURL_LOG"; then
+    echo "installer should not use GitHub's repo-wide latest release URL" >&2
+    exit 1
+  fi
+  unset MOCK_CURL_LOG
 }
 
 run_mismatch_case() {
@@ -88,6 +106,7 @@ run_mismatch_case() {
   make_mock_bin "$mockbin"
 
   export MOCK_PAYLOAD="tampered bundle payload"
+  export MOCK_RELEASES_JSON='[{ "tag_name": "web/v1.2.3" }]'
   export MOCK_CHECKSUM="deadbeef"
   export UNZIP_SHOULD_FAIL="1"
 
@@ -115,6 +134,32 @@ run_mismatch_case() {
   unset UNZIP_SHOULD_FAIL
 }
 
+run_pinned_case() {
+  local workspace="$1"
+  local mockbin="${workspace}/mockbin"
+  mkdir -p "$workspace" "$mockbin"
+  make_mock_bin "$mockbin"
+
+  export MOCK_PAYLOAD="verified pinned bundle payload"
+  export MOCK_RELEASES_JSON='[{ "tag_name": "ingest/v9.9.9" }]'
+  export MOCK_CURL_LOG="${workspace}/curl.log"
+  export MOCK_CHECKSUM
+  MOCK_CHECKSUM="$(printf '%s' "$MOCK_PAYLOAD" | openssl dgst -sha256 | awk '{print $NF}')"
+
+  (
+    cd "$workspace"
+    PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" CT_OPS_VERSION=v4.5.6 bash "$INSTALLER"
+  )
+
+  test -d "${workspace}/ct-ops"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v4.5.6/ct-ops-single-v4.5.6.zip" "$MOCK_CURL_LOG"
+  if grep -Fq "api.github.com" "$MOCK_CURL_LOG"; then
+    echo "pinned installs should not query the releases API" >&2
+    exit 1
+  fi
+  unset MOCK_CURL_LOG
+}
+
 main() {
   local tmpdir
   tmpdir="$(mktemp -d)"
@@ -122,6 +167,7 @@ main() {
 
   run_match_case "${tmpdir}/match"
   run_mismatch_case "${tmpdir}/mismatch"
+  run_pinned_case "${tmpdir}/pinned"
   echo "install.sh checksum verification tests passed"
 }
 

@@ -15,6 +15,7 @@ set -euo pipefail
 #   ./start.sh --down      Stop the stack (data is preserved)
 #   ./start.sh --version   Show bundle / app version and licence tier
 #   ./start.sh --help      Show this help and links to docs / support
+#   ./upgrade.sh           Back up this install and upgrade to a new release
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,6 +46,7 @@ Commands:
   ./start.sh --down      Stop the stack (named volumes are preserved)
   ./start.sh --version   Show bundle version, app version and licence tier
   ./start.sh --help      Show this message
+  ./upgrade.sh            Back up this install and upgrade to a new release
   ./generate_support_data  Create a redacted support archive for tickets
 
 Documentation: ${DOCS_URL}

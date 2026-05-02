@@ -15,6 +15,17 @@
 
 ## What Has Been Built
 
+### Session 95 — Customer bundle upgrade helper
+
+**Release bundle upgrades** (`deploy/customer-bundle/upgrade.sh`, `deploy/customer-bundle/README.md`)
+- Added a bundled `upgrade.sh` that backs up the current install, downloads or accepts a local release zip, stops the Compose stack without deleting named volumes, installs the new release files in place, preserves `.env` and TLS material, and restarts through `start.sh`.
+- Added `--version`, `--from-zip`, and `--no-start` options so online, pinned-version, and air-gapped upgrades use the same safety flow.
+- Updated customer bundle and getting-started docs to describe release-pinned images and the upgrade path instead of relying on `:latest`.
+
+**Validation**
+- Added `deploy/scripts/test-upgrade.sh` for the local bundle path, backup creation, stale offline image archive removal, and volume-preserving Compose shutdown.
+- Customer bundle CI now packages and syntax-checks `upgrade.sh`; local validation ran installer, upgrade, support-data, staged-bundle syntax, and Compose image rendering checks.
+
 ### Session 94 — Complete CT-CVE final residue audit
 
 **CT-CVE migration audit** (`docs/ct-cve-final-residue-audit.md`, `docs/ct-cve-migration-plan.md`)

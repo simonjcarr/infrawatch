@@ -33,7 +33,7 @@ $EDITOR .env      # set BETTER_AUTH_URL, AGENT_DOWNLOAD_BASE_URL, etc.
 
 To pin a specific bundle version: `CT_OPS_VERSION=v0.3.0 bash` instead of plain `bash`.
 
-The bundled `start.sh` generates dev TLS certs, generates `BETTER_AUTH_SECRET` if blank, pulls the latest `web`/`ingest`/`db` images from GHCR, and starts the stack. Database migrations run inside the web container automatically on startup.
+The bundled `start.sh` generates dev TLS certs, generates `BETTER_AUTH_SECRET` if blank, pulls the release-pinned `web`/`ingest`/`db` images from GHCR, and starts the stack. Database migrations run inside the web container automatically on startup. Future upgrades are handled by the bundled `./upgrade.sh`, which backs up the current install before replacing release files.
 
 When all three containers show `healthy` in `docker compose ps`, continue from [Create your account](#step-create-your-account). The full quickstart, troubleshooting, and uninstall instructions are in `ct-ops/README.md` inside the bundle.
 

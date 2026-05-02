@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.95.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.3...web/v0.95.0) (2026-05-02)
+
+
+### Features
+
+* **web:** enforce included ct-ops seats ([#850](https://github.com/carrtech-dev/ct-ops/issues/850)) ([362eea8](https://github.com/carrtech-dev/ct-ops/commit/362eea8b32f115d3bda7d2dea2f9254b1f0ec401))
+
 ## [0.94.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.2...web/v0.94.3) (2026-05-02)
 
 

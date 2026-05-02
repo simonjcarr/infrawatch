@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivationToken } from '@/lib/actions/settings'
+import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivationToken, updateFreeSeatUsers } from '@/lib/actions/settings'
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
 import {
@@ -35,6 +35,7 @@ import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput, SmtpRelayT
 import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 import type { LicenceTier } from '@/lib/features'
+import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
 
 const ALL_ROLES = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -82,11 +83,14 @@ interface SettingsClientProps {
     remainingSeats?: number
     maxUsers?: number
   }
+  freeSeatUsers?: {
+    users: Array<{ id: string; name: string; email: string; role: string; roles: string[] }>
+    selectedUserIds: string[]
+  }
 }
 
 function tierBadgeVariant(tier: string): 'outline' | 'default' | 'secondary' {
   if (tier === 'enterprise') return 'default'
-  if (tier === 'pro') return 'secondary'
   return 'outline'
 }
 
@@ -142,6 +146,7 @@ export function SettingsClient({
   description = 'Manage your organisation settings',
   effectiveLicence,
   seatUsage,
+  freeSeatUsers,
 }: SettingsClientProps) {
   const queryClient = useQueryClient()
   const tier = effectiveLicence?.tier ?? (org.licenceTier as LicenceTier)
@@ -167,6 +172,10 @@ export function SettingsClient({
   const [retentionDays, setRetentionDays] = useState(String(org.metricRetentionDays ?? 30))
   const [retentionSaveSuccess, setRetentionSaveSuccess] = useState(false)
   const [retentionError, setRetentionError] = useState<string | null>(null)
+  const [selectedFreeSeatUserIds, setSelectedFreeSeatUserIds] = useState(
+    freeSeatUsers?.selectedUserIds ?? [],
+  )
+  const [freeSeatResult, setFreeSeatResult] = useState<{ success?: boolean; error?: string } | null>(null)
 
   const orgForm = useForm<OrgNameValues>({
     resolver: zodResolver(orgNameSchema),
@@ -202,6 +211,20 @@ export function SettingsClient({
     },
   })
 
+  const freeSeatMutation = useMutation({
+    mutationFn: (userIds: string[]) => updateFreeSeatUsers(org.id, userIds),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setFreeSeatResult({ error: result.error })
+        return
+      }
+      setSelectedFreeSeatUserIds(result.userIds)
+      setFreeSeatResult({ success: true })
+      setTimeout(() => setFreeSeatResult(null), 3000)
+    },
+    onError: () => setFreeSeatResult({ error: 'An unexpected error occurred' }),
+  })
+
   const [activationToken, setActivationToken] = useState<string | null>(null)
   const [activationError, setActivationError] = useState<string | null>(null)
   const [activationCopied, setActivationCopied] = useState(false)
@@ -229,6 +252,16 @@ export function SettingsClient({
     } catch {
       setActivationError('Unable to copy — select the token and copy manually')
     }
+  }
+
+  function toggleFreeSeatUser(userId: string, checked: boolean) {
+    setFreeSeatResult(null)
+    setSelectedFreeSeatUserIds((current) => {
+      if (!checked) return current.filter((id) => id !== userId)
+      if (current.includes(userId)) return current
+      if (current.length >= FREE_INCLUDED_USER_SEATS) return current
+      return [...current, userId]
+    })
   }
 
   const retentionMutation = useMutation({
@@ -1386,6 +1419,65 @@ export function SettingsClient({
             CT Ops Community includes core fleet, reporting, certificate, service-account, terminal, alerting, and task features.
             Paid licences add user-seat capacity, and Enterprise licences add Enterprise-only capabilities.
           </div>
+
+          {isAdmin && freeSeatUsers ? (
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Included free seats</p>
+                <p className="text-xs text-muted-foreground">
+                  Choose up to {FREE_INCLUDED_USER_SEATS} active users who keep access if paid seats expire.
+                  If fewer are selected, CT-Ops fills the rest deterministically and always preserves an admin where possible.
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {freeSeatUsers.users.map((user) => {
+                  const checked = selectedFreeSeatUserIds.includes(user.id)
+                  const disabled = !checked && selectedFreeSeatUserIds.length >= FREE_INCLUDED_USER_SEATS
+                  return (
+                    <label
+                      key={user.id}
+                      className="flex items-start gap-2 rounded-md border bg-background p-2 text-sm"
+                      data-testid={`free-seat-user-${user.id}`}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={disabled || freeSeatMutation.isPending}
+                        onCheckedChange={(value) => toggleFreeSeatUser(user.id, value === true)}
+                        data-testid={`free-seat-user-checkbox-${user.id}`}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium text-foreground">{user.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+
+              {freeSeatUsers.users.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active users are available to pin.</p>
+              ) : null}
+
+              {freeSeatResult?.error ? (
+                <p className="text-xs text-destructive">{freeSeatResult.error}</p>
+              ) : null}
+              {freeSeatResult?.success ? (
+                <p className="text-xs text-green-700">Included free seats saved.</p>
+              ) : null}
+
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => freeSeatMutation.mutate(selectedFreeSeatUserIds)}
+                disabled={freeSeatMutation.isPending}
+                data-testid="free-seat-users-save"
+              >
+                {freeSeatMutation.isPending ? 'Saving…' : 'Save included seats'}
+              </Button>
+            </div>
+          ) : null}
 
           {isAdmin && (
             <div className="rounded-md border bg-muted/30 p-3 space-y-3">

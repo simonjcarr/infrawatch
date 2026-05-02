@@ -11,6 +11,7 @@ import { getBetterAuthSecret } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
 import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
+import { SeatAdmissionError, assertUserCanAccessSeat } from '@/lib/seat-admission'
 
 // 5 attempts per IP per 60 seconds — prevents brute-force and user enumeration
 const ldapRateLimit = createRateLimiter({
@@ -167,6 +168,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      await assertUserCanAccessSeat(user.organisationId!, user.id)
+
       // Create session
       const sessionToken = randomBytes(32).toString('hex')
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
@@ -208,6 +211,12 @@ export async function POST(request: NextRequest) {
       NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
     )
   } catch (err) {
+    if (err instanceof SeatAdmissionError) {
+      return withAuthDelay(
+        requestStart,
+        NextResponse.json({ error: 'User seat limit exceeded' }, { status: 403 }),
+      )
+    }
     const seatLimitMessage = toSeatLimitErrorMessage(err)
     if (seatLimitMessage) {
       return withAuthDelay(

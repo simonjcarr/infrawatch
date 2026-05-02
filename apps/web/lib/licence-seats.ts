@@ -4,6 +4,8 @@ export type SeatUsageInput = {
   maxUsers?: number
 }
 
+export const FREE_INCLUDED_USER_SEATS = 3
+
 export type SeatUsage = SeatUsageInput & {
   usedSeats: number
   remainingSeats?: number
@@ -11,16 +13,17 @@ export type SeatUsage = SeatUsageInput & {
 
 export function calculateSeatUsage(input: SeatUsageInput): SeatUsage {
   const usedSeats = input.activeUsers + input.pendingInvites
+  const maxUsers = input.maxUsers ?? FREE_INCLUDED_USER_SEATS
   return {
     ...input,
+    maxUsers,
     usedSeats,
-    remainingSeats: input.maxUsers === undefined ? undefined : Math.max(input.maxUsers - usedSeats, 0),
+    remainingSeats: Math.max(maxUsers - usedSeats, 0),
   }
 }
 
 export function canReserveSeats(usage: SeatUsage, seats = 1): boolean {
-  if (usage.maxUsers === undefined) return true
-  return usage.usedSeats + seats <= usage.maxUsers
+  return usage.usedSeats + seats <= (usage.maxUsers ?? FREE_INCLUDED_USER_SEATS)
 }
 
 export function formatSeatLimitError(usage: Pick<SeatUsage, 'maxUsers'>): string {

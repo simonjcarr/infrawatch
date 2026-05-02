@@ -22,6 +22,7 @@ export interface SoftwareInventorySettings {
 export interface OrgMetadata {
   defaultCollectionSettings?: HostCollectionSettings
   defaultTags?: Array<{ key: string; value: string }>
+  freeSeatUserIds?: string[]
   terminalEnabled?: boolean
   terminalLoggingEnabled?: boolean
   terminalDirectAccess?: boolean
@@ -62,6 +63,7 @@ const softwareInventorySettingsSchema = z.object({
 export const orgMetadataSchema = z.object({
   defaultCollectionSettings: hostCollectionSettingsSchema.optional().catch(undefined),
   defaultTags: z.array(tagPairSchema).catch([]).optional(),
+  freeSeatUserIds: z.array(z.string()).max(3).catch([]).optional(),
   terminalEnabled: z.boolean().optional().catch(undefined),
   terminalLoggingEnabled: z.boolean().optional().catch(undefined),
   terminalDirectAccess: z.boolean().optional().catch(undefined),

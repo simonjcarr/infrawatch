@@ -243,7 +243,6 @@ function NavGroup({
 
 const TIER_LABEL: Record<LicenceTier, string> = {
   community: 'Community Edition',
-  pro: 'Pro Edition',
   enterprise: 'Enterprise Edition',
 }
 

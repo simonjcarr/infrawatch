@@ -1,10 +1,11 @@
 # Licensing
 
-CT-Ops uses open-source, seat-based licensing. Core CT-Ops functionality is
-available in Community installs; paid CT-Ops tiers are based on user seats, and
-Enterprise adds Enterprise-only capabilities.
+CT-Ops core is free to use with the Community tier. Community includes the core
+operations feature set and 3 included active-user seats. Extra CT-Ops seats are
+sold separately, and Enterprise is an add-on entitlement for Enterprise-only
+capabilities.
 
-## Tiers
+## Tiers And Entitlements
 
 ### Community
 
@@ -19,17 +20,22 @@ Community is open source and includes core CT-Ops functionality:
 - LDAP / Active Directory login and directory lookup
 - Air-gap deployment support
 
-Community capacity is governed by the included user seats for the install.
+Community includes 3 active-user seats for the CT-Ops installation.
 
-### Pro
+### Extra Seats
 
-Pro is the paid CT-Ops tier for teams that need additional user-seat capacity.
-It uses the same core CT-Ops feature set as Community, with a signed licence
-that can carry a `maxUsers` seat limit and expiry date.
+Extra CT-Ops seats increase the active-user allowance beyond the 3 included
+Community seats. For example, a licence with 10 extra seats gives the install a
+`maxUsers` allowance of 13.
+
+Extra seats do not change the CT-Ops tier and do not unlock Enterprise-only
+capabilities.
 
 ### Enterprise
 
-Enterprise is seat-based and includes Enterprise-only capabilities:
+Enterprise is a separate add-on entitlement. It keeps the same seat allowance
+from Community plus any purchased extra seats and unlocks Enterprise-only
+capabilities such as:
 
 - SAML 2.0 single sign-on
 - Advanced RBAC and custom role definitions
@@ -44,7 +50,11 @@ only a convenience and are not the source of authority.
 
 ## Seat Limits
 
-The `maxUsers` licence claim defines the paid user-seat limit.
+The effective `maxUsers` allowance is:
+
+- 3 when no valid CT-Ops seat licence is present.
+- 3 plus the active paid extra-seat quantity when a valid seat licence is
+  present.
 
 Seats are consumed by:
 
@@ -58,11 +68,23 @@ Seats are not consumed by:
 - Expired or accepted invitations
 
 CT-Ops enforces seats on trusted backend flows including invitation creation,
-invite acceptance, user restoration, user reactivation, and LDAP
-auto-provisioning.
+invite acceptance, user restoration, user reactivation, LDAP auto-provisioning,
+and session admission.
 
-Licences without a `maxUsers` claim are treated as unlimited for compatibility
-with earlier licence payloads.
+## Included Seat Pinning
+
+Admins can pin up to 3 active users as the included Community-seat users. These
+users keep access if paid seats expire and the installation falls back to the 3
+included seats.
+
+If fewer than 3 users are pinned, CT-Ops fills the remaining included seats
+deterministically. The fallback preserves at least one active super admin when
+one exists, then other pinned/admin users, then the oldest active users.
+
+When an installation has more active users than its current allowance, users
+outside the admitted seats are not deleted or deactivated. Their login and
+authenticated requests are blocked until seats are renewed, active users are
+reduced, or an admin changes the pinned included-seat assignments.
 
 ## Licence Keys
 
@@ -70,10 +92,10 @@ CT-Ops uses an offline-capable licence model. A licence key is a signed JSON Web
 Token verified locally against the public key bundled with the CT-Ops web
 application. Validation does not require an outbound network connection.
 
-Every paid key can encode:
+Every CT-Ops key can encode:
 
 - Install organisation (`sub`)
-- Tier (`pro` or `enterprise`)
+- Tier (`community` or `enterprise`)
 - User-seat limit (`maxUsers`)
 - Expiry (`exp`)
 - Licence ID (`jti`)
@@ -81,7 +103,7 @@ Every paid key can encode:
 - Customer details for display and support
 
 The legacy `maxHosts` claim may still appear in older keys for compatibility,
-but CT-Ops commercial licensing is moving to user-seat capacity.
+but CT-Ops commercial licensing uses user-seat capacity.
 
 ## Activation
 
@@ -101,10 +123,16 @@ licence key back in.
 
 ## Expiry And Degraded State
 
-When a paid licence expires or becomes invalid, CT-Ops degrades to Community
-without shutting down the install. Core CT-Ops functionality remains available.
+When a paid seat licence expires or becomes invalid, CT-Ops degrades to
+Community with `maxUsers=3`. Core CT-Ops functionality remains available.
 Enterprise-only capabilities are disabled unless a valid Enterprise entitlement
 is present.
+
+For example, if an install has 13 active users and 10 paid extra seats, all 13
+users can log in while the paid seats are active. After the paid seats expire,
+only the 3 pinned or deterministically selected included-seat users can continue
+logging in. The other 10 users remain intact but are blocked from new sessions
+and authenticated requests.
 
 Renew before the expiry date shown in **Settings -> Licence** to avoid losing
 paid seat capacity or Enterprise capabilities.
@@ -130,6 +158,7 @@ The **Settings -> Licence** page shows:
 - Seats remaining
 - Licence expiry
 - Enterprise capability status
+- Included-seat user pinning
 
 If the saved tier in the database disagrees with the validated key, CT-Ops uses
 the validated effective licence for enforcement and display.

@@ -62,8 +62,6 @@ const REVOCATION_REFRESH_MS = 15 * 60 * 1000
 const REVOCATION_RETRY_MS = 5 * 60 * 1000
 const REVOCATION_FETCH_TIMEOUT_MS = 2_000
 
-export type PaidTier = Exclude<LicenceTier, 'community'>
-
 export type LicenceCustomer = {
   name: string
   email: string
@@ -77,7 +75,7 @@ export type LicencePayload = {
   nbf: number
   exp: number
   jti: string
-  tier: PaidTier
+  tier: LicenceTier
   features: Feature[]
   maxUsers?: number
   maxHosts?: number
@@ -103,8 +101,8 @@ type CachedRevocationBundle = {
 let revocationCache: CachedRevocationBundle | null = null
 let revocationInflight: Promise<CachedRevocationBundle | null> | null = null
 
-function isPaidTier(v: unknown): v is PaidTier {
-  return v === 'pro' || v === 'enterprise'
+function isLicenceTier(v: unknown): v is LicenceTier {
+  return v === 'community' || v === 'enterprise'
 }
 
 function isStringArray(v: unknown): v is string[] {
@@ -256,7 +254,8 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
       typ: 'JWT',
     })
 
-    if (!isPaidTier(payload['tier'])) {
+    const tier = payload['tier']
+    if (!isLicenceTier(tier)) {
       return { valid: false, error: 'Invalid licence tier in key' }
     }
     if (typeof payload.sub !== 'string' || !payload.sub) {
@@ -294,7 +293,7 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
         nbf: typeof payload.nbf === 'number' ? payload.nbf : payload.iat,
         exp: payload.exp,
         jti: payload.jti,
-        tier: payload['tier'],
+        tier,
         features,
         maxUsers,
         maxHosts,

@@ -181,11 +181,11 @@ test('invite acceptance rejects when no user seat is available', async ({ page }
   expect(org?.id).toBeTruthy()
 
   try {
-    const licenceKey = await issueTestLicence({ orgId: org!.id, tier: 'pro', maxUsers: 1 })
+    const licenceKey = await issueTestLicence({ orgId: org!.id, tier: 'community', maxUsers: 1 })
     await sql`
       UPDATE organisations
       SET licence_key = ${licenceKey},
-          licence_tier = 'pro'
+          licence_tier = 'community'
       WHERE id = ${org!.id}
     `
 

@@ -8,6 +8,7 @@ import type { User } from '@/lib/db/schema'
 import { requireActiveUser, requireOrgAdmin } from './guards'
 import { EXPIRED_SESSION_LOGIN_PATH } from './redirects'
 import { getPrimaryRole, normalizeAssignedRoles } from './roles'
+import { SEAT_LIMIT_EXCEEDED_PATH, assertUserCanAccessSeat } from '@/lib/seat-admission'
 
 // Re-export User as SessionUser for convenience
 export type { User as SessionUser }
@@ -73,6 +74,14 @@ export async function getRequiredSession(): Promise<RequiredSession> {
     redirect(EXPIRED_SESSION_LOGIN_PATH)
   }
 
+  if (session.user.organisationId) {
+    try {
+      await assertUserCanAccessSeat(session.user.organisationId, session.user.id)
+    } catch {
+      redirect(SEAT_LIMIT_EXCEEDED_PATH)
+    }
+  }
+
   return session
 }
 
@@ -86,6 +95,14 @@ export async function getApiSession(requestHeaders?: Headers): Promise<RequiredS
     requireActiveUser(session.user)
   } catch {
     throw new ApiAuthError(403, 'Forbidden')
+  }
+
+  if (session.user.organisationId) {
+    try {
+      await assertUserCanAccessSeat(session.user.organisationId, session.user.id)
+    } catch {
+      throw new ApiAuthError(403, 'User seat limit exceeded')
+    }
   }
 
   return session

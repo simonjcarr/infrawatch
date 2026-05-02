@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.1...web/v0.94.2) (2026-05-02)
+
+
+### Bug Fixes
+
+* **install:** encode generated database passwords ([#843](https://github.com/carrtech-dev/ct-ops/issues/843)) ([a8ddc88](https://github.com/carrtech-dev/ct-ops/commit/a8ddc88da22886df31ce50bf24fc000528abc476))
+
 ## [0.94.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.0...web/v0.94.1) (2026-05-01)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.1...ingest/v0.8.2) (2026-05-02)
+
+
+### Bug Fixes
+
+* **install:** encode generated database passwords ([#843](https://github.com/carrtech-dev/ct-ops/issues/843)) ([a8ddc88](https://github.com/carrtech-dev/ct-ops/commit/a8ddc88da22886df31ce50bf24fc000528abc476))
+
 ## [0.8.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.0...ingest/v0.8.1) (2026-04-29)
 
 

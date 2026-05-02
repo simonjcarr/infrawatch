@@ -42,7 +42,7 @@ This will:
 1. Generate `BETTER_AUTH_SECRET` if it is still blank
 2. Generate dev TLS certificates under `./deploy/dev-tls/` for the ingest
    service
-3. Pull the latest `web`, `ingest`, and `db` images from GHCR
+3. Pull the release-pinned `web`, `ingest`, and `db` images from GHCR
    (or load `images.tar.gz` if it is present — see *Air-gap installs* below)
 4. Start the stack
 5. A one-shot migration container applies database migrations before web and ingest start
@@ -68,6 +68,7 @@ the external HTTPS port and `9443` to the instance.
 ./start.sh --down     # stop the stack (data is preserved)
 ./start.sh --version  # show bundle version, app version and licence tier
 ./start.sh --help     # links to documentation and support
+./upgrade.sh          # back up this install and upgrade to the latest release
 ./generate_support_data  # create a redacted support archive
 ```
 
@@ -80,13 +81,28 @@ binary from your ct-ops server using `AGENT_DOWNLOAD_BASE_URL`.
 ## Updating
 
 ```sh
-./start.sh
+./upgrade.sh
 ```
 
-re-pulls `:latest` and recreates any containers whose image has changed.
+backs up the current install, downloads the latest release bundle, stops the
+stack without deleting named volumes, installs the new release files in place,
+preserves `.env` and TLS material, and starts the upgraded stack. Database
+migrations run before web and ingest start.
 
-To pin to a specific image version instead of `:latest`, set `WEB_IMAGE`
-and `INGEST_IMAGE` in `.env` (see commented examples in `.env.example`).
+To upgrade to a specific version:
+
+```sh
+./upgrade.sh --version v0.3.0
+```
+
+For air-gapped hosts, copy the new air-gap zip to the server and run:
+
+```sh
+./upgrade.sh --from-zip /path/to/ct-ops-single-v0.3.0-airgap.zip
+```
+
+Do not edit only one image reference. `web` and `ingest` are released as a
+matched pair in each bundle.
 
 ## Air-gap installs
 

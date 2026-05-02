@@ -9,9 +9,10 @@ import { EMAIL_VERIFICATION_RESEND_SENT_MESSAGE } from '@/lib/auth/email-verific
 
 type VerificationResendFormProps = {
   initialEmail?: string | null
+  callbackURL?: string | null
 }
 
-export function VerificationResendForm({ initialEmail }: VerificationResendFormProps) {
+export function VerificationResendForm({ initialEmail, callbackURL }: VerificationResendFormProps) {
   const [email, setEmail] = useState(initialEmail ?? '')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
@@ -31,7 +32,7 @@ export function VerificationResendForm({ initialEmail }: VerificationResendFormP
         body: JSON.stringify({
           email,
           password,
-          callbackURL: '/dashboard',
+          callbackURL: callbackURL ?? '/dashboard',
         }),
       })
       const data = await res.json().catch(() => null) as { message?: string } | null

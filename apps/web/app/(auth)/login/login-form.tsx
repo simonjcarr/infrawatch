@@ -11,6 +11,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { signIn } from '@/lib/auth/client'
+import {
+  getInviteAcceptPath,
+  getInviteRegisterPath,
+} from '@/lib/auth/invite-redirects'
 
 const localLoginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -27,6 +31,7 @@ type DomainLoginValues = z.infer<typeof domainLoginSchema>
 
 interface LoginFormProps {
   ldapLoginEnabled?: boolean
+  inviteToken?: string | null
   notice?: string | null
 }
 
@@ -34,8 +39,9 @@ function isEmailNotVerifiedError(message: string, code?: string): boolean {
   return code === 'EMAIL_NOT_VERIFIED' || message.toLowerCase().includes('email not verified')
 }
 
-export function LoginForm({ ldapLoginEnabled = false, notice = null }: LoginFormProps) {
+export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice = null }: LoginFormProps) {
   const router = useRouter()
+  const inviteAcceptPath = getInviteAcceptPath(inviteToken)
   const [serverError, setServerError] = useState<string | null>(null)
   const [canResendVerification, setCanResendVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
@@ -67,7 +73,7 @@ export function LoginForm({ ldapLoginEnabled = false, notice = null }: LoginForm
       return
     }
 
-    router.push('/dashboard')
+    router.push(inviteAcceptPath ?? '/dashboard')
   }
 
   async function onDomainSubmit(values: DomainLoginValues) {
@@ -169,7 +175,10 @@ export function LoginForm({ ldapLoginEnabled = false, notice = null }: LoginForm
                   size="sm"
                 >
                   <Link
-                    href={`/check-email${verificationEmail ? `?email=${encodeURIComponent(verificationEmail)}` : ''}`}
+                    href={`/check-email?${new URLSearchParams({
+                      ...(verificationEmail ? { email: verificationEmail } : {}),
+                      ...(inviteAcceptPath ? { callbackURL: inviteAcceptPath } : {}),
+                    }).toString()}`}
                     data-testid="manage-email-verification"
                   >
                     Manage email verification
@@ -225,7 +234,10 @@ export function LoginForm({ ldapLoginEnabled = false, notice = null }: LoginForm
             </Button>
             <p className="text-sm text-muted-foreground text-center">
               Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-foreground font-medium underline underline-offset-4">
+              <Link
+                href={getInviteRegisterPath(inviteToken)}
+                className="text-foreground font-medium underline underline-offset-4"
+              >
                 Create one
               </Link>
             </p>

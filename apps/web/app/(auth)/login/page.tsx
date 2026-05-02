@@ -7,6 +7,7 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { LoginForm } from './login-form'
 import { hasLdapLoginEnabled } from '@/lib/actions/ldap'
+import { getInviteAcceptPath } from '@/lib/auth/invite-redirects'
 import {
   getAuthenticatedRedirectPath,
   shouldBypassAuthenticatedRedirect,
@@ -27,9 +28,15 @@ function readParam(value: string | string[] | undefined): string | null {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams
+  const inviteToken = readParam(params.invite)
+  const inviteAcceptPath = getInviteAcceptPath(inviteToken)
   const session = await auth.api.getSession({ headers: await headers() })
   if (session && !shouldBypassAuthenticatedRedirect(params)) {
     const user = await db.query.users.findFirst({ where: eq(users.id, session.user.id) })
+    if (inviteAcceptPath && user?.isActive && !user.deletedAt && !user.organisationId) {
+      redirect(inviteAcceptPath)
+    }
+
     const redirectPath = getAuthenticatedRedirectPath(user)
     if (redirectPath) redirect(redirectPath)
   }
@@ -40,6 +47,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <LoginForm
       ldapLoginEnabled={ldapEnabled}
+      inviteToken={inviteToken}
       notice={resetComplete ? 'Your password has been reset. Sign in with your new password.' : null}
     />
   )

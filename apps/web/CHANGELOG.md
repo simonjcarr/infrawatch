@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.95.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.95.0...web/v0.95.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* **auth:** preserve invite redemption during signup ([#852](https://github.com/carrtech-dev/ct-ops/issues/852)) ([fbd3a47](https://github.com/carrtech-dev/ct-ops/commit/fbd3a4712aa60fd1be68c15056abba30855c9f9a))
+
 ## [0.95.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.94.3...web/v0.95.0) (2026-05-02)
 
 

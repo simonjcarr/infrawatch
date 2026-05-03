@@ -15,6 +15,23 @@
 
 ## What Has Been Built
 
+### Session 99 — CT-Passwd implementation coordination plan
+
+**CT-Passwd planning handoff** (`docs/ct-passwd-implementation-plan.md`)
+- Added the CT-Passwd implementation coordination plan for overnight agents,
+  including the required agent operating rules, security model, architecture
+  decisions, task table, MVP acceptance criteria, validation expectations, and
+  handoff log.
+- Locked the agreed CT-Passwd direction: a separate private repository at
+  `git@github.com:simonjcarr/ct-passwd.git`, Dockerized air-gapped deployment,
+  CT-OPS-owned identity/licence/nginx entry point, plugin-owned forms, dedicated
+  hostname routing by default, browser-side zero-knowledge encryption, shared
+  vault key wrapping, and no admin recovery in the MVP.
+
+**Validation**
+- Validation run: `git diff --check` and a targeted Markdown sanity check for
+  balanced fenced code blocks and tab characters.
+
 ### Session 98 — Licence public-key repository integration
 
 **Release key source of truth** (`deploy/scripts/fetch-licence-public-key.sh`, `.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`)

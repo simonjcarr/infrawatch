@@ -5,15 +5,29 @@
 For every task that changes files, agents must complete this checklist unless
 the user explicitly says not to:
 
-1. Create a dedicated Git worktree before editing files.
-2. Make all edits inside that worktree.
+1. Create a new dedicated Git worktree before editing files. Never reuse an
+   existing worktree for new work, even if it appears idle or related.
+2. Make all edits inside the new worktree created for the task.
 3. Run relevant validation.
 4. Commit the changes with a Conventional Commit message.
 5. Push the branch to GitHub.
 6. Open a pull request with a Conventional Commit title.
+7. Monitor the pull request until checks complete and it can merge cleanly.
+8. Merge the pull request into `main`.
+9. Confirm any required release has completed and any required container image or
+   other artifact has been published.
+10. Delete the task worktree folder after the work has landed on `main` and all
+    required release or publishing steps are complete.
 
-Do not stop after local edits. A file-changing task is not complete until the
-pull request exists, unless the user explicitly asked for local-only changes.
+Do not stop after local edits or after opening a pull request. A file-changing
+task is not complete until the code is on `main`, required release and
+publishing work is complete, and the task worktree folder has been deleted,
+unless the user explicitly asked for local-only changes.
+
+If a pull request has errors, failing checks, or merge conflicts, fix the issue
+in a new dedicated worktree and open a new pull request. Repeat this cycle until
+all required code is merged into `main` and any required release or image
+publication is complete.
 
 ## Security Expectations
 
@@ -101,10 +115,15 @@ Rules for using the harness:
 
 ## Pull Requests
 
-After finishing a task, commit the work, push it to GitHub, and create a pull
-request unless the user explicitly asks not to. Always use Conventional Commit
-names for commits and pull request titles so release-please can function
-correctly.
+After finishing the local implementation for a task, commit the work, push it to
+GitHub, create a pull request, monitor it, and merge it into `main` unless the
+user explicitly asks not to. Always use Conventional Commit names for commits
+and pull request titles so release-please can function correctly.
+
+Keep monitoring the pull request until all checks pass and the branch can merge
+without conflict. If checks fail, errors appear, or a merge conflict is detected,
+fix the issue in a new dedicated worktree and create a replacement pull request.
+Do not reuse the failed pull request's worktree for the next attempt.
 
 All pull request titles must use Conventional Commit format because squash merges
 use the PR title as the release-please input.
@@ -140,8 +159,11 @@ what remains outstanding.
 
 ## Completion Cleanup
 
-When work is complete, clean up any temporary worktrees created for the task.
-Only remove a worktree after its changes are committed, pushed, released, and
-published as appropriate for the task, including publication of new container
-images or other release artifacts where relevant. Never delete a worktree that
-contains uncommitted user work or unreleased changes.
+When work is complete, delete the task worktree folder. Every file-changing task
+must finish by removing the dedicated worktree that was created for it.
+
+Only remove a worktree after its changes are committed, pushed, merged into
+`main`, released, and published as appropriate for the task, including
+publication of new container images or other release artifacts where relevant.
+Never delete a worktree that contains uncommitted user work or unreleased
+changes.

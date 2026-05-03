@@ -1,5 +1,5 @@
 import { createHash, createPublicKey } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { importSPKI, jwtVerify } from 'jose'
 import type { Feature, LicenceTier } from './features'
 
@@ -33,30 +33,47 @@ YvAIzi0rDcPBMRFMGm6M7n6lwN/XCPgdXEAzI2z+/PiBAK3suh3jyaxtD0D4FHdt
 EQIDAQAB
 -----END PUBLIC KEY-----`
 
+function bundledPublicKeyPath(): string {
+  return process.env.LICENCE_BUNDLED_PUBLIC_KEY_PATH?.trim() || '/app/apps/web/licence-keys/current.pem'
+}
+
+function rejectDevelopmentKeyInProduction(pem: string, source: string): void {
+  if (process.env.NODE_ENV === 'production' && pem === DEV_PUBLIC_KEY_PEM.trim()) {
+    throw new Error(`${source} points to the development public key in a production environment. Use a valid production verifier key.`)
+  }
+}
+
+function readPublicKeyFile(path: string): string | null {
+  try {
+    if (!existsSync(path)) return null
+    return readFileSync(path, 'utf8').trim()
+  } catch {
+    return null
+  }
+}
+
 export function resolveLicencePublicKeyPem(): string {
   const pathOverride = process.env.LICENCE_PUBLIC_KEY_PATH?.trim()
   if (pathOverride) {
-    const pem = readFileSync(pathOverride, 'utf8').trim()
-    if (process.env.NODE_ENV === 'production' && pem === DEV_PUBLIC_KEY_PEM.trim()) {
-      throw new Error(
-        'LICENCE_PUBLIC_KEY_PATH points to the development public key in a production environment. ' +
-          'Use a valid production verifier key.',
-      )
+    const pem = readPublicKeyFile(pathOverride)
+    if (pem) {
+      rejectDevelopmentKeyInProduction(pem, 'LICENCE_PUBLIC_KEY_PATH')
+      return pem
     }
-    return pem
   }
 
   const override = process.env.LICENCE_PUBLIC_KEY?.trim()
 
   if (override) {
     // Prevent the dev key being smuggled into production via the env var override.
-    if (process.env.NODE_ENV === 'production' && override === DEV_PUBLIC_KEY_PEM.trim()) {
-      throw new Error(
-        'LICENCE_PUBLIC_KEY is set to the development public key in a production environment. ' +
-          'Remove LICENCE_PUBLIC_KEY to use the baked-in production key, or supply a valid production override.',
-      )
-    }
+    rejectDevelopmentKeyInProduction(override, 'LICENCE_PUBLIC_KEY')
     return override
+  }
+
+  const bundledKey = readPublicKeyFile(bundledPublicKeyPath())
+  if (bundledKey) {
+    rejectDevelopmentKeyInProduction(bundledKey, 'Bundled licence public key')
+    return bundledKey
   }
 
   if (process.env.NODE_ENV === 'production') {

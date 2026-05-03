@@ -96,6 +96,9 @@ jobs:
         with:
           images: ${{ env.IMAGE_PREFIX }}/web
 
+      - name: Fetch licence verifier key
+        run: bash deploy/scripts/fetch-licence-public-key.sh deploy/customer-bundle/licence-keys/current.pem
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v7

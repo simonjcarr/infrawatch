@@ -108,6 +108,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # so the image itself must carry the manifest that identifies that release.
 COPY --from=builder --chown=nextjs:nodejs /app/.release-please-manifest.json /app/.release-please-manifest.json
 
+# Current CarrTech licence verifier key fetched from carrtech-dev/licence-public-keys
+# by the release workflow before the image build starts.
+COPY --chown=nextjs:nodejs --chmod=644 deploy/customer-bundle/licence-keys/current.pem ./apps/web/licence-keys/current.pem
+
 # Agent binaries — built fresh in the agent-builder stage so every web image is
 # self-contained. The download route's resolveAgentBinary() checks this directory
 # as a fallback when the operator-managed agent_dist volume is empty and GitHub

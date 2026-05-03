@@ -121,12 +121,13 @@ release files.
 ## Licence verifier key
 
 `licence-keys/current.pem` is the current CarrTech public key used to validate
-newly pasted licence JWTs. When a licence is saved, CT-Ops stores the exact
-public key that validated it in the database and keeps using that stored key for
-that licence, so later image upgrades or key rotations do not invalidate active
-licences.
+newly pasted licence JWTs. The same key is also baked into the web image during
+release. When a licence is saved, CT-Ops stores the exact public key that
+validated it in the database and keeps using that stored key for that licence,
+so later image upgrades or key rotations do not invalidate active licences.
 
-To fetch the latest verifier key without upgrading CT-Ops:
+Connected installs can fetch the latest verifier key from GitHub without a full
+upgrade:
 
 ```sh
 ./refresh_licence_key
@@ -134,9 +135,12 @@ To fetch the latest verifier key without upgrading CT-Ops:
 
 For release engineering, the current public key is published in
 `carrtech-dev/licence-public-keys` at `ct-ops/current.pem`. CT-Ops release
-packaging fetches that file into the customer bundle as
+packaging fetches that file into the web image and customer bundle as
 `licence-keys/current.pem`. CT Portal keeps the private key; never place the
 private key in CT Ops or in a customer bundle.
+
+For air-gapped installs, upgrade CT-Ops to a release built after the CarrTech
+key rotation before activating licences purchased after that rotation.
 
 ## Air-gap installs
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.96.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.0...web/v0.96.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* **web:** trigger licence verifier image release ([#859](https://github.com/carrtech-dev/ct-ops/issues/859)) ([0d01a3c](https://github.com/carrtech-dev/ct-ops/commit/0d01a3c3af3d89208992a8efd4317c938812f3ab))
+
 ## [0.96.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.95.1...web/v0.96.0) (2026-05-03)
 
 

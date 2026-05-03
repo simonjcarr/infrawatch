@@ -293,3 +293,4 @@ project-local command exists, or document that no docs-specific validator exists
 | Date | Agent | Task | Status | PR | Validation | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-05-03 | Codex | 2 | Complete | https://github.com/carrtech-dev/ct-ops/pull/866 | `git diff --check`; targeted Markdown sanity check for balanced fenced code blocks and tab characters. | Initial coordination file created for overnight agents. |
+| 2026-05-03 | Codex | docs clarification | Complete | https://github.com/carrtech-dev/ct-ops/pull/870 | `git diff --check -- docs/ct-passwd-implementation-plan.md`; targeted Markdown sanity check for balanced fenced code blocks and tab/typo scan. | Clarified that CT-Passwd project files and docs must be published to `git@github.com:simonjcarr/ct-passwd.git`. |

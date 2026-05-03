@@ -57,11 +57,16 @@ services:
       # in the agent host's trust store.
       WEB_TLS_CERT: /var/lib/ct-ops/server-tls/server.crt
       CT_OPS_LOADTEST_ADMIN_KEY: ${CT_OPS_LOADTEST_ADMIN_KEY:-}
+      # Latest CarrTech licence verifier key. CT-Ops stores the exact public key
+      # that validates each saved licence, so future image upgrades cannot break
+      # existing licences. This mounted file is used for newly pasted licences.
+      LICENCE_PUBLIC_KEY_PATH: /var/lib/ct-ops/licence-keys/current.pem
     volumes:
       - agent_dist:/var/lib/ct-ops/agent-dist
       # Read-only mount of the nginx-facing server cert so the enrolment
       # bundle route can embed it in agent downloads.
       - ./deploy/tls:/var/lib/ct-ops/server-tls:ro
+      - ./licence-keys:/var/lib/ct-ops/licence-keys:ro
 
   agent-dist-init:
     image: busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662

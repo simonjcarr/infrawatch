@@ -184,8 +184,11 @@ jobs:
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
+          cp deploy/customer-bundle/backup.sh dist/ct-ops/backup.sh
           cp deploy/customer-bundle/upgrade.sh dist/ct-ops/upgrade.sh
+          cp deploy/customer-bundle/refresh_licence_key dist/ct-ops/refresh_licence_key
           cp deploy/customer-bundle/generate_support_data dist/ct-ops/generate_support_data
+          cp -R deploy/customer-bundle/licence-keys dist/ct-ops/licence-keys
           cp deploy/nginx/nginx.conf          dist/ct-ops/deploy/nginx/nginx.conf
           echo "$VERSION" > dist/ct-ops/VERSION
 
@@ -463,7 +466,9 @@ jobs:
           chmod +x dist/ct-ops/start.sh
           bash -n dist/ct-ops/start.sh
 
-          chmod +x dist/ct-ops/upgrade.sh
+          chmod +x dist/ct-ops/backup.sh dist/ct-ops/refresh_licence_key dist/ct-ops/upgrade.sh
+          bash -n dist/ct-ops/backup.sh
+          bash -n dist/ct-ops/refresh_licence_key
           bash -n dist/ct-ops/upgrade.sh
 
           # build-offline-installer.sh — also generated inline. Engineer runs

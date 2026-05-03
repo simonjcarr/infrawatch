@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 UPGRADE_SCRIPT="${REPO_ROOT}/deploy/customer-bundle/upgrade.sh"
+BACKUP_SCRIPT="${REPO_ROOT}/deploy/customer-bundle/backup.sh"
 
 make_mock_bin() {
   local dir="$1"
@@ -13,6 +14,10 @@ make_mock_bin() {
 set -euo pipefail
 
 if [ "$#" -ge 2 ] && [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  exit 0
+fi
+
+if [ "$#" -ge 3 ] && [ "$1" = "compose" ] && [ "$2" = "ps" ]; then
   exit 0
 fi
 
@@ -31,7 +36,7 @@ write_bundle() {
   local dir="$1"
   local version="$2"
 
-  mkdir -p "${dir}/ct-ops/deploy/nginx"
+  mkdir -p "${dir}/ct-ops/deploy/nginx" "${dir}/ct-ops/licence-keys"
   printf 'services:\n  web:\n    image: example/web:%s\n' "$version" > "${dir}/ct-ops/docker-compose.yml"
   {
     printf 'BETTER_AUTH_URL=https://example.test\n'
@@ -40,13 +45,18 @@ write_bundle() {
   } > "${dir}/ct-ops/.env.example"
   printf '# README %s\n' "$version" > "${dir}/ct-ops/README.md"
   printf '#!/usr/bin/env bash\necho start %s\n' "$version" > "${dir}/ct-ops/start.sh"
+  cp "$BACKUP_SCRIPT" "${dir}/ct-ops/backup.sh"
   printf '#!/usr/bin/env bash\necho offline %s\n' "$version" > "${dir}/ct-ops/build-offline-installer.sh"
+  printf '#!/usr/bin/env bash\necho refresh-key %s\n' "$version" > "${dir}/ct-ops/refresh_licence_key"
   printf '#!/usr/bin/env bash\necho support %s\n' "$version" > "${dir}/ct-ops/generate_support_data"
   cp "$UPGRADE_SCRIPT" "${dir}/ct-ops/upgrade.sh"
   printf '%s\n' "$version" > "${dir}/ct-ops/VERSION"
   printf 'nginx %s\n' "$version" > "${dir}/ct-ops/deploy/nginx/nginx.conf"
+  printf 'public-key-%s\n' "$version" > "${dir}/ct-ops/licence-keys/current.pem"
   chmod +x "${dir}/ct-ops/start.sh" \
+    "${dir}/ct-ops/backup.sh" \
     "${dir}/ct-ops/build-offline-installer.sh" \
+    "${dir}/ct-ops/refresh_licence_key" \
     "${dir}/ct-ops/generate_support_data" \
     "${dir}/ct-ops/upgrade.sh"
 }
@@ -93,6 +103,7 @@ main() {
   grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env"
   grep -q 'tls-cert' "${old_install}/deploy/tls/server.crt"
   grep -q 'dev-cert' "${old_install}/deploy/dev-tls/server.crt"
+  grep -q 'public-key-v9.9.9' "${old_install}/licence-keys/current.pem"
   test ! -f "${old_install}/images.tar.gz"
   grep -q 'docker compose down' "$docker_log"
 

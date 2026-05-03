@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Downloads the latest CarrTech CT-Ops licence verifier public key without
+# upgrading the whole CT-Ops bundle.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+KEY_URL="${CT_OPS_LICENCE_PUBLIC_KEY_URL:-https://licence.carrtech.dev/.well-known/ct-ops-licence-public-key.pem}"
+KEY_DIR="${CT_OPS_LICENCE_KEY_DIR:-${SCRIPT_DIR}/licence-keys}"
+KEY_FILE="${KEY_DIR}/current.pem"
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  cat <<EOF
+CT-Ops — refresh licence verifier key
+
+Usage:
+  ./refresh_licence_key
+
+Environment:
+  CT_OPS_LICENCE_PUBLIC_KEY_URL   Override key URL
+  CT_OPS_LICENCE_KEY_DIR          Override local key directory
+
+The downloaded public key is used only for newly activated licences. Existing
+saved licences keep using the verifier key stored in the CT-Ops database when
+that licence was activated.
+EOF
+  exit 0
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "ERROR: curl is required." >&2
+  exit 1
+fi
+
+tmp="$(mktemp -t ct-ops-licence-key.XXXXXX)"
+trap 'rm -f "$tmp"' EXIT
+
+echo "Downloading latest licence verifier key..."
+curl -fsSL -o "$tmp" "$KEY_URL"
+
+if ! grep -q '^-----BEGIN PUBLIC KEY-----$' "$tmp" || ! grep -q '^-----END PUBLIC KEY-----$' "$tmp"; then
+  echo "ERROR: downloaded file does not look like a PEM public key." >&2
+  exit 1
+fi
+
+mkdir -p "$KEY_DIR"
+cp "$tmp" "$KEY_FILE"
+chmod 644 "$KEY_FILE" 2>/dev/null || true
+
+echo "Updated:"
+echo "  $KEY_FILE"

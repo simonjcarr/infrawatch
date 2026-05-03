@@ -386,6 +386,13 @@
       "when": 1777627223101,
       "tag": "0054_heavy_magdalene",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1777631000000,
+      "tag": "0055_licence_verifier_keys",
+      "breakpoints": true
     }
   ]
 }

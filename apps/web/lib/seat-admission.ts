@@ -20,11 +20,13 @@ export class SeatAdmissionError extends Error {
 async function getSeatLimit(orgId: string): Promise<number> {
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
-    columns: { licenceKey: true },
+    columns: { licenceKey: true, licenceVerifierPublicKey: true },
   })
   if (!org?.licenceKey) return FREE_INCLUDED_USER_SEATS
 
-  const result = await validateLicenceKey(org.licenceKey)
+  const result = await validateLicenceKey(org.licenceKey, {
+    publicKeyPem: org.licenceVerifierPublicKey ?? undefined,
+  })
   if (!result.valid || result.payload.sub !== orgId) {
     return FREE_INCLUDED_USER_SEATS
   }

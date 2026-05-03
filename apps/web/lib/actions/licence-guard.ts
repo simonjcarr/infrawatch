@@ -35,6 +35,7 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
     columns: {
       licenceTier: true,
       licenceKey: true,
+      licenceVerifierPublicKey: true,
     },
     where: eq(organisations.id, orgId),
   })
@@ -47,7 +48,9 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
     return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
   }
 
-  const result = await validateLicenceKey(org.licenceKey)
+  const result = await validateLicenceKey(org.licenceKey, {
+    publicKeyPem: org.licenceVerifierPublicKey ?? undefined,
+  })
   if (!result.valid) {
     // Invalid or expired keys silently degrade to community. The licenceTier
     // column still reflects what was last saved; the guard trusts only the

@@ -69,6 +69,8 @@ the external HTTPS port and `9443` to the instance.
 ./start.sh --version  # show bundle version, app version and licence tier
 ./start.sh --help     # links to documentation and support
 ./upgrade.sh          # back up this install and upgrade to the latest release
+./backup.sh           # create a manual backup archive
+./refresh_licence_key # download the latest licence verifier public key
 ./generate_support_data  # create a redacted support archive
 ```
 
@@ -103,6 +105,37 @@ For air-gapped hosts, copy the new air-gap zip to the server and run:
 
 Do not edit only one image reference. `web` and `ingest` are released as a
 matched pair in each bundle.
+
+## Backups
+
+```sh
+./backup.sh
+```
+
+creates a backup archive next to the install directory by default. It includes
+the local bundle files, `.env`, TLS material, `licence-keys/current.pem`, and a
+database dump when the `db` container is running. The archive contains secrets;
+store it securely. `upgrade.sh` calls this script automatically before replacing
+release files.
+
+## Licence verifier key
+
+`licence-keys/current.pem` is the current CarrTech public key used to validate
+newly pasted licence JWTs. When a licence is saved, CT-Ops stores the exact
+public key that validated it in the database and keeps using that stored key for
+that licence, so later image upgrades or key rotations do not invalidate active
+licences.
+
+To fetch the latest verifier key without upgrading CT-Ops:
+
+```sh
+./refresh_licence_key
+```
+
+For release engineering, the matching public key is placed in the CT-Ops source
+tree at `deploy/customer-bundle/licence-keys/current.pem` before packaging a
+customer bundle. CT Portal keeps the private key; never place the private key in
+CT Ops or in a customer bundle.
 
 ## Air-gap installs
 

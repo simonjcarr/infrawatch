@@ -5,7 +5,8 @@ import type { Feature, LicenceTier } from './features'
 
 // Fallback production public key (RS256) for licence JWTs issued by the
 // official carrtech.dev licence-purchase service. Customer bundles mount the
-// current verifier key from ./licence-keys/current.pem via LICENCE_PUBLIC_KEY_PATH.
+// current verifier key from ./licence-keys/current.pem via LICENCE_PUBLIC_KEY_PATH;
+// upgrade.sh repairs legacy ownership so the shipped key can be refreshed.
 // Release builds also bake the current verifier key into the web image from
 // carrtech-dev/licence-public-keys so air-gapped installs can validate newly
 // issued licences after upgrading CT-Ops.

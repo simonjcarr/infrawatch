@@ -183,8 +183,14 @@ verify_local_bundle_checksum() {
 
 make_backup() {
   if [ ! -x ./backup.sh ]; then
-    echo "ERROR: backup.sh is missing or not executable; refusing to upgrade without a backup." >&2
-    exit 1
+    if [ -x "$NEW_BUNDLE_DIR/backup.sh" ]; then
+      echo "Restoring backup helper from the new release bundle..."
+      cp "$NEW_BUNDLE_DIR/backup.sh" backup.sh
+      chmod +x backup.sh
+    else
+      echo "ERROR: backup.sh is missing or not executable; refusing to upgrade without a backup." >&2
+      exit 1
+    fi
   fi
   echo "Backing up current install..."
   BACKUP_FILE="$(./backup.sh --print-path-only)"
@@ -199,8 +205,10 @@ unpack_new_bundle() {
 
   unzip -q "$BUNDLE_ZIP" -d "$UNPACK_DIR"
   NEW_BUNDLE_DIR="$UNPACK_DIR/ct-ops"
-  if [ ! -f "$NEW_BUNDLE_DIR/docker-compose.yml" ] || [ ! -f "$NEW_BUNDLE_DIR/start.sh" ]; then
-    echo "ERROR: upgrade bundle is missing docker-compose.yml or start.sh." >&2
+  if [ ! -f "$NEW_BUNDLE_DIR/docker-compose.yml" ] \
+    || [ ! -f "$NEW_BUNDLE_DIR/start.sh" ] \
+    || [ ! -f "$NEW_BUNDLE_DIR/backup.sh" ]; then
+    echo "ERROR: upgrade bundle is missing docker-compose.yml, start.sh or backup.sh." >&2
     exit 1
   fi
 }
@@ -320,8 +328,8 @@ else
   download_bundle
 fi
 
-make_backup
 unpack_new_bundle
+make_backup
 stop_stack
 install_new_bundle_files
 refresh_release_image_env_refs

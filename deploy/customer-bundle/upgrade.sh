@@ -218,6 +218,43 @@ stop_stack() {
   docker compose down --remove-orphans >/dev/null 2>&1 || true
 }
 
+ensure_licence_key_path_writable() {
+  if [ ! -f "$NEW_BUNDLE_DIR/licence-keys/current.pem" ]; then
+    return 0
+  fi
+
+  mkdir -p licence-keys
+  if [ -w licence-keys ] && { [ ! -e licence-keys/current.pem ] || [ -w licence-keys/current.pem ]; }; then
+    return 0
+  fi
+
+  if [ -O licence-keys ]; then
+    chmod u+rwx licence-keys
+    if [ -e licence-keys/current.pem ]; then
+      chmod u+rw licence-keys/current.pem
+    fi
+  fi
+
+  if [ -w licence-keys ] && { [ ! -e licence-keys/current.pem ] || [ -w licence-keys/current.pem ]; }; then
+    return 0
+  fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    echo "Repairing licence key directory ownership..."
+    sudo chown -R "$(id -u):$(id -g)" licence-keys
+    chmod u+rwx licence-keys
+    if [ -e licence-keys/current.pem ]; then
+      chmod u+rw licence-keys/current.pem
+    fi
+    return 0
+  fi
+
+  echo "ERROR: licence-keys is not writable, so the upgraded verifier key cannot be installed." >&2
+  echo "Fix ownership, then rerun ./upgrade.sh:" >&2
+  echo "  sudo chown -R $(id -u):$(id -g) licence-keys" >&2
+  exit 1
+}
+
 install_new_bundle_files() {
   echo "Installing new release files..."
 
@@ -330,6 +367,7 @@ fi
 
 unpack_new_bundle
 make_backup
+ensure_licence_key_path_writable
 stop_stack
 install_new_bundle_files
 refresh_release_image_env_refs

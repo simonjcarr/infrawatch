@@ -85,6 +85,8 @@ main() {
   printf 'tls-cert\n' > "${old_install}/deploy/tls/server.crt"
   printf 'dev-cert\n' > "${old_install}/deploy/dev-tls/server.crt"
   printf 'stale image archive\n' > "${old_install}/images.tar.gz"
+  rm -f "${old_install}/licence-keys/current.pem"
+  chmod 500 "${old_install}/licence-keys"
 
   write_bundle "$new_src" "v9.9.9"
   (cd "$new_src" && zip -qr "$bundle_zip" ct-ops)
@@ -104,6 +106,7 @@ main() {
   grep -q 'tls-cert' "${old_install}/deploy/tls/server.crt"
   grep -q 'dev-cert' "${old_install}/deploy/dev-tls/server.crt"
   grep -q 'public-key-v9.9.9' "${old_install}/licence-keys/current.pem"
+  test -w "${old_install}/licence-keys"
   test ! -f "${old_install}/images.tar.gz"
   grep -q 'docker compose down' "$docker_log"
 

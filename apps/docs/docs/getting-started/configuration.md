@@ -29,7 +29,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 
 CT-Ops validates licence JWTs using an RSA public key. Customer bundles mount the current CarrTech verifier key from `./licence-keys/current.pem`; the web image also carries a fallback production key. When an admin saves a licence, CT-Ops stores the exact public key that verified that licence and keeps using it for that stored JWT, so future key rotations or image upgrades do not invalidate active licences.
 
-In the CT-Ops source tree, the release-bundle public key lives at `deploy/customer-bundle/licence-keys/current.pem`. In an installed customer bundle, it lives at `./licence-keys/current.pem` and is mounted read-only into the web container. The private signing key belongs only in CT Portal.
+For releases, the public key source of truth is `carrtech-dev/licence-public-keys` at `ct-ops/current.pem`. CT-Ops release packaging fetches that file into the customer bundle. In an installed customer bundle, it lives at `./licence-keys/current.pem` and is mounted read-only into the web container. The private signing key belongs only in CT Portal.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|

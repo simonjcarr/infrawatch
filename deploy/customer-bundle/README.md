@@ -132,10 +132,11 @@ To fetch the latest verifier key without upgrading CT-Ops:
 ./refresh_licence_key
 ```
 
-For release engineering, the matching public key is placed in the CT-Ops source
-tree at `deploy/customer-bundle/licence-keys/current.pem` before packaging a
-customer bundle. CT Portal keeps the private key; never place the private key in
-CT Ops or in a customer bundle.
+For release engineering, the current public key is published in
+`carrtech-dev/licence-public-keys` at `ct-ops/current.pem`. CT-Ops release
+packaging fetches that file into the customer bundle as
+`licence-keys/current.pem`. CT Portal keeps the private key; never place the
+private key in CT Ops or in a customer bundle.
 
 ## Air-gap installs
 

@@ -188,7 +188,7 @@ jobs:
           cp deploy/customer-bundle/upgrade.sh dist/ct-ops/upgrade.sh
           cp deploy/customer-bundle/refresh_licence_key dist/ct-ops/refresh_licence_key
           cp deploy/customer-bundle/generate_support_data dist/ct-ops/generate_support_data
-          cp -R deploy/customer-bundle/licence-keys dist/ct-ops/licence-keys
+          bash deploy/scripts/fetch-licence-public-key.sh dist/ct-ops/licence-keys/current.pem
           cp deploy/nginx/nginx.conf          dist/ct-ops/deploy/nginx/nginx.conf
           echo "$VERSION" > dist/ct-ops/VERSION
 

@@ -14,19 +14,19 @@ async function getOrg(sql: ReturnType<typeof getTestDb>): Promise<{ id: string; 
   return rows[0]!
 }
 
-test('admin can validate and save a licence key from licence settings', async ({ authenticatedPage: page }) => {
+test('admin can validate and save a seat-capacity licence key from licence settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const org = await getOrg(sql)
   const licenceKey = await issueTestLicence({
     orgId: org.id,
-    tier: 'enterprise',
-    features: ['serviceAccountTracker'],
+    tier: 'community',
+    maxUsers: 8,
   })
 
   await page.goto('/settings/licence')
 
   await expect(page.getByTestId('settings-heading')).toContainText('Organisation')
-  await expect(page.getByText('Current tier:')).toBeVisible()
+  await expect(page.getByText('Current tier', { exact: true })).toBeVisible()
   await expect(page.getByText('Community', { exact: true })).toBeVisible()
 
   await page.getByLabel('Licence key').fill('not-a-real-licence')
@@ -36,7 +36,10 @@ test('admin can validate and save a licence key from licence settings', async ({
   await page.getByLabel('Licence key').fill(licenceKey)
   await page.getByRole('button', { name: 'Validate & save' }).click()
 
-  await expect(page.getByText('Licence activated')).toContainText('Enterprise')
+  await expect(page.getByText('Paid seats activated')).toContainText(
+    'capacity increased from 3 to 8 user seats',
+  )
+  await expect(page.getByTestId('licence-seat-usage')).toContainText('/ 8')
 
   await expect
     .poll(async () => {
@@ -49,7 +52,7 @@ test('admin can validate and save a licence key from licence settings', async ({
       return rows[0] ?? null
     })
     .toEqual({
-      licence_tier: 'enterprise',
+      licence_tier: 'community',
       licence_key: licenceKey,
     })
 })

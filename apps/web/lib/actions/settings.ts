@@ -12,6 +12,7 @@ import { validateLicenceKey } from '@/lib/licence'
 import { encodeActivationToken } from '@/lib/licence-activation-token'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
+import { getTrustedEffectiveLicence } from '@/lib/actions/licence-guard'
 
 const updateOrgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -100,7 +101,13 @@ export async function updateMetricRetention(
 export async function saveLicenceKey(
   orgId: string,
   key: string,
-): Promise<{ success: true; tier: string } | { error: string }> {
+): Promise<{
+  success: true
+  tier: string
+  maxUsers: number
+  previousTier: string
+  previousMaxUsers: number
+} | { error: string }> {
   let session
   try {
     session = await requireOrgAdminAccess(orgId)
@@ -118,10 +125,9 @@ export async function saveLicenceKey(
   }
 
   try {
-    const previous = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
-      columns: { licenceTier: true },
-    })
+    const previousLicence = await getTrustedEffectiveLicence(orgId)
+    const nextMaxUsers = result.payload.maxUsers ?? FREE_INCLUDED_USER_SEATS
+
     await db
       .update(organisations)
       .set({
@@ -141,12 +147,20 @@ export async function saveLicenceKey(
       targetId: orgId,
       summary: `Updated organisation licence to ${result.payload.tier}`,
       metadata: {
-        previousTier: previous?.licenceTier ?? null,
+        previousTier: previousLicence.tier,
         nextTier: result.payload.tier,
+        previousMaxUsers: previousLicence.maxUsers ?? FREE_INCLUDED_USER_SEATS,
+        nextMaxUsers,
       },
     })
 
-    return { success: true, tier: result.payload.tier }
+    return {
+      success: true,
+      tier: result.payload.tier,
+      maxUsers: nextMaxUsers,
+      previousTier: previousLicence.tier,
+      previousMaxUsers: previousLicence.maxUsers ?? FREE_INCLUDED_USER_SEATS,
+    }
   } catch (err) {
     logError('Failed to save licence key:', err)
     return { error: 'An unexpected error occurred' }

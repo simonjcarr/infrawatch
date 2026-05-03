@@ -40,6 +40,7 @@ Paid licence validation uses a signed JWT verified against a bundled public key.
 | [Installation](./getting-started/installation) | Get CT-Ops running in under 5 minutes |
 | [Offline Agent Install Bundle](./getting-started/agent-install-bundle) | Download a portable zip to install agents on air-gapped hosts |
 | [Architecture Overview](./architecture/overview) | Understand how the components fit together |
+| [CT-Passwd Architecture](./architecture/ct-passwd) | Product boundary, launch flow, zero-knowledge model |
 | [Agent Architecture](./architecture/agent) | Registration flow, identity model, self-update |
 | [Ingest Service](./architecture/ingest) | gRPC gateway, JWT issuance, queue |
 | [Deployment Profiles](./architecture/deployment-profiles) | single / standard / HA configurations |

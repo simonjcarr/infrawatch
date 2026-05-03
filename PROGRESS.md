@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 100 — CT-Passwd product architecture docs
+
+**CT-Passwd product boundary and security model** (`docs/ct-passwd-product-architecture.md`, `apps/docs/docs/architecture/ct-passwd.md`)
+- Added the CT-OPS-side CT-Passwd architecture definition covering product
+  ownership boundaries, deployment shape, nginx routing defaults, launch
+  assertion trust flow, zero-knowledge crypto constraints, shared-vault key
+  wrapping, licence-gated invisibility, audit ownership, and the initial threat
+  model.
+- Added a matching published docs page so the docs site now describes how
+  CT-Passwd fits into CT-Ops without exposing implementation detail that belongs
+  in the future private product repository.
+- Added a docs landing-page link for the CT-Passwd architecture page and updated
+  the implementation plan task tracker for Task 1.
+
+**Validation**
+- Validation run: `git diff --check`, targeted Markdown fence/tab sanity checks,
+  `pnpm install --frozen-lockfile`, and `pnpm --dir apps/docs build`.
+
 ### Session 99 — CT-Passwd implementation coordination plan
 
 **CT-Passwd planning handoff** (`docs/ct-passwd-implementation-plan.md`)

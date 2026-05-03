@@ -201,7 +201,7 @@ are not acceptable.
 
 | ID | Task | Repo | Dependencies | Status | Owner | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Create CT-Passwd product architecture docs in CT-OPS | ct-ops | none | In progress | Codex 2026-05-03 21:34 BST |  | Adding internal and published CT-Passwd architecture docs for boundary, routing, zero-knowledge, and threat model. |
+| 1 | Create CT-Passwd product architecture docs in CT-OPS | ct-ops | none | Complete | Codex 2026-05-03 21:34 BST | https://github.com/carrtech-dev/ct-ops/pull/869 | Added internal and published CT-Passwd architecture docs for boundary, routing, zero-knowledge, and threat model. Validation: `git diff --check`, Markdown sanity checks, `pnpm install --frozen-lockfile`, `pnpm --dir apps/docs build`. |
 | 2 | Add CT-Passwd implementation plan file | ct-ops | none | Complete | Codex 2026-05-03 20:53 BST | https://github.com/carrtech-dev/ct-ops/pull/866 | Created this coordination file and seeded the initial handoff log. |
 | 3 | Add shared plugin identity broker design/update | ct-ops | none | Not started |  |  | Align with existing CT-CVE plugin identity direction. |
 | 4 | Add plugin entitlement storage design for CT-Passwd | ct-ops | 3 | Not started |  |  | CT-Passwd hidden unless licensed. |

@@ -1,14 +1,14 @@
+import { createHash, createPublicKey } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { importSPKI, jwtVerify } from 'jose'
 import type { Feature, LicenceTier } from './features'
 
-// Production public key (RS256) — used to verify licence JWTs issued by the
-// official carrtech.dev licence-purchase service. The matching private key
-// lives only on the licence-purchase server (deploy/scripts/licence-prod-private.pem
-// during MVP, KMS / Vault Transit before customer launch).
-//
-// Rotating this key is a breaking change requiring every customer to upgrade
-// the binary. Treat it as a release-signing key — back up the private half in
-// multiple secure locations and never amend it casually.
+// Fallback production public key (RS256) for licence JWTs issued by the
+// official carrtech.dev licence-purchase service. Customer bundles mount the
+// current verifier key from ./licence-keys/current.pem via LICENCE_PUBLIC_KEY_PATH.
+// When a licence is saved, CT-Ops stores the exact verifier key used for that
+// licence and reuses it for future validation, so key rotation does not break
+// active licences after an image upgrade.
 const PROD_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs7wCpDYBtABdwlkDe5Vq
 ATSc3vjvPMvRZouJrvsg/DxWTUMYbvVvhaICXZjgDDl7ztrIS+jvM4SfGfrArQpu
@@ -19,7 +19,7 @@ Uol9h/Lzyomiz808xOIWvemZLeT3DzeeNDcT4GOpKt8aIr+CQ8nsZk9wggd6aWnk
 XwIDAQAB
 -----END PUBLIC KEY-----`
 
-// Development public key — only used when NODE_ENV !== 'production'. The
+// Fallback development public key — only used when NODE_ENV !== 'production'. The
 // matching private key lives at deploy/scripts/licence-dev-private.pem
 // (gitignored) and is used for local end-to-end iteration on the licence
 // issuance flow without exposing the production private key.
@@ -34,6 +34,18 @@ EQIDAQAB
 -----END PUBLIC KEY-----`
 
 export function resolveLicencePublicKeyPem(): string {
+  const pathOverride = process.env.LICENCE_PUBLIC_KEY_PATH?.trim()
+  if (pathOverride) {
+    const pem = readFileSync(pathOverride, 'utf8').trim()
+    if (process.env.NODE_ENV === 'production' && pem === DEV_PUBLIC_KEY_PEM.trim()) {
+      throw new Error(
+        'LICENCE_PUBLIC_KEY_PATH points to the development public key in a production environment. ' +
+          'Use a valid production verifier key.',
+      )
+    }
+    return pem
+  }
+
   const override = process.env.LICENCE_PUBLIC_KEY?.trim()
 
   if (override) {
@@ -83,7 +95,7 @@ export type LicencePayload = {
 }
 
 export type LicenceValidationResult =
-  | { valid: true; payload: LicencePayload }
+  | { valid: true; payload: LicencePayload; verifierPublicKeyPem: string; verifierPublicKeyFingerprint: string }
   | { valid: false; error: string }
 
 type RevocationBundlePayload = {
@@ -242,9 +254,20 @@ export function resetLicenceValidationStateForTests(): void {
   revocationInflight = null
 }
 
-export async function validateLicenceKey(key: string): Promise<LicenceValidationResult> {
+export function fingerprintLicencePublicKey(publicKeyPem: string): string {
+  const key = createPublicKey(publicKeyPem)
+  const der = key.export({ type: 'spki', format: 'der' })
+  return createHash('sha256').update(der).digest('hex')
+}
+
+export async function validateLicenceKey(
+  key: string,
+  options: { publicKeyPem?: string } = {},
+): Promise<LicenceValidationResult> {
   try {
-    const publicKey = await importSPKI(resolveLicencePublicKeyPem(), 'RS256')
+    const verifierPublicKeyPem = options.publicKeyPem?.trim() || resolveLicencePublicKeyPem()
+    const verifierPublicKeyFingerprint = fingerprintLicencePublicKey(verifierPublicKeyPem)
+    const publicKey = await importSPKI(verifierPublicKeyPem, 'RS256')
     const { payload } = await jwtVerify(key, publicKey, {
       algorithms: ['RS256'],
       issuer: LICENCE_ISSUER,
@@ -299,6 +322,8 @@ export async function validateLicenceKey(key: string): Promise<LicenceValidation
         maxHosts,
         customer: rawCustomer,
       },
+      verifierPublicKeyPem,
+      verifierPublicKeyFingerprint,
     }
   } catch (err) {
     if (err instanceof Error) {

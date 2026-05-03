@@ -15,6 +15,21 @@
 
 ## What Has Been Built
 
+### Session 97 — Durable licence verifier key rotation
+
+**Licence verifier continuity** (`apps/web/lib/licence.ts`, `apps/web/lib/actions/settings.ts`, `apps/web/lib/actions/licence-guard.ts`, `apps/web/lib/seat-admission.ts`)
+- Added persisted licence verifier public key storage on the organisation row so each saved licence continues to validate against the public key that originally verified it.
+- Added `LICENCE_PUBLIC_KEY_PATH` support and mounted `./licence-keys/current.pem` into the customer bundle for newly activated licences, with the baked production key retained as a fallback.
+- Added a migration for `licence_verifier_public_key` and `licence_verifier_public_key_fingerprint`.
+
+**Customer bundle backup and key refresh** (`deploy/customer-bundle/backup.sh`, `deploy/customer-bundle/refresh_licence_key`, `deploy/customer-bundle/upgrade.sh`)
+- Split upgrade backups into a standalone `backup.sh` that operators can run manually or schedule.
+- Updated `upgrade.sh` to call `backup.sh` before replacing release files and to carry forward `licence-keys/current.pem`.
+- Added `refresh_licence_key` so connected installs can download the latest CarrTech licence verifier public key without a full CT-Ops upgrade.
+
+**Validation**
+- Validation run: `node --experimental-strip-types --test apps/web/lib/licence.test.mjs`, `pnpm --dir apps/web type-check`, `node scripts/validate-migrations.js`, and `bash deploy/scripts/test-upgrade.sh`.
+
 ### Session 96 — CT-Ops included-seat admission
 
 **Install-bound seat enforcement** (`apps/web/lib/seat-admission.ts`, `apps/web/lib/seat-selection.ts`, `apps/web/lib/auth/session.ts`)

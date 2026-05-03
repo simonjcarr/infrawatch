@@ -11,6 +11,7 @@ import {
 const realFetch = globalThis.fetch
 const realNodeEnv = process.env.NODE_ENV
 const realPublicKey = process.env.LICENCE_PUBLIC_KEY
+const realPublicKeyPath = process.env.LICENCE_PUBLIC_KEY_PATH
 const realRevocationUrl = process.env.LICENCE_REVOCATION_URL
 
 async function createKeyPair() {
@@ -72,6 +73,12 @@ test.afterEach(() => {
     process.env.LICENCE_PUBLIC_KEY = realPublicKey
   }
 
+  if (realPublicKeyPath === undefined) {
+    delete process.env.LICENCE_PUBLIC_KEY_PATH
+  } else {
+    process.env.LICENCE_PUBLIC_KEY_PATH = realPublicKeyPath
+  }
+
   if (realRevocationUrl === undefined) {
     delete process.env.LICENCE_REVOCATION_URL
   } else {
@@ -109,6 +116,24 @@ test('validateLicenceKey preserves positive integer user seat capacity', async (
   assert.equal(result.valid, true)
   assert.equal(result.payload.maxUsers, 25)
   assert.equal(result.payload.maxHosts, 500)
+  assert.equal(result.verifierPublicKeyPem, keys.publicKeyPem)
+  assert.equal(typeof result.verifierPublicKeyFingerprint, 'string')
+})
+
+test('validateLicenceKey can use a stored verifier key instead of the current runtime key', async () => {
+  const oldKeys = await createKeyPair()
+  const newKeys = await createKeyPair()
+  process.env.NODE_ENV = 'production'
+  process.env.LICENCE_PUBLIC_KEY = newKeys.publicKeyPem
+  process.env.LICENCE_REVOCATION_URL = ''
+
+  const key = await signLicence(oldKeys.privateKeyPem)
+  const withoutStoredKey = await validateLicenceKey(key)
+  const withStoredKey = await validateLicenceKey(key, { publicKeyPem: oldKeys.publicKeyPem })
+
+  assert.equal(withoutStoredKey.valid, false)
+  assert.equal(withStoredKey.valid, true)
+  assert.equal(withStoredKey.verifierPublicKeyPem, oldKeys.publicKeyPem)
 })
 
 test('validateLicenceKey ignores invalid capacity claims', async () => {

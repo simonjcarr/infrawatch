@@ -182,31 +182,13 @@ verify_local_bundle_checksum() {
 }
 
 make_backup() {
-  need tar
-  need date
-
-  local parent dirname timestamp version safe_version
-  parent="$(dirname "$SCRIPT_DIR")"
-  dirname="$(basename "$SCRIPT_DIR")"
-  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  version="$(cat VERSION 2>/dev/null || echo unknown)"
-  safe_version="$(printf '%s' "$version" | tr -c 'A-Za-z0-9._-' '_')"
-
-  BACKUP_ROOT="${CT_OPS_BACKUP_DIR:-${parent}/ct-ops-backups}"
-  mkdir -p "$BACKUP_ROOT"
-  chmod 700 "$BACKUP_ROOT" 2>/dev/null || true
-
-  BACKUP_FILE="${BACKUP_ROOT}/${dirname}-${safe_version}-${timestamp}.tar.gz"
-  echo "Backing up current install to:"
+  if [ ! -x ./backup.sh ]; then
+    echo "ERROR: backup.sh is missing or not executable; refusing to upgrade without a backup." >&2
+    exit 1
+  fi
+  echo "Backing up current install..."
+  BACKUP_FILE="$(./backup.sh --print-path-only)"
   echo "  $BACKUP_FILE"
-  (
-    cd "$parent"
-    tar -czf "$BACKUP_FILE" \
-      --exclude "${dirname}/ct-ops-support-data-*.tar.gz" \
-      --exclude "${dirname}/ct-ops-single-*-airgap.zip" \
-      "$dirname"
-  )
-  chmod 600 "$BACKUP_FILE" 2>/dev/null || true
 }
 
 unpack_new_bundle() {
@@ -235,7 +217,9 @@ install_new_bundle_files() {
   cp "$NEW_BUNDLE_DIR/.env.example" .env.example
   cp "$NEW_BUNDLE_DIR/README.md" README.md
   cp "$NEW_BUNDLE_DIR/start.sh" start.sh
+  cp "$NEW_BUNDLE_DIR/backup.sh" backup.sh
   cp "$NEW_BUNDLE_DIR/build-offline-installer.sh" build-offline-installer.sh
+  cp "$NEW_BUNDLE_DIR/refresh_licence_key" refresh_licence_key
   cp "$NEW_BUNDLE_DIR/generate_support_data" generate_support_data
   if [ -f "$NEW_BUNDLE_DIR/upgrade.sh" ]; then
     cp "$NEW_BUNDLE_DIR/upgrade.sh" upgrade.sh
@@ -244,13 +228,18 @@ install_new_bundle_files() {
     cp "$NEW_BUNDLE_DIR/VERSION" VERSION
   fi
 
-  chmod +x start.sh build-offline-installer.sh generate_support_data
+  chmod +x start.sh backup.sh build-offline-installer.sh refresh_licence_key generate_support_data
   if [ -f upgrade.sh ]; then
     chmod +x upgrade.sh
   fi
 
   mkdir -p deploy/nginx
   cp "$NEW_BUNDLE_DIR/deploy/nginx/nginx.conf" deploy/nginx/nginx.conf
+  mkdir -p licence-keys
+  if [ -f "$NEW_BUNDLE_DIR/licence-keys/current.pem" ]; then
+    cp "$NEW_BUNDLE_DIR/licence-keys/current.pem" licence-keys/current.pem
+    chmod 644 licence-keys/current.pem
+  fi
 
   # Preserve operator-owned .env and TLS directories already in this install.
   # For online upgrades, remove any old offline image archive so start.sh pulls

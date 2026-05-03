@@ -27,11 +27,14 @@ All CT-Ops configuration is via environment variables. There are no config files
 
 ### Licence verification
 
-CT-Ops validates licence JWTs using an RSA public key. The production public key for verifying licences purchased from carrtech.dev is **baked into the web image** — there is nothing to configure for standard deployments. In development the server uses a separate built-in dev key, used only when `NODE_ENV !== 'production'`.
+CT-Ops validates licence JWTs using an RSA public key. Customer bundles mount the current CarrTech verifier key from `./licence-keys/current.pem`; the web image also carries a fallback production key. When an admin saves a licence, CT-Ops stores the exact public key that verified that licence and keeps using it for that stored JWT, so future key rotations or image upgrades do not invalidate active licences.
+
+In the CT-Ops source tree, the release-bundle public key lives at `deploy/customer-bundle/licence-keys/current.pem`. In an installed customer bundle, it lives at `./licence-keys/current.pem` and is mounted read-only into the web container. The private signing key belongs only in CT Portal.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `LICENCE_PUBLIC_KEY` | — 🔒 | *(baked-in prod key)* | PEM-encoded RSA public key used to verify licence JWTs. **Do not set this in normal deployments.** Reserved for emergency key rotation and internal QA/staging environments using a non-production keypair. In production, the dev key is explicitly rejected even if supplied here. |
+| `LICENCE_PUBLIC_KEY_PATH` | — 🔒 | `/var/lib/ct-ops/licence-keys/current.pem` in the customer bundle | Path to the current PEM-encoded RSA public key used for newly activated licence JWTs. Existing saved licences keep using the verifier key stored with the licence. |
+| `LICENCE_PUBLIC_KEY` | — 🔒 | *(fallback prod key)* | Inline PEM override used only for internal QA/staging or emergency recovery when a file mount is not available. In production, the dev key is explicitly rejected even if supplied here. |
 | `LICENCE_REVOCATION_URL` | `https://licence.carrtech.dev/.well-known/ct-ops-licence-revocations.jwt` | same | Signed JWT bundle listing revoked licence ids (`jti`). Connected installs refresh it opportunistically; offline installs fall back to expiry-only validation until the endpoint is reachable again. Set to an empty string to disable remote revocation checks. |
 
 ### Example `.env.local` (development)

@@ -127,6 +127,8 @@ export async function saveLicenceKey(
       .set({
         licenceKey: key.trim(),
         licenceTier: result.payload.tier,
+        licenceVerifierPublicKey: result.verifierPublicKeyPem,
+        licenceVerifierPublicKeyFingerprint: result.verifierPublicKeyFingerprint,
         updatedAt: new Date(),
       })
       .where(eq(organisations.id, orgId))

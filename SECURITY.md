@@ -71,7 +71,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [x] **[C-11] Hardcoded development public key used to validate production licence JWTs**
   - Location: `apps/web/lib/licence.ts`
-  - Resolved: the production public key (`PROD_PUBLIC_KEY_PEM`) is now baked into the web image and used whenever `NODE_ENV=production`. The dev key is only used in non-production. Customers verify carrtech.dev-issued licences against the embedded prod key with no configuration.
+  - Resolved: customer bundles mount the current production verifier key from `licence-keys/current.pem`, with a baked production fallback in the web image. CT-Ops stores the verifier key used for each saved licence, so later public-key rotation does not break already-active licence JWTs.
 
 - [ ] **[C-12] Raw SQL interpolation in `updateMetricRetention`**
   - Location: `apps/web/lib/actions/settings.ts:~80, ~90`

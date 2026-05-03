@@ -86,6 +86,8 @@ export const organisations = pgTable('organisations', {
   logoUrl: text('logo_url'),
   licenceTier: text('licence_tier').notNull().default('community'),
   licenceKey: text('licence_key'),
+  licenceVerifierPublicKey: text('licence_verifier_public_key'),
+  licenceVerifierPublicKeyFingerprint: text('licence_verifier_public_key_fingerprint'),
   metricRetentionDays: integer('metric_retention_days').notNull().default(30),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

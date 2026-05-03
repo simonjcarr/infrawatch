@@ -35,14 +35,17 @@ jobs:
           cp .env.example dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
           cp deploy/customer-bundle/start.sh dist/ct-ops/start.sh
+          cp deploy/customer-bundle/backup.sh dist/ct-ops/backup.sh
           cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
+          cp deploy/customer-bundle/refresh_licence_key dist/ct-ops/refresh_licence_key
           cp deploy/customer-bundle/upgrade.sh dist/ct-ops/upgrade.sh
           cp deploy/customer-bundle/generate_support_data dist/ct-ops/generate_support_data
+          cp -R deploy/customer-bundle/licence-keys dist/ct-ops/licence-keys
           cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
           echo "test" > dist/ct-ops/VERSION
           perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
           perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
-          chmod +x dist/ct-ops/start.sh dist/ct-ops/build-offline-installer.sh dist/ct-ops/upgrade.sh dist/ct-ops/generate_support_data
+          chmod +x dist/ct-ops/start.sh dist/ct-ops/backup.sh dist/ct-ops/build-offline-installer.sh dist/ct-ops/refresh_licence_key dist/ct-ops/upgrade.sh dist/ct-ops/generate_support_data
 
       - name: Validate scripts and required files
         working-directory: dist/ct-ops
@@ -51,10 +54,15 @@ jobs:
           test -f docker-compose.yml
           test -f deploy/nginx/nginx.conf
           test -f .env.example
+          test -f licence-keys/current.pem
+          test -x backup.sh
+          test -x refresh_licence_key
           test -x upgrade.sh
           test -x generate_support_data
           bash -n start.sh
+          bash -n backup.sh
           bash -n build-offline-installer.sh
+          bash -n refresh_licence_key
           bash -n upgrade.sh
           bash -n generate_support_data
 

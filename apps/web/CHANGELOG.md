@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.96.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.1...web/v0.96.2) (2026-05-03)
+
+
+### Bug Fixes
+
+* **web:** repair licence key upgrade permissions ([#862](https://github.com/carrtech-dev/ct-ops/issues/862)) ([ef422a4](https://github.com/carrtech-dev/ct-ops/commit/ef422a4c4b59369f41478d6051fe3eacb67e5436))
+
 ## [0.96.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.0...web/v0.96.1) (2026-05-03)
 
 

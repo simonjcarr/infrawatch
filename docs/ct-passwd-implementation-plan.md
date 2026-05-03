@@ -3,10 +3,10 @@
 This is the coordination file for agents building CT-Passwd and the CT-OPS
 integration around it.
 
-CT-Passwd code belongs in the private repository
-`git@github.com:simonjcarr/ct-passwd.git`. CT-OPS integration work belongs in
-this repository. Agents must keep this file current so parallel or overnight
-sessions do not duplicate work.
+CT-Passwd project files and product documentation must be published into the
+dedicated private repository `git@github.com:simonjcarr/ct-passwd.git`. CT-OPS
+integration work belongs in this repository. Agents must keep this file current
+so parallel or overnight sessions do not duplicate work.
 
 ## Agent Operating Rules
 
@@ -19,6 +19,9 @@ Before starting:
 - Change that task to `In progress` with your agent/session name and timestamp
   before editing code.
 - Use a dedicated Git worktree before making file changes.
+- Publish CT-Passwd project files, product docs, application code, package
+  manifests, deployment assets, and release configuration in
+  `git@github.com:simonjcarr/ct-passwd.git`, not in CT-OPS.
 - Use test-first development for new behaviour unless the task is explicitly
   docs-only.
 - Do not work on a task already marked `In progress`.
@@ -41,6 +44,10 @@ Status values:
 
 - CT-Passwd is a separate product repository:
   `git@github.com:simonjcarr/ct-passwd.git`.
+- CT-Passwd application code, product documentation, tests, deployment assets,
+  package configuration, and release automation must live in that dedicated
+  repository. CT-OPS should contain only the integration work needed to licence,
+  launch, proxy, install, and monitor CT-Passwd.
 - CT-Passwd is installed as Docker containers in customer air-gapped networks.
 - CT-OPS is the only product entry point, identity provider, licence gate, and
   nginx reverse-proxy owner.
@@ -206,7 +213,7 @@ are not acceptable.
 | 3 | Add shared plugin identity broker design/update | ct-ops | none | Not started |  |  | Align with existing CT-CVE plugin identity direction. |
 | 4 | Add plugin entitlement storage design for CT-Passwd | ct-ops | 3 | Not started |  |  | CT-Passwd hidden unless licensed. |
 | 5 | Add CT-Passwd nginx reverse-proxy install design | ct-ops | 4 | Not started |  |  | Dedicated hostname default, path fallback documented. |
-| 6 | Bootstrap `simonjcarr/ct-passwd` repository | ct-passwd | 1 | Not started |  |  | Monorepo with API, UI, crypto, db, deploy packages. |
+| 6 | Bootstrap `simonjcarr/ct-passwd` repository | ct-passwd | 1 | Not started |  |  | Publish all CT-Passwd project files and docs into `git@github.com:simonjcarr/ct-passwd.git`; monorepo with API, UI, crypto, db, deploy packages. |
 | 7 | Add CT-Passwd CI, lint, type-check, test, and release skeleton | ct-passwd | 6 | Not started |  |  | Include release-please/container publishing path. |
 | 8 | Add Docker Compose and air-gap deployment skeleton | ct-passwd | 6 | Not started |  |  | API/UI/Postgres initially; split worker later if needed. |
 | 9 | Add database schema and migrations | ct-passwd | 6 | Not started |  |  | Users, vaults, memberships, entries, key wraps, audit, nonces, sessions. |

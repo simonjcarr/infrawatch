@@ -15,6 +15,14 @@
 
 ## What Has Been Built
 
+### Session 98 — Licence public-key repository integration
+
+**Release key source of truth** (`deploy/scripts/fetch-licence-public-key.sh`, `.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`)
+- Added a release helper that fetches and validates `ct-ops/current.pem` from `carrtech-dev/licence-public-keys` before packaging a customer bundle.
+- Updated release and bundle-check workflows to pull the current licence verifier key from the dedicated public-key repository instead of treating the checked-in bundle key as the source of truth.
+- Updated customer docs to describe the public-key repository distribution model while keeping installed keys mounted from `./licence-keys/current.pem`.
+- Extended the web image release path so the same fetched verifier key is baked into the CT-Ops web image, with runtime validation falling back to that bundled key if the customer-bundle mount is missing. Air-gapped installs must upgrade CT-Ops before activating licences signed after a CarrTech key rotation.
+
 ### Session 97 — Durable licence verifier key rotation
 
 **Licence verifier continuity** (`apps/web/lib/licence.ts`, `apps/web/lib/actions/settings.ts`, `apps/web/lib/actions/licence-guard.ts`, `apps/web/lib/seat-admission.ts`)

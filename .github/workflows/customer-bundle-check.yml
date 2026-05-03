@@ -11,6 +11,7 @@ on:
       - "deploy/scripts/test-web-entrypoint.sh"
       - "deploy/scripts/test-upgrade.sh"
       - "deploy/scripts/test-support-data.sh"
+      - "deploy/scripts/fetch-licence-public-key.sh"
       - "deploy/nginx/nginx.conf"
       - "docker-compose.single.yml"
       - "apps/web/entrypoint.sh"
@@ -40,7 +41,7 @@ jobs:
           cp deploy/customer-bundle/refresh_licence_key dist/ct-ops/refresh_licence_key
           cp deploy/customer-bundle/upgrade.sh dist/ct-ops/upgrade.sh
           cp deploy/customer-bundle/generate_support_data dist/ct-ops/generate_support_data
-          cp -R deploy/customer-bundle/licence-keys dist/ct-ops/licence-keys
+          bash deploy/scripts/fetch-licence-public-key.sh dist/ct-ops/licence-keys/current.pem
           cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
           echo "test" > dist/ct-ops/VERSION
           perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml

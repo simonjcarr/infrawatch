@@ -1,5 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, SignJWT } from 'jose'
 
@@ -12,6 +15,7 @@ const realFetch = globalThis.fetch
 const realNodeEnv = process.env.NODE_ENV
 const realPublicKey = process.env.LICENCE_PUBLIC_KEY
 const realPublicKeyPath = process.env.LICENCE_PUBLIC_KEY_PATH
+const realBundledPublicKeyPath = process.env.LICENCE_BUNDLED_PUBLIC_KEY_PATH
 const realRevocationUrl = process.env.LICENCE_REVOCATION_URL
 
 async function createKeyPair() {
@@ -79,6 +83,12 @@ test.afterEach(() => {
     process.env.LICENCE_PUBLIC_KEY_PATH = realPublicKeyPath
   }
 
+  if (realBundledPublicKeyPath === undefined) {
+    delete process.env.LICENCE_BUNDLED_PUBLIC_KEY_PATH
+  } else {
+    process.env.LICENCE_BUNDLED_PUBLIC_KEY_PATH = realBundledPublicKeyPath
+  }
+
   if (realRevocationUrl === undefined) {
     delete process.env.LICENCE_REVOCATION_URL
   } else {
@@ -134,6 +144,23 @@ test('validateLicenceKey can use a stored verifier key instead of the current ru
   assert.equal(withoutStoredKey.valid, false)
   assert.equal(withStoredKey.valid, true)
   assert.equal(withStoredKey.verifierPublicKeyPem, oldKeys.publicKeyPem)
+})
+
+test('validateLicenceKey falls back to the bundled verifier key when the mounted key is missing', async () => {
+  const keys = await createKeyPair()
+  const dir = mkdtempSync(join(tmpdir(), 'ct-ops-licence-key-'))
+  const bundledPath = join(dir, 'current.pem')
+  writeFileSync(bundledPath, keys.publicKeyPem)
+  process.env.NODE_ENV = 'production'
+  process.env.LICENCE_PUBLIC_KEY_PATH = join(dir, 'missing.pem')
+  process.env.LICENCE_BUNDLED_PUBLIC_KEY_PATH = bundledPath
+  process.env.LICENCE_REVOCATION_URL = ''
+
+  const key = await signLicence(keys.privateKeyPem)
+  const result = await validateLicenceKey(key)
+
+  assert.equal(result.valid, true)
+  assert.equal(result.verifierPublicKeyPem, keys.publicKeyPem)
 })
 
 test('validateLicenceKey ignores invalid capacity claims', async () => {

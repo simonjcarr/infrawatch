@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Downloads the latest CarrTech CT-Ops licence verifier public key without
-# upgrading the whole CT-Ops bundle.
+# Downloads the latest CarrTech CT-Ops licence verifier public key from the
+# public GitHub key repository. Air-gapped installs should upgrade CT-Ops
+# instead so the verifier key is carried in the release image and bundle.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-KEY_URL="${CT_OPS_LICENCE_PUBLIC_KEY_URL:-https://licence.carrtech.dev/.well-known/ct-ops-licence-public-key.pem}"
+KEY_URL="${CT_OPS_LICENCE_PUBLIC_KEY_URL:-https://raw.githubusercontent.com/carrtech-dev/licence-public-keys/main/ct-ops/current.pem}"
 KEY_DIR="${CT_OPS_LICENCE_KEY_DIR:-${SCRIPT_DIR}/licence-keys}"
 KEY_FILE="${KEY_DIR}/current.pem"
 
@@ -24,7 +25,8 @@ Environment:
 
 The downloaded public key is used only for newly activated licences. Existing
 saved licences keep using the verifier key stored in the CT-Ops database when
-that licence was activated.
+that licence was activated. Air-gapped installs should upgrade CT-Ops before
+activating licences signed after a CarrTech key rotation.
 EOF
   exit 0
 fi

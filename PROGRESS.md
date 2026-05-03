@@ -17,13 +17,16 @@
 
 ### Session 99 — CT-Passwd implementation coordination plan
 
-**CT-Passwd planning handoff** (`docs/ct-passwd-implementation-plan.md`)
-- Added the CT-Passwd implementation coordination plan for overnight agents,
-  including the required agent operating rules, security model, architecture
+**CT-Passwd planning handoff** (`git@github.com:carrtech-dev/ct-passwd.git`,
+`docs/ct-passwd-implementation-plan.md`)
+- Added the CT-Passwd implementation coordination plan for overnight agents.
+  The plan has now been moved to the dedicated CT-Passwd repository and removed
+  from CT-OPS so CT-Passwd project files and product docs stay with the product.
+  It includes the required agent operating rules, security model, architecture
   decisions, task table, MVP acceptance criteria, validation expectations, and
   handoff log.
 - Locked the agreed CT-Passwd direction: a separate private repository at
-  `git@github.com:simonjcarr/ct-passwd.git`, Dockerized air-gapped deployment,
+  `git@github.com:carrtech-dev/ct-passwd.git`, Dockerized air-gapped deployment,
   CT-OPS-owned identity/licence/nginx entry point, plugin-owned forms, dedicated
   hostname routing by default, browser-side zero-knowledge encryption, shared
   vault key wrapping, and no admin recovery in the MVP.

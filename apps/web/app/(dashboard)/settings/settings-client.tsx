@@ -2,6 +2,7 @@
 
 import type { FormEvent } from 'react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -103,6 +104,41 @@ function formatLicenceDate(value?: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 }
 
+function formatUserSeats(count: number) {
+  return `${count} user ${count === 1 ? 'seat' : 'seats'}`
+}
+
+function formatLicenceActivationMessage(result: {
+  tier?: string
+  maxUsers?: number
+  previousTier?: string
+  previousMaxUsers?: number
+}) {
+  const tierChanged = Boolean(result.tier && result.previousTier && result.tier !== result.previousTier)
+  const seatsChanged =
+    typeof result.maxUsers === 'number' &&
+    typeof result.previousMaxUsers === 'number' &&
+    result.maxUsers !== result.previousMaxUsers
+
+  if (seatsChanged && typeof result.maxUsers === 'number' && typeof result.previousMaxUsers === 'number') {
+    const seatText = `capacity increased from ${result.previousMaxUsers} to ${formatUserSeats(result.maxUsers)}`
+    if (tierChanged) {
+      return `Licence activated — tier upgraded to ${formatTier(result.tier ?? '')} and ${seatText}.`
+    }
+    return `Paid seats activated — ${seatText}.`
+  }
+
+  if (tierChanged) {
+    return `Licence activated — tier upgraded to ${formatTier(result.tier ?? '')}.`
+  }
+
+  if (typeof result.maxUsers === 'number') {
+    return `Licence activated — ${formatUserSeats(result.maxUsers)} available.`
+  }
+
+  return `Licence activated — tier set to ${formatTier(result.tier ?? '')}.`
+}
+
 const RETENTION_OPTIONS = [
   { value: '7', label: '7 days' },
   { value: '14', label: '14 days' },
@@ -148,6 +184,7 @@ export function SettingsClient({
   seatUsage,
   freeSeatUsers,
 }: SettingsClientProps) {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const tier = effectiveLicence?.tier ?? (org.licenceTier as LicenceTier)
   const visibleSections = new Set<SettingsSection>(
@@ -167,6 +204,9 @@ export function SettingsClient({
   const [licenceResult, setLicenceResult] = useState<{
     success?: boolean
     tier?: string
+    maxUsers?: number
+    previousTier?: string
+    previousMaxUsers?: number
     error?: string
   } | null>(null)
   const [retentionDays, setRetentionDays] = useState(String(org.metricRetentionDays ?? 30))
@@ -206,8 +246,15 @@ export function SettingsClient({
         setLicenceResult({ error: result.error })
         return
       }
-      setLicenceResult({ success: true, tier: result.tier })
+      setLicenceResult({
+        success: true,
+        tier: result.tier,
+        maxUsers: result.maxUsers,
+        previousTier: result.previousTier,
+        previousMaxUsers: result.previousMaxUsers,
+      })
       licenceForm.reset()
+      router.refresh()
     },
   })
 
@@ -1364,7 +1411,7 @@ export function SettingsClient({
                 <Users className="size-3.5" />
                 Seats used
               </div>
-              <p className="mt-2 text-lg font-semibold text-foreground">
+              <p className="mt-2 text-lg font-semibold text-foreground" data-testid="licence-seat-usage">
                 {seatUsage ? (
                   <>
                     {seatUsage.usedSeats}
@@ -1587,10 +1634,7 @@ export function SettingsClient({
                   {licenceResult.success ? (
                     <>
                       <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-                      <span>
-                        Licence activated — tier upgraded to{' '}
-                        <strong>{formatTier(licenceResult.tier ?? '')}</strong>
-                      </span>
+                      <span>{formatLicenceActivationMessage(licenceResult)}</span>
                     </>
                   ) : (
                     <>

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.96.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.95.1...web/v0.96.0) (2026-05-03)
+
+
+### Features
+
+* **licence:** persist verifier keys for rotation ([#854](https://github.com/carrtech-dev/ct-ops/issues/854)) ([94a66a9](https://github.com/carrtech-dev/ct-ops/commit/94a66a976cb2962b8bf1a69195ee089d3c884997))
+
 ## [0.95.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.95.0...web/v0.95.1) (2026-05-02)
 
 

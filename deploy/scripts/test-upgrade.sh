@@ -114,6 +114,39 @@ main() {
     exit 1
   fi
 
+  rm -rf "$old_install" "$new_src" "$backup_dir"
+  mkdir -p "${tmpdir}/current" "$backup_dir"
+
+  write_bundle "${tmpdir}/current" "v1.0.0"
+  rm -f "${old_install}/backup.sh"
+  {
+    printf 'customer-secret=true\n'
+    printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
+    printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+  } > "${old_install}/.env"
+
+  write_bundle "$new_src" "v9.9.9"
+  rm -f "$bundle_zip"
+  (cd "$new_src" && zip -qr "$bundle_zip" ct-ops)
+
+  (
+    cd "$old_install"
+    PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" \
+      MOCK_DOCKER_LOG="$docker_log" \
+      CT_OPS_BACKUP_DIR="$backup_dir" \
+      ./upgrade.sh --from-zip "$bundle_zip" --no-start
+  )
+
+  test -x "${old_install}/backup.sh"
+  grep -q 'example/web:v9.9.9' "${old_install}/docker-compose.yml"
+  grep -q 'public-key-v9.9.9' "${old_install}/licence-keys/current.pem"
+
+  backups="$(find "$backup_dir" -name '*.tar.gz' -type f | wc -l | tr -d ' ')"
+  if [ "$backups" != "1" ]; then
+    echo "expected one backup tarball for legacy install, found $backups" >&2
+    exit 1
+  fi
+
   echo "upgrade.sh local bundle tests passed"
 }
 

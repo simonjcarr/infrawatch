@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.96.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.2...web/v0.96.3) (2026-05-03)
+
+
+### Bug Fixes
+
+* **web:** refresh licence seat activation state ([#864](https://github.com/carrtech-dev/ct-ops/issues/864)) ([#865](https://github.com/carrtech-dev/ct-ops/issues/865)) ([d62225b](https://github.com/carrtech-dev/ct-ops/commit/d62225b1cd98a8e794f52322c1123444b9d34b4b))
+
 ## [0.96.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.1...web/v0.96.2) (2026-05-03)
 
 

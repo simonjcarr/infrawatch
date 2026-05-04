@@ -75,6 +75,7 @@ import { checkTerminalAccess } from '@/lib/actions/terminal'
 import { getAlertInstances } from '@/lib/actions/alerts'
 import { getHostVulnerabilityAssessment } from '@/lib/actions/vulnerabilities'
 import type { HostVulnerabilityAssessmentStatus } from '@/lib/vulnerabilities/assessment'
+import { canAccessTooling } from '@/lib/auth/tooling'
 import { getHostCollectionSettings } from '@/lib/actions/host-settings'
 import { getServiceAccounts } from '@/lib/actions/service-accounts'
 import { listGroupsForHost, listGroups, addHostToGroup, removeHostFromGroup } from '@/lib/actions/host-groups'
@@ -255,6 +256,7 @@ function TabButton({
 }
 
 export function HostDetailClient({ host: initialHost, orgId, currentUserId, userRole, latestAgentVersion }: Props) {
+  const canManageHost = canAccessTooling({ role: userRole })
   const [activeParentTab, setActiveParentTab] = useState<ParentTabId>('overview')
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState<MetricsPreset>('24h')
@@ -506,23 +508,25 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
             </h1>
             <StatusBadge status={host.status} />
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              setDeleteError(null)
-              setUninstallAgent(false)
-              setDeleteOpen(true)
-            }}
-            disabled={isDeleting}
-          >
-            {isDeleting ? (
-              <Loader2 className="size-4 mr-1 animate-spin" />
-            ) : (
-              <Trash2 className="size-4 mr-1" />
-            )}
-            Delete Host
-          </Button>
+          {canManageHost ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setDeleteError(null)
+                setUninstallAgent(false)
+                setDeleteOpen(true)
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="size-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="size-4 mr-1" />
+              )}
+              Delete Host
+            </Button>
+          ) : null}
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           Last seen {formatLastSeen(host.lastSeenAt)}
@@ -1310,27 +1314,28 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
         />
       )}
 
-      <AlertDialog
-        open={deleteOpen}
-        onOpenChange={(open) => {
-          if (isDeleting) return
-          setDeleteOpen(open)
-          if (!open) {
-            setDeleteError(null)
-            setUninstallAgent(false)
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete host</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to permanently delete{' '}
-              <strong>{host.displayName ?? host.hostname}</strong>? This will
-              remove all associated data including metrics, checks, alerts,
-              certificates, users, and SSH keys. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+      {canManageHost ? (
+        <AlertDialog
+          open={deleteOpen}
+          onOpenChange={(open) => {
+            if (isDeleting) return
+            setDeleteOpen(open)
+            if (!open) {
+              setDeleteError(null)
+              setUninstallAgent(false)
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete host</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete{' '}
+                <strong>{host.displayName ?? host.hostname}</strong>? This will
+                remove all associated data including metrics, checks, alerts,
+                certificates, users, and SSH keys. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
 
           {/* Remote uninstall option */}
           <div className="rounded-md border border-border bg-muted/30 p-3">
@@ -1394,33 +1399,34 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
             </div>
           )}
 
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={isDeleting}
-              onClick={(e) => {
-                // Prevent the dialog from closing automatically on click so we
-                // can keep it open to show the error on failure.
-                e.preventDefault()
-                setDeleteError(null)
-                removeHost({ uninstall: uninstallAgent })
-              }}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="size-4 mr-1 animate-spin" />
-                  {uninstallAgent ? 'Uninstalling & deleting…' : 'Deleting…'}
-                </>
-              ) : uninstallAgent ? (
-                'Uninstall agent & delete'
-              ) : (
-                'Delete permanently'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={isDeleting}
+                onClick={(e) => {
+                  // Prevent the dialog from closing automatically on click so we
+                  // can keep it open to show the error on failure.
+                  e.preventDefault()
+                  setDeleteError(null)
+                  removeHost({ uninstall: uninstallAgent })
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="size-4 mr-1 animate-spin" />
+                    {uninstallAgent ? 'Uninstalling & deleting…' : 'Deleting…'}
+                  </>
+                ) : uninstallAgent ? (
+                  'Uninstall agent & delete'
+                ) : (
+                  'Delete permanently'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
     </div>
   )
 }

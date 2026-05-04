@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.0...web/v0.103.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **agent:** use configured installer origin ([f09e229](https://github.com/carrtech-dev/ct-ops/commit/f09e2294b9ea2ddecb62736fe6b50270153d0011))
+
 ## [0.102.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.102.1...web/v0.102.2) (2026-05-04)
 
 

@@ -189,7 +189,7 @@ function PaletteRow({ item, onSelect }: PaletteRowProps) {
     .filter((x): x is string => typeof x === 'string' && x.length > 0)
     .join(' ')
   return (
-    <CommandItem value={searchValue} onSelect={() => onSelect(item)}>
+    <CommandItem value={searchValue} onSelect={() => onSelect(item)} data-testid={`command-palette-${item.id}`}>
       {Icon ? <Icon className="size-4 text-muted-foreground" /> : null}
       <div className="flex flex-col">
         <span className="text-sm text-foreground">{item.label}</span>

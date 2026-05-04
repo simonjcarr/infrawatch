@@ -23,6 +23,7 @@ import {
   FolderSearch,
   ScanSearch,
   Lock,
+  KeyRound,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -60,6 +61,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
+  testId?: string
   children?: NavChild[]
 }
 
@@ -79,6 +81,7 @@ const primaryNav: NavItem[] = [
   { title: 'Notifications', href: '/notifications', icon: BellPlus },
   { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
   { title: 'Service Accounts', href: '/service-accounts', icon: Key },
+  { title: 'Password Vault', href: '/password-vault', icon: KeyRound, testId: 'sidebar-password-vault-link' },
 ]
 
 const reportingNav: NavItem[] = [
@@ -210,7 +213,7 @@ function NavGroupItems({ items }: { items: NavItem[] }) {
         return (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton asChild isActive={isActive}>
-              <Link href={item.href}>
+              <Link href={item.href} data-testid={item.testId}>
                 <item.icon className={cn('size-4', isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/70')} />
                 <span>{item.title}</span>
               </Link>

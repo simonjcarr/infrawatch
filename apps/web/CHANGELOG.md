@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.102.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.101.0...web/v0.102.0) (2026-05-04)
+
+
+### Features
+
+* **password-vault:** add audit event coverage ([2171298](https://github.com/carrtech-dev/ct-ops/commit/2171298922abda6fa7167434b537514a0316b776))
+
 ## [0.101.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.100.1...web/v0.101.0) (2026-05-04)
 
 

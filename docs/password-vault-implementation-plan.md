@@ -31,8 +31,15 @@ Before starting any task:
   docs-only or the PR clearly documents why test-first is not practical.
 - Pick the first `Not started` task whose dependencies are complete.
 - Mark the task `In progress` with owner and timestamp before editing code.
+- Do not start a task already marked `In progress` or `Complete` unless the
+  existing owner has handed it off or the status is clearly stale and the PR or
+  branch evidence confirms it is abandoned.
 - Keep each session scoped to one task unless a dependency is tiny and directly
   required to complete the chosen task.
+- At the end of the session, update the task row with final status, owner, PR,
+  and concise notes on what changed or what remains blocked.
+- Append a Handoff Log row with date, agent, task ID, status, PR, validation,
+  and notes so the next agent can see progress without redoing completed work.
 - Commit with a Conventional Commit message.
 - Push, open a pull request, monitor checks, merge to `main`, confirm required
   release or artifact publication, and remove the task worktree as required by

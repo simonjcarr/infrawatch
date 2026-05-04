@@ -42,20 +42,20 @@ export function NotificationBell({ orgId, userId }: NotificationBellProps) {
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications-unread', orgId, userId],
-    queryFn: () => getUnreadCount(orgId, userId),
+    queryFn: () => getUnreadCount(orgId),
     refetchInterval: 20_000,
     staleTime: 10_000,
   })
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications-recent', orgId, userId],
-    queryFn: () => getNotifications(orgId, userId, 10),
+    queryFn: () => getNotifications(orgId, 10),
     refetchInterval: 20_000,
     staleTime: 10_000,
   })
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => markAsRead(orgId, userId, id),
+    mutationFn: (id: string) => markAsRead(orgId, id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
       qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
@@ -63,7 +63,7 @@ export function NotificationBell({ orgId, userId }: NotificationBellProps) {
   })
 
   const markAllMutation = useMutation({
-    mutationFn: () => markAllAsRead(orgId, userId),
+    mutationFn: () => markAllAsRead(orgId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
       qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })

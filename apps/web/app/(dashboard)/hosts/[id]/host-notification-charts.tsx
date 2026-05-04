@@ -65,13 +65,13 @@ export function HostNotificationCharts({ orgId, userId, hostId }: HostNotificati
 
   const { data: stats } = useQuery({
     queryKey: ['notifications-stats', orgId, userId, hostId],
-    queryFn: () => getNotificationStats(orgId, userId, hostId),
+    queryFn: () => getNotificationStats(orgId, hostId),
     refetchInterval: 60_000,
   })
 
   const { data: timeSeries } = useQuery({
     queryKey: ['notifications-time-series', orgId, userId, hostId, trendRange],
-    queryFn: () => getNotificationsOverTime(orgId, userId, trendRange, hostId),
+    queryFn: () => getNotificationsOverTime(orgId, trendRange, hostId),
     refetchInterval: 60_000,
   })
 

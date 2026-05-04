@@ -13,8 +13,8 @@ export default async function NotificationsPage() {
   const userId = session.user.id
 
   const [initialNotifications, initialUnread] = await Promise.all([
-    getNotifications(orgId, userId, 25),
-    getUnreadCount(orgId, userId),
+    getNotifications(orgId, 25),
+    getUnreadCount(orgId),
   ])
 
   return (

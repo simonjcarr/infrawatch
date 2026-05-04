@@ -9,11 +9,11 @@ import type { Notification } from '@/lib/db/schema'
 
 export async function getNotifications(
   orgId: string,
-  userId: string,
   limit = 20,
   offset = 0,
 ): Promise<Notification[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   return db.query.notifications.findMany({
     where: and(
       eq(notifications.organisationId, orgId),
@@ -26,8 +26,9 @@ export async function getNotifications(
   })
 }
 
-export async function getUnreadCount(orgId: string, userId: string): Promise<number> {
-  await requireOrgAccess(orgId)
+export async function getUnreadCount(orgId: string): Promise<number> {
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   const [result] = await db
     .select({ value: count() })
     .from(notifications)
@@ -44,10 +45,10 @@ export async function getUnreadCount(orgId: string, userId: string): Promise<num
 
 export async function markAsRead(
   orgId: string,
-  userId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   try {
     await db
       .update(notifications)
@@ -68,9 +69,9 @@ export async function markAsRead(
 
 export async function markAllAsRead(
   orgId: string,
-  userId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   try {
     await db
       .update(notifications)
@@ -91,10 +92,10 @@ export async function markAllAsRead(
 
 export async function deleteNotification(
   orgId: string,
-  userId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   try {
     await db
       .update(notifications)
@@ -115,10 +116,10 @@ export async function deleteNotification(
 
 export async function deleteNotifications(
   orgId: string,
-  userId: string,
   ids: string[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -140,11 +141,11 @@ export async function deleteNotifications(
 
 export async function markBatchReadStatus(
   orgId: string,
-  userId: string,
   ids: string[],
   read: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -171,10 +172,10 @@ export type NotificationSeverityStat = {
 
 export async function getNotificationStats(
   orgId: string,
-  userId: string,
   hostId?: string,
 ): Promise<NotificationSeverityStat[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   const results = await db
     .select({
       severity: notifications.severity,
@@ -215,11 +216,11 @@ export type NotificationTimeSeriesPoint = {
 
 export async function getNotificationsOverTime(
   orgId: string,
-  userId: string,
   range: TrendRange = '30d',
   hostId?: string,
 ): Promise<NotificationTimeSeriesPoint[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
+  const userId = session.user.id
   // Intentionally does NOT filter on deletedAt so that deleting notifications
   // from the inbox does not affect the historical trend.
   const config = TREND_RANGE_CONFIG[range]

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildAgentInstallScript } from '@/lib/agent/install-script'
+import { getAgentPublicOrigin } from '@/lib/agent/public-origin'
 import { createRateLimiter } from '@/lib/rate-limit'
 
 // 30 requests per IP per 60 s — generous for CI/CD pipelines but throttles enumeration/DoS.
@@ -38,12 +39,10 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const host = request.headers.get('host') ?? 'localhost'
-  const proto = request.headers.get('x-forwarded-proto') ?? 'http'
-  const serverURL = `${proto}://${host}`
+  const serverURL = getAgentPublicOrigin()
 
   const { searchParams } = new URL(request.url)
-  const bareHost = host.split(':')[0]
+  const bareHost = new URL(serverURL).hostname
   const ingestAddress = searchParams.get('ingest') ?? `${bareHost}:9443`
   const skipVerify = searchParams.get('skip_verify') === 'true'
   const script = buildAgentInstallScript(serverURL, ingestAddress, skipVerify)

@@ -70,9 +70,16 @@ export async function POST(request: NextRequest) {
     }
 
     const authSecret = getBetterAuthSecret()
+    const signedChallengeCookie = request.cookies.get(LDAP_TWO_FACTOR_COOKIE_NAME)?.value
 
-    if (twoFactorCode) {
-      const signedChallengeCookie = request.cookies.get(LDAP_TWO_FACTOR_COOKIE_NAME)?.value
+    if (signedChallengeCookie) {
+      if (!twoFactorCode) {
+        return withAuthDelay(
+          requestStart,
+          NextResponse.json({ error: 'Two-factor code is required' }, { status: 400 }),
+        )
+      }
+
       const challengeId = await readSignedLdapTwoFactorCookieValue(signedChallengeCookie, authSecret)
 
       if (!challengeId) {

@@ -932,7 +932,6 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
               <HostNotificationCharts
                 orgId={orgId}
-                userId={currentUserId}
                 hostId={initialHost.id}
               />
             </>

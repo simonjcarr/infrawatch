@@ -74,7 +74,6 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 interface NotificationsClientProps {
   orgId: string
-  userId: string
   initialNotifications: Notification[]
   initialUnread: number
 }
@@ -102,18 +101,18 @@ function SeverityDot({ severity }: { severity: string }) {
   return <span className={`inline-block size-2.5 rounded-full shrink-0 mt-1 ${cls}`} />
 }
 
-function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }) {
+function NotificationCharts({ orgId }: { orgId: string }) {
   const [trendRange, setTrendRange] = useState<TrendRange>('30d')
 
   const { data: stats } = useQuery({
-    queryKey: ['notifications-stats', orgId, userId],
-    queryFn: () => getNotificationStats(orgId, userId),
+    queryKey: ['notifications-stats', orgId],
+    queryFn: () => getNotificationStats(orgId),
     refetchInterval: 60_000,
   })
 
   const { data: timeSeries } = useQuery({
-    queryKey: ['notifications-time-series', orgId, userId, trendRange],
-    queryFn: () => getNotificationsOverTime(orgId, userId, trendRange),
+    queryKey: ['notifications-time-series', orgId, trendRange],
+    queryFn: () => getNotificationsOverTime(orgId, trendRange),
     refetchInterval: 60_000,
   })
 
@@ -250,7 +249,6 @@ function NotificationCharts({ orgId, userId }: { orgId: string; userId: string }
 
 export function NotificationsClient({
   orgId,
-  userId,
   initialNotifications,
   initialUnread,
 }: NotificationsClientProps) {
@@ -262,64 +260,64 @@ export function NotificationsClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: unread = initialUnread } = useQuery({
-    queryKey: ['notifications-unread', orgId, userId],
-    queryFn: () => getUnreadCount(orgId, userId),
+    queryKey: ['notifications-unread', orgId],
+    queryFn: () => getUnreadCount(orgId),
     initialData: initialUnread,
     refetchInterval: 20_000,
   })
 
   const { data: notifications = initialNotifications } = useQuery({
-    queryKey: ['notifications', orgId, userId, offset],
-    queryFn: () => getNotifications(orgId, userId, PAGE_SIZE, offset),
+    queryKey: ['notifications', orgId, offset],
+    queryFn: () => getNotifications(orgId, PAGE_SIZE, offset),
     initialData: offset === 0 ? initialNotifications : undefined,
     refetchInterval: 30_000,
   })
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => markAsRead(orgId, userId, id),
+    mutationFn: (id: string) => markAsRead(orgId, id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
     },
   })
 
   const markAllMutation = useMutation({
-    mutationFn: () => markAllAsRead(orgId, userId),
+    mutationFn: () => markAllAsRead(orgId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
     },
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteNotification(orgId, userId, id),
+    mutationFn: (id: string) => deleteNotification(orgId, id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
     },
   })
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: (ids: string[]) => deleteNotifications(orgId, userId, ids),
+    mutationFn: (ids: string[]) => deleteNotifications(orgId, ids),
     onSuccess: () => {
       setSelectedIds(new Set())
-      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-stats', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-time-series', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-stats', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-time-series', orgId] })
     },
   })
 
   const bulkMarkReadMutation = useMutation({
     mutationFn: ({ ids, read }: { ids: string[]; read: boolean }) =>
-      markBatchReadStatus(orgId, userId, ids, read),
+      markBatchReadStatus(orgId, ids, read),
     onSuccess: () => {
       setSelectedIds(new Set())
-      qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
     },
   })
 
@@ -374,7 +372,7 @@ export function NotificationsClient({
         </div>
       </div>
 
-      <NotificationCharts orgId={orgId} userId={userId} />
+      <NotificationCharts orgId={orgId} />
 
       {/* Filter tabs */}
       <div className="flex items-center gap-1 border-b">
@@ -560,10 +558,10 @@ export function NotificationsClient({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => markBatchReadStatus(orgId, userId, [n.id], false).then(() => {
-                            qc.invalidateQueries({ queryKey: ['notifications', orgId, userId] })
-                            qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-                            qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+                          onClick={() => markBatchReadStatus(orgId, [n.id], false).then(() => {
+                            qc.invalidateQueries({ queryKey: ['notifications', orgId] })
+                            qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+                            qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
                           })}
                           data-testid={`notification-mark-unread-${n.id}`}
                         >

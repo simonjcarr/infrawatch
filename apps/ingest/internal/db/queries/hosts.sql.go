@@ -12,8 +12,8 @@ import (
 )
 
 // HostCollision describes an existing host whose identity (hostname or IP) overlaps
-// with a newly registering agent. Used to reject online duplicates and adopt offline
-// ones rather than creating a second row for the same physical machine.
+// with a newly registering agent. The registration handler uses this to reject
+// live duplicates and require explicit review for offline/unknown collisions.
 type HostCollision struct {
 	HostID      string
 	AgentID     string
@@ -26,10 +26,9 @@ type HostCollision struct {
 // matches or whose ip_addresses jsonb array overlaps any of the provided ips.
 // Returns nil, nil when no collision exists.
 //
-// An "online" match means the physical machine is still heartbeating under a
-// different keypair — the new registration must be rejected. An "offline" or
-// "unknown" match is treated as a re-registration of the same machine and the
-// caller will rotate the keypair onto the existing row.
+// An "online" match means a host is still heartbeating under a different
+// keypair, so the new registration must be rejected. An "offline" or "unknown"
+// match is a suspicious identity claim and must not mutate the existing row.
 func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname string, ips []string) (*HostCollision, error) {
 	const q = `
 		SELECT h.id, COALESCE(h.agent_id, ''), h.hostname, h.status, COALESCE(a.status, '')
@@ -60,17 +59,14 @@ func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname 
 	return &c, nil
 }
 
-// RotateAgentPublicKey replaces the public key on an existing agent row. Used
-// during re-registration adoption: the physical machine is the same (hostname
-// or IP match) but the agent has generated a fresh keypair (e.g. data dir wiped).
+// RotateAgentPublicKey replaces the public key on an existing agent row.
 func RotateAgentPublicKey(ctx context.Context, pool *pgxpool.Pool, agentID, publicKey string) error {
 	const q = `UPDATE agents SET public_key = $1, updated_at = NOW() WHERE id = $2`
 	_, err := pool.Exec(ctx, q, publicKey, agentID)
 	return err
 }
 
-// ReattachHostToAgent ensures a host row is linked to the given agent id. Used
-// when adopting an existing host during re-registration.
+// ReattachHostToAgent ensures a host row is linked to the given agent id.
 func ReattachHostToAgent(ctx context.Context, pool *pgxpool.Pool, hostID, agentID, hostname string) error {
 	const q = `
 		UPDATE hosts

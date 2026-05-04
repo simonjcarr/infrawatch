@@ -34,8 +34,8 @@ func NewRegisterHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, ca *pki.Agen
 //  1. Validate org_token → UNAUTHENTICATED if invalid/expired
 //  2. Check if public_key already registered → return existing state (idempotent)
 //  3. Check for a colliding host (same hostname or overlapping IP) in the org:
-//     - Online match → reject with ALREADY_EXISTS (two live hosts can't share identity)
-//     - Offline/unknown match → adopt: rotate public key onto the existing agent row
+//     - Online/active/revoked match → reject with ALREADY_EXISTS
+//     - Offline/unknown match → create a separate pending registration
 //  4. Insert agent (status=pending) + host row
 //  5. If auto_approve on token → set active, issue JWT
 //  6. Return RegisterResponse
@@ -123,19 +123,18 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	mergedTags := queries.MergeTagLayers(token.Metadata.Tags, reqTagPairs)
 
 	// Step 3: Check for identity collision with an existing host in the org.
-	// Hostname or IP overlap indicates the same physical machine — either
-	// actively duplicating (reject) or re-registering after a data-dir wipe
-	// (adopt the existing row to avoid stale duplicate records).
+	// Hostname or IP overlap is not a strong identity signal. Online/active
+	// matches are rejected, and offline/unknown matches continue as separate
+	// pending registrations instead of mutating an existing trusted identity.
+	forcePendingApproval := false
 	collision, err := queries.FindHostCollision(ctx, h.pool, orgID, hostname, reportedIPs)
 	if err != nil {
 		slog.Error("checking host collision", "err", err)
 		return nil, status.Error(codes.Internal, "internal error")
 	}
 	if collision != nil {
-		// An active/online match means a live agent is still heartbeating under
-		// a different keypair. The network can't hold two machines with the same
-		// hostname/IP, so this is an error — delete the existing host first.
-		if collision.HostStatus == "online" || collision.AgentStatus == "active" || collision.AgentStatus == "revoked" {
+		switch classifyHostCollision(collision) {
+		case collisionActionReject:
 			reason := "online duplicate"
 			if collision.AgentStatus == "revoked" {
 				reason = "existing agent revoked"
@@ -152,47 +151,15 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 				"a host matching this hostname or IP is already registered in this organisation (%s) — delete the existing host before re-registering",
 				reason,
 			)
-		}
-
-		// Offline or unknown: treat as a re-registration of the same machine.
-		// Rotate the public key onto the existing agent row and reuse the host.
-		if collision.AgentID == "" {
-			slog.Warn("host collision has no linked agent; falling through to fresh insert",
-				"host_id", collision.HostID)
-		} else {
-			if err := queries.RotateAgentPublicKey(ctx, h.pool, collision.AgentID, req.PublicKey); err != nil {
-				slog.Error("rotating public key on adopted agent", "err", err)
-				return nil, status.Error(codes.Internal, "failed to adopt existing registration")
-			}
-			if err := queries.ReattachHostToAgent(ctx, h.pool, collision.HostID, collision.AgentID, hostname); err != nil {
-				slog.Warn("reattaching host during adoption", "err", err)
-			}
-			// A keypair change is a new identity claim — always require re-approval
-			// regardless of the prior agent status. Resuming "active" without
-			// re-approval would let anyone who learns the enrolment token silently
-			// hijack an already-trusted agent identity (H-11).
-			if err := queries.SetAgentStatus(ctx, h.pool, collision.AgentID, "pending"); err != nil {
-				slog.Error("resetting agent status to pending after keypair rotation", "err", err)
-				return nil, status.Error(codes.Internal, "internal error")
-			}
-			if err := queries.InsertAgentStatusHistory(ctx, h.pool, collision.AgentID, orgID, "pending", nil,
-				"keypair rotated on re-registration; requires admin re-approval"); err != nil {
-				slog.Warn("inserting adoption history", "err", err)
-			}
-			if err := queries.IncrementUsageCount(ctx, h.pool, token.ID); err != nil {
-				slog.Warn("incrementing enrolment token usage", "err", err)
-			}
-			slog.Info("adopted existing host for re-registering agent",
-				"agent_id", collision.AgentID,
+		case collisionActionFreshInsert:
+			forcePendingApproval = true
+			slog.Warn("continuing suspicious host collision as separate pending registration",
+				"existing_agent_id", collision.AgentID,
 				"host_id", collision.HostID,
 				"hostname", hostname,
-				"prior_status", collision.AgentStatus,
+				"existing_host_status", collision.HostStatus,
+				"existing_agent_status", collision.AgentStatus,
 			)
-			return &agentv1.RegisterResponse{
-				AgentId: collision.AgentID,
-				Status:  "pending",
-				Message: "re-registration adopted existing host; keypair rotated — awaiting admin approval",
-			}, nil
 		}
 	}
 
@@ -220,7 +187,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	// tags into metadata.pendingTags so approveAgent (TS) can drain them. On
 	// auto-approve we apply tags directly below and pass nil here.
 	var pendingForInsert []queries.TagPair
-	if !token.AutoApprove {
+	if !token.AutoApprove || forcePendingApproval {
 		pendingForInsert = mergedTags
 	}
 	hostID, err := queries.InsertHost(ctx, h.pool, orgID, agentID, hostname, agentOS, agentArch, pendingForInsert)
@@ -236,7 +203,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	slog.Info("agent registered", "agent_id", agentID, "hostname", hostname, "auto_approve", token.AutoApprove)
 
 	// Step 5: Auto-approve if configured
-	if token.AutoApprove {
+	if token.AutoApprove && !forcePendingApproval {
 		if err := queries.ApproveAgent(ctx, h.pool, agentID); err != nil {
 			slog.Error("auto-approving agent", "err", err)
 			return nil, status.Error(codes.Internal, "internal error")
@@ -288,11 +255,32 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	}
 
 	// Step 6: Pending — waiting for admin approval
+	message := "agent registered and awaiting admin approval"
+	if forcePendingApproval {
+		message = "agent registered with a hostname or IP collision and requires explicit admin approval"
+	}
 	return &agentv1.RegisterResponse{
 		AgentId: agentID,
 		Status:  "pending",
-		Message: "agent registered and awaiting admin approval",
+		Message: message,
 	}, nil
+}
+
+type collisionAction int
+
+const (
+	collisionActionFreshInsert collisionAction = iota
+	collisionActionReject
+)
+
+func classifyHostCollision(collision *queries.HostCollision) collisionAction {
+	if collision == nil {
+		return collisionActionFreshInsert
+	}
+	if collision.HostStatus == "online" || collision.AgentStatus == "active" || collision.AgentStatus == "revoked" {
+		return collisionActionReject
+	}
+	return collisionActionFreshInsert
 }
 
 // signAndAttach signs a CSR immediately, persists the leaf onto the agents

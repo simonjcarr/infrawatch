@@ -43,7 +43,10 @@ test('password vault schema contract identifies organisation-scoped tables', () 
 })
 
 test('password vault schema contract encodes the required membership and key epoch constraints', () => {
-  assert.deepEqual(PASSWORD_VAULT_TABLE_CONTRACT.keyEpochs.uniqueKeys, [['vaultId', 'epochNumber']])
+  assert.deepEqual(PASSWORD_VAULT_TABLE_CONTRACT.keyEpochs.uniqueKeys, [
+    ['vaultId', 'epochNumber'],
+    ['vaultId', 'idempotencyKey'],
+  ])
   assert.deepEqual(PASSWORD_VAULT_TABLE_CONTRACT.members.uniqueKeys, [['vaultId', 'userId']])
   assert.deepEqual(
     PASSWORD_VAULT_TABLE_CONTRACT.members.foreignKeys.map((key) => key.column),

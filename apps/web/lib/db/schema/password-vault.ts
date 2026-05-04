@@ -78,6 +78,7 @@ export const passwordVaultKeyEpochs = pgTable(
     epochNumber: integer('epoch_number').notNull(),
     wrapVersion: text('wrap_version').notNull(),
     rotationReason: text('rotation_reason').$type<PasswordVaultRotationReason>().notNull(),
+    idempotencyKey: text('idempotency_key'),
     rotatedByUserId: text('rotated_by_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -85,6 +86,7 @@ export const passwordVaultKeyEpochs = pgTable(
   },
   (t) => [
     uniqueIndex('password_vault_key_epochs_vault_epoch_uidx').on(t.vaultId, t.epochNumber),
+    uniqueIndex('password_vault_key_epochs_vault_idempotency_uidx').on(t.vaultId, t.idempotencyKey),
     index('password_vault_key_epochs_org_vault_idx').on(t.organisationId, t.vaultId),
   ],
 )

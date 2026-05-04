@@ -70,6 +70,7 @@ export const PASSWORD_VAULT_TABLE_CONTRACT = {
       'epochNumber',
       'wrapVersion',
       'rotationReason',
+      'idempotencyKey',
       'rotatedByUserId',
       'createdAt',
     ],
@@ -80,6 +81,7 @@ export const PASSWORD_VAULT_TABLE_CONTRACT = {
     ],
     uniqueKeys: [
       ['vaultId', 'epochNumber'],
+      ['vaultId', 'idempotencyKey'],
     ],
   },
   members: {

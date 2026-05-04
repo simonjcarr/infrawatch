@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.97.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.0...web/v0.97.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **web:** require tooling auth for agent lifecycle actions ([#900](https://github.com/carrtech-dev/ct-ops/issues/900)) ([561efa4](https://github.com/carrtech-dev/ct-ops/commit/561efa4faaee19c73ddcb0aa2dab2096beec33ad))
+
 ## [0.97.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.4...web/v0.97.0) (2026-05-04)
 
 

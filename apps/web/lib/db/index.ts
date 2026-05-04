@@ -5,9 +5,10 @@ import { runWithOrgDatabaseScope } from './rls.ts'
 import { getDatabaseUrl } from './connection-string.ts'
 
 const connectionString = getDatabaseUrl()
+const maxConnections = getMaxConnections()
 
 // Disable prefetch as it is not supported for "transaction" pool mode
-export const client = postgres(connectionString, { prepare: false })
+export const client = postgres(connectionString, { prepare: false, max: maxConnections })
 
 const rootDb = drizzle(client, { schema })
 
@@ -20,4 +21,16 @@ export async function withOrgDatabaseScope<T>(
   run: (db: TransactionDatabase) => Promise<T>,
 ): Promise<T> {
   return runWithOrgDatabaseScope<TransactionDatabase, T>(rootDb, orgId, run)
+}
+
+function getMaxConnections(): number {
+  const raw = process.env['POSTGRES_POOL_MAX']
+  if (!raw) return 10
+
+  const max = Number(raw)
+  if (!Number.isInteger(max) || max < 1) {
+    throw new Error('POSTGRES_POOL_MAX must be a positive integer')
+  }
+
+  return max
 }

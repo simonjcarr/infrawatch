@@ -300,7 +300,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
   const { mutate: removeHost, isPending: isDeleting } = useMutation({
     mutationFn: (opts: { uninstall: boolean }) =>
       opts.uninstall
-        ? uninstallAndDeleteHost(orgId, currentUserId, initialHost.id)
+        ? uninstallAndDeleteHost(orgId, initialHost.id)
         : deleteHost(orgId, initialHost.id),
     onSuccess: (result) => {
       if ('success' in result) {
@@ -946,7 +946,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
       {/* Alerts Tab */}
       {activeTab === 'alerts' && (
-        <AlertsTab orgId={orgId} hostId={initialHost.id} currentUserId={currentUserId} />
+        <AlertsTab orgId={orgId} hostId={initialHost.id} />
       )}
 
       {/* Users Tab */}

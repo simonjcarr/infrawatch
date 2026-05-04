@@ -435,9 +435,8 @@ export async function getAlertInstanceCount(
 export async function acknowledgeAlert(
   orgId: string,
   instanceId: string,
-  userId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   const existing = await db.query.alertInstances.findFirst({
     where: and(
       eq(alertInstances.id, instanceId),
@@ -452,7 +451,7 @@ export async function acknowledgeAlert(
     .set({
       status: 'acknowledged',
       acknowledgedAt: new Date(),
-      acknowledgedBy: userId,
+      acknowledgedBy: session.user.id,
     })
     .where(and(eq(alertInstances.id, instanceId), eq(alertInstances.organisationId, orgId)))
 
@@ -967,10 +966,9 @@ export async function getActiveSilencesForHost(
 
 export async function createSilence(
   orgId: string,
-  userId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   const parsed = createSilenceSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -987,14 +985,14 @@ export async function createSilence(
         reason: data.reason,
         startsAt: new Date(data.startsAt),
         endsAt: new Date(data.endsAt),
-        createdBy: userId,
+        createdBy: session.user.id,
       })
       .returning({ id: alertSilences.id })
 
     if (!row) return { error: 'Insert failed' }
     await writeAuditEvent(db, {
       organisationId: orgId,
-      actorUserId: userId,
+      actorUserId: session.user.id,
       action: 'alert_silence.created',
       targetType: 'alert_silence',
       targetId: row.id,

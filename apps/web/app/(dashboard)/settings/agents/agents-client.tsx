@@ -61,7 +61,6 @@ type CreateTokenForm = z.infer<typeof createTokenSchema>
 
 interface AgentsSettingsClientProps {
   orgId: string
-  currentUserId: string
   initialTokens: EnrolmentTokenSafe[]
   appUrl: string
 }
@@ -101,7 +100,6 @@ function tokenStatus(token: EnrolmentTokenSafe): { label: string; className: str
 
 export function AgentsSettingsClient({
   orgId,
-  currentUserId,
   initialTokens,
   appUrl,
 }: AgentsSettingsClientProps) {
@@ -142,7 +140,7 @@ export function AgentsSettingsClient({
 
   const createMutation = useMutation({
     mutationFn: (data: CreateTokenForm) =>
-      createEnrolmentToken(orgId, currentUserId, {
+      createEnrolmentToken(orgId, {
         label: data.label,
         autoApprove: data.autoApprove,
         skipVerify: data.skipVerify,

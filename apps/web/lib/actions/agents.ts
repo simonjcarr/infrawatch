@@ -1,7 +1,7 @@
 'use server'
 
 import { logError, logWarn } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -98,7 +98,7 @@ export async function approveAgent(
   agentId: string,
   actorId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -228,7 +228,7 @@ export async function rejectAgent(
   agentId: string,
   actorId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -501,7 +501,7 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   if (!await createEnrolmentTokenLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before creating another enrolment token.' }
   }
@@ -590,7 +590,7 @@ export async function revokeEnrolmentToken(
   orgId: string,
   tokenId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   try {
     await db
       .update(agentEnrolmentTokens)
@@ -962,7 +962,7 @@ export async function deleteHost(
   orgId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   try {
     const session = await getRequiredSession()
     // Capture the result of the "not found" check that happens inside the
@@ -1231,7 +1231,7 @@ export async function uninstallAndDeleteHost(
   | { success: true }
   | { error: string; taskRunId?: string; agentOffline?: boolean }
 > {
-  await requireOrgAccess(orgId)
+  await requireOrgToolingAccess(orgId)
   try {
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),

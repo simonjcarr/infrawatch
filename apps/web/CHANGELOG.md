@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.100.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.100.0...web/v0.100.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **notifications:** bind inbox actions to session user ([#922](https://github.com/carrtech-dev/ct-ops/issues/922)) ([e8d7252](https://github.com/carrtech-dev/ct-ops/commit/e8d725252444c4e6f4670f89ddb08692dffde9d4))
+
 ## [0.100.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.99.0...web/v0.100.0) (2026-05-04)
 
 

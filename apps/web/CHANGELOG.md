@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.2...web/v0.103.3) (2026-05-04)
+
+
+### Bug Fixes
+
+* **authz:** derive privileged action actors from session ([#952](https://github.com/carrtech-dev/ct-ops/issues/952)) ([db28c0c](https://github.com/carrtech-dev/ct-ops/commit/db28c0ca113c620e0d05bad0467ed2514c550aae))
+
 ## [0.103.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.1...web/v0.103.2) (2026-05-04)
 
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { ZodError } from 'zod'
 import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { writeAuditEvent } from '@/lib/audit/events'
 import { type TransactionDatabase, withOrgDatabaseScope } from '@/lib/db'
 import {
   passwordVaultKeyEpochs,
@@ -15,6 +16,7 @@ import {
   assertPasswordVaultMutationBodySize,
   assertPasswordVaultReadBodySize,
 } from './api-policy.ts'
+import { buildPasswordVaultAuditEvent } from './audit-api.ts'
 import {
   createPasswordVaultDeletedResponse,
   parseCreatePasswordVaultPayload,
@@ -218,6 +220,13 @@ async function createVault(
       .returning()
     const createdMember = requireRow(member, 'Password Vault owner membership create failed')
 
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'vault_created',
+      vaultId: createdVault.id,
+    }))
+
     return toSerializableVault({ vault: createdVault, member: createdMember, keyEpoch: createdKeyEpoch })
   })
 }
@@ -253,6 +262,13 @@ async function updateVault(
       ))
       .returning()
     const updatedVault = requireRow(updated, 'Password Vault update failed')
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'vault_updated',
+      vaultId,
+    }))
 
     return {
       ...current,
@@ -291,6 +307,13 @@ async function deleteVault(
         eq(passwordVaults.organisationId, session.user.organisationId),
         isNull(passwordVaults.deletedAt),
       ))
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'vault_deleted',
+      vaultId,
+    }))
 
     return 'deleted'
   })

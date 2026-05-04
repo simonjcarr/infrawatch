@@ -124,6 +124,9 @@ export const PASSWORD_VAULT_API_POLICY = {
     ...readPolicy('unlockMetadata', '/api/password-vault/unlock-metadata'),
     rateLimit: PASSWORD_VAULT_API_RATE_LIMITS.unlock,
   },
+  unlockAudit: mutationPolicy('unlockAudit', 'POST', '/api/password-vault/unlock-audit', {
+    rateLimit: PASSWORD_VAULT_API_RATE_LIMITS.sensitiveAudit,
+  }),
   listVaults: readPolicy('listVaults', '/api/password-vault/vaults'),
   createVault: mutationPolicy('createVault', 'POST', '/api/password-vault/vaults'),
   getVault: vaultReadPolicy('getVault', '/api/password-vault/vaults/:vaultId'),
@@ -195,6 +198,13 @@ export const PASSWORD_VAULT_API_POLICY = {
     'POST',
     '/api/password-vault/vaults/:vaultId/key-epochs',
     MANAGER_ROLES,
+  ),
+  exportAudit: vaultMutationPolicy(
+    'exportAudit',
+    'POST',
+    '/api/password-vault/vaults/:vaultId/export-audit',
+    MEMBER_ROLES,
+    PASSWORD_VAULT_API_RATE_LIMITS.sensitiveAudit,
   ),
   revealAudit: vaultMutationPolicy(
     'revealAudit',

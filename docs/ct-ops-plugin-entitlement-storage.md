@@ -240,13 +240,13 @@ Suggested response:
 {
   "product": "ct-cve",
   "orgId": "org_123",
-  "pluginInstanceId": "passwd_inst_123",
+  "pluginInstanceId": "ctcve_inst_123",
   "configured": true,
   "licensed": true,
   "status": "active",
   "plan": "team",
   "capacity": {
-    "maxVaults": 25
+    "maxHosts": 500
   },
   "visibilityPolicy": "hidden-unless-licensed",
   "expiresAt": "2027-05-01T00:00:00Z",

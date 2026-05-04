@@ -15,39 +15,19 @@
 
 ## What Has Been Built
 
-### Session 103 — Password Vault stale plugin-doc cleanup
+### Session 104 — Password Manager direction reset
 
-**Built-in Password Vault direction cleanup** (`docs/password-vault-implementation-plan.md`, `docs/ct-ops-plugin-identity-broker.md`, `docs/ct-ops-plugin-entitlement-storage.md`, `docs/ct-ops-licensing-and-ct-cve-product-decision.md`, `docs/ct-cve-migration-plan.md`)
-- Removed the live CT-Passwd external-plugin direction from the shared CT Ops
-  design docs and rewrote those sections around CT-CVE plus generic future
-  external plugins.
-- Replaced the old external password-manager/product-plan history in
-  `PROGRESS.md` with an explicit superseded note so future sessions do not treat
-  the old repository, entitlement, or launch model as active CTOps direction.
-- Kept the plugin broker and entitlement designs focused on real external
-  plugin use cases while stating that Password Vault is now built in to CT Ops
-  and does not use that external plugin model.
+**Historical note**
+- The embedded CT-Ops Password Vault direction was superseded before customer
+  release. Password Manager is now planned as a standalone service/API, with
+  CT-Ops as the first UI/client.
+- Embedded Password Vault code, routes, UI, schema, migrations, public docs, and
+  active implementation-plan references were removed so future work does not
+  continue the in-app implementation.
 
 **Validation**
-- Validation run: targeted `rg` residue checks for `CT-Passwd` and the old
-  external repository slug, `git diff --check`, and a targeted Markdown sanity
-  check for balanced fenced code blocks and tab characters.
-
-### Session 102 — Password Vault implementation plan
-
-**Built-in Password Vault coordination** (`docs/password-vault-implementation-plan.md`)
-- Added an implementation coordination plan for the built-in CTOps Password
-  Vault, split into one-session chunks that future agents can pick up safely.
-- Recorded the current product decision: Password Vault is first-party CTOps
-  functionality, uses browser-side zero-knowledge encryption, has no admin
-  recovery in the MVP, and starts with a multi-user core vault.
-- Made stale external password-manager plugin documentation cleanup the first
-  implementation task so old product/repository direction does not confuse
-  future work.
-
-**Validation**
-- Validation run: `git diff --check` and a targeted Markdown sanity check for
-  balanced fenced code blocks and tab characters.
+- Validation run: targeted residue searches plus the web validation commands
+  listed in the cleanup PR.
 
 ### Session 101 — Plugin entitlement storage design
 
@@ -80,19 +60,6 @@
 - Marked the CT-CVE migration plan's plugin-identity-broker phase complete and
   narrowed the remaining CT-CVE GUI blocker to plugin entitlement and follow-on
   integration work.
-
-**Validation**
-- Validation run: `git diff --check` and a targeted Markdown sanity check for
-  balanced fenced code blocks and tab characters.
-
-### Session 99 — Superseded external password-manager planning
-
-**Historical note**
-- This session previously tracked an external CT-Passwd repository and plugin
-  deployment direction for password management.
-- That direction has been superseded by the built-in CTOps Password Vault. The
-  old external repository slug, plugin launch model, and related product plan
-  are intentionally no longer active CTOps direction.
 
 **Validation**
 - Validation run: `git diff --check` and a targeted Markdown sanity check for

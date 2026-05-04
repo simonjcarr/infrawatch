@@ -170,8 +170,7 @@ Required claims:
 Assertion rules:
 
 - Assertions must not contain secrets, licence keys, API tokens, plugin config,
-  unlock passwords, vault keys, plaintext entry data, or other sensitive
-  payloads.
+  customer data, product-owned credentials, or other sensitive payloads.
 - CT Ops issues assertions only after backend checks confirm the user session is
   active, the user still belongs to the organization, seat admission has not
   blocked the user, and the plugin instance is active for that product/org.
@@ -301,13 +300,12 @@ Plugin backend checks after launch:
 - CT-CVE still owns feed credentials, source configuration, and vulnerability
   processing in its own service and database.
 
-### Built-In Password Vault
+### Password Manager
 
-- CTOps Password Vault is now built in to CT Ops and does not use this external
-  plugin broker model.
-- Browser-side unlock, key handling, and vault-secret isolation are documented
-  in the Password Vault implementation and threat-model work instead of plugin
-  launch contracts.
+- The embedded CT-Ops vault direction was superseded before customer release.
+- Password Manager is now planned as a standalone service/API. Any future
+  broker relationship should be designed against that service boundary, not the
+  removed embedded CT-Ops implementation.
 
 ## Failure Handling
 

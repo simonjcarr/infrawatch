@@ -10,14 +10,14 @@ import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdtemp, rm, stat as fsStat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { randomBytes, randomUUID } from 'node:crypto'
-import { auth } from '@/lib/auth'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
-import { hosts, taskRunHosts, taskRuns, users } from '@/lib/db/schema'
+import { hosts, taskRunHosts, taskRuns } from '@/lib/db/schema'
 import { resolveWarUrl } from '@/lib/jenkins/update-center'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 import { getApiOrgSession } from '@/lib/auth/session'
 import { canAccessTooling } from '@/lib/auth/tooling'
+import { buildHostDownloadScript } from '@/lib/tools/bundle-transfer/host-download-script'
 
 export const runtime = 'nodejs'
 export const maxDuration = 900
@@ -412,52 +412,24 @@ async function writeLocalArchive(params: {
   })
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
+async function calculateFileSha256(filePath: string) {
+  const hash = createHash('sha256')
+  await pipeline(createReadStream(filePath), hash)
+  return hash.digest('hex')
 }
 
-function buildHostDownloadScript(params: {
-  downloadUrl: string
-  directory: string
-  fileName: string
-  owner: string
-}) {
-  const destination = path.posix.join(params.directory, params.fileName)
-  return [
-    'set -eu',
-    `DEST_DIR=${shellQuote(params.directory)}`,
-    `DEST_FILE=${shellQuote(params.fileName)}`,
-    `DEST_PATH=${shellQuote(destination)}`,
-    `DOWNLOAD_URL=${shellQuote(params.downloadUrl)}`,
-    `OWNER=${shellQuote(params.owner)}`,
-    'TMP_PATH="${DEST_DIR}/.${DEST_FILE}.ct-ops-transfer.$$"',
-    'cleanup() { rm -f "$TMP_PATH"; }',
-    'trap cleanup INT TERM EXIT',
-    'mkdir -p "$DEST_DIR"',
-    'echo "Downloading bundle to ${DEST_PATH}"',
-    'if command -v curl >/dev/null 2>&1; then',
-    '  curl -fLk --retry 3 --connect-timeout 20 --output "$TMP_PATH" "$DOWNLOAD_URL"',
-    'elif command -v wget >/dev/null 2>&1; then',
-    '  wget --no-check-certificate --tries=3 --timeout=20 -O "$TMP_PATH" "$DOWNLOAD_URL"',
-    'else',
-    '  echo "Neither curl nor wget is installed on this host" >&2',
-    '  exit 127',
-    'fi',
-    'mv -f "$TMP_PATH" "$DEST_PATH"',
-    'trap - INT TERM EXIT',
-    'if [ -n "$OWNER" ] && command -v chown >/dev/null 2>&1 && id "$OWNER" >/dev/null 2>&1; then',
-    '  chown "$OWNER" "$DEST_PATH" || true',
-    'fi',
-    'echo "Bundle transferred to ${DEST_PATH}"',
-  ].join('\n')
-}
-
-async function createBundleTransferTask(job: TransferJob, request: TransferRequest, downloadUrl: string) {
+async function createBundleTransferTask(
+  job: TransferJob,
+  request: TransferRequest,
+  downloadUrl: string,
+  expectedSha256: string,
+) {
   const script = buildHostDownloadScript({
     downloadUrl,
     directory: path.posix.normalize(request.directory),
     fileName: request.fileName,
     owner: request.username.trim(),
+    expectedSha256,
   })
 
   return db.transaction(async (tx) => {
@@ -609,6 +581,7 @@ async function runTransferJob(job: TransferJob, request: TransferRequest, baseUr
       readme: archive.readme,
       job,
     })
+    const archiveSha256 = await calculateFileSha256(archivePath)
 
     const downloadToken = randomBytes(32).toString('base64url')
     const downloadUrl = new URL('/api/tools/bundle-transfer', baseUrl)
@@ -624,7 +597,7 @@ async function runTransferJob(job: TransferJob, request: TransferRequest, baseUr
       currentTotal: null,
     })
 
-    const taskRunId = await createBundleTransferTask(job, request, downloadUrl.toString())
+    const taskRunId = await createBundleTransferTask(job, request, downloadUrl.toString(), archiveSha256)
     publishJob(job, { taskRunId })
 
     await refreshTransferTaskStatus(job)

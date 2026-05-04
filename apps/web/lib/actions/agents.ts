@@ -49,6 +49,7 @@ import type { HostMetadata, TagPair } from '@/lib/db/schema'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getRequiredSession } from '@/lib/auth/session'
+import { hasRole } from '@/lib/auth/guards'
 import {
   calculateEnrolmentTokenExpiry,
   DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,
@@ -96,9 +97,9 @@ export async function listPendingAgents(orgId: string): Promise<Agent[]> {
 export async function approveAgent(
   orgId: string,
   agentId: string,
-  actorId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgToolingAccess(orgId)
+  const actorId = session.user.id
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -226,9 +227,9 @@ async function findOnlineHostCollision(
 export async function rejectAgent(
   orgId: string,
   agentId: string,
-  actorId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgToolingAccess(orgId)
+  const actorId = session.user.id
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -491,7 +492,6 @@ export async function listDistinctHostOses(orgId: string): Promise<string[]> {
 
 export async function createEnrolmentToken(
   orgId: string,
-  userId: string,
   input: {
     label: string
     autoApprove: boolean
@@ -501,7 +501,8 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgToolingAccess(orgId)
+  const userId = session.user.id
   if (!await createEnrolmentTokenLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before creating another enrolment token.' }
   }
@@ -513,8 +514,7 @@ export async function createEnrolmentToken(
   // autoApprove bypasses the registration approval queue — restrict to super_admin to limit
   // blast radius if an org_admin account is compromised (M-29).
   if (parsed.data.autoApprove) {
-    const { user } = await getRequiredSession()
-    if (user.role !== 'super_admin') {
+    if (!hasRole(session.user, 'super_admin')) {
       return { error: 'Only super_admin users may create auto-approve enrolment tokens.' }
     }
   }
@@ -1225,13 +1225,13 @@ export async function deleteHost(
  */
 export async function uninstallAndDeleteHost(
   orgId: string,
-  userId: string,
   hostId: string,
 ): Promise<
   | { success: true }
   | { error: string; taskRunId?: string; agentOffline?: boolean }
 > {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgToolingAccess(orgId)
+  const userId = session.user.id
   try {
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),

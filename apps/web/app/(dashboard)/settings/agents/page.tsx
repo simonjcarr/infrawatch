@@ -33,7 +33,6 @@ export default async function AgentsSettingsPage() {
       />
       <AgentsSettingsClient
         orgId={orgId}
-        currentUserId={session.user.id}
         initialTokens={tokens}
         appUrl={appUrl}
       />

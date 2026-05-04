@@ -118,14 +118,12 @@ type SilenceFormValues = z.infer<typeof silenceFormSchema>
 function AddSilenceDialog({
   orgId,
   hostId,
-  userId,
   open,
   onOpenChange,
   onSuccess,
 }: {
   orgId: string
   hostId: string
-  userId: string
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: () => void
@@ -147,7 +145,7 @@ function AddSilenceDialog({
   })
 
   async function onSubmit(values: SilenceFormValues) {
-    const result = await createSilence(orgId, userId, {
+    const result = await createSilence(orgId, {
       hostId,
       reason: values.reason,
       startsAt: new Date(values.startsAt).toISOString(),
@@ -532,10 +530,9 @@ function AddRuleDialog({
 interface Props {
   orgId: string
   hostId: string
-  currentUserId: string
 }
 
-export function AlertsTab({ orgId, hostId, currentUserId }: Props) {
+export function AlertsTab({ orgId, hostId }: Props) {
   const qc = useQueryClient()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [addSilenceOpen, setAddSilenceOpen] = useState(false)
@@ -762,7 +759,6 @@ export function AlertsTab({ orgId, hostId, currentUserId }: Props) {
       <AddSilenceDialog
         orgId={orgId}
         hostId={hostId}
-        userId={currentUserId}
         open={addSilenceOpen}
         onOpenChange={setAddSilenceOpen}
         onSuccess={() => qc.invalidateQueries({ queryKey: ['silences-active', orgId, hostId] })}

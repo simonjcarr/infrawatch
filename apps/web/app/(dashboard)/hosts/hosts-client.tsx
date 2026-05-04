@@ -63,7 +63,6 @@ type StatusFilter = 'all' | 'online' | 'offline' | 'unknown'
 
 interface HostsClientProps {
   orgId: string
-  currentUserId: string
   currentUserRole: string
   initialHostPage: HostListResult
   initialStats: HostInventoryStats
@@ -199,7 +198,6 @@ function SortableHeader({
 
 export function HostsClient({
   orgId,
-  currentUserId,
   currentUserRole,
   initialHostPage,
   initialStats,
@@ -313,7 +311,7 @@ export function HostsClient({
 
   const approveMutation = useMutation({
     mutationFn: ({ agentId }: { agentId: string }) =>
-      approveAgent(orgId, agentId, currentUserId),
+      approveAgent(orgId, agentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents', 'pending', orgId] })
       queryClient.invalidateQueries({ queryKey: ['hosts', 'page', orgId] })
@@ -323,7 +321,7 @@ export function HostsClient({
 
   const rejectMutation = useMutation({
     mutationFn: ({ agentId }: { agentId: string }) =>
-      rejectAgent(orgId, agentId, currentUserId),
+      rejectAgent(orgId, agentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents', 'pending', orgId] })
       queryClient.invalidateQueries({ queryKey: ['hosts', 'stats', orgId] })

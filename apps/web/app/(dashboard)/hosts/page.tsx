@@ -26,7 +26,6 @@ export default async function HostsPage() {
   return (
     <HostsClient
       orgId={orgId}
-      currentUserId={session.user.id}
       currentUserRole={session.user.role}
       initialHostPage={hostPage}
       initialStats={stats}

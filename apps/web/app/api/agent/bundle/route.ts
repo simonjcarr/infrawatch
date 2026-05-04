@@ -12,6 +12,7 @@ import {
   type AgentArch,
 } from '@/lib/agent/binary'
 import { buildInstallBundle } from '@/lib/agent/bundle'
+import { getAgentPublicOrigin } from '@/lib/agent/public-origin'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 import { readFile } from 'node:fs/promises'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
@@ -183,11 +184,9 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const host = request.headers.get('host') ?? 'localhost'
-  const proto = request.headers.get('x-forwarded-proto') ?? 'http'
-  const serverUrl = `${proto}://${host}`
+  const serverUrl = getAgentPublicOrigin()
   const ingestAddress =
-    parsed.data.ingestAddress?.trim() || `${host.split(':')[0]}:9443`
+    parsed.data.ingestAddress?.trim() || `${new URL(serverUrl).hostname}:9443`
 
   const serverCaPem = await readPemFile(SERVER_TLS_CERT_PATH)
   const webServerCertPem = await readPemFile(WEB_TLS_CERT_PATH)

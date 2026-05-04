@@ -15,6 +15,22 @@
 
 ## What Has Been Built
 
+### Session 102 — Password Vault implementation plan
+
+**Built-in Password Vault coordination** (`docs/password-vault-implementation-plan.md`)
+- Added an implementation coordination plan for the built-in CTOps Password
+  Vault, split into one-session chunks that future agents can pick up safely.
+- Recorded the current product decision: Password Vault is first-party CTOps
+  functionality, uses browser-side zero-knowledge encryption, has no admin
+  recovery in the MVP, and starts with a multi-user core vault.
+- Made stale external password-manager plugin documentation cleanup the first
+  implementation task so old product/repository direction does not confuse
+  future work.
+
+**Validation**
+- Validation run: `git diff --check` and a targeted Markdown sanity check for
+  balanced fenced code blocks and tab characters.
+
 ### Session 101 — Plugin entitlement storage design
 
 **Plugin licensing contract** (`docs/ct-ops-plugin-entitlement-storage.md`, `docs/ct-ops-licensing-and-ct-cve-product-decision.md`, `docs/ct-ops-ct-cve-api-contract.md`, `docs/ct-cve-migration-plan.md`)

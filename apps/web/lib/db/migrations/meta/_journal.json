@@ -407,6 +407,13 @@
       "when": 1777902425026,
       "tag": "0057_wet_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1777918800000,
+      "tag": "0058_password_vault_key_epoch_idempotency",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.97.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.1...web/v0.97.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **alerts:** block stored private notification targets ([#904](https://github.com/carrtech-dev/ct-ops/issues/904)) ([eda2d31](https://github.com/carrtech-dev/ct-ops/commit/eda2d3175e990f9d3dca02fcb0e58d6dbe670482))
+
 ## [0.97.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.0...web/v0.97.1) (2026-05-04)
 
 

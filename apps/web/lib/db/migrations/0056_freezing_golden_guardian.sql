@@ -65,8 +65,6 @@ CREATE TABLE "password_vaults" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
-ALTER TABLE "organisations" ADD COLUMN IF NOT EXISTS "licence_verifier_public_key" text;--> statement-breakpoint
-ALTER TABLE "organisations" ADD COLUMN IF NOT EXISTS "licence_verifier_public_key_fingerprint" text;--> statement-breakpoint
 ALTER TABLE "password_vault_entries" ADD CONSTRAINT "password_vault_entries_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_vault_entries" ADD CONSTRAINT "password_vault_entries_vault_id_password_vaults_id_fk" FOREIGN KEY ("vault_id") REFERENCES "public"."password_vaults"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_vault_entries" ADD CONSTRAINT "password_vault_entries_created_by_user_id_user_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."user"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

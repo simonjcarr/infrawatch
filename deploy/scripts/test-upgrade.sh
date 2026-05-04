@@ -29,7 +29,52 @@ fi
 exit 0
 EOF
 
-  chmod +x "${dir}/docker"
+  cat > "${dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+out=""
+url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o)
+      out="$2"
+      shift 2
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$out" || -z "$url" ]]; then
+  echo "mock curl expected -o <file> <url>" >&2
+  exit 2
+fi
+
+if [[ -n "${MOCK_CURL_LOG:-}" ]]; then
+  printf '%s\n' "$url" >> "$MOCK_CURL_LOG"
+fi
+
+if [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100" \
+  || "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=1" ]]; then
+  printf '%s' "${MOCK_RELEASES_JSON}" > "$out"
+elif [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=2" ]]; then
+  printf '%s' "${MOCK_RELEASES_JSON_PAGE_2:-[]}" > "$out"
+elif [[ "$url" == https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100\&page=* ]]; then
+  printf '[]' > "$out"
+elif [[ "$url" == *.sha256 ]]; then
+  printf '%s  ct-ops-single.zip\n' "${MOCK_CHECKSUM}" > "$out"
+else
+  cp "${MOCK_BUNDLE_ZIP}" "$out"
+fi
+EOF
+
+  chmod +x "${dir}/docker" "${dir}/curl"
 }
 
 write_bundle() {
@@ -149,6 +194,46 @@ main() {
     echo "expected one backup tarball for legacy install, found $backups" >&2
     exit 1
   fi
+
+  rm -rf "$old_install" "$new_src" "$backup_dir"
+  mkdir -p "${tmpdir}/current" "$backup_dir"
+
+  write_bundle "${tmpdir}/current" "v1.0.0"
+  {
+    printf 'customer-secret=true\n'
+    printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
+    printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+  } > "${old_install}/.env"
+
+  write_bundle "$new_src" "v0.100.0"
+  rm -f "$bundle_zip"
+  (cd "$new_src" && zip -qr "$bundle_zip" ct-ops)
+
+  export MOCK_RELEASES_JSON='[
+    { "tag_name": "ingest/v9.9.9" },
+    { "tag_name": "web/v0.99.0" },
+    { "tag_name": "web/v0.98.0" }
+  ]'
+  export MOCK_RELEASES_JSON_PAGE_2='[
+    { "tag_name": "web/v0.100.0" }
+  ]'
+  export MOCK_BUNDLE_ZIP="$bundle_zip"
+  export MOCK_CURL_LOG="${tmpdir}/curl.log"
+  export MOCK_CHECKSUM
+  MOCK_CHECKSUM="$(openssl dgst -sha256 "$bundle_zip" | awk '{print $NF}')"
+
+  (
+    cd "$old_install"
+    PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" \
+      MOCK_DOCKER_LOG="$docker_log" \
+      CT_OPS_BACKUP_DIR="$backup_dir" \
+      ./upgrade.sh --no-start
+  )
+
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
+  grep -q 'example/web:v0.100.0' "${old_install}/docker-compose.yml"
+  unset MOCK_CURL_LOG MOCK_RELEASES_JSON_PAGE_2
 
   echo "upgrade.sh local bundle tests passed"
 }

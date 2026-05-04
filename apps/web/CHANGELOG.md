@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.102.2...web/v0.103.0) (2026-05-04)
+
+
+### Features
+
+* **password-vault:** add route shell ([#938](https://github.com/carrtech-dev/ct-ops/issues/938)) ([06fd1a3](https://github.com/carrtech-dev/ct-ops/commit/06fd1a3d8a587e792437780fde8d50be01d729cb))
+
 ## [0.102.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.102.1...web/v0.102.2) (2026-05-04)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.2...ingest/v0.8.3) (2026-05-04)
+
+
+### Bug Fixes
+
+* **alerts:** block stored private notification targets ([#904](https://github.com/carrtech-dev/ct-ops/issues/904)) ([eda2d31](https://github.com/carrtech-dev/ct-ops/commit/eda2d3175e990f9d3dca02fcb0e58d6dbe670482))
+
 ## [0.8.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.1...ingest/v0.8.2) (2026-05-02)
 
 

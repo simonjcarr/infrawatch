@@ -44,6 +44,16 @@ in a new dedicated worktree and open a new pull request. Repeat this cycle until
 all required code is merged into `main` and any required release or image
 publication is complete.
 
+## Out-of-Scope Findings
+
+If you discover an issue while working in a codebase and the issue is outside
+the scope of the current task, create a focused GitHub issue in the relevant
+repository before finishing. Include enough detail for another engineer to
+understand and act on it: what you found, where you found it, why it matters,
+available reproduction or evidence, and your view on what should be done to fix
+it. Do not silently ignore the issue, and do not expand the current task's scope
+unless the user explicitly asks you to fix it now.
+
 ## Security Expectations
 
 When planning and implementing a feature, ensure the feature would pass an
@@ -77,12 +87,6 @@ For forms and other user-controlled inputs:
 
 These examples are not exhaustive. Consider the broader security implications of
 the feature, its failure modes, and how it could be abused before shipping.
-
-If you identify an error, bug, or security risk that is unrelated to the task
-you are working on, create an issue in the GitHub repository before finishing so
-the finding is tracked and not forgotten. Keep the issue focused, include enough
-evidence to reproduce or assess the risk, and do not expand the current task's
-scope unless the user explicitly asks you to fix it.
 
 ## Testing Expectations
 

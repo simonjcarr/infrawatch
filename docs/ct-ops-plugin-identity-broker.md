@@ -12,20 +12,18 @@ Related:
 
 ## Context
 
-CT-CVE and CT-Passwd both need CT Ops to remain the installation entry point,
-identity provider, and organization authority without forcing each plugin to
-run its own user database. The existing product decision record and CT-CVE API
-contract already define that direction, but they stop short of a concrete
-shared broker design for pairing, trust storage, launch assertions, session
-revocation, and backend authorization checks.
+CT-CVE and future external CT Ops plugins need CT Ops to remain the
+installation entry point, identity provider, and organization authority without
+forcing each plugin to run its own user database. The existing product
+decision record and CT-CVE API contract already define that direction, but
+they stop short of a concrete shared broker design for pairing, trust storage,
+launch assertions, session revocation, and backend authorization checks.
 
 That missing broker detail now blocks multiple follow-on tasks:
 
 - CT-CVE cannot replace its placeholder GUI subscription/auth status with a
   real CT Ops-launched flow.
-- CT-Passwd needs a trusted launch path before it can build plugin-local
-  sessions and unlock flows.
-- Future first-party plugins need one repeatable model instead of product-by-
+- Future external plugins need one repeatable model instead of product-by-
   product authentication inventions.
 
 ## Goals
@@ -33,8 +31,7 @@ That missing broker detail now blocks multiple follow-on tasks:
 - Keep CT Ops as the only customer user-login system.
 - Prevent plugins from trusting a copied or forged CT Ops database by requiring
   CT Ops-signed assertions and pinned installation trust.
-- Support CT-CVE, CT-Passwd, and future first-party plugins with one broker
-  model.
+- Support CT-CVE and future first-party plugins with one broker model.
 - Keep plugin-specific forms, workflows, and operational data in each plugin.
 - Ensure backend authorization decisions are enforceable even when the frontend
   is bypassed.
@@ -93,7 +90,7 @@ CT Ops stores one registry row per paired plugin instance.
 Required registry fields:
 
 - `pluginInstanceId`
-- `product`, for example `ct-cve` or `ct-passwd`
+- `product`, for example `ct-cve`
 - `organisationId`
 - `displayName`
 - `launchUrl`
@@ -163,7 +160,7 @@ Required claims:
 | `sub` | CT Ops user identifier. |
 | `orgId` | CT Ops organization identifier. |
 | `orgSlug` | Optional human-readable diagnostics only. |
-| `product` | Plugin product identifier such as `ct-cve` or `ct-passwd`. |
+| `product` | Plugin product identifier such as `ct-cve`. |
 | `roles` | CT Ops roles available to the plugin. |
 | `permissions` | Optional derived permissions for plugin launch decisions. |
 | `sid` | CT Ops session identifier or equivalent session binding. |
@@ -245,7 +242,7 @@ Request body:
 ```json
 {
   "pluginInstanceId": "plugin_inst_123",
-  "product": "ct-passwd",
+  "product": "ct-cve",
   "orgId": "org_123",
   "userId": "user_123",
   "sid": "sess_123"
@@ -304,15 +301,13 @@ Plugin backend checks after launch:
 - CT-CVE still owns feed credentials, source configuration, and vulnerability
   processing in its own service and database.
 
-### CT-Passwd
+### Built-In Password Vault
 
-- The broker authenticates entry into CT-Passwd but does not unlock the user's
-  vault.
-- CT Ops must never receive or issue CT-Passwd unlock passwords, derived keys,
-  private keys, vault keys, entry data encryption keys, plaintext secrets, or
-  decrypted password-entry fields.
-- CT-Passwd keeps its own plugin-local session and then requires a separate
-  unlock step inside the browser before vault secrets become accessible.
+- CTOps Password Vault is now built in to CT Ops and does not use this external
+  plugin broker model.
+- Browser-side unlock, key handling, and vault-secret isolation are documented
+  in the Password Vault implementation and threat-model work instead of plugin
+  launch contracts.
 
 ## Failure Handling
 
@@ -332,5 +327,4 @@ Next phases remain separate:
 
 - Plugin entitlement storage and CT Portal contract.
 - CT-CVE integration with real CT Ops launch/session status.
-- CT-Passwd launch assertion verification, plugin-local sessions, and unlock
-  flows.
+- Future plugin-specific launch/session constraints beyond CT-CVE.

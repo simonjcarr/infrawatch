@@ -123,7 +123,7 @@ export function parseLdapTwoFactorChallenge(value: string): LdapTwoFactorChallen
 async function readBackupCodes(value: string | null, secret: string): Promise<string[]> {
   if (!value) return []
 
-  let decrypted = value
+  let decrypted: string
   try {
     decrypted = await symmetricDecrypt({
       key: secret,

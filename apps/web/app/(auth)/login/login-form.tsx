@@ -124,7 +124,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
     setServerError(null)
 
     try {
-      const res = await fetch('/api/auth/ldap', {
+      const res = await fetch('/api/auth/ldap/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,6 +28,7 @@ const domainLoginSchema = z.object({
 
 type LocalLoginValues = z.infer<typeof localLoginSchema>
 type DomainLoginValues = z.infer<typeof domainLoginSchema>
+type DomainTwoFactorMethod = 'totp' | 'backup_code'
 
 interface LoginFormProps {
   ldapLoginEnabled?: boolean
@@ -46,6 +47,9 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
   const [canResendVerification, setCanResendVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
   const [loginMode, setLoginMode] = useState<'local' | 'domain'>('local')
+  const [ldapTwoFactorRequired, setLdapTwoFactorRequired] = useState(false)
+  const [ldapTwoFactorCode, setLdapTwoFactorCode] = useState('')
+  const [ldapTwoFactorMethod, setLdapTwoFactorMethod] = useState<DomainTwoFactorMethod>('totp')
 
   const localForm = useForm<LocalLoginValues>({
     resolver: zodResolver(localLoginSchema),
@@ -84,9 +88,48 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
       const res = await fetch('/api/auth/ldap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ldapTwoFactorRequired
+          ? {
+              twoFactorCode: ldapTwoFactorCode,
+              twoFactorMethod: ldapTwoFactorMethod,
+            }
+          : {
+              username: values.username,
+              password: values.password,
+            }),
+      })
+
+      const data = await res.json()
+
+      if (data.twoFactorRequired) {
+        setLdapTwoFactorRequired(true)
+        setLdapTwoFactorMethod('totp')
+        setLdapTwoFactorCode('')
+        return
+      }
+
+      if (!res.ok) {
+        setServerError(data.error ?? 'Domain sign in failed.')
+        return
+      }
+
+      router.push('/dashboard')
+    } catch {
+      setServerError('An unexpected error occurred.')
+    }
+  }
+
+  async function onDomainTwoFactorSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setServerError(null)
+
+    try {
+      const res = await fetch('/api/auth/ldap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: values.username,
-          password: values.password,
+          twoFactorCode: ldapTwoFactorCode,
+          twoFactorMethod: ldapTwoFactorMethod,
         }),
       })
 
@@ -101,6 +144,12 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
     } catch {
       setServerError('An unexpected error occurred.')
     }
+  }
+
+  function resetDomainTwoFactor() {
+    setLdapTwoFactorRequired(false)
+    setLdapTwoFactorCode('')
+    setLdapTwoFactorMethod('totp')
   }
 
   return (
@@ -130,6 +179,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
                 setServerError(null)
                 setCanResendVerification(false)
                 setVerificationEmail(null)
+                resetDomainTwoFactor()
               }}
             >
               Local Account
@@ -146,6 +196,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
                 setServerError(null)
                 setCanResendVerification(false)
                 setVerificationEmail(null)
+                resetDomainTwoFactor()
               }}
             >
               Domain Account
@@ -244,41 +295,113 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
           </CardFooter>
         </form>
       ) : (
-        <form onSubmit={domainForm.handleSubmit(onDomainSubmit)}>
+        <form onSubmit={ldapTwoFactorRequired ? onDomainTwoFactorSubmit : domainForm.handleSubmit(onDomainSubmit)}>
           <CardContent className="space-y-4">
             {serverError && (
               <p className="text-sm text-destructive">{serverError}</p>
             )}
-            <div className="space-y-1.5">
-              <Label htmlFor="domain-username">Username</Label>
-              <Input
-                id="domain-username"
-                type="text"
-                autoComplete="username"
-                placeholder="jsmith"
-                {...domainForm.register('username')}
-              />
-              {domainForm.formState.errors.username && (
-                <p className="text-xs text-destructive">{domainForm.formState.errors.username.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="domain-password">Password</Label>
-              <Input
-                id="domain-password"
-                type="password"
-                autoComplete="current-password"
-                {...domainForm.register('password')}
-              />
-              {domainForm.formState.errors.password && (
-                <p className="text-xs text-destructive">{domainForm.formState.errors.password.message}</p>
-              )}
-            </div>
+            {ldapTwoFactorRequired ? (
+              <>
+                <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
+                  <p className="font-medium text-foreground">Second factor required</p>
+                  <p className="text-muted-foreground">
+                    Enter the code from your authenticator app or use one of your backup codes to finish signing in.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Verification method</Label>
+                  <div className="flex rounded-md border p-1 gap-1">
+                    <button
+                      type="button"
+                      className={`flex-1 px-3 py-1.5 text-sm rounded transition-colors ${
+                        ldapTwoFactorMethod === 'totp'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      onClick={() => setLdapTwoFactorMethod('totp')}
+                      data-testid="domain-2fa-method-totp"
+                    >
+                      Authenticator
+                    </button>
+                    <button
+                      type="button"
+                      className={`flex-1 px-3 py-1.5 text-sm rounded transition-colors ${
+                        ldapTwoFactorMethod === 'backup_code'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      onClick={() => setLdapTwoFactorMethod('backup_code')}
+                      data-testid="domain-2fa-method-backup"
+                    >
+                      Backup Code
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="domain-two-factor-code">
+                    {ldapTwoFactorMethod === 'totp' ? 'Authenticator code' : 'Backup code'}
+                  </Label>
+                  <Input
+                    id="domain-two-factor-code"
+                    type="text"
+                    autoComplete="one-time-code"
+                    value={ldapTwoFactorCode}
+                    onChange={(event) => setLdapTwoFactorCode(event.target.value)}
+                    data-testid="domain-2fa-code"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="domain-username">Username</Label>
+                  <Input
+                    id="domain-username"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="jsmith"
+                    {...domainForm.register('username')}
+                    data-testid="domain-login-username"
+                  />
+                  {domainForm.formState.errors.username && (
+                    <p className="text-xs text-destructive">{domainForm.formState.errors.username.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="domain-password">Password</Label>
+                  <Input
+                    id="domain-password"
+                    type="password"
+                    autoComplete="current-password"
+                    {...domainForm.register('password')}
+                    data-testid="domain-login-password"
+                  />
+                  {domainForm.formState.errors.password && (
+                    <p className="text-xs text-destructive">{domainForm.formState.errors.password.message}</p>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={domainForm.formState.isSubmitting}>
-              {domainForm.formState.isSubmitting ? 'Signing in...' : 'Sign in with Domain Account'}
+            <Button type="submit" className="w-full" disabled={domainForm.formState.isSubmitting || (ldapTwoFactorRequired && !ldapTwoFactorCode.trim())}>
+              {domainForm.formState.isSubmitting
+                ? (ldapTwoFactorRequired ? 'Verifying...' : 'Signing in...')
+                : (ldapTwoFactorRequired ? 'Verify code' : 'Sign in with Domain Account')}
             </Button>
+            {ldapTwoFactorRequired && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setServerError(null)
+                  resetDomainTwoFactor()
+                }}
+              >
+                Start over
+              </Button>
+            )}
           </CardFooter>
         </form>
       )}

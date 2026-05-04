@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 101 — Plugin entitlement storage design
+
+**Plugin licensing contract** (`docs/ct-ops-plugin-entitlement-storage.md`, `docs/ct-ops-licensing-and-ct-cve-product-decision.md`, `docs/ct-ops-ct-cve-api-contract.md`, `docs/ct-cve-migration-plan.md`)
+- Added the shared CT Ops plugin entitlement storage design covering normalized
+  entitlement records, CT Portal request-token and licence binding, encrypted
+  licence artifact storage, derived subscription-status responses, audit
+  requirements, and safe degradation rules for air-gapped installs.
+- Defined CT-Passwd's stricter visibility rule: CT Ops must keep CT-Passwd
+  hidden unless a valid entitlement exists, including on nav, settings, search,
+  and launch paths.
+- Linked the new design from the product decision record, the CT-CVE API
+  contract, and the migration plan so later implementation work uses one CT
+  Ops-owned contract.
+
+**Validation**
+- Validation run: `git diff --check` and a targeted Markdown sanity check for
+  balanced fenced code blocks and tab characters.
+
 ### Session 100 — Shared plugin identity broker design
 
 **Plugin identity groundwork** (`docs/ct-ops-plugin-identity-broker.md`, `docs/ct-ops-licensing-and-ct-cve-product-decision.md`, `docs/ct-ops-ct-cve-api-contract.md`, `docs/ct-cve-migration-plan.md`)

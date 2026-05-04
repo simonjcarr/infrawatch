@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 100 — Shared plugin identity broker design
+
+**Plugin identity groundwork** (`docs/ct-ops-plugin-identity-broker.md`, `docs/ct-ops-licensing-and-ct-cve-product-decision.md`, `docs/ct-ops-ct-cve-api-contract.md`, `docs/ct-cve-migration-plan.md`)
+- Added the shared CT Ops plugin identity broker design covering installation
+  identity, plugin-instance registration, trust exchange, short-lived signed
+  launch assertions, redirect/iframe/proxy launch modes, plugin-local sessions,
+  session-status revocation checks, and backend authorization responsibilities.
+- Linked the new broker document from the CT-CVE product decision record and API
+  contract so future CT-CVE and CT-Passwd implementation work shares one
+  source of truth.
+- Marked the CT-CVE migration plan's plugin-identity-broker phase complete and
+  narrowed the remaining CT-CVE GUI blocker to plugin entitlement and follow-on
+  integration work.
+
+**Validation**
+- Validation run: `git diff --check` and a targeted Markdown sanity check for
+  balanced fenced code blocks and tab characters.
+
 ### Session 99 — CT-Passwd implementation coordination plan
 
 **CT-Passwd planning handoff** (`git@github.com:simonjcarr/ct-passwd.git`,

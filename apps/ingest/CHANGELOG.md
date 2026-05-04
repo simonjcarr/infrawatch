@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.3...ingest/v0.8.4) (2026-05-04)
+
+
+### Bug Fixes
+
+* **ingest:** prevent agent identity takeover on re-registration ([639fe92](https://github.com/carrtech-dev/ct-ops/commit/639fe925483f6bbb73bbf456116a25b641d26243)), closes [#909](https://github.com/carrtech-dev/ct-ops/issues/909)
+
 ## [0.8.3](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.2...ingest/v0.8.3) (2026-05-04)
 
 

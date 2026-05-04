@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.1...web/v0.103.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **bundle-transfer:** verify host bundle downloads ([99dbfe8](https://github.com/carrtech-dev/ct-ops/commit/99dbfe80bcf47e87ff4c2b108ed9c3609ba5ba2d)), closes [#935](https://github.com/carrtech-dev/ct-ops/issues/935)
+
 ## [0.103.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.0...web/v0.103.1) (2026-05-04)
 
 

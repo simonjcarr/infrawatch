@@ -11,6 +11,7 @@ Core capabilities:
 - **Agent-based server monitoring** — A lightweight Go agent runs on each host, streaming metrics and running checks over gRPC with mTLS
 - **Certificate lifecycle management** — Track TLS certificates across your infrastructure and get expiry alerts before they cause outages
 - **Service account and identity tracking** — Inventory domain accounts, SSH keys, and users across your fleet via LDAP/Active Directory sync
+- **Password Vault (in active development)** — Store shared secrets with browser-side encryption, local unlock, and per-user wrapped vault keys
 - **Infrastructure tooling** — A persistent terminal panel, custom script runner, service management, task runner, and runbooks
 - **Alerting and notification routing** — Rule-based alerts with channels for Slack, SMTP, Webhooks, Telegram, and in-app notifications
 
@@ -43,4 +44,5 @@ Paid licence validation uses a signed JWT verified against a bundled public key.
 | [Agent Architecture](./architecture/agent) | Registration flow, identity model, self-update |
 | [Ingest Service](./architecture/ingest) | gRPC gateway, JWT issuance, queue |
 | [Deployment Profiles](./architecture/deployment-profiles) | single / standard / HA configurations |
+| [Password Vault](./features/password-vault) | MVP scope, trust model, and recovery limits |
 | [Air-Gap Deployment](./deployment/air-gap) | Run CT-Ops with zero external dependencies |

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.101.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.100.1...web/v0.101.0) (2026-05-04)
+
+
+### Features
+
+* **password-vault:** add sharing api ([dfad1f7](https://github.com/carrtech-dev/ct-ops/commit/dfad1f7c3cabd138628dfbb52d71bc8f5c4bf66e))
+
 ## [0.100.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.100.0...web/v0.100.1) (2026-05-04)
 
 

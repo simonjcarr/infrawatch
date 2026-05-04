@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.96.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.3...web/v0.96.4) (2026-05-04)
+
+
+### Bug Fixes
+
+* **web:** limit e2e database pool usage ([d14c2f2](https://github.com/carrtech-dev/ct-ops/commit/d14c2f2ad844d19df1a980c3b2912ce93fbf5665))
+
 ## [0.96.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.2...web/v0.96.3) (2026-05-03)
 
 

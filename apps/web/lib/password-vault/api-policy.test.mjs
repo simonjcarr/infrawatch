@@ -109,8 +109,16 @@ test('password vault API policy defines rate limits for sensitive flows', () => 
     PASSWORD_VAULT_API_RATE_LIMITS.unlock,
   )
   assert.deepEqual(
+    PASSWORD_VAULT_API_POLICY.unlockAudit.rateLimit,
+    PASSWORD_VAULT_API_RATE_LIMITS.sensitiveAudit,
+  )
+  assert.deepEqual(
     PASSWORD_VAULT_API_POLICY.addMember.rateLimit,
     PASSWORD_VAULT_API_RATE_LIMITS.share,
+  )
+  assert.deepEqual(
+    PASSWORD_VAULT_API_POLICY.exportAudit.rateLimit,
+    PASSWORD_VAULT_API_RATE_LIMITS.sensitiveAudit,
   )
   assert.deepEqual(
     PASSWORD_VAULT_API_POLICY.revealAudit.rateLimit,

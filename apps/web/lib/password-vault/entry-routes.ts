@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { ZodError } from 'zod'
 import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { writeAuditEvent } from '@/lib/audit/events'
 import { type TransactionDatabase, withOrgDatabaseScope } from '@/lib/db'
 import {
   passwordVaultEntries,
@@ -13,6 +14,7 @@ import {
   assertPasswordVaultMutationBodySize,
   assertPasswordVaultReadBodySize,
 } from './api-policy.ts'
+import { buildPasswordVaultAuditEvent } from './audit-api.ts'
 import {
   PASSWORD_VAULT_ENTRY_ENVELOPE_VERSION,
   createPasswordVaultEntryDeletedResponse,
@@ -197,7 +199,17 @@ async function createEntry(
         isNull(passwordVaults.deletedAt),
       ))
 
-    return toSerializableEntry(requireRow(entry, 'Password Vault entry create failed'))
+    const createdEntry = requireRow(entry, 'Password Vault entry create failed')
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'entry_created',
+      vaultId,
+      entryId: createdEntry.id,
+    }))
+
+    return toSerializableEntry(createdEntry)
   })
 }
 
@@ -242,7 +254,17 @@ async function updateEntry(
         isNull(passwordVaults.deletedAt),
       ))
 
-    return toSerializableEntry(requireRow(entry, 'Password Vault entry update failed'))
+    const updatedEntry = requireRow(entry, 'Password Vault entry update failed')
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'entry_updated',
+      vaultId,
+      entryId,
+    }))
+
+    return toSerializableEntry(updatedEntry)
   })
 }
 
@@ -283,6 +305,14 @@ async function deleteEntry(
         eq(passwordVaults.organisationId, session.user.organisationId),
         isNull(passwordVaults.deletedAt),
       ))
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'entry_deleted',
+      vaultId,
+      entryId,
+    }))
 
     return 'deleted'
   })

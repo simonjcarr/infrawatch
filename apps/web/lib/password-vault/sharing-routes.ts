@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { ZodError } from 'zod'
 import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { writeAuditEvent } from '@/lib/audit/events'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { type TransactionDatabase, withOrgDatabaseScope } from '@/lib/db'
 import {
@@ -21,6 +22,7 @@ import {
   assertPasswordVaultMutationBodySize,
   assertPasswordVaultReadBodySize,
 } from './api-policy.ts'
+import { buildPasswordVaultAuditEvent } from './audit-api.ts'
 import { PASSWORD_VAULT_KEY_WRAP_VERSION } from './vault-api.ts'
 import {
   createPasswordVaultKeyEpochResponse,
@@ -340,6 +342,15 @@ async function addMember(
       throw new Error('Password Vault member create failed')
     }
 
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'member_added',
+      vaultId,
+      targetUserId: payload.userId,
+      role: createdMember.role,
+    }))
+
     return createdMember
   })
 }
@@ -398,6 +409,15 @@ async function updateMember(
       throw new Error('Password Vault member update failed')
     }
 
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'member_role_changed',
+      vaultId,
+      targetUserId: userId,
+      role: updatedMember.role,
+    }))
+
     return updatedMember
   })
 }
@@ -447,6 +467,15 @@ async function removeMember(
         eq(passwordVaultMembers.userId, userId),
         isNull(passwordVaultMembers.revokedAt),
       ))
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'member_revoked',
+      vaultId,
+      targetUserId: userId,
+      role: targetMember.role,
+    }))
 
     return 'deleted'
   })
@@ -533,6 +562,17 @@ async function rotateKeyEpoch(
           isNull(passwordVaultMembers.revokedAt),
         ))
     }
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'key_rotated',
+      vaultId,
+      keyEpochId: newEpoch.id,
+      keyEpochNumber: newEpoch.epochNumber,
+      rotationReason: newEpoch.rotationReason,
+      memberCount: payload.memberKeyWraps.length,
+    }))
 
     return newEpoch
   })

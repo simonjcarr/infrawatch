@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { ZodError } from 'zod'
 import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { writeAuditEvent } from '@/lib/audit/events'
 import { withOrgDatabaseScope } from '@/lib/db'
 import { passwordVaultUserKeys } from '@/lib/db/schema'
 import type { PasswordVaultUserKey } from '@/lib/db/schema/password-vault.ts'
@@ -12,6 +13,7 @@ import {
   assertPasswordVaultMutationBodySize,
   assertPasswordVaultReadBodySize,
 } from './api-policy.ts'
+import { buildPasswordVaultAuditEvent } from './audit-api.ts'
 import {
   createPasswordVaultSetupStatus,
   createPasswordVaultUserKeyConflictResponse,
@@ -53,7 +55,17 @@ async function createUserKey(
       .onConflictDoNothing({ target: passwordVaultUserKeys.userId })
       .returning()
 
-    return created ?? null
+    if (!created) {
+      return null
+    }
+
+    await writeAuditEvent(scopedDb, buildPasswordVaultAuditEvent({
+      organisationId: session.user.organisationId,
+      actorUserId: session.user.id,
+      event: 'setup_completed',
+    }))
+
+    return created
   })
 }
 

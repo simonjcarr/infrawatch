@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 103 — Password Vault stale plugin-doc cleanup
+
+**Built-in Password Vault direction cleanup** (`docs/password-vault-implementation-plan.md`, `docs/ct-ops-plugin-identity-broker.md`, `docs/ct-ops-plugin-entitlement-storage.md`, `docs/ct-ops-licensing-and-ct-cve-product-decision.md`, `docs/ct-cve-migration-plan.md`)
+- Removed the live CT-Passwd external-plugin direction from the shared CT Ops
+  design docs and rewrote those sections around CT-CVE plus generic future
+  external plugins.
+- Replaced the old external password-manager/product-plan history in
+  `PROGRESS.md` with an explicit superseded note so future sessions do not treat
+  the old repository, entitlement, or launch model as active CTOps direction.
+- Kept the plugin broker and entitlement designs focused on real external
+  plugin use cases while stating that Password Vault is now built in to CT Ops
+  and does not use that external plugin model.
+
+**Validation**
+- Validation run: targeted `rg` residue checks for `CT-Passwd` and the old
+  external repository slug, `git diff --check`, and a targeted Markdown sanity
+  check for balanced fenced code blocks and tab characters.
+
 ### Session 102 — Password Vault implementation plan
 
 **Built-in Password Vault coordination** (`docs/password-vault-implementation-plan.md`)
@@ -38,9 +56,9 @@
   entitlement records, CT Portal request-token and licence binding, encrypted
   licence artifact storage, derived subscription-status responses, audit
   requirements, and safe degradation rules for air-gapped installs.
-- Defined CT-Passwd's stricter visibility rule: CT Ops must keep CT-Passwd
-  hidden unless a valid entitlement exists, including on nav, settings, search,
-  and launch paths.
+- Defined the stricter hidden-plugin visibility rule for any future external
+  plugin that needs it: CT Ops must keep the product hidden unless a valid
+  entitlement exists, including on nav, settings, search, and launch paths.
 - Linked the new design from the product decision record, the CT-CVE API
   contract, and the migration plan so later implementation work uses one CT
   Ops-owned contract.
@@ -57,8 +75,8 @@
   launch assertions, redirect/iframe/proxy launch modes, plugin-local sessions,
   session-status revocation checks, and backend authorization responsibilities.
 - Linked the new broker document from the CT-CVE product decision record and API
-  contract so future CT-CVE and CT-Passwd implementation work shares one
-  source of truth.
+  contract so future CT-CVE and other external plugin implementation work
+  shares one source of truth.
 - Marked the CT-CVE migration plan's plugin-identity-broker phase complete and
   narrowed the remaining CT-CVE GUI blocker to plugin entitlement and follow-on
   integration work.
@@ -67,21 +85,14 @@
 - Validation run: `git diff --check` and a targeted Markdown sanity check for
   balanced fenced code blocks and tab characters.
 
-### Session 99 — CT-Passwd implementation coordination plan
+### Session 99 — Superseded external password-manager planning
 
-**CT-Passwd planning handoff** (`git@github.com:simonjcarr/ct-passwd.git`,
-`docs/ct-passwd-implementation-plan.md`)
-- Added the CT-Passwd implementation coordination plan for overnight agents.
-  The plan has now been moved to the dedicated CT-Passwd repository and removed
-  from CT-OPS so CT-Passwd project files and product docs stay with the product.
-  It includes the required agent operating rules, security model, architecture
-  decisions, task table, MVP acceptance criteria, validation expectations, and
-  handoff log.
-- Locked the agreed CT-Passwd direction: a separate private repository at
-  `git@github.com:simonjcarr/ct-passwd.git`, Dockerized air-gapped deployment,
-  CT-OPS-owned identity/licence/nginx entry point, plugin-owned forms, dedicated
-  hostname routing by default, browser-side zero-knowledge encryption, shared
-  vault key wrapping, and no admin recovery in the MVP.
+**Historical note**
+- This session previously tracked an external CT-Passwd repository and plugin
+  deployment direction for password management.
+- That direction has been superseded by the built-in CTOps Password Vault. The
+  old external repository slug, plugin launch model, and related product plan
+  are intentionally no longer active CTOps direction.
 
 **Validation**
 - Validation run: `git diff --check` and a targeted Markdown sanity check for

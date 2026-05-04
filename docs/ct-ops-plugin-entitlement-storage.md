@@ -19,17 +19,18 @@ CT Ops needs one trusted way to bind a CT Portal-issued plugin licence to a
 paired plugin instance, expose derived entitlement status to the plugin, and
 gate CT Ops-owned launch surfaces.
 
-This phase is especially important for CT-Passwd because CT-Passwd must stay
-invisible in CT Ops unless the organization has a valid CT-Passwd entitlement.
-No CT-Passwd nav item, settings card, search result, route teaser, or launch
-action can appear based only on frontend state or a customer-managed flag.
+This phase is especially important because some external plugin products may
+need to stay invisible in CT Ops unless the organization has a valid
+entitlement. No plugin nav item, settings card, search result, route teaser, or
+launch action should appear based only on frontend state or a
+customer-managed flag when the product policy requires backend-hidden
+visibility.
 
 ## Goals
 
 - Keep plugin entitlements bound to the paired CT Ops installation, organization,
   product, and plugin instance.
-- Reuse one entitlement model for CT-CVE, CT-Passwd, and future first-party
-  plugins.
+- Reuse one entitlement model for CT-CVE and future first-party plugins.
 - Ensure CT Ops-owned launch and visibility checks are enforceable server-side.
 - Let plugins fetch derived subscription status without learning licence secrets.
 - Support offline validation and safe degradation in air-gapped installs.
@@ -41,7 +42,8 @@ action can appear based only on frontend state or a customer-managed flag.
 - Collecting payment inside CT Ops.
 - Exposing raw licence keys or private verification material to plugin UIs.
 - Replacing product-specific billing semantics inside CT Portal.
-- Making CT-Passwd discoverable before a valid entitlement exists.
+- Making a backend-hidden plugin discoverable before a valid entitlement
+  exists.
 
 ## Core Model
 
@@ -62,7 +64,7 @@ an imported CT Portal-issued licence artifact.
 Required normalized fields:
 
 - `pluginEntitlementId`
-- `product`, for example `ct-cve` or `ct-passwd`
+- `product`, for example `ct-cve`
 - `organisationId`
 - `ctOpsInstallationId`
 - `pluginInstanceId`
@@ -103,22 +105,23 @@ Suggested policy values:
 - `admin-visible-when-paired`
 - `always-visible`
 
-CT-Passwd must use `hidden-unless-licensed`.
+Products that need backend-hidden visibility can use
+`hidden-unless-licensed`.
 
-Policy effect for CT-Passwd:
+Policy effect for a backend-hidden plugin:
 
-- Without an `active` or explicitly allowed `grace` entitlement, CT Ops must not
-  render a CT-Passwd nav item, settings entry, dashboard card, search result,
-  or launcher.
-- Direct CT-Passwd launch routes should return the same not-found or
-  unauthorized shape used for unavailable products instead of revealing that
-  CT-Passwd exists but is unlicensed.
+- Without an `active` or explicitly allowed `grace` entitlement, CT Ops must
+  not render the plugin's nav item, settings entry, dashboard card, search
+  result, or launcher.
+- Direct launch routes should return the same not-found or unauthorized shape
+  used for unavailable products instead of revealing that a hidden plugin
+  exists but is unlicensed.
 - The frontend may still receive a generic plugin inventory response, but the
-  backend must filter CT-Passwd rows before they reach normal customer-facing
-  surfaces when entitlement is missing.
+  backend must filter hidden-plugin rows before they reach normal
+  customer-facing surfaces when entitlement is missing.
 - Any pre-entitlement import path must be generic and admin-only, for example a
   generic plugin licence import page or installer workflow that does not name
-  CT-Passwd until a valid licence is present.
+  the hidden product until a valid licence is present.
 
 ## Request Token Contract
 
@@ -235,7 +238,7 @@ Suggested response:
 
 ```json
 {
-  "product": "ct-passwd",
+  "product": "ct-cve",
   "orgId": "org_123",
   "pluginInstanceId": "passwd_inst_123",
   "configured": true,
@@ -265,10 +268,11 @@ CT Ops should degrade plugin entitlements predictably:
 
 - `active`: normal launch and plugin processing allowed.
 - `grace`: optional short operator grace period when local validation is
-  temporarily stale but the last known licence was valid; CT-Passwd visibility
-  should stay enabled only if the grace policy is explicit and bounded.
-- `expired` or `revoked`: hide CT-Passwd surfaces immediately and stop issuing
-  launch assertions.
+  temporarily stale but the last known licence was valid; hidden-plugin
+  visibility should stay enabled only if the grace policy is explicit and
+  bounded.
+- `expired` or `revoked`: hide hidden-plugin surfaces immediately and stop
+  issuing launch assertions.
 - `invalid` or `mismatch`: treat as unlicensed, keep audit evidence, and avoid
   exposing plugin hints to non-admin users.
 - `missing`: plugin remains absent for `hidden-unless-licensed` products.
@@ -311,8 +315,8 @@ transition, and normalized error code, but never raw licence values.
   trust silently.
 - Rate-limit import, status, and request-token endpoints and keep request-token
   nonces single use.
-- Keep CT-Passwd hidden when entitlement is absent so the UI does not leak the
-  product's existence in unlicensed environments.
+- Keep backend-hidden plugins hidden when entitlement is absent so the UI does
+  not leak the product's existence in unlicensed environments.
 
 ## Follow-On Implementation Work
 
@@ -323,5 +327,6 @@ still includes:
 - request-token generation and nonce persistence
 - plugin-licence import and validation handlers
 - generic subscription-status endpoint implementation
-- CT-Passwd hidden licence gate enforcement in CT Ops UI and launch routes
-- CT-CVE and CT-Passwd plugin-side consumption of derived entitlement status
+- hidden-plugin licence gate enforcement in CT Ops UI and launch routes where
+  the product policy requires it
+- CT-CVE and future plugin-side consumption of derived entitlement status

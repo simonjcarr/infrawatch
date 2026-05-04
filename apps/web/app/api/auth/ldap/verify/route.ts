@@ -47,15 +47,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { twoFactorCode, twoFactorMethod } = body as {
+    const body = await request.json() as {
       twoFactorCode?: string
       twoFactorMethod?: LdapTwoFactorMethod
     }
-
-    if (!twoFactorCode) {
-      return NextResponse.json({ error: 'Two-factor code is required' }, { status: 400 })
-    }
+    const twoFactorCode = typeof body.twoFactorCode === 'string' ? body.twoFactorCode : ''
+    const twoFactorMethod = body.twoFactorMethod
 
     const authSecret = getBetterAuthSecret()
     const signedChallengeCookie = request.cookies.get(LDAP_TWO_FACTOR_COOKIE_NAME)?.value

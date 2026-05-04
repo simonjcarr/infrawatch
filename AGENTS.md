@@ -22,13 +22,16 @@ the user explicitly says not to:
 8. Merge the pull request into `main`.
 9. Confirm any required release has completed and any required container image or
    other artifact has been published.
-10. Delete the task worktree folder after the work has landed on `main` and all
-    required release or publishing steps are complete.
+10. Remove the task worktree after the work has landed on `main` and all
+    required release or publishing steps are complete. This means the worktree
+    must be unregistered from Git and its folder must be deleted from the local
+    disk.
 
 Do not stop after local edits or after opening a pull request. A file-changing
 task is not complete until the code is on `main`, required release and
-publishing work is complete, and the task worktree folder has been deleted,
-unless the user explicitly asked for local-only changes.
+publishing work is complete, the task worktree has been removed from Git, and
+the task worktree folder has been deleted from the local disk, unless the user
+explicitly asked for local-only changes.
 
 If a pull request has errors, failing checks, or merge conflicts, fix the issue
 in a new dedicated worktree and open a new pull request. Repeat this cycle until
@@ -182,8 +185,18 @@ remains outstanding.
 
 ## Completion Cleanup
 
-When work is complete, delete the task worktree folder. Every file-changing task
-must finish by removing the dedicated worktree that was created for it.
+When work is complete, remove the dedicated task worktree. Every file-changing
+task must finish with no leftover local worktree for that task.
+
+Cleanup requires both of these outcomes:
+
+- The worktree is unregistered from Git, for example with
+  `git worktree remove <path>` from the main repository.
+- The task worktree folder no longer exists on the local disk.
+
+Do not leave completed task worktrees hanging around. A completed task that still
+has a registered Git worktree or an on-disk worktree folder is not actually
+finished.
 
 Only remove a worktree after its changes are committed, pushed, merged into
 `main`, released, and published as appropriate for the task, including

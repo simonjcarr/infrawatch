@@ -393,6 +393,20 @@
       "when": 1777631000000,
       "tag": "0055_licence_verifier_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1777902398922,
+      "tag": "0056_freezing_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1777902425026,
+      "tag": "0057_wet_taskmaster",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { getTableColumns, getTableName } from 'drizzle-orm'
 
 import {
   PASSWORD_VAULT_AUDIT_RELATIONSHIPS,
@@ -8,6 +9,13 @@ import {
   PASSWORD_VAULT_SECRET_FIELDS,
   PASSWORD_VAULT_TABLE_CONTRACT,
 } from './password-vault.contract.ts'
+import {
+  passwordVaultEntries,
+  passwordVaultKeyEpochs,
+  passwordVaultMembers,
+  passwordVaultUserKeys,
+  passwordVaults,
+} from './password-vault.ts'
 
 test('password vault schema contract covers the planned table set', () => {
   assert.deepEqual(
@@ -84,4 +92,35 @@ test('password vault schema contract records audit actor relationships for mutab
       actorColumns: ['createdByUserId', 'updatedByUserId', 'deletedByUserId'],
     },
   ])
+})
+
+test('password vault schema definitions implement the planned table names', () => {
+  assert.deepEqual(
+    [
+      getTableName(passwordVaultUserKeys),
+      getTableName(passwordVaults),
+      getTableName(passwordVaultKeyEpochs),
+      getTableName(passwordVaultMembers),
+      getTableName(passwordVaultEntries),
+    ],
+    PASSWORD_VAULT_REQUIRED_TABLES,
+  )
+})
+
+test('password vault schema definitions expose the contract-required columns', () => {
+  const actualColumnsByTable = {
+    userKeys: Object.keys(getTableColumns(passwordVaultUserKeys)),
+    vaults: Object.keys(getTableColumns(passwordVaults)),
+    keyEpochs: Object.keys(getTableColumns(passwordVaultKeyEpochs)),
+    members: Object.keys(getTableColumns(passwordVaultMembers)),
+    entries: Object.keys(getTableColumns(passwordVaultEntries)),
+  }
+
+  for (const [tableKey, contract] of Object.entries(PASSWORD_VAULT_TABLE_CONTRACT)) {
+    assert.deepEqual(
+      actualColumnsByTable[tableKey],
+      contract.requiredColumns,
+      `${contract.tableName} should expose the required Drizzle columns`,
+    )
+  }
 })

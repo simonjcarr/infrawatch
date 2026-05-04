@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.99.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.98.0...web/v0.99.0) (2026-05-04)
+
+
+### Features
+
+* **password-vault:** add vault crud api ([e95b9cc](https://github.com/carrtech-dev/ct-ops/commit/e95b9ccdc1440ad02c35e8986d0dfb8ae20bcd38))
+
 ## [0.98.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.2...web/v0.98.0) (2026-05-04)
 
 

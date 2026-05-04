@@ -1,7 +1,7 @@
 import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users, accounts, sessions, ldapConfigurations, totpCredentials, verifications } from '@/lib/db/schema'
+import { users, accounts, sessions, ldapConfigurations, verifications } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
@@ -14,14 +14,9 @@ import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions
 import { SeatAdmissionError, assertUserCanAccessSeat } from '@/lib/seat-admission'
 import {
   createSignedLdapTwoFactorCookieValue,
-  encryptLdapBackupCodes,
   LDAP_TWO_FACTOR_CHALLENGE_TTL_MS,
   LDAP_TWO_FACTOR_COOKIE_NAME,
-  parseLdapTwoFactorChallenge,
-  readSignedLdapTwoFactorCookieValue,
   serialiseLdapTwoFactorChallenge,
-  verifyLdapTwoFactorCode,
-  type LdapTwoFactorMethod,
 } from '@/lib/auth/ldap-two-factor'
 
 // 5 attempts per IP per 60 seconds — prevents brute-force and user enumeration
@@ -57,158 +52,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      username,
-      password,
-      twoFactorCode,
-      twoFactorMethod,
-    } = body as {
-      username?: string
-      password?: string
-      twoFactorCode?: string
-      twoFactorMethod?: LdapTwoFactorMethod
-    }
+    const { username, password } = body as { username?: string; password?: string }
 
     const authSecret = getBetterAuthSecret()
-    const signedChallengeCookie = request.cookies.get(LDAP_TWO_FACTOR_COOKIE_NAME)?.value
-
-    if (signedChallengeCookie) {
-      if (!twoFactorCode) {
-        return withAuthDelay(
-          requestStart,
-          NextResponse.json({ error: 'Two-factor code is required' }, { status: 400 }),
-        )
-      }
-
-      const challengeId = await readSignedLdapTwoFactorCookieValue(signedChallengeCookie, authSecret)
-
-      if (!challengeId) {
-        return withAuthDelay(
-          requestStart,
-          NextResponse.json({ error: 'Two-factor verification session expired. Please sign in again.' }, { status: 401 }),
-        )
-      }
-
-      const challengeRecord = await db.query.verifications.findFirst({
-        where: eq(verifications.identifier, challengeId),
-      })
-
-      if (!challengeRecord || challengeRecord.expiresAt <= new Date()) {
-        if (challengeRecord) {
-          await db.delete(verifications).where(eq(verifications.identifier, challengeId))
-        }
-
-        const expiredResponse = NextResponse.json(
-          { error: 'Two-factor verification session expired. Please sign in again.' },
-          { status: 401 },
-        )
-        expiredResponse.cookies.set(LDAP_TWO_FACTOR_COOKIE_NAME, '', {
-          path: '/',
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
-          expires: new Date(0),
-        })
-        return withAuthDelay(requestStart, expiredResponse)
-      }
-
-      const challenge = parseLdapTwoFactorChallenge(challengeRecord.value)
-      if (!challenge) {
-        await db.delete(verifications).where(eq(verifications.identifier, challengeId))
-        return withAuthDelay(
-          requestStart,
-          NextResponse.json({ error: 'Two-factor verification session expired. Please sign in again.' }, { status: 401 }),
-        )
-      }
-
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, challenge.userId),
-      })
-      if (!user || !user.isActive || user.deletedAt || !user.twoFactorEnabled) {
-        await db.delete(verifications).where(eq(verifications.identifier, challengeId))
-        return withAuthDelay(
-          requestStart,
-          NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
-        )
-      }
-
-      await assertUserCanAccessSeat(user.organisationId!, user.id)
-
-      const credential = await db.query.totpCredentials.findFirst({
-        where: eq(totpCredentials.userId, user.id),
-      })
-      if (!credential) {
-        await db.delete(verifications).where(eq(verifications.identifier, challengeId))
-        return withAuthDelay(
-          requestStart,
-          NextResponse.json({ error: 'Two-factor authentication is not configured for this account.' }, { status: 403 }),
-        )
-      }
-
-      const verification = await verifyLdapTwoFactorCode({
-        credential,
-        method: twoFactorMethod === 'backup_code' ? 'backup_code' : 'totp',
-        code: twoFactorCode,
-        secret: authSecret,
-        digits: 6,
-        period: 30,
-      })
-
-      if (!verification.ok) {
-        return withAuthDelay(
-          requestStart,
-          NextResponse.json({ error: 'Invalid two-factor code' }, { status: 401 }),
-        )
-      }
-
-      if (verification.backupCode) {
-        await db
-          .update(totpCredentials)
-          .set({
-            backupCodes: await encryptLdapBackupCodes(verification.backupCode.remainingCodes, authSecret),
-            updatedAt: new Date(),
-          })
-          .where(eq(totpCredentials.id, credential.id))
-      }
-
-      const sessionToken = randomBytes(32).toString('hex')
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-
-      await db.insert(sessions).values({
-        token: sessionToken,
-        userId: user.id,
-        expiresAt,
-        ipAddress: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? null,
-        userAgent: request.headers.get('user-agent') ?? null,
-      })
-
-      const cookieValue = await makeSessionCookieValue(sessionToken, authSecret)
-      await db.delete(verifications).where(eq(verifications.identifier, challengeId))
-      await passwordLoginAttemptGuard.reset(challenge.username)
-
-      const response = NextResponse.json({
-        success: true,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-        },
-      })
-
-      response.headers.append(
-        'Set-Cookie',
-        `better-auth.session_token=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
-      )
-      response.cookies.set(LDAP_TWO_FACTOR_COOKIE_NAME, '', {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        expires: new Date(0),
-      })
-
-      return withAuthDelay(requestStart, response)
-    }
 
     if (!username || !password) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })

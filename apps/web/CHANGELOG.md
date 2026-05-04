@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.98.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.2...web/v0.98.0) (2026-05-04)
+
+
+### Features
+
+* **password-vault:** add setup profile api ([39181a1](https://github.com/carrtech-dev/ct-ops/commit/39181a12ee04f079346398135134e5a380f7e236))
+
 ## [0.97.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.1...web/v0.97.2) (2026-05-04)
 
 

@@ -11,6 +11,12 @@ Update https://github.com/carrtech-dev/agent-instructions instead.
 For every task that changes files, agents must complete this checklist unless
 the user explicitly says not to:
 
+0. Before starting new work, check whether the previous agent or run left any
+   required follow-through unfinished for the same workstream, including open or
+   unmerged implementation PRs, open or unmerged release PRs, incomplete
+   release publication, or missing cleanup required by these instructions. If
+   any such incomplete follow-through exists, finish that work first before
+   starting the new task.
 1. Create a new dedicated Git worktree before editing files. Never reuse an
    existing worktree for new work, even if it appears idle or related.
 2. Make all edits inside the new worktree created for the task.

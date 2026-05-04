@@ -5,7 +5,7 @@ import type {
   SmtpChannelConfig,
   TelegramChannelConfig,
   WebhookChannelConfig,
-} from '../db/schema.ts'
+} from '../db/schema'
 
 type StoredNotificationChannelType = 'webhook' | 'smtp' | 'slack' | 'telegram'
 

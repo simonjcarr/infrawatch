@@ -494,7 +494,7 @@ export type NotificationChannelSafe = Omit<NotificationChannel, 'config' | 'type
         toAddresses: string[]
       }
     }
-  | { type: 'slack'; config: { webhookUrl: string } }
+  | { type: 'slack'; config: { hasWebhookUrl: boolean } }
   | { type: 'telegram'; config: { chatId: string; hasBotToken: boolean } }
 )
 
@@ -535,7 +535,7 @@ export async function getNotificationChannels(orgId: string): Promise<Notificati
       return {
         ...ch,
         type: 'slack' as const,
-        config: { webhookUrl: cfg.webhookUrl },
+        config: { hasWebhookUrl: !!(cfg.webhookUrl) },
       }
     }
     if (ch.type === 'telegram') {
@@ -653,7 +653,7 @@ const updateSmtpChannelSchema = z.object({
 
 const updateSlackChannelSchema = z.object({
   name: z.string().min(1).max(100),
-  webhookUrl: httpsUrl,
+  webhookUrl: httpsUrl.optional(),
 })
 
 const updateTelegramChannelSchema = z.object({
@@ -714,7 +714,8 @@ export async function updateNotificationChannel(
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, webhookUrl } = parsed.data
       nextName = name
-      const newConfig: SlackChannelConfig = { webhookUrl }
+      const existingConfig = existing.config as SlackChannelConfig
+      const newConfig: SlackChannelConfig = { webhookUrl: webhookUrl || existingConfig.webhookUrl }
       await validateStoredNotificationChannelConfig(existing.type, newConfig)
       await db
         .update(notificationChannels)

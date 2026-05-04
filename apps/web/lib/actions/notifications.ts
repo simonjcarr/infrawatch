@@ -9,15 +9,14 @@ import type { Notification } from '@/lib/db/schema'
 
 export async function getNotifications(
   orgId: string,
-  userId: string,
   limit = 20,
   offset = 0,
 ): Promise<Notification[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   return db.query.notifications.findMany({
     where: and(
       eq(notifications.organisationId, orgId),
-      eq(notifications.userId, userId),
+      eq(notifications.userId, session.user.id),
       isNull(notifications.deletedAt),
     ),
     orderBy: desc(notifications.createdAt),
@@ -26,15 +25,15 @@ export async function getNotifications(
   })
 }
 
-export async function getUnreadCount(orgId: string, userId: string): Promise<number> {
-  await requireOrgAccess(orgId)
+export async function getUnreadCount(orgId: string): Promise<number> {
+  const session = await requireOrgAccess(orgId)
   const [result] = await db
     .select({ value: count() })
     .from(notifications)
     .where(
       and(
         eq(notifications.organisationId, orgId),
-        eq(notifications.userId, userId),
+        eq(notifications.userId, session.user.id),
         eq(notifications.read, false),
         isNull(notifications.deletedAt),
       ),
@@ -44,10 +43,9 @@ export async function getUnreadCount(orgId: string, userId: string): Promise<num
 
 export async function markAsRead(
   orgId: string,
-  userId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   try {
     await db
       .update(notifications)
@@ -56,7 +54,7 @@ export async function markAsRead(
         and(
           eq(notifications.id, notificationId),
           eq(notifications.organisationId, orgId),
-          eq(notifications.userId, userId),
+          eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
       )
@@ -68,9 +66,8 @@ export async function markAsRead(
 
 export async function markAllAsRead(
   orgId: string,
-  userId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   try {
     await db
       .update(notifications)
@@ -78,7 +75,7 @@ export async function markAllAsRead(
       .where(
         and(
           eq(notifications.organisationId, orgId),
-          eq(notifications.userId, userId),
+          eq(notifications.userId, session.user.id),
           eq(notifications.read, false),
           isNull(notifications.deletedAt),
         ),
@@ -91,10 +88,9 @@ export async function markAllAsRead(
 
 export async function deleteNotification(
   orgId: string,
-  userId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   try {
     await db
       .update(notifications)
@@ -103,7 +99,7 @@ export async function deleteNotification(
         and(
           eq(notifications.id, notificationId),
           eq(notifications.organisationId, orgId),
-          eq(notifications.userId, userId),
+          eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
       )
@@ -115,10 +111,9 @@ export async function deleteNotification(
 
 export async function deleteNotifications(
   orgId: string,
-  userId: string,
   ids: string[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -128,7 +123,7 @@ export async function deleteNotifications(
         and(
           inArray(notifications.id, ids),
           eq(notifications.organisationId, orgId),
-          eq(notifications.userId, userId),
+          eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
       )
@@ -140,11 +135,10 @@ export async function deleteNotifications(
 
 export async function markBatchReadStatus(
   orgId: string,
-  userId: string,
   ids: string[],
   read: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -154,7 +148,7 @@ export async function markBatchReadStatus(
         and(
           inArray(notifications.id, ids),
           eq(notifications.organisationId, orgId),
-          eq(notifications.userId, userId),
+          eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
       )
@@ -171,10 +165,9 @@ export type NotificationSeverityStat = {
 
 export async function getNotificationStats(
   orgId: string,
-  userId: string,
   hostId?: string,
 ): Promise<NotificationSeverityStat[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   const results = await db
     .select({
       severity: notifications.severity,
@@ -184,7 +177,7 @@ export async function getNotificationStats(
     .where(
       and(
         eq(notifications.organisationId, orgId),
-        eq(notifications.userId, userId),
+        eq(notifications.userId, session.user.id),
         isNull(notifications.deletedAt),
         hostId ? eq(notifications.resourceType, 'host') : undefined,
         hostId ? eq(notifications.resourceId, hostId) : undefined,
@@ -215,11 +208,10 @@ export type NotificationTimeSeriesPoint = {
 
 export async function getNotificationsOverTime(
   orgId: string,
-  userId: string,
   range: TrendRange = '30d',
   hostId?: string,
 ): Promise<NotificationTimeSeriesPoint[]> {
-  await requireOrgAccess(orgId)
+  const session = await requireOrgAccess(orgId)
   // Intentionally does NOT filter on deletedAt so that deleting notifications
   // from the inbox does not affect the historical trend.
   const config = TREND_RANGE_CONFIG[range]
@@ -243,7 +235,7 @@ export async function getNotificationsOverTime(
     .where(
       and(
         eq(notifications.organisationId, orgId),
-        eq(notifications.userId, userId),
+        eq(notifications.userId, session.user.id),
         gte(notifications.createdAt, cutoff),
         hostId ? eq(notifications.resourceType, 'host') : undefined,
         hostId ? eq(notifications.resourceId, hostId) : undefined,

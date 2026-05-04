@@ -40,15 +40,13 @@ export function Topbar({ orgId }: TopbarProps) {
 
   const userName = session?.user?.name ?? 'User'
   const userEmail = session?.user?.email ?? ''
-  const userId = session?.user?.id
-
   return (
     <header className="flex h-14 items-center gap-3 border-b bg-background px-4">
       <SidebarTrigger />
       <div className="flex-1" />
       <CommandPaletteTrigger />
-      {userId && orgId && (
-        <NotificationBell orgId={orgId} userId={userId} />
+      {session?.user?.id && orgId && (
+        <NotificationBell orgId={orgId} />
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

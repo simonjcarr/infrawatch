@@ -10,17 +10,15 @@ export const metadata: Metadata = {
 export default async function NotificationsPage() {
   const session = await getRequiredSession()
   const orgId = session.user.organisationId ?? ''
-  const userId = session.user.id
 
   const [initialNotifications, initialUnread] = await Promise.all([
-    getNotifications(orgId, userId, 25),
-    getUnreadCount(orgId, userId),
+    getNotifications(orgId, 25),
+    getUnreadCount(orgId),
   ])
 
   return (
     <NotificationsClient
       orgId={orgId}
-      userId={userId}
       initialNotifications={initialNotifications}
       initialUnread={initialUnread}
     />

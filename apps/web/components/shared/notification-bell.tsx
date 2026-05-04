@@ -17,7 +17,6 @@ import type { Notification } from '@/lib/db/schema'
 
 interface NotificationBellProps {
   orgId: string
-  userId: string
 }
 
 function getResourceUrl(resourceType: string, resourceId: string): string {
@@ -37,36 +36,36 @@ function severityDot(severity: string) {
   return <span className={`inline-block size-2 rounded-full shrink-0 mt-1.5 ${cls}`} />
 }
 
-export function NotificationBell({ orgId, userId }: NotificationBellProps) {
+export function NotificationBell({ orgId }: NotificationBellProps) {
   const qc = useQueryClient()
 
   const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['notifications-unread', orgId, userId],
-    queryFn: () => getUnreadCount(orgId, userId),
+    queryKey: ['notifications-unread', orgId],
+    queryFn: () => getUnreadCount(orgId),
     refetchInterval: 20_000,
     staleTime: 10_000,
   })
 
   const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications-recent', orgId, userId],
-    queryFn: () => getNotifications(orgId, userId, 10),
+    queryKey: ['notifications-recent', orgId],
+    queryFn: () => getNotifications(orgId, 10),
     refetchInterval: 20_000,
     staleTime: 10_000,
   })
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => markAsRead(orgId, userId, id),
+    mutationFn: (id: string) => markAsRead(orgId, id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
     },
   })
 
   const markAllMutation = useMutation({
-    mutationFn: () => markAllAsRead(orgId, userId),
+    mutationFn: () => markAllAsRead(orgId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId, userId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId, userId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
     },
   })
 

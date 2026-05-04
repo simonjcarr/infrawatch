@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createHmac } from 'crypto'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { assertPublicHost, assertPublicUrl } from '@/lib/net/ssrf-guard'
+import { validateStoredNotificationChannelConfig } from '@/lib/actions/alerts-notification-security'
 import { getRequiredSession } from '@/lib/auth/session'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { decrypt } from '@/lib/crypto/encrypt'
@@ -570,6 +571,8 @@ export async function createNotificationChannel(
   const data = parsed.data
 
   try {
+    await validateStoredNotificationChannelConfig(data.type, data.config)
+
     const [row] = await db
       .insert(notificationChannels)
       .values({
@@ -688,6 +691,7 @@ export async function updateNotificationChannel(
         url,
         secret: secret || existingConfig.secret,
       }
+      await validateStoredNotificationChannelConfig(existing.type, newConfig)
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
@@ -700,6 +704,7 @@ export async function updateNotificationChannel(
       const newConfig: SmtpChannelConfig = {
         toAddresses,
       }
+      await validateStoredNotificationChannelConfig(existing.type, newConfig)
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
@@ -710,6 +715,7 @@ export async function updateNotificationChannel(
       const { name, webhookUrl } = parsed.data
       nextName = name
       const newConfig: SlackChannelConfig = { webhookUrl }
+      await validateStoredNotificationChannelConfig(existing.type, newConfig)
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
@@ -724,6 +730,7 @@ export async function updateNotificationChannel(
         botToken: botToken || existingConfig.botToken,
         chatId,
       }
+      await validateStoredNotificationChannelConfig(existing.type, newConfig)
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })

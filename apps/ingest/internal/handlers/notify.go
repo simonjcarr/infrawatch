@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -21,6 +22,64 @@ import (
 	ctcrypto "github.com/carrtech-dev/ct-ops/ingest/internal/crypto"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 )
+
+var cgnatIPv4Range = mustParseCIDR("100.64.0.0/10")
+
+func mustParseCIDR(cidr string) *net.IPNet {
+	_, network, err := net.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return network
+}
+
+func isPrivateOrReservedIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return ipv4[0] == 0 || cgnatIPv4Range.Contains(ipv4) || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified()
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified()
+}
+
+func assertPublicHost(host string) error {
+	normalizedHost := strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	if ip := net.ParseIP(normalizedHost); ip != nil {
+		if isPrivateOrReservedIP(ip) {
+			return fmt.Errorf("blocked private or reserved address: %s", ip.String())
+		}
+		return nil
+	}
+
+	ips, err := net.LookupIP(normalizedHost)
+	if err != nil {
+		return fmt.Errorf("resolve host %q: %w", normalizedHost, err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("resolve host %q: no addresses returned", normalizedHost)
+	}
+	for _, ip := range ips {
+		if isPrivateOrReservedIP(ip) {
+			return fmt.Errorf("blocked private or reserved address: %s", ip.String())
+		}
+	}
+	return nil
+}
+
+func assertPublicHTTPURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("parse url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("unsupported outbound scheme: %s", parsed.Scheme)
+	}
+	if parsed.Hostname() == "" {
+		return fmt.Errorf("missing outbound host")
+	}
+	return assertPublicHost(parsed.Hostname())
+}
 
 // AlertEvent is the payload sent to webhook notification channels.
 type AlertEvent struct {
@@ -36,6 +95,11 @@ type AlertEvent struct {
 // HMAC-SHA256 signature is added as X-CT-Ops-Signature. Failures are logged
 // and discarded — webhook delivery is best-effort.
 func postWebhook(ctx context.Context, url, secret string, event AlertEvent) {
+	if err := assertPublicHTTPURL(url); err != nil {
+		slog.Warn("webhook: blocked outbound target", "url", url, "err", err)
+		return
+	}
+
 	body, err := json.Marshal(event)
 	if err != nil {
 		slog.Warn("webhook: marshalling event", "url", url, "err", err)
@@ -249,6 +313,10 @@ func dispatchSmtp(smtpChannels []queries.SmtpChannelRow, event AlertEvent) {
 			slog.Warn("dispatchSmtp: incomplete smtp configuration", "channel_id", ch.ID)
 			continue
 		}
+		if err := assertPublicHost(cfg.Host); err != nil {
+			slog.Warn("dispatchSmtp: blocked outbound target", "channel_id", ch.ID, "host", cfg.Host, "err", err)
+			continue
+		}
 		go func(c smtpChannelConfig) {
 			if err := sendSmtpEmail(c, event); err != nil {
 				slog.Warn("smtp: delivery failed", "host", c.Host, "err", err)
@@ -278,6 +346,11 @@ func severityEmoji(severity string) string {
 // postSlack POSTs an AlertEvent to a Slack incoming webhook URL.
 // Failures are logged and discarded — delivery is best-effort.
 func postSlack(ctx context.Context, webhookURL string, event AlertEvent) {
+	if err := assertPublicHTTPURL(webhookURL); err != nil {
+		slog.Warn("slack: blocked outbound target", "url", webhookURL, "err", err)
+		return
+	}
+
 	emoji := severityEmoji(event.Severity)
 	eventLabel := map[string]string{
 		"alert.fired":    "FIRING",

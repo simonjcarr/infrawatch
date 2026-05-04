@@ -41,8 +41,8 @@ jobs:
 
       - name: Install gosec
         run: |
-          curl -sSfL https://raw.githubusercontent.com/securego/gosec/master/install.sh \
-            | sh -s -- -b "$HOME/.local/bin" v2.22.0
+          mkdir -p "$HOME/.local/bin"
+          GOBIN="$HOME/.local/bin" go install github.com/securego/gosec/v2/cmd/gosec@v2.26.1
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run gosec

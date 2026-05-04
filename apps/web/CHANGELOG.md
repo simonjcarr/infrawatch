@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.102.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.102.0...web/v0.102.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **auth:** enforce LDAP 2FA challenge ([#931](https://github.com/carrtech-dev/ct-ops/issues/931)) ([c1b2634](https://github.com/carrtech-dev/ct-ops/commit/c1b2634bc5de1633c77fc80e7e7dc4c1aa015892))
+
 ## [0.102.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.101.0...web/v0.102.0) (2026-05-04)
 
 

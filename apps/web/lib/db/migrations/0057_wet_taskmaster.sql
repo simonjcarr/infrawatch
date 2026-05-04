@@ -1,2 +1,0 @@
-ALTER TABLE "password_vault_key_epochs"
-ALTER COLUMN "epoch_number" SET DATA TYPE integer USING "epoch_number"::integer;

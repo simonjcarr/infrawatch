@@ -1,12 +1,5 @@
 # Changelog
 
-## [0.103.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.102.2...web/v0.103.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add route shell ([#938](https://github.com/carrtech-dev/ct-ops/issues/938)) ([06fd1a3](https://github.com/carrtech-dev/ct-ops/commit/06fd1a3d8a587e792437780fde8d50be01d729cb))
-
 ## [0.102.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.102.1...web/v0.102.2) (2026-05-04)
 
 
@@ -21,47 +14,12 @@
 
 * **auth:** enforce LDAP 2FA challenge ([#931](https://github.com/carrtech-dev/ct-ops/issues/931)) ([c1b2634](https://github.com/carrtech-dev/ct-ops/commit/c1b2634bc5de1633c77fc80e7e7dc4c1aa015892))
 
-## [0.102.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.101.0...web/v0.102.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add audit event coverage ([2171298](https://github.com/carrtech-dev/ct-ops/commit/2171298922abda6fa7167434b537514a0316b776))
-
-## [0.101.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.100.1...web/v0.101.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add sharing api ([dfad1f7](https://github.com/carrtech-dev/ct-ops/commit/dfad1f7c3cabd138628dfbb52d71bc8f5c4bf66e))
-
 ## [0.100.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.100.0...web/v0.100.1) (2026-05-04)
 
 
 ### Bug Fixes
 
 * **notifications:** bind inbox actions to session user ([#922](https://github.com/carrtech-dev/ct-ops/issues/922)) ([e8d7252](https://github.com/carrtech-dev/ct-ops/commit/e8d725252444c4e6f4670f89ddb08692dffde9d4))
-
-## [0.100.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.99.0...web/v0.100.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add entry crud api ([b5898c7](https://github.com/carrtech-dev/ct-ops/commit/b5898c739f7dc72cb53635b359b6f4e64690d286))
-
-## [0.99.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.98.0...web/v0.99.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add vault crud api ([e95b9cc](https://github.com/carrtech-dev/ct-ops/commit/e95b9ccdc1440ad02c35e8986d0dfb8ae20bcd38))
-
-## [0.98.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.2...web/v0.98.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add setup profile api ([39181a1](https://github.com/carrtech-dev/ct-ops/commit/39181a12ee04f079346398135134e5a380f7e236))
 
 ## [0.97.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.97.1...web/v0.97.2) (2026-05-04)
 
@@ -76,14 +34,6 @@
 ### Bug Fixes
 
 * **web:** require tooling auth for agent lifecycle actions ([#900](https://github.com/carrtech-dev/ct-ops/issues/900)) ([561efa4](https://github.com/carrtech-dev/ct-ops/commit/561efa4faaee19c73ddcb0aa2dab2096beec33ad))
-
-## [0.97.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.4...web/v0.97.0) (2026-05-04)
-
-
-### Features
-
-* **password-vault:** add browser crypto primitives ([#898](https://github.com/carrtech-dev/ct-ops/issues/898)) ([6eb468d](https://github.com/carrtech-dev/ct-ops/commit/6eb468da20ac54d1dd74009efffde53ab560502f))
-* **password-vault:** add vault schema and migrations ([#895](https://github.com/carrtech-dev/ct-ops/issues/895)) ([d8f1c52](https://github.com/carrtech-dev/ct-ops/commit/d8f1c525f2f40d79f0d484a3ac77bf1e7c300b6b))
 
 ## [0.96.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.3...web/v0.96.4) (2026-05-04)
 

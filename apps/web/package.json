@@ -49,7 +49,6 @@
     "jose": "^6.2.3",
     "jszip": "^3.10.1",
     "ldapts": "^8.1.7",
-    "libsodium-wrappers-sumo": "^0.8.4",
     "lucide-react": "^1.14.0",
     "next": "16.2.4",
     "node-forge": "^1.4.0",

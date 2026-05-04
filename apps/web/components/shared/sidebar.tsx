@@ -23,7 +23,6 @@ import {
   FolderSearch,
   ScanSearch,
   Lock,
-  KeyRound,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -81,7 +80,6 @@ const primaryNav: NavItem[] = [
   { title: 'Notifications', href: '/notifications', icon: BellPlus },
   { title: 'Certificates', href: '/certificates', icon: ShieldCheck },
   { title: 'Service Accounts', href: '/service-accounts', icon: Key },
-  { title: 'Password Vault', href: '/password-vault', icon: KeyRound, testId: 'sidebar-password-vault-link' },
 ]
 
 const reportingNav: NavItem[] = [

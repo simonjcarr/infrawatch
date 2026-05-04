@@ -22,7 +22,6 @@ export default async function AlertsPage() {
   return (
     <AlertsClient
       orgId={orgId}
-      currentUserId={session.user.id}
       initialActive={activeAlerts}
       initialChannels={channels}
       initialSilences={silences}

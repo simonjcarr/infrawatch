@@ -97,7 +97,6 @@ function isRunActive(status: string) {
 
 interface Props {
   orgId: string
-  userId: string
   initialGroup: HostGroupWithMembers
   initialAllHosts: HostWithAgent[]
 }
@@ -168,7 +167,7 @@ function RunStatusBadge({ status }: { status: string }) {
   }
 }
 
-export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts }: Props) {
+export function GroupDetailClient({ orgId, initialGroup, initialAllHosts }: Props) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
@@ -237,7 +236,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const { mutate: doPatchGroup, isPending: isPatching } = useMutation({
     mutationFn: () =>
-      triggerGroupPatchRun(orgId, userId, initialGroup.id, patchMode, maxParallel),
+      triggerGroupPatchRun(orgId, initialGroup.id, patchMode, maxParallel),
     onSuccess: (result) => {
       setPatchOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -246,7 +245,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const { mutate: doGroupScript, isPending: isScripting } = useMutation({
     mutationFn: () =>
-      triggerGroupCustomScriptRun(orgId, userId, initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
+      triggerGroupCustomScriptRun(orgId, initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
     onSuccess: (result) => {
       setScriptOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -255,7 +254,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const { mutate: doGroupService, isPending: isServicing } = useMutation({
     mutationFn: () =>
-      triggerGroupServiceAction(orgId, userId, initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
+      triggerGroupServiceAction(orgId, initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
     onSuccess: (result) => {
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)

@@ -64,7 +64,6 @@ import { useRouter } from 'next/navigation'
 interface Props {
   orgId: string
   host: HostWithAgent
-  userId: string
 }
 
 type AgentQueryPollResponse = {
@@ -173,7 +172,7 @@ function TaskDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: strin
   return <span className="text-sm text-muted-foreground">—</span>
 }
 
-export function TasksTab({ orgId, host, userId }: Props) {
+export function TasksTab({ orgId, host }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const isLinux = host.os?.toLowerCase() === 'linux'
@@ -237,7 +236,7 @@ export function TasksTab({ orgId, host, userId }: Props) {
   }
 
   const { mutate: doPatchRun, isPending: isPatching } = useMutation({
-    mutationFn: () => triggerPatchRun(orgId, userId, host.id, patchMode),
+    mutationFn: () => triggerPatchRun(orgId, host.id, patchMode),
     onSuccess: (result) => {
       setPatchOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -245,7 +244,7 @@ export function TasksTab({ orgId, host, userId }: Props) {
   })
 
   const { mutate: doScriptRun, isPending: isScripting } = useMutation({
-    mutationFn: () => triggerCustomScriptRun(orgId, userId, host.id, scriptBody, interpreter),
+    mutationFn: () => triggerCustomScriptRun(orgId, host.id, scriptBody, interpreter),
     onSuccess: (result) => {
       setScriptOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -253,7 +252,7 @@ export function TasksTab({ orgId, host, userId }: Props) {
   })
 
   const { mutate: doServiceAction, isPending: isServicing } = useMutation({
-    mutationFn: () => triggerServiceAction(orgId, userId, host.id, serviceName, serviceAction),
+    mutationFn: () => triggerServiceAction(orgId, host.id, serviceName, serviceAction),
     onSuccess: (result) => {
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)

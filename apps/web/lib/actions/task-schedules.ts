@@ -367,7 +367,7 @@ export async function runScheduleNow(
   orgId: string,
   id: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgToolingAccess(orgId)
+  await requireOrgToolingAccess(orgId)
 
   const schedule = await db.query.taskSchedules.findFirst({
     where: and(
@@ -378,15 +378,14 @@ export async function runScheduleNow(
   })
   if (!schedule) return { error: 'Schedule not found' }
 
-  const userId = session.user.id
   const { taskType, targetType, targetId, maxParallel, config } = schedule
 
   if (taskType === 'patch') {
     const mode = (config as { mode: 'security' | 'all' }).mode
     return targetType === 'host'
-      ? triggerPatchRun(orgId, userId, targetId, mode)
+      ? triggerPatchRun(orgId, targetId, mode)
       : (async () => {
-          const r = await triggerGroupPatchRun(orgId, userId, targetId, mode, maxParallel)
+          const r = await triggerGroupPatchRun(orgId, targetId, mode, maxParallel)
           if ('error' in r) return r
           return { success: true as const, taskRunId: r.taskRunId }
         })()
@@ -394,15 +393,15 @@ export async function runScheduleNow(
   if (taskType === 'custom_script') {
     const c = config as { script: string; interpreter: 'sh' | 'bash' | 'python3'; timeout_seconds?: number }
     return targetType === 'host'
-      ? triggerCustomScriptRun(orgId, userId, targetId, c.script, c.interpreter, c.timeout_seconds)
-      : triggerGroupCustomScriptRun(orgId, userId, targetId, c.script, c.interpreter, maxParallel, c.timeout_seconds)
+      ? triggerCustomScriptRun(orgId, targetId, c.script, c.interpreter, c.timeout_seconds)
+      : triggerGroupCustomScriptRun(orgId, targetId, c.script, c.interpreter, maxParallel, c.timeout_seconds)
   }
   if (taskType === 'service') {
     const c = config as { service_name: string; action: 'start' | 'stop' | 'restart' | 'status' }
     return targetType === 'host'
-      ? triggerServiceAction(orgId, userId, targetId, c.service_name, c.action)
+      ? triggerServiceAction(orgId, targetId, c.service_name, c.action)
       : (async () => {
-          const r = await triggerGroupServiceAction(orgId, userId, targetId, c.service_name, c.action, maxParallel)
+          const r = await triggerGroupServiceAction(orgId, targetId, c.service_name, c.action, maxParallel)
           if ('error' in r) return r
           return { success: true as const, taskRunId: r.taskRunId }
         })()

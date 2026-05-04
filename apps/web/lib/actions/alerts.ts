@@ -435,9 +435,9 @@ export async function getAlertInstanceCount(
 export async function acknowledgeAlert(
   orgId: string,
   instanceId: string,
-  userId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const { user } = await requireOrgAccess(orgId)
+  const userId = user.id
   const existing = await db.query.alertInstances.findFirst({
     where: and(
       eq(alertInstances.id, instanceId),
@@ -967,10 +967,10 @@ export async function getActiveSilencesForHost(
 
 export async function createSilence(
   orgId: string,
-  userId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  const { user } = await requireOrgAccess(orgId)
+  const userId = user.id
   const parsed = createSilenceSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }

@@ -96,9 +96,9 @@ export async function listPendingAgents(orgId: string): Promise<Agent[]> {
 export async function approveAgent(
   orgId: string,
   agentId: string,
-  actorId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const { user } = await requireOrgToolingAccess(orgId)
+  const actorId = user.id
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -226,9 +226,9 @@ async function findOnlineHostCollision(
 export async function rejectAgent(
   orgId: string,
   agentId: string,
-  actorId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const { user } = await requireOrgToolingAccess(orgId)
+  const actorId = user.id
   try {
     const agent = await db.query.agents.findFirst({
       where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
@@ -491,7 +491,6 @@ export async function listDistinctHostOses(orgId: string): Promise<string[]> {
 
 export async function createEnrolmentToken(
   orgId: string,
-  userId: string,
   input: {
     label: string
     autoApprove: boolean
@@ -501,7 +500,8 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const { user } = await requireOrgToolingAccess(orgId)
+  const userId = user.id
   if (!await createEnrolmentTokenLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before creating another enrolment token.' }
   }
@@ -513,7 +513,6 @@ export async function createEnrolmentToken(
   // autoApprove bypasses the registration approval queue — restrict to super_admin to limit
   // blast radius if an org_admin account is compromised (M-29).
   if (parsed.data.autoApprove) {
-    const { user } = await getRequiredSession()
     if (user.role !== 'super_admin') {
       return { error: 'Only super_admin users may create auto-approve enrolment tokens.' }
     }
@@ -1225,7 +1224,6 @@ export async function deleteHost(
  */
 export async function uninstallAndDeleteHost(
   orgId: string,
-  userId: string,
   hostId: string,
 ): Promise<
   | { success: true }
@@ -1250,7 +1248,7 @@ export async function uninstallAndDeleteHost(
       }
     }
 
-    const trigger = await triggerAgentUninstall(orgId, userId, hostId)
+    const trigger = await triggerAgentUninstall(orgId, hostId)
     if ('error' in trigger) return { error: trigger.error }
 
     // Poll until the agent reports the uninstall as scheduled, or we hit

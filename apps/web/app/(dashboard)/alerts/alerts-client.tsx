@@ -890,7 +890,6 @@ type SilenceFormValues = z.infer<typeof silenceFormSchema>
 
 function AddSilenceDialog({
   orgId,
-  userId,
   hosts,
   open,
   onOpenChange,
@@ -898,7 +897,6 @@ function AddSilenceDialog({
   prefilledHostId,
 }: {
   orgId: string
-  userId: string
   hosts: HostWithAgent[]
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -923,7 +921,7 @@ function AddSilenceDialog({
   })
 
   async function onSubmit(values: SilenceFormValues) {
-    const result = await createSilence(orgId, userId, {
+    const result = await createSilence(orgId, {
       hostId: values.hostId || null,
       reason: values.reason,
       startsAt: new Date(values.startsAt).toISOString(),
@@ -996,7 +994,6 @@ function AddSilenceDialog({
 
 interface AlertsClientProps {
   orgId: string
-  currentUserId: string
   initialActive: AlertInstanceWithRule[]
   initialChannels: NotificationChannelSafe[]
   initialSilences: AlertSilenceWithHost[]
@@ -1009,7 +1006,6 @@ const HISTORY_PAGE_SIZE = 25
 
 export function AlertsClient({
   orgId,
-  currentUserId,
   initialActive,
   initialChannels,
   initialSilences,
@@ -1076,7 +1072,7 @@ export function AlertsClient({
   })
 
   const acknowledgeMutation = useMutation({
-    mutationFn: (instanceId: string) => acknowledgeAlert(orgId, instanceId, currentUserId),
+    mutationFn: (instanceId: string) => acknowledgeAlert(orgId, instanceId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['alerts', orgId] })
     },
@@ -1608,7 +1604,6 @@ export function AlertsClient({
 
       <AddSilenceDialog
         orgId={orgId}
-        userId={currentUserId}
         hosts={hosts}
         open={addSilenceOpen}
         onOpenChange={setAddSilenceOpen}

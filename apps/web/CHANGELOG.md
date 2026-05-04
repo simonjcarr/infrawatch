@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.97.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.4...web/v0.97.0) (2026-05-04)
+
+
+### Features
+
+* **password-vault:** add browser crypto primitives ([#898](https://github.com/carrtech-dev/ct-ops/issues/898)) ([6eb468d](https://github.com/carrtech-dev/ct-ops/commit/6eb468da20ac54d1dd74009efffde53ab560502f))
+* **password-vault:** add vault schema and migrations ([#895](https://github.com/carrtech-dev/ct-ops/issues/895)) ([d8f1c52](https://github.com/carrtech-dev/ct-ops/commit/d8f1c525f2f40d79f0d484a3ac77bf1e7c300b6b))
+
 ## [0.96.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.96.3...web/v0.96.4) (2026-05-04)
 
 

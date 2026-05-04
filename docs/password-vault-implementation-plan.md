@@ -100,7 +100,7 @@ implementation decision.
 | ID | Task | Dependencies | Status | Owner | PR | Expected session output |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Remove obsolete external password-manager plugin references | none | Complete | automation/work-on-password-manager |  | Rewrote CT-Passwd/external password-manager references into generic external-plugin guidance or explicit superseded-history notes; old repo slug removed from active docs. |
-| 2 | Add built-in Password Vault architecture and threat model | 1 | Not started |  |  | Add a docs file covering first-party boundaries, zero-knowledge limits, recovery posture, browser/server trust, key hierarchy, and standards alignment. |
+| 2 | Add built-in Password Vault architecture and threat model | 1 | Complete | automation/work-on-password-manager |  | Added `docs/password-vault-architecture.md` covering first-party boundaries, zero-knowledge limits, recovery posture, browser/server trust, key hierarchy, threat model, and standards alignment. |
 | 3 | Add public docs shell and navigation | 2 | Not started |  |  | Add `apps/docs/docs/features/password-vault.md`, wire it into the docs sidebar, and describe MVP behavior without promising deferred features. |
 | 4 | Add schema test expectations first | 2 | Not started |  |  | Add failing or validation-focused tests/checks for the vault tables, organisation scoping, membership constraints, key epochs, and audit relationships. |
 | 5 | Add vault schema and migration | 4 | Not started |  |  | Add Drizzle schema, migration, exports, and E2E truncate entries for user keys, vaults, key epochs, members, entries, and audit references. |
@@ -225,3 +225,4 @@ the built-in Password Vault.
 | Date | Agent | Task | Status | PR | Validation | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-05-04 | automation/work-on-password-manager | 1 | Complete |  | `rg -n "CT-Passwd|ct-passwd|git@github.com:simonjcarr/ct-passwd.git" docs PROGRESS.md`; `git diff --check`; Markdown fence/tab sanity check | Removed active external password-manager direction from shared docs, kept only an explicit superseded historical note in `PROGRESS.md`, and preserved generic CT-CVE/plugin broker guidance. |
+| 2026-05-04 | automation/work-on-password-manager | 2 | Complete |  | `git diff --check`; `pnpm --filter @ct-ops/docs build` (fails: `vuepress` not installed in this worktree) | Added `docs/password-vault-architecture.md` as the internal source of truth for built-in vault boundaries, key hierarchy, recovery posture, residual malicious-JavaScript risk, and backend security constraints. |

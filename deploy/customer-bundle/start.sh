@@ -362,7 +362,7 @@ start_stack() {
       exit 1
     fi
   else
-    echo "Pulling latest images from GHCR..."
+    echo "Pulling release-pinned images from GHCR..."
     if ! docker compose pull db web migrate ingest nginx tls-init; then
       echo "" >&2
       echo "ERROR: failed to pull one or more images from GHCR." >&2

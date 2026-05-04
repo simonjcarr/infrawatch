@@ -44,8 +44,13 @@ if [[ -n "${MOCK_CURL_LOG:-}" ]]; then
   printf '%s\n' "$url" >> "$MOCK_CURL_LOG"
 fi
 
-if [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100" ]]; then
+if [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100" \
+  || "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=1" ]]; then
   printf '%s' "${MOCK_RELEASES_JSON}" > "$out"
+elif [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=2" ]]; then
+  printf '%s' "${MOCK_RELEASES_JSON_PAGE_2:-[]}" > "$out"
+elif [[ "$url" == https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100\&page=* ]]; then
+  printf '[]' > "$out"
 elif [[ "$url" == *.sha256 ]]; then
   printf '%s  ct-ops-single.zip\n' "${MOCK_CHECKSUM}" > "$out"
 else
@@ -78,7 +83,11 @@ run_match_case() {
   export MOCK_PAYLOAD="verified bundle payload"
   export MOCK_RELEASES_JSON='[
     { "tag_name": "ingest/v9.9.9" },
-    { "tag_name": "web/v1.2.3" }
+    { "tag_name": "web/v0.99.0" },
+    { "tag_name": "web/v0.98.0" }
+  ]'
+  export MOCK_RELEASES_JSON_PAGE_2='[
+    { "tag_name": "web/v0.100.0" }
   ]'
   export MOCK_CURL_LOG="${workspace}/curl.log"
   export MOCK_CHECKSUM
@@ -90,13 +99,14 @@ run_match_case() {
   )
 
   test -d "${workspace}/ct-ops"
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v1.2.3/ct-ops-single.zip" "$MOCK_CURL_LOG"
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v1.2.3/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
   if grep -Fq "/releases/latest/" "$MOCK_CURL_LOG"; then
     echo "installer should not use GitHub's repo-wide latest release URL" >&2
     exit 1
   fi
   unset MOCK_CURL_LOG
+  unset MOCK_RELEASES_JSON_PAGE_2
 }
 
 run_mismatch_case() {

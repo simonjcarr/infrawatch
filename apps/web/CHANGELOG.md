@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.13](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.12...web/v0.103.13) (2026-05-05)
+
+
+### Bug Fixes
+
+* **agent:** validate install ingest address ([#1018](https://github.com/carrtech-dev/ct-ops/issues/1018)) ([426777d](https://github.com/carrtech-dev/ct-ops/commit/426777dca5b3ac5937018f34145f10cd995d5ef2))
+
 ## [0.103.12](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.11...web/v0.103.12) (2026-05-05)
 
 

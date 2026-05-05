@@ -8,6 +8,7 @@ import {
   type AgentArch,
 } from '@/lib/agent/binary'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 
 // 20 requests per IP per 60 s — prevents binary-download floods while accommodating automation.
 const downloadRateLimit = createRateLimiter({
@@ -29,10 +30,7 @@ const downloadRateLimit = createRateLimiter({
  * Query params: os (linux|darwin|windows), arch (amd64|arm64)
  */
 export async function GET(request: NextRequest) {
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown'
+  const ip = getClientIpFromHeaders(request.headers)
   if (!await downloadRateLimit.check(ip)) {
     return NextResponse.json(
       { error: 'Too many requests — please wait before trying again.' },

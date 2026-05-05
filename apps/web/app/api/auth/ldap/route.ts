@@ -11,6 +11,7 @@ import { getBetterAuthSecret } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
 import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
 import { normalizeLdapTenantSlug } from '@/lib/auth/ldap-tenant'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 import { SeatAdmissionError, assertUserCanAccessSeat } from '@/lib/seat-admission'
 import {
@@ -41,9 +42,7 @@ export async function POST(request: NextRequest) {
   const requestStart = Date.now()
 
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      ?? request.headers.get('x-real-ip')
-      ?? 'unknown'
+    const ip = getClientIpFromHeaders(request.headers)
 
     if (!await ldapRateLimit.check(ip)) {
       return NextResponse.json(
@@ -236,7 +235,7 @@ export async function POST(request: NextRequest) {
         token: sessionToken,
         userId,
         expiresAt,
-        ipAddress: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? null,
+        ipAddress: ip === 'unknown' ? null : ip,
         userAgent: request.headers.get('user-agent') ?? null,
       })
 

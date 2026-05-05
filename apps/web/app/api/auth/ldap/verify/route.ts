@@ -9,6 +9,7 @@ import { getBetterAuthSecret } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
 import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
 import { assertUserCanAccessSeat, SeatAdmissionError } from '@/lib/seat-admission'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 import {
   encryptLdapBackupCodes,
   LDAP_TWO_FACTOR_COOKIE_NAME,
@@ -36,9 +37,7 @@ export async function POST(request: NextRequest) {
   const requestStart = Date.now()
 
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      ?? request.headers.get('x-real-ip')
-      ?? 'unknown'
+    const ip = getClientIpFromHeaders(request.headers)
 
     if (!await ldapTwoFactorRateLimit.check(ip)) {
       return NextResponse.json(
@@ -154,7 +153,7 @@ export async function POST(request: NextRequest) {
       token: sessionToken,
       userId: user.id,
       expiresAt,
-      ipAddress: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? null,
+      ipAddress: ip === 'unknown' ? null : ip,
       userAgent: request.headers.get('user-agent') ?? null,
     })
 

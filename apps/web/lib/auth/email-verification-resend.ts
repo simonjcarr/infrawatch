@@ -1,3 +1,5 @@
+import { getClientIpFromHeaders } from '../client-ip.ts'
+
 export const EMAIL_VERIFICATION_RESEND_INVALID_MESSAGE =
   'We could not resend a verification email. Check your email and password, then try again.'
 
@@ -9,11 +11,7 @@ export function normalizeVerificationEmail(email: string): string {
 }
 
 export function getVerificationResendClientIp(request: Request): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip')?.trim() ||
-    'unknown'
-  )
+  return getClientIpFromHeaders(request.headers)
 }
 
 export function sanitizeVerificationCallbackPath(value: unknown): string {

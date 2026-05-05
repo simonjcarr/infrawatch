@@ -15,6 +15,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `BETTER_AUTH_URL` | ✓ 🔒 | — | Public URL of the web app (e.g. `https://ct-ops.corp.example.com`). Use `https://` — `http://` disables cookie Secure flag |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | ✓ 🔒 | — | Comma-separated list of allowed origins. Auth flows from origins not in this list are rejected |
 | `REQUIRE_EMAIL_VERIFICATION` | — 🔒 | `true` | Require local email/password users to verify their email before sign-in. Set to `false` only when email verification should be optional |
+| `CT_OPS_TRUST_PROXY_HEADERS` | — 🔒 | `false` (`true` in the bundled Docker Compose profile) | Trust `X-Forwarded-For` / `X-Real-IP` for client IP rate limits only when a reverse proxy overwrites those headers and direct web-container access is blocked |
 | `CT_OPS_LOADTEST_ADMIN_KEY` | — 🔒 | — | Bearer credential for `/api/admin/hosts/bulk-delete`. Endpoint returns 503 when unset. Set only on environments running load tests |
 | `NEXT_PUBLIC_APP_URL` | — | — | Exposed to the browser — used for constructing absolute links |
 | `NODE_ENV` | — | `development` | Set to `production` in production |

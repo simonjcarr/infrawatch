@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -19,9 +20,23 @@ import {
 } from './client.ts'
 
 function loadPinnedContract() {
-  const filePath = fileURLToPath(
-    new URL('../../../../../ct-password-manager/docs/api-contract/openapi.json', import.meta.url),
-  )
+  const currentFilePath = fileURLToPath(import.meta.url)
+  let currentDir = path.dirname(currentFilePath)
+
+  while (currentDir !== path.dirname(currentDir)) {
+    const candidate = path.join(currentDir, 'ct-password-manager', 'docs', 'api-contract', 'openapi.json')
+    try {
+      return JSON.parse(readFileSync(candidate, 'utf8'))
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        currentDir = path.dirname(currentDir)
+        continue
+      }
+      throw error
+    }
+  }
+
+  const filePath = fileURLToPath(new URL('../../../../../ct-password-manager/docs/api-contract/openapi.json', import.meta.url))
   return JSON.parse(readFileSync(filePath, 'utf8'))
 }
 

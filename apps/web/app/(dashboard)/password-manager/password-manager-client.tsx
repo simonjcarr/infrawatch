@@ -16,6 +16,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  RotateCcw,
   KeyRound,
   Lock,
   LogOut,
@@ -33,6 +34,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { logWarn } from '@/lib/logging'
@@ -43,10 +45,13 @@ import {
   decryptEntryPayload,
   decryptVaultMetadata,
   decryptUserPrivateKeyEnvelope,
+  exportPublicKeyEnvelope,
   generateVaultKey,
+  importPublicKeyEnvelope,
   type PasswordManagerEncryptedPrivateKeyEnvelope,
   type PasswordManagerEncryptedPayloadEnvelope,
   type PasswordManagerKdfMetadata,
+  type PasswordManagerPublicKeyEnvelope,
   type PasswordManagerWrappedVaultKeyEnvelope,
   unwrapVaultKeyEnvelope,
   wrapVaultKeyForMember,
@@ -54,6 +59,7 @@ import {
 import {
   PasswordManagerApiError,
   type EntryRecord,
+  type MemberRecord,
   type VaultRecord,
   createPasswordManagerClient,
 } from '@/lib/password-manager/client'
@@ -81,6 +87,7 @@ const PASSWORD_MANAGER_LAUNCH_PATH = '/api/password-manager/launch-assertion'
 const GENERIC_UNLOCK_FAILURE =
   'Password Manager could not unlock with the provided materials. Retry or relaunch.'
 const GENERIC_SETUP_FAILURE = 'Password Manager setup could not be completed safely. Retry or relaunch.'
+const PASSWORD_MANAGER_MEMBER_ROLES = ['viewer', 'member', 'manager', 'owner'] as const
 
 function toClientPayload<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -98,7 +105,37 @@ function isSessionScopedError(error: unknown): boolean {
   return error instanceof PasswordManagerApiError && (error.status === 401 || error.status === 403)
 }
 
-export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
+function isMembershipConflictError(error: unknown): boolean {
+  return error instanceof PasswordManagerApiError && error.status === 409 && error.code === 'membership_conflict'
+}
+
+function sortMembers(members: MemberRecord[]): MemberRecord[] {
+  return [...members].sort((left, right) => {
+    if (left.role !== right.role) {
+      return PASSWORD_MANAGER_MEMBER_ROLES.indexOf(right.role as (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]) -
+        PASSWORD_MANAGER_MEMBER_ROLES.indexOf(left.role as (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number])
+    }
+    return left.user_id.localeCompare(right.user_id)
+  })
+}
+
+function upsertVaultEpochKey(vaultKeyCache: Map<string, Map<number, CryptoKey>>, vaultId: string, epoch: number, key: CryptoKey) {
+  const existing = vaultKeyCache.get(vaultId) ?? new Map<number, CryptoKey>()
+  existing.set(epoch, key)
+  vaultKeyCache.set(vaultId, existing)
+}
+
+function readVaultEpochKey(vaultKeyCache: Map<string, Map<number, CryptoKey>>, vaultId: string, epoch: number): CryptoKey | null {
+  return vaultKeyCache.get(vaultId)?.get(epoch) ?? null
+}
+
+export function PasswordManagerClientShell({
+  currentUserId,
+  orgId,
+}: {
+  currentUserId: string
+  orgId: string
+}) {
   const client = useMemo(
     () =>
       createPasswordManagerClient({
@@ -127,6 +164,7 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
   const [statusNotice, setStatusNotice] = useState<string | null>(null)
   const [vaultsPending, setVaultsPending] = useState(false)
   const [entriesPending, setEntriesPending] = useState(false)
+  const [membersPending, setMembersPending] = useState(false)
   const [workspacePending, setWorkspacePending] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [vaultFilter, setVaultFilter] = useState('')
@@ -135,10 +173,17 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
   const deferredEntryFilter = useDeferredValue(entryFilter)
   const [vaults, setVaults] = useState<PasswordManagerVaultSummary[]>([])
   const [entries, setEntries] = useState<PasswordManagerEntrySummary[]>([])
+  const [members, setMembers] = useState<MemberRecord[]>([])
   const [createVaultName, setCreateVaultName] = useState('')
   const [createVaultDescription, setCreateVaultDescription] = useState('')
   const [renameVaultName, setRenameVaultName] = useState('')
   const [renameVaultDescription, setRenameVaultDescription] = useState('')
+  const [memberUserId, setMemberUserId] = useState('')
+  const [memberRole, setMemberRole] = useState<(typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]>('viewer')
+  const [memberPublicKeyEnvelopeText, setMemberPublicKeyEnvelopeText] = useState('')
+  const [memberRoleEdits, setMemberRoleEdits] = useState<Record<string, string>>({})
+  const [memberPublicKeyEnvelopeInputs, setMemberPublicKeyEnvelopeInputs] = useState<Record<string, string>>({})
+  const [rotationPrompt, setRotationPrompt] = useState<string | null>(null)
   const [entryTitle, setEntryTitle] = useState('')
   const [entryUsername, setEntryUsername] = useState('')
   const [entryPassword, setEntryPassword] = useState('')
@@ -146,12 +191,19 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
   const [entryNotes, setEntryNotes] = useState('')
   const [entryRevealId, setEntryRevealId] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
-  const vaultKeyCacheRef = useRef(new Map<string, CryptoKey>())
+  const vaultKeyCacheRef = useRef(new Map<string, Map<number, CryptoKey>>())
+  const memberPublicKeyEnvelopeCacheRef = useRef<Record<string, PasswordManagerPublicKeyEnvelope>>({})
   const pendingVaultCreateRef = useRef<{
     encryptedMetadata: PasswordManagerEncryptedPayloadEnvelope
     metadata: PasswordManagerVaultMetadata
     wrappedVaultKeyEnvelope: PasswordManagerWrappedVaultKeyEnvelope
     idempotencyKey: string
+    vaultKey: CryptoKey
+  } | null>(null)
+  const pendingRotationRef = useRef<{
+    idempotencyKey: string
+    members: Array<{ userId: string; wrappedVaultKeyEnvelope: PasswordManagerWrappedVaultKeyEnvelope }>
+    vaultId: string
     vaultKey: CryptoKey
   } | null>(null)
 
@@ -292,15 +344,24 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
     }
 
     vaultKeyCacheRef.current = new Map()
+    memberPublicKeyEnvelopeCacheRef.current = {}
     pendingVaultCreateRef.current = null
+    pendingRotationRef.current = null
     setVaults([])
     setEntries([])
+    setMembers([])
     setVaultFilter('')
     setEntryFilter('')
     setCreateVaultName('')
     setCreateVaultDescription('')
     setRenameVaultName('')
     setRenameVaultDescription('')
+    setMemberUserId('')
+    setMemberRole('viewer')
+    setMemberPublicKeyEnvelopeText('')
+    setMemberRoleEdits({})
+    setMemberPublicKeyEnvelopeInputs({})
+    setRotationPrompt(null)
     setEntryTitle('')
     setEntryUsername('')
     setEntryPassword('')
@@ -311,6 +372,31 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
     setWorkspaceError(null)
     workspaceDispatch({ type: 'restart' })
   }, [state.view])
+
+  useEffect(() => {
+    if (state.view !== 'unlocked' || !state.activeKeyPair) {
+      return
+    }
+
+    let cancelled = false
+
+    async function cacheCurrentUserPublicKey() {
+      const envelope = await exportPublicKeyEnvelope(state.activeKeyPair!.publicKey as CryptoKey)
+      if (cancelled) {
+        return
+      }
+      memberPublicKeyEnvelopeCacheRef.current = {
+        ...memberPublicKeyEnvelopeCacheRef.current,
+        [currentUserId]: envelope,
+      }
+    }
+
+    void cacheCurrentUserPublicKey()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId, state.activeKeyPair, state.view])
 
   useEffect(() => {
     if (state.view !== 'unlocked' || !state.activeKeyPair) {
@@ -334,12 +420,19 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
               record.encrypted_metadata as unknown as PasswordManagerEncryptedPayloadEnvelope,
               vaultKey,
             )
-            vaultKeyCacheRef.current.set(record.id, vaultKey)
+            upsertVaultEpochKey(vaultKeyCacheRef.current, record.id, record.current_key_epoch, vaultKey)
             return createVaultSummary(record, metadata)
           }),
         )
         if (cancelled) {
           return
+        }
+
+        const visibleVaultIds = new Set(decryptedVaults.map((vault) => vault.id))
+        for (const vaultId of [...vaultKeyCacheRef.current.keys()]) {
+          if (!visibleVaultIds.has(vaultId)) {
+            vaultKeyCacheRef.current.delete(vaultId)
+          }
         }
 
         setVaults(decryptedVaults)
@@ -378,26 +471,24 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
     let cancelled = false
 
     async function loadEntries() {
-      const vaultKey = vaultKeyCacheRef.current.get(workspaceState.selectedVaultId ?? '')
-      if (!vaultKey) {
-        setWorkspaceError('The selected vault key is no longer available in browser memory. Relock or relaunch.')
-        return
-      }
-
       setEntriesPending(true)
       setWorkspaceError(null)
       try {
         const response = await client.listEntries(workspaceState.selectedVaultId!)
         const decryptedEntries = await Promise.all(
-          response.entries.map(async (record) =>
-            createEntrySummary(
+          response.entries.map(async (record) => {
+            const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, record.vault_id, record.key_epoch)
+            if (!vaultKey) {
+              throw new Error('The required vault key epoch is no longer available in browser memory. Rotate or relaunch.')
+            }
+            return createEntrySummary(
               record,
               await decryptEntryPayload<PasswordManagerEntryPayload>(
                 record.encrypted_payload as unknown as PasswordManagerEncryptedPayloadEnvelope,
                 vaultKey,
               ),
-            ),
-          ),
+            )
+          }),
         )
         if (cancelled) {
           return
@@ -425,6 +516,45 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
       cancelled = true
     }
   }, [client, state.view, workspaceState.selectedEntryId, workspaceState.selectedVaultId])
+
+  useEffect(() => {
+    if (state.view !== 'unlocked' || !workspaceState.selectedVaultId) {
+      setMembers([])
+      return
+    }
+
+    let cancelled = false
+
+    async function loadMembers() {
+      setMembersPending(true)
+      setWorkspaceError(null)
+      try {
+        const response = await client.listMembers(workspaceState.selectedVaultId!)
+        if (cancelled) {
+          return
+        }
+
+        const nextMembers = sortMembers(response.members)
+        setMembers(nextMembers)
+        setMemberRoleEdits(Object.fromEntries(nextMembers.map((member) => [member.user_id, member.role])))
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+        handleWorkspaceEffectError(error, 'Password Manager members could not be loaded safely.')
+      } finally {
+        if (!cancelled) {
+          setMembersPending(false)
+        }
+      }
+    }
+
+    void loadMembers()
+
+    return () => {
+      cancelled = true
+    }
+  }, [client, state.view, workspaceState.selectedVaultId])
 
   useEffect(() => {
     if (!selectedVault) {
@@ -684,7 +814,7 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
         idempotencyKey: request.idempotencyKey,
       })
       const summary = createVaultSummary(record, request.metadata)
-      vaultKeyCacheRef.current.set(summary.id, request.vaultKey)
+      upsertVaultEpochKey(vaultKeyCacheRef.current, summary.id, summary.currentKeyEpoch, request.vaultKey)
       setVaults((current) => filterPasswordManagerVaults([...current.filter((vault) => vault.id !== summary.id), summary], ''))
       workspaceDispatch({ type: 'vault-selected', vaultId: summary.id })
       pendingVaultCreateRef.current = null
@@ -702,7 +832,7 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
     if (!selectedVault) {
       return
     }
-    const vaultKey = vaultKeyCacheRef.current.get(selectedVault.id)
+    const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, selectedVault.id, selectedVault.currentKeyEpoch)
     if (!vaultKey) {
       setWorkspaceError('The selected vault key is no longer available in browser memory. Relock or relaunch.')
       return
@@ -748,10 +878,237 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
       vaultKeyCacheRef.current.delete(selectedVault.id)
       setVaults((current) => current.filter((vault) => vault.id !== selectedVault.id))
       setEntries([])
+      setMembers([])
       workspaceDispatch({ type: 'vault-removed', vaultId: selectedVault.id })
       setStatusNotice('Vault removed and decrypted browser state cleared for that vault.')
     } catch (error) {
       handleWorkspaceActionError(error, 'The vault could not be deleted safely.')
+    } finally {
+      setWorkspacePending(false)
+    }
+  }
+
+  async function handleMemberAdd() {
+    if (!selectedVault) {
+      setWorkspaceError('Select a vault before adding a member.')
+      return
+    }
+    const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, selectedVault.id, selectedVault.currentKeyEpoch)
+    if (!vaultKey) {
+      setWorkspaceError('The selected vault key is no longer available in browser memory. Relock or relaunch.')
+      return
+    }
+
+    const userId = memberUserId.trim()
+    if (!userId) {
+      setWorkspaceError('Enter a CT-Ops user ID to add a member safely.')
+      return
+    }
+
+    setWorkspacePending(true)
+    setWorkspaceError(null)
+    try {
+      const parsedEnvelope = JSON.parse(memberPublicKeyEnvelopeText) as PasswordManagerPublicKeyEnvelope
+      const memberPublicKey = await importPublicKeyEnvelope(parsedEnvelope)
+      const wrappedVaultKeyEnvelope = await wrapVaultKeyForMember(vaultKey, memberPublicKey)
+      const created = await client.addMember({
+        vaultId: selectedVault.id,
+        userId,
+        role: memberRole,
+        wrappedVaultKeyEnvelope: toClientPayload(wrappedVaultKeyEnvelope) as never,
+        keyEpoch: selectedVault.currentKeyEpoch,
+      })
+      memberPublicKeyEnvelopeCacheRef.current = {
+        ...memberPublicKeyEnvelopeCacheRef.current,
+        [created.user_id]: parsedEnvelope,
+      }
+      setMembers((current) => sortMembers([...current.filter((member) => member.user_id !== created.user_id), created]))
+      setMemberRoleEdits((current) => ({ ...current, [created.user_id]: created.role }))
+      setMemberPublicKeyEnvelopeInputs((current) => ({ ...current, [created.user_id]: JSON.stringify(parsedEnvelope, null, 2) }))
+      setMemberUserId('')
+      setMemberRole('viewer')
+      setMemberPublicKeyEnvelopeText('')
+      setStatusNotice('Member added with a wrapped vault key only.')
+    } catch (error) {
+      if (isMembershipConflictError(error)) {
+        setWorkspaceError('Password Manager rejected that membership change because owner safety or current membership state would be violated. Refresh and retry.')
+      } else if (error instanceof SyntaxError) {
+        setWorkspaceError('Paste a valid Password Manager public-key envelope JSON document for the new member.')
+      } else {
+        handleWorkspaceActionError(error, 'The member could not be added safely.')
+      }
+    } finally {
+      setWorkspacePending(false)
+    }
+  }
+
+  async function handleMemberRoleUpdate(member: MemberRecord) {
+    if (!selectedVault) {
+      return
+    }
+
+    const nextRole = memberRoleEdits[member.user_id] ?? member.role
+    if (nextRole === member.role) {
+      setStatusNotice(`No role change was needed for ${member.user_id}.`)
+      return
+    }
+
+    setWorkspacePending(true)
+    setWorkspaceError(null)
+    try {
+      const updated = await client.updateMember({
+        vaultId: selectedVault.id,
+        userId: member.user_id,
+        role: nextRole,
+        wrappedVaultKeyEnvelope: toClientPayload(member.wrapped_vault_key_envelope) as never,
+        keyEpoch: member.key_epoch,
+      })
+      setMembers((current) => sortMembers(current.map((entry) => (entry.user_id === updated.user_id ? updated : entry))))
+      setMemberRoleEdits((current) => ({ ...current, [updated.user_id]: updated.role }))
+      setStatusNotice(`Role updated safely for ${updated.user_id}.`)
+    } catch (error) {
+      if (isMembershipConflictError(error)) {
+        setWorkspaceError('Password Manager rejected that membership change because owner safety or current membership state would be violated. Refresh and retry.')
+      } else {
+        handleWorkspaceActionError(error, 'The member role could not be updated safely.')
+      }
+    } finally {
+      setWorkspacePending(false)
+    }
+  }
+
+  async function runVaultRotation(
+    request = pendingRotationRef.current,
+  ) {
+    if (!selectedVault || !state.activeKeyPair) {
+      setWorkspaceError('Unlock Password Manager and select a vault before rotating keys.')
+      return
+    }
+
+    if (!request) {
+      if (members.length === 0) {
+        setWorkspaceError('No active members remain to receive the next wrapped vault key.')
+        return
+      }
+
+      const vaultKey = await generateVaultKey()
+      const rotatedMembers: Array<{ userId: string; wrappedVaultKeyEnvelope: PasswordManagerWrappedVaultKeyEnvelope }> = []
+
+      for (const member of members) {
+        let memberPublicKey: CryptoKey
+        if (member.user_id === currentUserId) {
+          memberPublicKey = state.activeKeyPair.publicKey as CryptoKey
+        } else {
+          const cachedEnvelope = memberPublicKeyEnvelopeCacheRef.current[member.user_id]
+          const pastedEnvelope = memberPublicKeyEnvelopeInputs[member.user_id]?.trim()
+          const envelope = cachedEnvelope ?? (pastedEnvelope ? (JSON.parse(pastedEnvelope) as PasswordManagerPublicKeyEnvelope) : null)
+          if (!envelope) {
+            setWorkspaceError(`Paste the Password Manager public-key envelope for ${member.user_id} before rotating this vault key.`)
+            return
+          }
+          memberPublicKey = await importPublicKeyEnvelope(envelope)
+          memberPublicKeyEnvelopeCacheRef.current = {
+            ...memberPublicKeyEnvelopeCacheRef.current,
+            [member.user_id]: envelope,
+          }
+        }
+
+        rotatedMembers.push({
+          userId: member.user_id,
+          wrappedVaultKeyEnvelope: await wrapVaultKeyForMember(vaultKey, memberPublicKey),
+        })
+      }
+
+      request = {
+        idempotencyKey: createIdempotencyKey(),
+        members: rotatedMembers,
+        vaultId: selectedVault.id,
+        vaultKey,
+      }
+      pendingRotationRef.current = request
+    }
+
+    setWorkspacePending(true)
+    setWorkspaceError(null)
+    try {
+      const rotated = await client.rotateVaultKeys({
+        vaultId: request.vaultId,
+        rotationReason: 'membership_revoked',
+        members: request.members.map((member) => ({
+          userId: member.userId,
+          wrappedVaultKeyEnvelope: toClientPayload(member.wrappedVaultKeyEnvelope) as never,
+        })),
+        idempotencyKey: request.idempotencyKey,
+      })
+      upsertVaultEpochKey(vaultKeyCacheRef.current, request.vaultId, rotated.epoch, request.vaultKey)
+      setVaults((current) =>
+        current.map((vault) =>
+          vault.id === request.vaultId
+            ? {
+                ...vault,
+                currentKeyEpoch: rotated.epoch,
+                updatedAt: rotated.created_at,
+              }
+            : vault,
+        ),
+      )
+      setMembers((current) =>
+        sortMembers(
+          current.map((member) =>
+            request!.members.find((candidate) => candidate.userId === member.user_id)
+              ? { ...member, key_epoch: rotated.epoch, updated_at: rotated.created_at }
+              : member,
+          ),
+        ),
+      )
+      pendingRotationRef.current = null
+      setRotationPrompt(null)
+      setStatusNotice('Vault key rotated for active members using browser-only key wrapping.')
+    } catch (error) {
+      handleWorkspaceActionError(error, 'The vault key could not be rotated safely. Retry the same encrypted request.')
+    } finally {
+      setWorkspacePending(false)
+    }
+  }
+
+  async function handleMemberRemove(member: MemberRecord) {
+    if (!selectedVault) {
+      return
+    }
+
+    setWorkspacePending(true)
+    setWorkspaceError(null)
+    try {
+      await client.removeMember({
+        vaultId: selectedVault.id,
+        userId: member.user_id,
+      })
+
+      if (member.user_id === currentUserId) {
+        vaultKeyCacheRef.current.delete(selectedVault.id)
+        setVaults((current) => current.filter((vault) => vault.id !== selectedVault.id))
+        setEntries([])
+        setMembers([])
+        workspaceDispatch({ type: 'vault-removed', vaultId: selectedVault.id })
+        setStatusNotice('Your access to this vault was removed. Local decrypted state was purged immediately.')
+        return
+      }
+
+      pendingRotationRef.current = null
+      setMembers((current) => sortMembers(current.filter((entry) => entry.user_id !== member.user_id)))
+      setMemberRoleEdits((current) => {
+        const next = { ...current }
+        delete next[member.user_id]
+        return next
+      })
+      setRotationPrompt(`Rotate the vault key now that ${member.user_id} no longer has access.`)
+      setStatusNotice('Member removed. Rotate the vault key before adding or updating more secrets.')
+    } catch (error) {
+      if (isMembershipConflictError(error)) {
+        setWorkspaceError('Password Manager rejected that membership change because owner safety or current membership state would be violated. Refresh and retry.')
+      } else {
+        handleWorkspaceActionError(error, 'The member could not be removed safely.')
+      }
     } finally {
       setWorkspacePending(false)
     }
@@ -762,7 +1119,7 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
       setWorkspaceError('Select a vault before saving an entry.')
       return
     }
-    const vaultKey = vaultKeyCacheRef.current.get(workspaceState.selectedVaultId)
+    const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, workspaceState.selectedVaultId, selectedVault.currentKeyEpoch)
     if (!vaultKey) {
       setWorkspaceError('The selected vault key is no longer available in browser memory. Relock or relaunch.')
       return
@@ -903,6 +1260,7 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
         <PasswordManagerWorkspace
           createVaultDescription={createVaultDescription}
           createVaultName={createVaultName}
+          currentUserId={currentUserId}
           deferredEntryFilter={deferredEntryFilter}
           deferredVaultFilter={deferredVaultFilter}
           editingEntryId={editingEntryId}
@@ -915,6 +1273,13 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
           entryTitle={entryTitle}
           entryUrl={entryUrl}
           entryUsername={entryUsername}
+          memberPublicKeyEnvelopeInputs={memberPublicKeyEnvelopeInputs}
+          memberPublicKeyEnvelopeText={memberPublicKeyEnvelopeText}
+          memberRole={memberRole}
+          memberRoleEdits={memberRoleEdits}
+          memberUserId={memberUserId}
+          members={members}
+          membersPending={membersPending}
           onCopyPassword={handleCopyPassword}
           onCreateVault={runVaultCreate}
           onCreateVaultDescriptionChange={setCreateVaultDescription}
@@ -929,10 +1294,20 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
           onEntryTitleChange={setEntryTitle}
           onEntryUrlChange={setEntryUrl}
           onEntryUsernameChange={setEntryUsername}
+          onMemberPublicKeyEnvelopeChange={setMemberPublicKeyEnvelopeText}
+          onMemberPublicKeyEnvelopeInputChange={(userId, value) =>
+            setMemberPublicKeyEnvelopeInputs((current) => ({ ...current, [userId]: value }))
+          }
+          onMemberRemove={handleMemberRemove}
+          onMemberRoleChange={setMemberRole}
+          onMemberRoleEditChange={(userId, role) => setMemberRoleEdits((current) => ({ ...current, [userId]: role }))}
+          onMemberSave={handleMemberAdd}
+          onMemberUserIdChange={setMemberUserId}
           onRenameVault={handleVaultRename}
           onRenameVaultDescriptionChange={setRenameVaultDescription}
           onRenameVaultNameChange={setRenameVaultName}
           onRetryCreateVault={() => runVaultCreate(pendingVaultCreateRef.current)}
+          onRetryRotation={() => runVaultRotation(pendingRotationRef.current)}
           onSelectEntry={(entryId) => workspaceDispatch({ type: 'entry-selected', entryId })}
           onSelectVault={(vaultId) => workspaceDispatch({ type: 'vault-selected', vaultId })}
           onStartCreateEntry={() => {
@@ -951,9 +1326,11 @@ export function PasswordManagerClientShell({ orgId }: { orgId: string }) {
             setEntryUrl(entry.payload.url ?? '')
             setEntryNotes(entry.payload.notes ?? '')
           }}
+          onUpdateMemberRole={handleMemberRoleUpdate}
           onVaultFilterChange={setVaultFilter}
           renameVaultDescription={renameVaultDescription}
           renameVaultName={renameVaultName}
+          rotationPrompt={rotationPrompt}
           selectedEntry={selectedEntry}
           selectedVault={selectedVault}
           vaultFilter={vaultFilter}
@@ -1285,6 +1662,7 @@ function ShellCard({
 function PasswordManagerWorkspace({
   createVaultDescription,
   createVaultName,
+  currentUserId,
   deferredEntryFilter,
   deferredVaultFilter,
   editingEntryId,
@@ -1297,6 +1675,13 @@ function PasswordManagerWorkspace({
   entryTitle,
   entryUrl,
   entryUsername,
+  memberPublicKeyEnvelopeInputs,
+  memberPublicKeyEnvelopeText,
+  memberRole,
+  memberRoleEdits,
+  memberUserId,
+  members,
+  membersPending,
   onCopyPassword,
   onCreateVault,
   onCreateVaultDescriptionChange,
@@ -1311,17 +1696,27 @@ function PasswordManagerWorkspace({
   onEntryTitleChange,
   onEntryUrlChange,
   onEntryUsernameChange,
+  onMemberPublicKeyEnvelopeChange,
+  onMemberPublicKeyEnvelopeInputChange,
+  onMemberRemove,
+  onMemberRoleChange,
+  onMemberRoleEditChange,
+  onMemberSave,
+  onMemberUserIdChange,
   onRenameVault,
   onRenameVaultDescriptionChange,
   onRenameVaultNameChange,
   onRetryCreateVault,
+  onRetryRotation,
   onSelectEntry,
   onSelectVault,
   onStartCreateEntry,
   onStartEditEntry,
+  onUpdateMemberRole,
   onVaultFilterChange,
   renameVaultDescription,
   renameVaultName,
+  rotationPrompt,
   selectedEntry,
   selectedVault,
   vaultFilter,
@@ -1333,6 +1728,7 @@ function PasswordManagerWorkspace({
 }: {
   createVaultDescription: string
   createVaultName: string
+  currentUserId: string
   deferredEntryFilter: string
   deferredVaultFilter: string
   editingEntryId: string | null
@@ -1345,6 +1741,13 @@ function PasswordManagerWorkspace({
   entryTitle: string
   entryUrl: string
   entryUsername: string
+  memberPublicKeyEnvelopeInputs: Record<string, string>
+  memberPublicKeyEnvelopeText: string
+  memberRole: (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]
+  memberRoleEdits: Record<string, string>
+  memberUserId: string
+  members: MemberRecord[]
+  membersPending: boolean
   onCopyPassword: (entry: PasswordManagerEntrySummary) => Promise<void>
   onCreateVault: () => Promise<void>
   onCreateVaultDescriptionChange: (value: string) => void
@@ -1359,17 +1762,27 @@ function PasswordManagerWorkspace({
   onEntryTitleChange: (value: string) => void
   onEntryUrlChange: (value: string) => void
   onEntryUsernameChange: (value: string) => void
+  onMemberPublicKeyEnvelopeChange: (value: string) => void
+  onMemberPublicKeyEnvelopeInputChange: (userId: string, value: string) => void
+  onMemberRemove: (member: MemberRecord) => Promise<void>
+  onMemberRoleChange: (role: (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]) => void
+  onMemberRoleEditChange: (userId: string, role: string) => void
+  onMemberSave: () => Promise<void>
+  onMemberUserIdChange: (value: string) => void
   onRenameVault: () => Promise<void>
   onRenameVaultDescriptionChange: (value: string) => void
   onRenameVaultNameChange: (value: string) => void
   onRetryCreateVault: () => Promise<void>
+  onRetryRotation: () => Promise<void>
   onSelectEntry: (entryId: string | null) => void
   onSelectVault: (vaultId: string) => void
   onStartCreateEntry: () => void
   onStartEditEntry: (entry: PasswordManagerEntrySummary) => void
+  onUpdateMemberRole: (member: MemberRecord) => Promise<void>
   onVaultFilterChange: (value: string) => void
   renameVaultDescription: string
   renameVaultName: string
+  rotationPrompt: string | null
   selectedEntry: PasswordManagerEntrySummary | null
   selectedVault: PasswordManagerVaultSummary | null
   vaultFilter: string
@@ -1524,6 +1937,139 @@ function PasswordManagerWorkspace({
             </CardHeader>
           </Card>
         )}
+
+        <Card className="border-border/60 shadow-xs">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Members</CardTitle>
+                <CardDescription>
+                  Share and revoke access with wrapped vault keys only. Public-key envelopes stay in browser memory unless you paste them again.
+                </CardDescription>
+              </div>
+              {selectedVault ? <Badge variant="outline">Vault role: {selectedVault.role}</Badge> : null}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {rotationPrompt ? (
+              <Alert>
+                <RotateCcw className="size-4" />
+                <AlertTitle>Key rotation recommended</AlertTitle>
+                <AlertDescription>{rotationPrompt}</AlertDescription>
+              </Alert>
+            ) : null}
+            {membersPending ? <p className="text-sm text-muted-foreground">Loading wrapped member records…</p> : null}
+            {!membersPending && selectedVault && members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">This vault has no active members.</p>
+            ) : null}
+            <div className="space-y-3">
+              {members.map((member) => (
+                <div key={member.user_id} className="rounded-2xl border border-border/60 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{member.user_id}</p>
+                      <p className="text-sm text-muted-foreground">Wrapped key epoch {member.key_epoch}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Select
+                        value={memberRoleEdits[member.user_id] ?? member.role}
+                        onValueChange={(value) => onMemberRoleEditChange(member.user_id, value)}
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue placeholder="Role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PASSWORD_MANAGER_MEMBER_ROLES.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {role}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="outline" size="sm" onClick={() => void onUpdateMemberRole(member)} disabled={!selectedVault || workspacePending}>
+                        <Pencil className="mr-2 size-4" />
+                        Save role
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => void onMemberRemove(member)} disabled={!selectedVault || workspacePending}>
+                        <Trash2 className="mr-2 size-4" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                  {member.user_id !== '' && member.user_id !== ' ' ? (
+                    <div className="mt-3 grid gap-2">
+                      <Label htmlFor={`password-manager-member-envelope-${member.user_id}`}>
+                        Public-key envelope for future rotations
+                      </Label>
+                      <Textarea
+                        id={`password-manager-member-envelope-${member.user_id}`}
+                        value={memberPublicKeyEnvelopeInputs[member.user_id] ?? ''}
+                        onChange={(event) => onMemberPublicKeyEnvelopeInputChange(member.user_id, event.target.value)}
+                        placeholder={
+                          member.user_id === currentUserId
+                            ? 'Current session key is already available locally.'
+                            : '{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
+                        }
+                        disabled={member.user_id === currentUserId}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            {selectedVault ? (
+              <>
+                <Separator />
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="password-manager-member-user-id">CT-Ops user ID</Label>
+                    <Input
+                      id="password-manager-member-user-id"
+                      value={memberUserId}
+                      onChange={(event) => onMemberUserIdChange(event.target.value)}
+                      placeholder="user-1234"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Role</Label>
+                    <Select value={memberRole} onValueChange={(value) => onMemberRoleChange(value as (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number])}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PASSWORD_MANAGER_MEMBER_ROLES.map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-member-public-key-envelope">Member public-key envelope JSON</Label>
+                  <Textarea
+                    id="password-manager-member-public-key-envelope"
+                    value={memberPublicKeyEnvelopeText}
+                    onChange={(event) => onMemberPublicKeyEnvelopeChange(event.target.value)}
+                    placeholder='{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => void onMemberSave()} disabled={workspacePending || !selectedVault}>
+                    <Plus className="mr-2 size-4" />
+                    Add member
+                  </Button>
+                  <Button variant="outline" onClick={() => void onRetryRotation()} disabled={workspacePending || !selectedVault}>
+                    <RotateCcw className="mr-2 size-4" />
+                    {rotationPrompt ? 'Rotate vault key' : 'Retry saved rotation'}
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
 
         <Card className="border-border/60 shadow-xs">
           <CardHeader>

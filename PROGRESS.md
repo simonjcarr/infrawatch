@@ -15,6 +15,32 @@
 
 ## What Has Been Built
 
+### Session 112 — Password Manager sharing and key rotation UI
+
+**Hosted sharing and revocation workflow** (`apps/web/app/(dashboard)/password-manager/page.tsx`, `apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/browser-crypto.ts`, `apps/web/lib/password-manager/browser-crypto.test.mjs`, `apps/web/lib/password-manager/client.test.mjs`)
+- Extended the hosted `/password-manager` UI with vault-member management:
+  users can list members, add a member by wrapping the current vault key for a
+  pasted Password Manager public-key envelope, update member roles without
+  resending plaintext, and remove members with safe conflict messaging.
+- Added browser-only public-key-envelope import so the client can rehydrate a
+  recipient RSA-OAEP key from portable JSON and wrap new vault keys without any
+  CT-Ops-side secret handling.
+- Added rotation retry state for membership revocation flows, including
+  browser-only wrapping of the next vault key for all remaining members,
+  idempotency-key reuse on retry, and immediate local purge when the current
+  user loses access to the selected vault.
+- Hardened the client-contract test path resolution so the pinned Password
+  Manager OpenAPI artifact is still found from dedicated Git worktrees, which
+  the repo instructions require for every file-changing task.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `node --experimental-strip-types --test apps/web/lib/password-manager/browser-crypto.test.mjs apps/web/lib/password-manager/client.test.mjs apps/web/lib/password-manager/workspace.test.mjs`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'lib/password-manager/browser-crypto.ts' 'lib/password-manager/client.test.mjs'`
+- `BETTER_AUTH_URL=https://ops.example.test BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=build-time-placeholder pnpm --dir apps/web build`
+- `git diff --check`
+
 ### Session 111 — Password Manager portable client and browser crypto
 
 **Reusable Password Manager product layer** (`apps/web/lib/password-manager/client.ts`, `apps/web/lib/password-manager/browser-crypto.ts`, `apps/web/lib/password-manager/client.test.mjs`, `apps/web/lib/password-manager/browser-crypto.test.mjs`)

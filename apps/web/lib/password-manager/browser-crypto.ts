@@ -203,6 +203,31 @@ export async function exportPublicKeyEnvelope(
   }
 }
 
+export async function importPublicKeyEnvelope(
+  envelope: PasswordManagerPublicKeyEnvelope,
+): Promise<CryptoKey> {
+  if (envelope.version !== 1) {
+    throw new Error('Password Manager public key envelope version must be 1')
+  }
+  if (envelope.algorithm !== 'rsa-oaep-256') {
+    throw new Error('Password Manager public key envelope algorithm must be rsa-oaep-256')
+  }
+  if (!envelope.public_key_spki_b64.trim()) {
+    throw new Error('Password Manager public key envelope public_key_spki_b64 must be set')
+  }
+
+  return getWebCrypto().subtle.importKey(
+    'spki',
+    fromBase64(envelope.public_key_spki_b64),
+    {
+      name: 'RSA-OAEP',
+      hash: 'SHA-256',
+    },
+    true,
+    ['wrapKey'],
+  )
+}
+
 export async function generateVaultKey(): Promise<CryptoKey> {
   return getWebCrypto().subtle.generateKey(
     {

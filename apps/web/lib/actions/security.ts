@@ -11,11 +11,17 @@ import { encrypt } from '@/lib/crypto/encrypt'
 import { getRequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { requireRole } from '@/lib/auth/guards'
+import { assertAgentCAManagementAccess } from './security-auth'
 import type { SecurityOverview } from './security-types'
 
 async function requireAdmin(): Promise<void> {
   const session = await getRequiredSession()
   requireRole(session.user, ADMIN_ROLES)
+}
+
+async function requireAgentCAManager(): Promise<void> {
+  const session = await getRequiredSession()
+  assertAgentCAManagementAccess(session.user)
 }
 
 const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/server.crt'
@@ -79,7 +85,7 @@ export async function uploadAgentCA(
   input: z.infer<typeof uploadSchema>,
 ): Promise<{ success: true; fingerprint: string } | { error: string }> {
   try {
-    await requireAdmin()
+    await requireAgentCAManager()
     const parsed = uploadSchema.parse(input)
 
     // Validate cert: parses, is a CA, still valid.

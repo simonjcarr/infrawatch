@@ -6,6 +6,27 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 UPGRADE_SCRIPT="${REPO_ROOT}/deploy/customer-bundle/upgrade.sh"
 BACKUP_SCRIPT="${REPO_ROOT}/deploy/customer-bundle/backup.sh"
 
+assert_env_value() {
+  local env_file="$1"
+  local key="$2"
+  local expected="$3"
+  local actual
+
+  actual="$(sed -n "s/^${key}=//p" "$env_file" | head -n1)"
+  if [ "$actual" != "$expected" ]; then
+    echo "expected ${key}=${expected}, got ${actual:-<missing>}" >&2
+    sed -n '1,200p' "$env_file" >&2
+    exit 1
+  fi
+}
+
+read_env_value() {
+  local env_file="$1"
+  local key="$2"
+
+  sed -n "s/^${key}=//p" "$env_file" | head -n1
+}
+
 make_mock_bin() {
   local dir="$1"
 
@@ -87,6 +108,7 @@ write_bundle() {
     printf 'BETTER_AUTH_URL=https://example.test\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' "${version//[^0-9]/}"
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' "${version//[^0-9]/}"
+    printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' "${version//[^0-9]/}"
   } > "${dir}/ct-ops/.env.example"
   cat > "${dir}/ct-ops/password-manager-release.json" <<EOF
 {"schema_version":1,"repository":"carrtech-dev/ct-password-manager","git_tag":"api/${version}","source_commit_sha":"53ecd8f3cacbb8617cc05f4847ad506b1988fd99","image_repository":"ghcr.io/carrtech-dev/ct-password-manager/api","image_digest":"sha256:$(printf '%064d' "${version//[^0-9]/}")","digest_reference":"ghcr.io/carrtech-dev/ct-password-manager/api@sha256:$(printf '%064d' "${version//[^0-9]/}")","api_contract_version":"1.0.0","api_contract_checksum_sha256":"a07ffa6c4c8a6f0b57611a1a7c380a8b8ea1a889f4449c4f2ce02f914c05cf95"}
@@ -128,6 +150,7 @@ main() {
     printf 'customer-secret=true\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' 100
   } > "${old_install}/.env"
   mkdir -p "${old_install}/deploy/tls" "${old_install}/deploy/dev-tls"
   printf 'tls-cert\n' > "${old_install}/deploy/tls/server.crt"
@@ -151,6 +174,7 @@ main() {
   grep -q 'customer-secret=true' "${old_install}/.env"
   grep -q 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:.*999' "${old_install}/.env"
   grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env"
+  assert_env_value "${old_install}/.env" PASSWORD_MANAGER_API_IMAGE "$(read_env_value "${new_src}/ct-ops/.env.example" PASSWORD_MANAGER_API_IMAGE)"
   grep -q '"git_tag":"api/v9.9.9"' "${old_install}/password-manager-release.json"
   grep -q 'tls-cert' "${old_install}/deploy/tls/server.crt"
   grep -q 'dev-cert' "${old_install}/deploy/dev-tls/server.crt"
@@ -175,6 +199,7 @@ main() {
     printf 'customer-secret=true\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' 100
   } > "${old_install}/.env"
 
   write_bundle "$new_src" "v9.9.9"
@@ -208,6 +233,7 @@ main() {
     printf 'customer-secret=true\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' 100
   } > "${old_install}/.env"
 
   write_bundle "$new_src" "v0.100.0"
@@ -238,6 +264,7 @@ main() {
   grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
   grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
   grep -q 'example/web:v0.100.0' "${old_install}/docker-compose.yml"
+  assert_env_value "${old_install}/.env" PASSWORD_MANAGER_API_IMAGE "$(read_env_value "${new_src}/ct-ops/.env.example" PASSWORD_MANAGER_API_IMAGE)"
   grep -q '"git_tag":"api/v0.100.0"' "${old_install}/password-manager-release.json"
   unset MOCK_CURL_LOG MOCK_RELEASES_JSON_PAGE_2
 

@@ -334,7 +334,7 @@ install_new_bundle_files() {
 refresh_release_image_env_refs() {
   local var new_value current_value
 
-  for var in WEB_IMAGE INGEST_IMAGE; do
+  for var in WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_API_IMAGE; do
     new_value="$(sed -n "s/^${var}=//p" .env.example | head -n1)"
     if [ -z "$new_value" ] || ! grep -q "^${var}=" .env; then
       continue
@@ -342,7 +342,7 @@ refresh_release_image_env_refs() {
 
     current_value="$(sed -n "s/^${var}=//p" .env | head -n1)"
     case "$current_value" in
-      ghcr.io/carrtech-dev/ct-ops/web@sha256:*|ghcr.io/carrtech-dev/ct-ops/ingest@sha256:*)
+      ghcr.io/carrtech-dev/ct-ops/web@sha256:*|ghcr.io/carrtech-dev/ct-ops/ingest@sha256:*|ghcr.io/carrtech-dev/ct-password-manager/api@sha256:*)
         awk -v key="$var" -v value="$new_value" '
           $0 ~ "^" key "=" { print key "=" value; next }
           { print }
@@ -352,7 +352,11 @@ refresh_release_image_env_refs() {
         ;;
       *)
         echo "WARN: preserving custom ${var} override in .env." >&2
-        echo "      Ensure WEB_IMAGE and INGEST_IMAGE come from the same CT-Ops release." >&2
+        if [ "$var" = "PASSWORD_MANAGER_API_IMAGE" ]; then
+          echo "      Ensure PASSWORD_MANAGER_API_IMAGE stays aligned with password-manager-release.json." >&2
+        else
+          echo "      Ensure WEB_IMAGE and INGEST_IMAGE come from the same CT-Ops release." >&2
+        fi
         ;;
     esac
   done

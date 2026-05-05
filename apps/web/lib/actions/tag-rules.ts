@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -73,7 +73,7 @@ export async function bulkAssignTags(
   filter: HostFilter,
   pairs: TagPair[],
 ): Promise<{ success: true; applied: number } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const parsedFilter = hostFilterSchema.safeParse(filter)
     if (!parsedFilter.success) return { error: 'Invalid filter' }
@@ -106,7 +106,7 @@ export async function createTagRule(
   orgId: string,
   input: { name: string; filter: HostFilter; tags: TagPair[]; enabled?: boolean },
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   try {
     const parsed = createRuleSchema.safeParse(input)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -134,7 +134,7 @@ export async function updateTagRule(
   ruleId: string,
   input: Partial<{ name: string; filter: HostFilter; tags: TagPair[]; enabled: boolean }>,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   try {
     const existing = await db.query.tagRules.findFirst({
       where: and(
@@ -175,7 +175,7 @@ export async function deleteTagRule(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   try {
     await db
       .update(tagRules)
@@ -195,7 +195,7 @@ export async function runTagRule(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true; applied: number } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const rule = await db.query.tagRules.findFirst({
       where: and(
@@ -221,7 +221,7 @@ export async function runMatchingTagRules(
   orgId: string,
   hostId: string,
 ): Promise<void> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })

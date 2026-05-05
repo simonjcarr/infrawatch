@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { hosts, organisations, checks } from '@/lib/db/schema'
@@ -36,7 +36,7 @@ export async function updateHostCollectionSettings(
   hostId: string,
   settings: HostCollectionSettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
@@ -86,7 +86,7 @@ export async function updateOrgDefaultCollectionSettings(
   orgId: string,
   settings: HostCollectionSettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   try {
     const org = await db.query.organisations.findFirst({
       where: eq(organisations.id, orgId),

@@ -1,4 +1,4 @@
-import { requireOrgAdmin, requireSameOrg } from '../auth/guards.ts'
+import { requireOrgAdmin, requireOrgWriteAccess as requireWriteAccess, requireSameOrg } from '../auth/guards.ts'
 
 export type OrgScopedUser = {
   organisationId: string | null
@@ -16,4 +16,8 @@ export function assertOrgAccess(user: OrgScopedUser, orgId: string): void {
 
 export function assertOrgAdminAccess(user: OrgAdminScopedUser, orgId: string): void {
   requireOrgAdmin(user, orgId)
+}
+
+export function assertOrgWriteAccess(user: OrgAdminScopedUser, orgId: string): void {
+  requireWriteAccess(user, orgId)
 }

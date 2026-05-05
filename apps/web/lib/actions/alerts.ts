@@ -1,13 +1,12 @@
 'use server'
 
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { createHmac } from 'crypto'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { assertPublicHost, assertPublicUrl } from '@/lib/net/ssrf-guard'
 import { validateStoredNotificationChannelConfig } from '@/lib/actions/alerts-notification-security'
-import { getRequiredSession } from '@/lib/auth/session'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { decrypt } from '@/lib/crypto/encrypt'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
@@ -154,7 +153,7 @@ export async function createGlobalAlertDefault(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   const parsed = createGlobalAlertDefaultSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -186,8 +185,7 @@ export async function deleteGlobalAlertDefault(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
+  const session = await requireOrgAdminAccess(orgId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
@@ -225,7 +223,7 @@ export async function applyGlobalDefaultsToHost(
   orgId: string,
   hostId: string,
 ): Promise<void> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   const defaults = await getGlobalAlertDefaults(orgId)
   if (defaults.length === 0) return
 
@@ -247,7 +245,7 @@ export async function createAlertRule(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const parsed = createAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -279,7 +277,7 @@ export async function updateAlertRule(
   ruleId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const parsed = updateAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -313,8 +311,7 @@ export async function deleteAlertRule(
   orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
+  const session = await requireOrgWriteAccess(orgId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
@@ -436,7 +433,7 @@ export async function acknowledgeAlert(
   orgId: string,
   instanceId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireOrgWriteAccess(orgId)
   const existing = await db.query.alertInstances.findFirst({
     where: and(
       eq(alertInstances.id, instanceId),
@@ -969,7 +966,7 @@ export async function createSilence(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireOrgWriteAccess(orgId)
   const parsed = createSilenceSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -1016,7 +1013,7 @@ export async function deleteSilence(
   orgId: string,
   silenceId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const existing = await db.query.alertSilences.findFirst({
     where: and(
       eq(alertSilences.id, silenceId),

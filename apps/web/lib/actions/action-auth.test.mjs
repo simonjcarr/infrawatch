@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { assertOrgAccess, assertOrgAdminAccess } from './action-auth-core.ts'
+import { assertOrgAccess, assertOrgAdminAccess, assertOrgWriteAccess } from './action-auth-core.ts'
 
 test('assertOrgAccess rejects inactive users', () => {
   assert.throws(
@@ -27,6 +27,29 @@ test('assertOrgAccess rejects cross-org access', () => {
 test('assertOrgAccess allows active users in their own organisation', () => {
   assert.doesNotThrow(
     () => assertOrgAccess({ organisationId: 'org-1', isActive: true, deletedAt: null }, 'org-1'),
+  )
+})
+
+test('assertOrgWriteAccess rejects read-only users in their own organisation', () => {
+  assert.throws(
+    () => assertOrgWriteAccess({
+      organisationId: 'org-1',
+      isActive: true,
+      deletedAt: null,
+      role: 'read_only',
+    }, 'org-1'),
+    /forbidden: write role required/,
+  )
+})
+
+test('assertOrgWriteAccess allows engineers in their own organisation', () => {
+  assert.doesNotThrow(
+    () => assertOrgWriteAccess({
+      organisationId: 'org-1',
+      isActive: true,
+      deletedAt: null,
+      role: 'engineer',
+    }, 'org-1'),
   )
 })
 

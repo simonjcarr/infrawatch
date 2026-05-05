@@ -15,6 +15,31 @@
 
 ## What Has Been Built
 
+### Session 107 — Password Manager startup bootstrap
+
+**First-run Password Manager config** (`start.sh`, `deploy/customer-bundle/start.sh`, `docker-compose.single.yml`, `.env.example`, `deploy/customer-bundle/generate_support_data`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-startup.sh`, `deploy/scripts/test-support-data.sh`)
+- Added first-run generation for `PASSWORD_MANAGER_DB_PASSWORD`,
+  `CT_OPS_INSTANCE_ID`, and a bundled Password Manager Ed25519 launch-signing
+  keypair, writing the generated values back to `.env` with mode `0600`.
+- Filled the Password Manager launch assertion config from CT-Ops defaults when
+  blank, including issuer, audience, product, trusted origins, and an
+  `https`-aware session-cookie secure flag.
+- Wired the generated Password Manager signing private key plus related launch
+  config into the `web` container environment so the later launch-assertion
+  route can sign assertions without out-of-band secret copying.
+- Extended support-data and CI coverage so the new Password Manager bootstrap
+  secrets are redacted and the customer-bundle workflow exercises the startup
+  generation path directly.
+
+**Validation**
+- `bash deploy/scripts/test-password-manager-startup.sh`
+- `bash deploy/scripts/test-support-data.sh`
+- `bash deploy/scripts/test-start.sh`
+- `bash -n start.sh`
+- `bash -n deploy/customer-bundle/start.sh`
+- `BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=build-time-placeholder docker compose -f docker-compose.single.yml config`
+- `git diff --check`
+
 ### Session 106 — Password Manager nginx routing
 
 **CT-Ops origin routing** (`deploy/nginx/nginx.conf`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-nginx.sh`)

@@ -30,7 +30,7 @@ REQUIRED_VARS=(BETTER_AUTH_URL BETTER_AUTH_TRUSTED_ORIGINS BETTER_AUTH_SECRET PO
 
 # Optional variables — missing values get a warning, not an error. Most have
 # safe localhost defaults baked into docker-compose.yml.
-OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_API_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
+OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_API_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
 REQUIRED_FILES=(
   docker-compose.yml
   deploy/nginx/nginx.conf
@@ -52,6 +52,205 @@ Commands:
 Documentation: ${DOCS_URL}
 Support:       ${SUPPORT_URL}
 EOF
+}
+
+upsert_env_var() {
+  local key="$1"
+  local value="$2"
+
+  awk -v key="$key" -v value="$value" '
+    BEGIN { replaced = 0 }
+    $0 ~ "^#?[[:space:]]*" key "=" {
+      print key "=" value
+      replaced = 1
+      next
+    }
+    { print }
+    END {
+      if (!replaced) {
+        print key "=" value
+      }
+    }
+  ' .env > .env.tmp && mv .env.tmp .env
+
+  chmod 600 .env
+  export "${key}=${value}"
+}
+
+require_openssl() {
+  local purpose="$1"
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "ERROR: 'openssl' is required to ${purpose}." >&2
+    exit 1
+  fi
+}
+
+find_optional_command() {
+  local cmd="$1"
+  local dir
+
+  if command -v "$cmd" >/dev/null 2>&1; then
+    command -v "$cmd"
+    return 0
+  fi
+
+  for dir in /opt/homebrew/bin /usr/local/bin; do
+    if [ -x "${dir}/${cmd}" ]; then
+      printf '%s\n' "${dir}/${cmd}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+find_python_for_ed25519() {
+  local candidate
+  local candidates=()
+
+  if command -v python3 >/dev/null 2>&1; then
+    candidates+=("$(command -v python3)")
+  fi
+  candidates+=("/opt/homebrew/bin/python3" "/usr/local/bin/python3")
+
+  for candidate in "${candidates[@]}"; do
+    [ -x "$candidate" ] || continue
+    if "$candidate" - <<'EOF' >/dev/null 2>&1
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives import serialization
+EOF
+    then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+generate_password_manager_launch_keypair() {
+  local tmpdir private_pem private_der public_der private_key public_key python_bin node_bin
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/ct-ops-pm-launch-key.XXXXXX")"
+  private_pem="${tmpdir}/private.pem"
+  private_der="${tmpdir}/private.der"
+  public_der="${tmpdir}/public.der"
+
+  if command -v openssl >/dev/null 2>&1 && openssl genpkey -algorithm ED25519 -out "$private_pem" >/dev/null 2>&1; then
+    if ! openssl pkey -in "$private_pem" -outform DER -out "$private_der" >/dev/null 2>&1; then
+      rm -rf "$tmpdir"
+      echo "ERROR: failed to encode Password Manager launch-signing private key." >&2
+      exit 1
+    fi
+    if ! openssl pkey -in "$private_pem" -pubout -outform DER -out "$public_der" >/dev/null 2>&1; then
+      rm -rf "$tmpdir"
+      echo "ERROR: failed to derive Password Manager launch-signing public key." >&2
+      exit 1
+    fi
+  elif python_bin="$(find_python_for_ed25519)" && "$python_bin" - <<'EOF' 2>/dev/null
+from base64 import b64encode
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+private_key = ed25519.Ed25519PrivateKey.generate()
+public_key = private_key.public_key()
+
+print(b64encode(private_key.private_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption(),
+)).decode("ascii"))
+print(b64encode(public_key.public_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+)).decode("ascii"))
+EOF
+  then
+    rm -rf "$tmpdir"
+    return 0
+  elif node_bin="$(find_optional_command node)"; then
+    "$node_bin" - <<'EOF'
+const { generateKeyPairSync } = require('node:crypto')
+
+const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+process.stdout.write(privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64') + '\n')
+process.stdout.write(publicKey.export({ format: 'der', type: 'spki' }).toString('base64') + '\n')
+EOF
+    rm -rf "$tmpdir"
+    return 0
+  else
+    rm -rf "$tmpdir"
+    echo "ERROR: generating Password Manager launch-signing keys requires OpenSSL with Ed25519 support, Python 3 with cryptography, or Node.js." >&2
+    exit 1
+  fi
+
+  private_key="$(base64 < "$private_der" | tr -d '\n')"
+  public_key="$(base64 < "$public_der" | tr -d '\n')"
+  rm -rf "$tmpdir"
+
+  printf '%s\n%s\n' "$private_key" "$public_key"
+}
+
+ensure_password_manager_bootstrap() {
+  local issuer trusted_origins cookie_secure instance_id generated_private_key generated_public_key keypair_output
+
+  if [ -z "${PASSWORD_MANAGER_DB_PASSWORD:-}" ]; then
+    require_openssl "generate PASSWORD_MANAGER_DB_PASSWORD on first run"
+    upsert_env_var "PASSWORD_MANAGER_DB_PASSWORD" "$(openssl rand -hex 16)"
+    echo "Generated PASSWORD_MANAGER_DB_PASSWORD and wrote it to .env."
+  fi
+
+  if [ -z "${CT_OPS_INSTANCE_ID:-}" ]; then
+    require_openssl "generate CT_OPS_INSTANCE_ID on first run"
+    instance_id="ct-ops-$(openssl rand -hex 8)"
+    upsert_env_var "CT_OPS_INSTANCE_ID" "$instance_id"
+    echo "Generated CT_OPS_INSTANCE_ID and wrote it to .env."
+  fi
+
+  if [ -z "${PASSWORD_MANAGER_CT_OPS_AUDIENCE:-}" ]; then
+    upsert_env_var "PASSWORD_MANAGER_CT_OPS_AUDIENCE" "ct-password-manager"
+    echo "Set PASSWORD_MANAGER_CT_OPS_AUDIENCE in .env."
+  fi
+
+  if [ -z "${PASSWORD_MANAGER_CT_OPS_PRODUCT:-}" ]; then
+    upsert_env_var "PASSWORD_MANAGER_CT_OPS_PRODUCT" "ct-password-manager"
+    echo "Set PASSWORD_MANAGER_CT_OPS_PRODUCT in .env."
+  fi
+
+  issuer="${PASSWORD_MANAGER_CT_OPS_ISSUER:-${BETTER_AUTH_URL:-https://localhost}}"
+  if [ -z "${PASSWORD_MANAGER_CT_OPS_ISSUER:-}" ]; then
+    upsert_env_var "PASSWORD_MANAGER_CT_OPS_ISSUER" "$issuer"
+    echo "Set PASSWORD_MANAGER_CT_OPS_ISSUER in .env."
+  fi
+
+  trusted_origins="${PASSWORD_MANAGER_TRUSTED_ORIGINS:-${BETTER_AUTH_TRUSTED_ORIGINS:-$issuer}}"
+  if [ -z "${PASSWORD_MANAGER_TRUSTED_ORIGINS:-}" ]; then
+    upsert_env_var "PASSWORD_MANAGER_TRUSTED_ORIGINS" "$trusted_origins"
+    echo "Set PASSWORD_MANAGER_TRUSTED_ORIGINS in .env."
+  fi
+
+  if [ -z "${PASSWORD_MANAGER_SESSION_COOKIE_SECURE:-}" ]; then
+    case "$issuer" in
+      https://*) cookie_secure="true" ;;
+      *) cookie_secure="false" ;;
+    esac
+    upsert_env_var "PASSWORD_MANAGER_SESSION_COOKIE_SECURE" "$cookie_secure"
+    echo "Set PASSWORD_MANAGER_SESSION_COOKIE_SECURE in .env."
+  fi
+
+  if [ -z "${PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY:-}" ] || [ -z "${PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY:-}" ]; then
+    keypair_output="$(generate_password_manager_launch_keypair)"
+    generated_private_key="$(printf '%s\n' "$keypair_output" | sed -n '1p')"
+    generated_public_key="$(printf '%s\n' "$keypair_output" | sed -n '2p')"
+    if [ -z "$generated_private_key" ] || [ -z "$generated_public_key" ]; then
+      echo "ERROR: Password Manager launch-signing key generation returned an incomplete keypair." >&2
+      exit 1
+    fi
+
+    upsert_env_var "PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY" "$generated_private_key"
+    upsert_env_var "PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY" "$generated_public_key"
+    echo "Generated Password Manager launch-signing keypair and wrote it to .env."
+  fi
 }
 
 require_docker() {
@@ -158,38 +357,22 @@ check_env() {
   # Anyone with this value can forge sessions, so it must never be empty in
   # production — generating it here means the first ./start.sh "just works".
   if [ -z "${BETTER_AUTH_SECRET:-}" ]; then
-    if ! command -v openssl >/dev/null 2>&1; then
-      echo "ERROR: 'openssl' is required to generate BETTER_AUTH_SECRET on first run." >&2
-      exit 1
-    fi
+    require_openssl "generate BETTER_AUTH_SECRET on first run"
     GENERATED_SECRET=$(openssl rand -hex 32)
-    if grep -q '^BETTER_AUTH_SECRET=' .env; then
-      awk -v s="$GENERATED_SECRET" '/^BETTER_AUTH_SECRET=/ {print "BETTER_AUTH_SECRET=" s; next} {print}' .env > .env.tmp && mv .env.tmp .env
-    else
-      echo "BETTER_AUTH_SECRET=$GENERATED_SECRET" >> .env
-    fi
-    chmod 600 .env
-    export BETTER_AUTH_SECRET="$GENERATED_SECRET"
+    upsert_env_var "BETTER_AUTH_SECRET" "$GENERATED_SECRET"
     echo "Generated BETTER_AUTH_SECRET and wrote it to .env."
   fi
 
   # Same reasoning for the database password — the example file ships blank so
   # we never accidentally seed a known credential into a real deployment.
   if [ -z "${POSTGRES_PASSWORD:-}" ]; then
-    if ! command -v openssl >/dev/null 2>&1; then
-      echo "ERROR: 'openssl' is required to generate POSTGRES_PASSWORD on first run." >&2
-      exit 1
-    fi
+    require_openssl "generate POSTGRES_PASSWORD on first run"
     GENERATED_PG_PASS=$(openssl rand -hex 16)
-    if grep -q '^POSTGRES_PASSWORD=' .env; then
-      awk -v p="$GENERATED_PG_PASS" '/^POSTGRES_PASSWORD=/ {print "POSTGRES_PASSWORD=" p; next} {print}' .env > .env.tmp && mv .env.tmp .env
-    else
-      echo "POSTGRES_PASSWORD=$GENERATED_PG_PASS" >> .env
-    fi
-    chmod 600 .env
-    export POSTGRES_PASSWORD="$GENERATED_PG_PASS"
+    upsert_env_var "POSTGRES_PASSWORD" "$GENERATED_PG_PASS"
     echo "Generated POSTGRES_PASSWORD and wrote it to .env."
   fi
+
+  ensure_password_manager_bootstrap
 
   MISSING=()
   for v in "${REQUIRED_VARS[@]}"; do

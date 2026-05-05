@@ -15,6 +15,26 @@
 
 ## What Has Been Built
 
+### Session 109 — Password Manager launch assertions
+
+**CT-Ops Password Manager launch route** (`apps/web/app/api/password-manager/launch-assertion/route.ts`, `apps/web/lib/password-manager/launch-assertion.ts`, `apps/web/lib/password-manager/launch-assertion.test.mjs`)
+- Added `POST /api/password-manager/launch-assertion`, gated by trusted
+  mutation origins, an active organisation session, Tooling access, and a
+  per-user launch rate limit.
+- Added a shared Password Manager launch-assertion helper that reads the CT-Ops
+  launch config from runtime env, parses the configured Ed25519 PKCS#8 private
+  key, and signs short-lived `EdDSA` JWTs carrying the required Password
+  Manager claims including issuer, audience, product, CT-Ops instance,
+  organisation, user identity, `iat`, `exp`, and `jti`.
+- Included optional organisation display names in the assertion when CT-Ops can
+  resolve them from the organisations table, while keeping failure responses
+  generic and never proxying Password Manager API traffic or session cookies.
+
+**Validation**
+- `node --experimental-strip-types --test lib/password-manager/launch-assertion.test.mjs`
+- `pnpm type-check`
+- `git diff --check`
+
 ### Session 108 — Password Manager release bundle pinning
 
 **Customer bundle Password Manager pinning** (`deploy/customer-bundle/upgrade.sh`, `deploy/customer-bundle/README.md`, `.github/workflows/customer-bundle-check.yml`, `.github/workflows/agent-release.yml`, `deploy/scripts/test-upgrade.sh`)

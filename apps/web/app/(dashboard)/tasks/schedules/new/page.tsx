@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { canAccessTooling } from '@/lib/auth/tooling'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { db } from '@/lib/db'
 import { hosts, hostGroups } from '@/lib/db/schema'
 import { and, eq, isNull, asc } from 'drizzle-orm'
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function NewSchedulePage() {
   const session = await getRequiredSession()
-  if (!canAccessTooling(session.user)) redirect('/dashboard')
+  if (!ADMIN_ROLES.includes(session.user.role)) redirect('/tasks')
   const orgId = session.user.organisationId!
 
   const [hostRows, groupRows] = await Promise.all([

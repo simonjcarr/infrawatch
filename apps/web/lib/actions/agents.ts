@@ -1,7 +1,7 @@
 'use server'
 
 import { logError, logWarn } from '@/lib/logging'
-import { requireOrgAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -1230,8 +1230,7 @@ export async function uninstallAndDeleteHost(
   | { success: true }
   | { error: string; taskRunId?: string; agentOffline?: boolean }
 > {
-  const session = await requireOrgToolingAccess(orgId)
-  const userId = session.user.id
+  await requireOrgAdminAccess(orgId)
   try {
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),
@@ -1250,7 +1249,7 @@ export async function uninstallAndDeleteHost(
       }
     }
 
-    const trigger = await triggerAgentUninstall(orgId, userId, hostId)
+    const trigger = await triggerAgentUninstall(orgId, hostId)
     if ('error' in trigger) return { error: trigger.error }
 
     // Poll until the agent reports the uninstall as scheduled, or we hit

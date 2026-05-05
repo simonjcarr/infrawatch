@@ -72,7 +72,6 @@ import {
 } from '@/lib/actions/task-runs'
 import type { HostGroupWithMembers } from '@/lib/actions/host-groups'
 import type { HostWithAgent } from '@/lib/actions/agents'
-import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
 import type {
   Host,
   PatchTaskConfig,
@@ -97,7 +96,7 @@ function isRunActive(status: string) {
 
 interface Props {
   orgId: string
-  userId: string
+  userRole: string
   initialGroup: HostGroupWithMembers
   initialAllHosts: HostWithAgent[]
 }
@@ -168,9 +167,10 @@ function RunStatusBadge({ status }: { status: string }) {
   }
 }
 
-export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts }: Props) {
+export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHosts }: Props) {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const canRunTasks = userRole === 'org_admin' || userRole === 'super_admin'
   const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Host | null>(null)
@@ -237,7 +237,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const { mutate: doPatchGroup, isPending: isPatching } = useMutation({
     mutationFn: () =>
-      triggerGroupPatchRun(orgId, userId, initialGroup.id, patchMode, maxParallel),
+      triggerGroupPatchRun(orgId, initialGroup.id, patchMode, maxParallel),
     onSuccess: (result) => {
       setPatchOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -246,7 +246,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const { mutate: doGroupScript, isPending: isScripting } = useMutation({
     mutationFn: () =>
-      triggerGroupCustomScriptRun(orgId, userId, initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
+      triggerGroupCustomScriptRun(orgId, initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
     onSuccess: (result) => {
       setScriptOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -255,7 +255,7 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
 
   const { mutate: doGroupService, isPending: isServicing } = useMutation({
     mutationFn: () =>
-      triggerGroupServiceAction(orgId, userId, initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
+      triggerGroupServiceAction(orgId, initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
     onSuccess: (result) => {
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -306,18 +306,22 @@ export function GroupDetailClient({ orgId, userId, initialGroup, initialAllHosts
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setScriptOpen(true)}>
-              <Terminal className="size-4 mr-1" />
-              Run Script
-            </Button>
-            <Button variant="outline" onClick={() => setServiceOpen(true)}>
-              <Power className="size-4 mr-1" />
-              Service Action
-            </Button>
-            <Button variant="outline" onClick={() => setPatchOpen(true)}>
-              <Shield className="size-4 mr-1" />
-              Patch Group
-            </Button>
+            {canRunTasks && (
+              <>
+                <Button variant="outline" onClick={() => setScriptOpen(true)}>
+                  <Terminal className="size-4 mr-1" />
+                  Run Script
+                </Button>
+                <Button variant="outline" onClick={() => setServiceOpen(true)}>
+                  <Power className="size-4 mr-1" />
+                  Service Action
+                </Button>
+                <Button variant="outline" onClick={() => setPatchOpen(true)}>
+                  <Shield className="size-4 mr-1" />
+                  Patch Group
+                </Button>
+              </>
+            )}
             <Button onClick={() => setAddOpen(true)} data-testid="host-group-add-open">
               <Plus className="size-4 mr-1" />
               Add Hosts

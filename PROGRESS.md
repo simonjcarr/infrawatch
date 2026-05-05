@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 110 — Release bundle digest verification fix
+
+**Release workflow Password Manager digest scope** (`.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-agent-release-password-manager-image-ref.sh`)
+- Fixed the post-merge release workflow so the `Verify bundled compose pins
+  image digests` step resolves `PASSWORD_MANAGER_API_IMAGE_REF` inside the same
+  shell step where it is consumed, instead of relying on a prior step-local
+  export that disappears between GitHub Actions steps.
+- Added a dedicated regression script that fails if the release workflow ever
+  stops resolving `PASSWORD_MANAGER_API_IMAGE_REF` before asserting the bundled
+  compose image pins.
+- Wired that regression into `Customer bundle check` so future PR CI catches the
+  variable-scope bug before another release run fails on `set -u`.
+
+**Validation**
+- `bash deploy/scripts/test-agent-release-password-manager-image-ref.sh`
+- `git diff --check`
+- `python3` workflow whitespace sanity check for `.github/workflows/agent-release.yml` and `.github/workflows/customer-bundle-check.yml`
+
 ### Session 109 — Password Manager launch assertions
 
 **CT-Ops Password Manager launch route** (`apps/web/app/api/password-manager/launch-assertion/route.ts`, `apps/web/lib/password-manager/launch-assertion.ts`, `apps/web/lib/password-manager/launch-assertion.test.mjs`)

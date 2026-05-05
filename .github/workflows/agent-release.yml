@@ -593,6 +593,7 @@ jobs:
       - name: Verify bundled compose pins image digests
         run: |
           set -euo pipefail
+          PASSWORD_MANAGER_API_IMAGE_REF="$(python3 -c 'import json; print(json.load(open("deploy/password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
           export BETTER_AUTH_SECRET=verify-placeholder
           export POSTGRES_PASSWORD=verify-placeholder
           refs="$(docker compose -f dist/ct-ops/docker-compose.yml --env-file dist/ct-ops/.env.example config --images)"

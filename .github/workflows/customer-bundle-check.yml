@@ -78,6 +78,7 @@ jobs:
           set -euo pipefail
           bash -n install.sh
           bash deploy/scripts/test-install.sh
+          bash deploy/scripts/test-password-manager-compose.sh
           bash deploy/scripts/test-start.sh
           bash deploy/scripts/test-web-entrypoint.sh
           bash deploy/scripts/test-upgrade.sh

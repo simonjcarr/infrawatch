@@ -91,7 +91,7 @@ test('deactivating a user revokes existing sessions and blocks stale dashboard/a
     expect(response.status()).toBe(401)
 
     await stalePage.goto('/dashboard')
-    await expect(stalePage).toHaveURL(/\/login$/)
+    await expect(stalePage).toHaveURL(/\/login(?:\?session=expired)?$/)
   } finally {
     await staleContext.close()
   }

@@ -27,11 +27,21 @@ const APP_TABLES = [
   'alert_instances',
   'alert_rules',
   'alert_silences',
+  'audit_events',
+  'build_doc_asset_storage_settings',
+  'build_doc_assets',
+  'build_doc_revisions',
+  'build_doc_sections',
+  'build_doc_snippets',
+  'build_doc_template_versions',
+  'build_doc_templates',
+  'build_docs',
   'certificate_authorities',
   'certificate_events',
   'certificates',
   'check_results',
   'checks',
+  'ct_cve_service_nonces',
   'domain_accounts',
   'host_group_members',
   'host_groups',
@@ -52,13 +62,16 @@ const APP_TABLES = [
   'notes',
   'notification_channels',
   'notifications',
+  'pending_cert_signings',
   'resource_tags',
+  'revoked_certificates',
   'security_throttles',
   'saved_software_reports',
   'service_accounts',
   'software_packages',
   'software_scans',
   'ssh_keys',
+  'system_config',
   'tag_rules',
   'tags',
   'task_run_hosts',
@@ -68,9 +81,17 @@ const APP_TABLES = [
   'vulnerability_cves',
 ]
 
+const AUTH_AND_ORG_TABLES = [
+  'totp_credential',
+  'session',
+  'account',
+  'verification',
+  'user',
+  'organisations',
+]
+
 export async function truncateAppTables(): Promise<void> {
   const sql = getTestDb()
-  const list = APP_TABLES.map((t) => `"${t}"`).join(', ')
+  const list = [...APP_TABLES, ...AUTH_AND_ORG_TABLES].map((t) => `"${t}"`).join(', ')
   await sql.unsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`)
-  await sql.unsafe('DELETE FROM "session"')
 }

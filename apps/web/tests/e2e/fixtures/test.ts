@@ -12,14 +12,14 @@ export const test = base.extend<Fixtures>({
   autoTruncate: [
     async ({}, use) => {
       await truncateAppTables()
+      await seedOrgAndUser()
       await use()
     },
     { auto: true },
   ],
 
-  authenticatedPage: async ({ browser, baseURL, request }, use) => {
+  authenticatedPage: async ({ browser, baseURL }, use) => {
     if (!baseURL) throw new Error('baseURL must be configured')
-    await seedOrgAndUser(request)
     const storageState = await getStorageStatePath(baseURL)
     const context = await browser.newContext({ storageState })
     const page = await context.newPage()

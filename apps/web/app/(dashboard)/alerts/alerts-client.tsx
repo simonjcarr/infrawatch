@@ -67,6 +67,8 @@ import type { AlertInstanceWithRule, NotificationChannelSafe, AlertSilenceWithHo
 import type { AlertSeverity, AlertInstanceStatus } from '@/lib/db/schema'
 import type { HostWithAgent } from '@/lib/actions/agents'
 
+type SuccessHandler = () => void | Promise<void>
+
 // ─── Severity Badge ────────────────────────────────────────────────────────────
 
 function SeverityBadge({ severity }: { severity: AlertSeverity }) {
@@ -149,7 +151,7 @@ function AddWebhookDialog({
   orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -168,7 +170,7 @@ function AddWebhookDialog({
       return
     }
     reset()
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -244,7 +246,7 @@ function AddSmtpDialog({
   orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -268,7 +270,7 @@ function AddSmtpDialog({
     })
     if ('error' in result) return
     reset()
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -396,7 +398,7 @@ function EditWebhookDialog({
   channel: NotificationChannelSafe & { type: 'webhook' }
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -416,7 +418,7 @@ function EditWebhookDialog({
       secret: values.secret || undefined,
     })
     if ('error' in result) return
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -485,7 +487,7 @@ function EditSmtpDialog({
   channel: NotificationChannelSafe & { type: 'smtp' }
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -510,7 +512,7 @@ function EditSmtpDialog({
       toAddresses,
     })
     if ('error' in result) return
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -576,7 +578,7 @@ function AddSlackDialog({
   orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -593,7 +595,7 @@ function AddSlackDialog({
     })
     if ('error' in result) return
     reset()
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -647,7 +649,7 @@ function EditSlackDialog({
   channel: NotificationChannelSafe & { type: 'slack' }
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -666,7 +668,7 @@ function EditSlackDialog({
       webhookUrl: values.webhookUrl,
     })
     if ('error' in result) return
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -725,7 +727,7 @@ function AddTelegramDialog({
   orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -742,7 +744,7 @@ function AddTelegramDialog({
     })
     if ('error' in result) return
     reset()
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -816,7 +818,7 @@ function EditTelegramDialog({
   channel: NotificationChannelSafe & { type: 'telegram' }
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
 }) {
   const {
     register,
@@ -836,7 +838,7 @@ function EditTelegramDialog({
       chatId: values.chatId,
     })
     if ('error' in result) return
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 
@@ -914,7 +916,7 @@ function AddSilenceDialog({
   hosts: HostWithAgent[]
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSuccess: () => void
+  onSuccess: SuccessHandler
   prefilledHostId?: string
 }) {
   const now = new Date()
@@ -943,7 +945,7 @@ function AddSilenceDialog({
     })
     if ('error' in result) return
     reset()
-    onSuccess()
+    await onSuccess()
     onOpenChange(false)
   }
 

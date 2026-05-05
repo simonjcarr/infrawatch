@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.10...web/v0.103.11) (2026-05-05)
+
+
+### Bug Fixes
+
+* **web:** stabilize e2e isolation and db pooling ([#978](https://github.com/carrtech-dev/ct-ops/issues/978)) ([943f372](https://github.com/carrtech-dev/ct-ops/commit/943f3721bf116f3661c82761b5c061d9be8f74ee))
+
 ## [0.103.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.9...web/v0.103.10) (2026-05-05)
 
 

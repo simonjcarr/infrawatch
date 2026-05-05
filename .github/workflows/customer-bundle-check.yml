@@ -9,6 +9,7 @@ on:
       - "deploy/password-manager-release.json"
       - "deploy/scripts/validate-password-manager-release.py"
       - "deploy/scripts/test-install.sh"
+      - "deploy/scripts/test-agent-release-password-manager-image-ref.sh"
       - "deploy/scripts/test-password-manager-nginx.sh"
       - "deploy/scripts/test-password-manager-startup.sh"
       - "deploy/scripts/test-start.sh"
@@ -82,6 +83,7 @@ jobs:
           set -euo pipefail
           bash -n install.sh
           bash deploy/scripts/test-install.sh
+          bash deploy/scripts/test-agent-release-password-manager-image-ref.sh
           bash deploy/scripts/test-password-manager-compose.sh
           bash deploy/scripts/test-password-manager-nginx.sh
           bash deploy/scripts/test-password-manager-startup.sh

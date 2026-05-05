@@ -1,4 +1,8 @@
 import { PasswordManagerApiError } from './client.ts'
+import type {
+  PasswordManagerEncryptedPrivateKeyEnvelope,
+  PasswordManagerKdfMetadata,
+} from './browser-crypto.ts'
 
 export type PasswordManagerShellView =
   | 'launching'
@@ -9,17 +13,43 @@ export type PasswordManagerShellView =
   | 'object-unavailable'
   | 'operational-failure'
 
+export interface PasswordManagerActiveKeyPair {
+  privateKey: unknown
+  publicKey: unknown
+}
+
 export interface PasswordManagerShellState {
   organisationId: string
+  activeKeyPair: PasswordManagerActiveKeyPair | null
+  encryptedPrivateKeyEnvelope: PasswordManagerEncryptedPrivateKeyEnvelope | null
   launchNonce: number
+  needsRelaunch: boolean
+  setupError: string | null
   setupConfigured: boolean | null
+  unlockError: string | null
+  unlockMetadata: PasswordManagerKdfMetadata | null
   view: PasswordManagerShellView
 }
 
 export type PasswordManagerShellEvent =
   | { type: 'launch-succeeded'; setupConfigured: boolean }
   | { type: 'launch-failed'; view: Exclude<PasswordManagerShellView, 'launching' | 'locked' | 'unlocked'> }
-  | { type: 'unlock-succeeded' }
+  | { type: 'unlock-metadata-loaded'; kdfMetadata: PasswordManagerKdfMetadata }
+  | { type: 'setup-failed'; message: string }
+  | {
+      type: 'setup-succeeded'
+      encryptedPrivateKeyEnvelope: PasswordManagerEncryptedPrivateKeyEnvelope
+      kdfMetadata: PasswordManagerKdfMetadata
+      keyPair: PasswordManagerActiveKeyPair
+    }
+  | { type: 'unlock-material-loaded'; encryptedPrivateKeyEnvelope: PasswordManagerEncryptedPrivateKeyEnvelope }
+  | {
+      type: 'unlock-succeeded'
+      encryptedPrivateKeyEnvelope: PasswordManagerEncryptedPrivateKeyEnvelope
+      kdfMetadata: PasswordManagerKdfMetadata
+      keyPair: PasswordManagerActiveKeyPair
+    }
+  | { type: 'unlock-failed'; message: string; needsRelaunch: boolean }
   | { type: 'lock' }
   | { type: 'restart-launch' }
   | { type: 'organisation-changed'; organisationId: string }
@@ -27,8 +57,14 @@ export type PasswordManagerShellEvent =
 export function createInitialPasswordManagerShellState(organisationId: string): PasswordManagerShellState {
   return {
     organisationId,
+    activeKeyPair: null,
+    encryptedPrivateKeyEnvelope: null,
     launchNonce: 0,
+    needsRelaunch: false,
+    setupError: null,
     setupConfigured: null,
+    unlockError: null,
+    unlockMetadata: null,
     view: 'launching',
   }
 }
@@ -60,38 +96,98 @@ export function reducePasswordManagerShellState(
     case 'launch-succeeded':
       return {
         ...state,
+        activeKeyPair: null,
+        encryptedPrivateKeyEnvelope: null,
+        needsRelaunch: false,
+        setupError: null,
         setupConfigured: event.setupConfigured,
+        unlockError: null,
+        unlockMetadata: null,
         view: 'locked',
       }
     case 'launch-failed':
       return {
         ...state,
+        activeKeyPair: null,
+        encryptedPrivateKeyEnvelope: null,
+        needsRelaunch: false,
         setupConfigured: null,
+        setupError: null,
+        unlockError: null,
+        unlockMetadata: null,
         view: event.view,
+      }
+    case 'unlock-metadata-loaded':
+      return {
+        ...state,
+        unlockMetadata: event.kdfMetadata,
+      }
+    case 'setup-failed':
+      return {
+        ...state,
+        activeKeyPair: null,
+        encryptedPrivateKeyEnvelope: null,
+        needsRelaunch: false,
+        setupError: event.message,
+        unlockError: null,
+        view: 'locked',
+      }
+    case 'setup-succeeded':
+      return {
+        ...state,
+        activeKeyPair: event.keyPair,
+        encryptedPrivateKeyEnvelope: event.encryptedPrivateKeyEnvelope,
+        needsRelaunch: false,
+        setupConfigured: true,
+        setupError: null,
+        unlockError: null,
+        unlockMetadata: event.kdfMetadata,
+        view: 'unlocked',
+      }
+    case 'unlock-material-loaded':
+      return {
+        ...state,
+        encryptedPrivateKeyEnvelope: event.encryptedPrivateKeyEnvelope,
       }
     case 'unlock-succeeded':
       return {
         ...state,
+        activeKeyPair: event.keyPair,
+        encryptedPrivateKeyEnvelope: event.encryptedPrivateKeyEnvelope,
+        needsRelaunch: false,
+        setupError: null,
+        unlockError: null,
+        unlockMetadata: event.kdfMetadata,
         view: 'unlocked',
+      }
+    case 'unlock-failed':
+      return {
+        ...state,
+        activeKeyPair: null,
+        encryptedPrivateKeyEnvelope: null,
+        needsRelaunch: event.needsRelaunch,
+        setupError: null,
+        unlockError: event.message,
+        view: 'locked',
       }
     case 'lock':
       return {
         ...state,
+        activeKeyPair: null,
+        needsRelaunch: false,
+        setupError: null,
+        unlockError: null,
         view: 'locked',
       }
     case 'restart-launch':
       return {
-        ...state,
+        ...createInitialPasswordManagerShellState(state.organisationId),
         launchNonce: state.launchNonce + 1,
-        setupConfigured: null,
-        view: 'launching',
       }
     case 'organisation-changed':
       return {
-        organisationId: event.organisationId,
+        ...createInitialPasswordManagerShellState(event.organisationId),
         launchNonce: state.launchNonce + 1,
-        setupConfigured: null,
-        view: 'launching',
       }
   }
 }

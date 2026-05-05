@@ -26,6 +26,20 @@ test('unlock profile generation and decrypt round-trip stays browser-only', asyn
   assert.equal(decrypted.privateKey.algorithm.name, 'RSA-OAEP')
 })
 
+test('decryptUserPrivateKeyEnvelope rejects invalid unlock secrets without exposing plaintext', async () => {
+  const profile = await createUnlockProfile('correct horse battery staple')
+
+  await assert.rejects(
+    () =>
+      decryptUserPrivateKeyEnvelope({
+        unlockPassword: 'wrong battery horse staple',
+        encryptedPrivateKeyEnvelope: profile.encryptedPrivateKeyEnvelope,
+        kdfMetadata: profile.kdfMetadata,
+      }),
+    /operation/i,
+  )
+})
+
 test('vault key wrapping and entry encryption round-trip', async () => {
   const owner = await createUnlockProfile('owner password')
   const ownerKeys = await decryptUserPrivateKeyEnvelope({

@@ -58,6 +58,36 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
           ('tag-a', 'org-a', 'env', 'prod', 1),
           ('tag-b', 'org-b', 'env', 'dev', 1)
       `)
+      await migrationClient.unsafe(`
+        INSERT INTO "user" (id, name, email, email_verified, organisation_id, role, is_active)
+        VALUES
+          ('user-a', 'User A', 'user-a@example.com', true, 'org-a', 'admin', true),
+          ('user-b', 'User B', 'user-b@example.com', true, 'org-b', 'admin', true)
+      `)
+      await migrationClient.unsafe(`
+        INSERT INTO "session" (id, expires_at, token, user_id)
+        VALUES
+          ('session-a', now() + interval '1 day', 'token-a', 'user-a'),
+          ('session-b', now() + interval '1 day', 'token-b', 'user-b')
+      `)
+      await migrationClient.unsafe(`
+        INSERT INTO account (id, account_id, provider_id, user_id, password, access_token, refresh_token)
+        VALUES
+          ('account-a', 'account-a', 'credential', 'user-a', 'hash-a', 'access-a', 'refresh-a'),
+          ('account-b', 'account-b', 'credential', 'user-b', 'hash-b', 'access-b', 'refresh-b')
+      `)
+      await migrationClient.unsafe(`
+        INSERT INTO totp_credential (id, user_id, secret, backup_codes)
+        VALUES
+          ('totp-a', 'user-a', 'secret-a', 'backup-a'),
+          ('totp-b', 'user-b', 'secret-b', 'backup-b')
+      `)
+      await migrationClient.unsafe(`
+        INSERT INTO verification (id, identifier, value, expires_at)
+        VALUES
+          ('verification-a', 'user-a@example.com', 'verification-token-a', now() + interval '1 day'),
+          ('verification-b', 'user-b@example.com', 'verification-token-b', now() + interval '1 day')
+      `)
     } finally {
       await migrationClient.end()
     }
@@ -96,6 +126,26 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
     )
     assert.deepEqual(orgRows.map((row) => row.id), ['tag-a'])
 
+    const orgSessions = await withOrgDatabaseScope('org-a', async (scopedDb) =>
+      scopedDb.query.sessions.findMany({ orderBy: [asc(schema.sessions.id)] }),
+    )
+    assert.deepEqual(orgSessions.map((row) => row.id), ['session-a'])
+
+    const orgAccounts = await withOrgDatabaseScope('org-a', async (scopedDb) =>
+      scopedDb.query.accounts.findMany({ orderBy: [asc(schema.accounts.id)] }),
+    )
+    assert.deepEqual(orgAccounts.map((row) => row.id), ['account-a'])
+
+    const orgTotpCredentials = await withOrgDatabaseScope('org-a', async (scopedDb) =>
+      scopedDb.query.totpCredentials.findMany({ orderBy: [asc(schema.totpCredentials.id)] }),
+    )
+    assert.deepEqual(orgTotpCredentials.map((row) => row.id), ['totp-a'])
+
+    const orgVerifications = await withOrgDatabaseScope('org-a', async (scopedDb) =>
+      scopedDb.query.verifications.findMany({ orderBy: [asc(schema.verifications.id)] }),
+    )
+    assert.deepEqual(orgVerifications.map((row) => row.id), ['verification-a'])
+
     await assert.rejects(
       withOrgDatabaseScope('org-a', async (scopedDb) => {
         await scopedDb.insert(schema.tags).values({
@@ -108,6 +158,21 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
       }),
       (error) => {
         assert.match(error.message, /Failed query: insert into "tags"/)
+        return true
+      },
+    )
+
+    await assert.rejects(
+      withOrgDatabaseScope('org-a', async (scopedDb) => {
+        await scopedDb.insert(schema.sessions).values({
+          id: 'session-cross-org',
+          expiresAt: new Date(Date.now() + 86_400_000),
+          token: 'token-cross-org',
+          userId: 'user-b',
+        })
+      }),
+      (error) => {
+        assert.match(error.message, /Failed query: insert into "session"/)
         return true
       },
     )

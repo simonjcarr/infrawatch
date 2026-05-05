@@ -2,8 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  createEncryptedVaultMetadata,
   createEncryptedEntryPayload,
   createUnlockProfile,
+  decryptVaultMetadata,
   decryptEntryPayload,
   decryptUserPrivateKeyEnvelope,
   exportPublicKeyEnvelope,
@@ -70,6 +72,24 @@ test('vault key wrapping and entry encryption round-trip', async () => {
     title: 'Database root password',
     username: 'postgres',
     password: 'super-secret',
+  })
+})
+
+test('vault metadata encryption round-trip stays client-side', async () => {
+  const vaultKey = await generateVaultKey()
+  const encryptedMetadata = await createEncryptedVaultMetadata(
+    {
+      name: 'Shared production',
+      description: 'Operator secrets',
+    },
+    vaultKey,
+  )
+  const decryptedMetadata = await decryptVaultMetadata(encryptedMetadata, vaultKey)
+
+  assert.equal(encryptedMetadata.algorithm, 'aes-256-gcm')
+  assert.deepEqual(decryptedMetadata, {
+    name: 'Shared production',
+    description: 'Operator secrets',
   })
 })
 

@@ -222,7 +222,9 @@ export function HostsClient({
   // event callback path rather than from inside an effect — the lint rule
   // `react-hooks/set-state-in-effect` blocks the effect variant.
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    rootRef.current?.setAttribute('data-hydrated', 'true')
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     }
@@ -361,7 +363,7 @@ export function HostsClient({
     .reduce((acc, row) => acc + row.count, 0)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="hosts-client-root" ref={rootRef}>
       <div>
         <h1 className="text-2xl font-semibold text-foreground" data-testid="hosts-heading">Hosts</h1>
         <p className="text-muted-foreground mt-1">

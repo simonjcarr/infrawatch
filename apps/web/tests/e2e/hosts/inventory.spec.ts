@@ -70,6 +70,7 @@ test('authenticated user can search and filter the host inventory', async ({ aut
 
   await page.goto('/hosts')
 
+  await expect(page.getByTestId('hosts-client-root')).toHaveAttribute('data-hydrated', 'true')
   await expect(page.getByTestId('hosts-heading')).toBeVisible()
   await expect(page.getByText('2 hosts registered')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Alpha Node' })).toBeVisible()
@@ -135,6 +136,7 @@ test('authenticated user can paginate through the host inventory', async ({ auth
 
   await page.goto('/hosts')
 
+  await expect(page.getByTestId('hosts-client-root')).toHaveAttribute('data-hydrated', 'true')
   await expect(page.getByTestId('hosts-heading')).toBeVisible()
   await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–50 of 55')
   await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 1 of 2')
@@ -374,6 +376,7 @@ test('authenticated user can sort and paginate the host inventory', async ({ aut
 
   await page.goto('/hosts')
 
+  await expect(page.getByTestId('hosts-client-root')).toHaveAttribute('data-hydrated', 'true')
   await expect(page.getByTestId('hosts-pagination-summary')).toContainText('Showing 1–50 of 55')
   await expect(page.getByTestId('hosts-page-indicator')).toContainText('Page 1 of 2')
   await expect(page.getByRole('link', { name: 'Host 001' })).toBeVisible()

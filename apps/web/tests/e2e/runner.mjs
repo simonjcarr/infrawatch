@@ -54,6 +54,7 @@ async function main() {
     process.env.BETTER_AUTH_TRUSTED_ORIGINS = appUrl
     process.env.E2E_PORT = String(port)
     process.env.AUTH_EMAIL_CAPTURE_FILE = authEmailCaptureFile
+    process.env.E2E = '1'
     process.env.E2E_DISABLE_AGENT_CACHE_PREWARM = '1'
     process.env.POSTGRES_POOL_MAX = process.env.POSTGRES_POOL_MAX ?? '2'
     process.env.LICENCE_PUBLIC_KEY = e2eLicencePublicKey

@@ -281,12 +281,12 @@ test('admin can create a silence, email channel, and webhook channel from the al
 
   await page.getByTestId('alerts-add-webhook').click()
   await page.getByTestId('alert-webhook-name').fill('PagerDuty Webhook')
-  await page.getByTestId('alert-webhook-url').fill('https://alerts.example.com/hooks/pagerduty')
+  await page.getByTestId('alert-webhook-url').fill('https://example.com/hooks/pagerduty')
   await page.getByTestId('alert-webhook-secret').fill('super-secret-token')
   await page.getByTestId('alert-webhook-submit').click()
 
   const webhookRow = page.getByRole('row').filter({ hasText: 'PagerDuty Webhook' })
-  await expect(webhookRow).toContainText('https://alerts.example.com/hooks/pagerduty')
+  await expect(webhookRow).toContainText('https://example.com/hooks/pagerduty')
 
   const createdRows = await sql<Array<{
     silence_reason: string | null
@@ -323,7 +323,7 @@ test('admin can create a silence, email channel, and webhook channel from the al
       recipients: ['alerts2@example.com', 'team@example.com'],
       webhook_name: 'PagerDuty Webhook',
       webhook_type: 'webhook',
-      webhook_url: 'https://alerts.example.com/hooks/pagerduty',
+      webhook_url: 'https://example.com/hooks/pagerduty',
       webhook_secret: 'super-secret-token',
     },
   ])

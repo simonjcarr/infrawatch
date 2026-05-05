@@ -257,6 +257,7 @@ function TabButton({
 
 export function HostDetailClient({ host: initialHost, orgId, currentUserId, userRole, latestAgentVersion }: Props) {
   const canManageHost = canAccessTooling({ role: userRole })
+  const canRunHostTasks = userRole === 'org_admin' || userRole === 'super_admin'
   const [activeParentTab, setActiveParentTab] = useState<ParentTabId>('overview')
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState<MetricsPreset>('24h')
@@ -1291,7 +1292,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
       {/* Tasks Tab */}
       {activeTab === 'tasks' && (
-        <TasksTab orgId={orgId} host={host} userId={currentUserId} />
+        <TasksTab orgId={orgId} host={host} canRunTasks={canRunHostTasks} />
       )}
 
       {/* Logs Tab */}

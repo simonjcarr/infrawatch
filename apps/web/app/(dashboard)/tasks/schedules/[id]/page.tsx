@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { canAccessTooling } from '@/lib/auth/tooling'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { db } from '@/lib/db'
 import { hosts, hostGroups } from '@/lib/db/schema'
 import { and, eq, isNull, asc } from 'drizzle-orm'
@@ -19,7 +19,7 @@ interface Props {
 export default async function SchedulePage({ params }: Props) {
   const { id } = await params
   const session = await getRequiredSession()
-  if (!canAccessTooling(session.user)) redirect('/dashboard')
+  if (!ADMIN_ROLES.includes(session.user.role)) redirect('/tasks')
   const orgId = session.user.organisationId!
 
   const result = await getSchedule(orgId, id)

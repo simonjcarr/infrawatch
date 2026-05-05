@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgToolingAccess } from '@/lib/actions/action-auth'
+import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import {
@@ -10,7 +10,7 @@ import {
   hosts,
   hostGroupMembers,
 } from '@/lib/db/schema'
-import { eq, and, isNull, isNotNull, desc, inArray, or } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull, desc, inArray } from 'drizzle-orm'
 import type {
   TaskRun,
   TaskRunHost,
@@ -340,13 +340,12 @@ const MAX_SCRIPT_LENGTH: Record<'sh' | 'bash' | 'python3', number> = {
  */
 export async function triggerCustomScriptRun(
   orgId: string,
-  userId: string,
   hostId: string,
   script: string,
   interpreter: 'sh' | 'bash' | 'python3',
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
     return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
   }
@@ -357,7 +356,7 @@ export async function triggerCustomScriptRun(
   if (!host) return { error: 'Host not found' }
 
   const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
-  return createTaskRun(orgId, userId, 'host', hostId, 'custom_script', config, 1, [hostId], [])
+  return createTaskRun(orgId, session.user.id, 'host', hostId, 'custom_script', config, 1, [hostId], [])
 }
 
 /**
@@ -366,14 +365,13 @@ export async function triggerCustomScriptRun(
  */
 export async function triggerGroupCustomScriptRun(
   orgId: string,
-  userId: string,
   groupId: string,
   script: string,
   interpreter: 'sh' | 'bash' | 'python3',
   maxParallel: number,
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
     return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
   }
@@ -389,7 +387,7 @@ export async function triggerGroupCustomScriptRun(
 
   const hostIds = members.map((m) => m.hostId)
   const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
-  return createTaskRun(orgId, userId, 'group', groupId, 'custom_script', config, maxParallel, hostIds, [])
+  return createTaskRun(orgId, session.user.id, 'group', groupId, 'custom_script', config, maxParallel, hostIds, [])
 }
 
 // ── Service management actions ────────────────────────────────────────────────
@@ -400,12 +398,11 @@ export async function triggerGroupCustomScriptRun(
  */
 export async function triggerServiceAction(
   orgId: string,
-  userId: string,
   hostId: string,
   serviceName: string,
   action: 'start' | 'stop' | 'restart' | 'status',
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })
@@ -415,7 +412,7 @@ export async function triggerServiceAction(
   }
 
   const config: ServiceTaskConfig = { service_name: serviceName, action }
-  return createTaskRun(orgId, userId, 'host', hostId, 'service', config, 1, [hostId], [])
+  return createTaskRun(orgId, session.user.id, 'host', hostId, 'service', config, 1, [hostId], [])
 }
 
 /**
@@ -424,7 +421,6 @@ export async function triggerServiceAction(
  */
 export async function triggerGroupServiceAction(
   orgId: string,
-  userId: string,
   groupId: string,
   serviceName: string,
   action: 'start' | 'stop' | 'restart' | 'status',
@@ -432,7 +428,7 @@ export async function triggerGroupServiceAction(
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),
@@ -472,7 +468,7 @@ export async function triggerGroupServiceAction(
 
   const config: ServiceTaskConfig = { service_name: serviceName, action }
   const result = await createTaskRun(
-    orgId, userId, 'group', groupId, 'service', config, maxParallel, pendingHostIds, skipHosts,
+    orgId, session.user.id, 'group', groupId, 'service', config, maxParallel, pendingHostIds, skipHosts,
   )
 
   if ('error' in result) return result
@@ -500,17 +496,16 @@ export async function triggerGroupServiceAction(
  */
 export async function triggerAgentUninstall(
   orgId: string,
-  userId: string,
   hostId: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
   })
   if (!host) return { error: 'Host not found' }
 
   const config: AgentUninstallTaskConfig = {}
-  return createTaskRun(orgId, userId, 'host', hostId, 'agent_uninstall', config, 1, [hostId], [])
+  return createTaskRun(orgId, session.user.id, 'host', hostId, 'agent_uninstall', config, 1, [hostId], [])
 }
 
 // ── Deletion ──────────────────────────────────────────────────────────────────
@@ -565,11 +560,10 @@ export async function deleteTaskRuns(
  */
 export async function triggerPatchRun(
   orgId: string,
-  userId: string,
   hostId: string,
   mode: 'security' | 'all',
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   const host = await db.query.hosts.findFirst({
     where: and(
       eq(hosts.id, hostId),
@@ -583,7 +577,7 @@ export async function triggerPatchRun(
   }
 
   const config: PatchTaskConfig = { mode }
-  return createTaskRun(orgId, userId, 'host', hostId, 'patch', config, 1, [hostId], [])
+  return createTaskRun(orgId, session.user.id, 'host', hostId, 'patch', config, 1, [hostId], [])
 }
 
 /**
@@ -593,14 +587,13 @@ export async function triggerPatchRun(
  */
 export async function triggerGroupPatchRun(
   orgId: string,
-  userId: string,
   groupId: string,
   mode: 'security' | 'all',
   maxParallel: number,
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgAdminAccess(orgId)
   // Fetch all members of the group
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
@@ -645,7 +638,7 @@ export async function triggerGroupPatchRun(
   const config: PatchTaskConfig = { mode }
   const result = await createTaskRun(
     orgId,
-    userId,
+    session.user.id,
     'group',
     groupId,
     'patch',

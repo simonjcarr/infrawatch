@@ -62,7 +62,7 @@ export function SchedulesClient({
   const [deleteTarget, setDeleteTarget] = useState<ScheduleWithTargetName | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const canEdit = userRole !== 'read_only'
+  const canEdit = userRole === 'org_admin' || userRole === 'super_admin'
 
   const { data: schedules = initialSchedules } = useQuery({
     queryKey: ['task-schedules', orgId],

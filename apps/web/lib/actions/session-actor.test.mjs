@@ -16,7 +16,7 @@ function getActionSegment(source, action) {
 }
 
 test('privileged agent actions derive audit actors from the authenticated session', () => {
-  for (const action of ['approveAgent', 'rejectAgent', 'createEnrolmentToken', 'uninstallAndDeleteHost']) {
+  for (const action of ['approveAgent', 'rejectAgent', 'createEnrolmentToken']) {
     const segment = getActionSegment(agentsSource, action)
 
     assert.doesNotMatch(

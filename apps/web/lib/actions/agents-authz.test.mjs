@@ -25,8 +25,8 @@ test('privileged agent and host mutations require tooling access', () => {
 
     assert.match(
       segment,
-      /requireOrgToolingAccess\(orgId\)/,
-      `${action} must require tooling access before mutating fleet state`,
+      /requireOrg(?:Admin|Tooling)Access\(orgId\)/,
+      `${action} must require an org-scoped privileged guard before mutating fleet state`,
     )
   }
 })

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.5...ingest/v0.8.6) (2026-05-05)
+
+
+### Bug Fixes
+
+* **terminal:** require pinned SSH host keys ([#973](https://github.com/carrtech-dev/ct-ops/issues/973)) ([ae5d5cb](https://github.com/carrtech-dev/ct-ops/commit/ae5d5cbdcc382952ff060b5c37325ef09def2dae))
+
 ## [0.8.5](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.4...ingest/v0.8.5) (2026-05-05)
 
 

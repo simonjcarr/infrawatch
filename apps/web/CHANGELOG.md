@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.8...web/v0.103.9) (2026-05-05)
+
+
+### Bug Fixes
+
+* **ct-cve:** share service nonce replay protection ([d4df6b0](https://github.com/carrtech-dev/ct-ops/commit/d4df6b0f57f704178b2056be63b81ddcabae7a9d)), closes [#910](https://github.com/carrtech-dev/ct-ops/issues/910)
+
 ## [0.103.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.7...web/v0.103.8) (2026-05-05)
 
 

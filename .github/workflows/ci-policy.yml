@@ -1,0 +1,26 @@
+name: CI Policy
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-runner-policy:
+    name: Workflow runner policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Assert PR workflows use hosted runners
+        run: .github/scripts/assert-pr-workflows-use-hosted-runners.sh

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.14](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.13...web/v0.103.14) (2026-05-05)
+
+
+### Bug Fixes
+
+* **db:** fail closed for tenant RLS scope ([0612b94](https://github.com/carrtech-dev/ct-ops/commit/0612b94489c4bf4517509faf6d76a18d11e13c19)), closes [#980](https://github.com/carrtech-dev/ct-ops/issues/980)
+
 ## [0.103.13](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.12...web/v0.103.13) (2026-05-05)
 
 

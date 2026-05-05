@@ -18,6 +18,9 @@ if [ "$#" -ge 2 ] && [ "$1" = "compose" ] && [ "$2" = "version" ]; then
 fi
 
 if [ "$#" -ge 1 ] && [ "$1" = "compose" ]; then
+  if [ -n "${MOCK_DOCKER_LOG:-}" ]; then
+    printf 'docker %s\n' "$*" >> "$MOCK_DOCKER_LOG"
+  fi
   exit 0
 fi
 
@@ -121,12 +124,13 @@ assert_password_manager_bootstrap() {
 }
 
 run_root_start_bootstrap_test() {
-  local tmpdir mockbin repo_dir
+  local tmpdir mockbin repo_dir docker_log
 
   tmpdir="$(mktemp -d)"
   trap 'chmod -R u+w "'"$tmpdir"'" 2>/dev/null || true; rm -rf "'"$tmpdir"'"' RETURN
   mockbin="${tmpdir}/mockbin"
   repo_dir="${tmpdir}/ct-ops"
+  docker_log="${tmpdir}/docker.log"
   mkdir -p "$mockbin" "$repo_dir/deploy/dev-tls"
   make_mock_docker "$mockbin"
 
@@ -149,8 +153,11 @@ EOF
 
   (
     cd "$repo_dir" &&
-      PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" ./start.sh >/dev/null 2>&1
+      PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" MOCK_DOCKER_LOG="$docker_log" ./start.sh >/dev/null 2>&1
   )
+
+  grep -q 'docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate' "$docker_log"
+  grep -q 'docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate' "$docker_log"
 
   assert_password_manager_bootstrap \
     "$repo_dir/.env" \
@@ -160,12 +167,13 @@ EOF
 }
 
 run_bundle_start_bootstrap_test() {
-  local tmpdir mockbin bundle_dir
+  local tmpdir mockbin bundle_dir docker_log
 
   tmpdir="$(mktemp -d)"
   trap 'chmod -R u+w "'"$tmpdir"'" 2>/dev/null || true; rm -rf "'"$tmpdir"'"' RETURN
   mockbin="${tmpdir}/mockbin"
   bundle_dir="${tmpdir}/bundle"
+  docker_log="${tmpdir}/docker.log"
   mkdir -p "$mockbin" "$bundle_dir/deploy/nginx" "$bundle_dir/deploy/dev-tls" "$bundle_dir/deploy/tls"
   make_mock_docker "$mockbin"
 
@@ -190,8 +198,11 @@ EOF
 
   (
     cd "$bundle_dir" &&
-      PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" ./start.sh >/dev/null 2>&1
+      PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" MOCK_DOCKER_LOG="$docker_log" ./start.sh >/dev/null 2>&1
   )
+
+  grep -q 'docker compose up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate' "$docker_log"
+  grep -q 'docker compose up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate' "$docker_log"
 
   assert_password_manager_bootstrap \
     "$bundle_dir/.env" \

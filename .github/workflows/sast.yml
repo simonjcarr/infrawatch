@@ -15,7 +15,7 @@ permissions:
 jobs:
   gosec:
     name: gosec (${{ matrix.module }})
-    runs-on: self-hosted
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
     strategy:
       fail-fast: false
       matrix:
@@ -71,7 +71,7 @@ jobs:
 
   semgrep:
     name: semgrep
-    runs-on: self-hosted
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
     container:
       image: semgrep/semgrep
     steps:
@@ -127,7 +127,7 @@ jobs:
 
   trivy-fs:
     name: trivy (filesystem)
-    runs-on: self-hosted
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - name: Reset workspace ownership
         run: |
@@ -171,7 +171,7 @@ jobs:
 
   crypto-lint:
     name: crypto-lint (no weak hashes / ciphers)
-    runs-on: self-hosted
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - name: Reset workspace ownership
         run: |
@@ -229,7 +229,7 @@ jobs:
 
   trivy-config:
     name: trivy (config / IaC)
-    runs-on: self-hosted
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - name: Reset workspace ownership
         run: |

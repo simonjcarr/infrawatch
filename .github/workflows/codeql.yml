@@ -16,7 +16,7 @@ permissions:
 jobs:
   analyse:
     name: Analyse ${{ matrix.language }}
-    runs-on: self-hosted
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
 
     strategy:
       fail-fast: false

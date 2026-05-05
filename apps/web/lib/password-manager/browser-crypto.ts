@@ -35,6 +35,11 @@ export interface PasswordManagerEncryptedPayloadEnvelope {
   ciphertext_b64: string
 }
 
+export interface PasswordManagerVaultMetadata {
+  name: string
+  description?: string
+}
+
 function getWebCrypto(): Crypto {
   if (!globalThis.crypto?.subtle) {
     throw new Error('Web Crypto API is required')
@@ -253,6 +258,20 @@ export async function createEncryptedEntryPayload(
   value: unknown,
   vaultKey: CryptoKey,
 ): Promise<PasswordManagerEncryptedPayloadEnvelope> {
+  return createEncryptedJsonEnvelope(value, vaultKey)
+}
+
+export async function createEncryptedVaultMetadata(
+  value: PasswordManagerVaultMetadata,
+  vaultKey: CryptoKey,
+): Promise<PasswordManagerEncryptedPayloadEnvelope> {
+  return createEncryptedJsonEnvelope(value, vaultKey)
+}
+
+async function createEncryptedJsonEnvelope(
+  value: unknown,
+  vaultKey: CryptoKey,
+): Promise<PasswordManagerEncryptedPayloadEnvelope> {
   const iv = randomBytes(AES_GCM_IV_BYTES)
   const ciphertext = await getWebCrypto().subtle.encrypt(
     {
@@ -272,6 +291,20 @@ export async function createEncryptedEntryPayload(
 }
 
 export async function decryptEntryPayload<T>(
+  envelope: PasswordManagerEncryptedPayloadEnvelope,
+  vaultKey: CryptoKey,
+): Promise<T> {
+  return decryptJsonEnvelope<T>(envelope, vaultKey)
+}
+
+export async function decryptVaultMetadata(
+  envelope: PasswordManagerEncryptedPayloadEnvelope,
+  vaultKey: CryptoKey,
+): Promise<PasswordManagerVaultMetadata> {
+  return decryptJsonEnvelope<PasswordManagerVaultMetadata>(envelope, vaultKey)
+}
+
+async function decryptJsonEnvelope<T>(
   envelope: PasswordManagerEncryptedPayloadEnvelope,
   vaultKey: CryptoKey,
 ): Promise<T> {

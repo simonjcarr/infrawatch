@@ -2,7 +2,7 @@ const REDACTED = '[REDACTED]'
 const CIRCULAR = '[Circular]'
 const MAX_DEPTH = 6
 const SENSITIVE_KEY_PATTERN =
-  /(pass(word)?|token|secret|authorization|cookie|session|private[_-]?key|api[_-]?key|bindpassword|config)/i
+  /(pass(word)?|token|secret|authorization|cookie|session|private[_-]?key|api[_-]?key|bindpassword|config|assertion|cipher(text)?|wrapped|encrypted|envelope|derived[_-]?key|unlock[_-]?key|vault[_-]?key|entry[_-]?key)/i
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object') return false

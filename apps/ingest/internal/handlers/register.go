@@ -49,6 +49,10 @@ func decideHostCollision(collision *queries.HostCollision) (hostCollisionDecisio
 	return hostCollisionCreateSeparatePending, "existing offline or unknown host identity"
 }
 
+func existingAgentBelongsToTokenOrg(existing *queries.AgentRow, tokenOrgID string) bool {
+	return existing != nil && existing.OrganisationID == tokenOrgID
+}
+
 // Register handles agent registration.
 //
 // Flow:
@@ -94,6 +98,14 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	}
 
 	if existing != nil {
+		if !existingAgentBelongsToTokenOrg(existing, orgID) {
+			slog.Warn("rejecting registration for existing public key in different organisation",
+				"agent_id", existing.ID,
+				"agent_org_id", existing.OrganisationID,
+				"token_org_id", orgID,
+			)
+			return nil, status.Error(codes.Unauthenticated, "invalid or expired enrolment token")
+		}
 		slog.Info("agent already registered", "agent_id", existing.ID, "status", existing.Status)
 		// Update the queued CSR in case the agent has re-generated one (e.g.
 		// after a reinstall that preserved the keypair but lost the cert).
@@ -103,7 +115,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 			}
 		}
 		if existing.Status == "active" {
-			jwtToken, err := h.issuer.IssueAgentToken(existing.ID, orgID)
+			jwtToken, err := h.issuer.IssueAgentToken(existing.ID, existing.OrganisationID)
 			if err != nil {
 				slog.Error("issuing JWT for existing agent", "err", err)
 				return nil, status.Error(codes.Internal, "internal error")

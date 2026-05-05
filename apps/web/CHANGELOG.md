@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.18](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.17...web/v0.103.18) (2026-05-05)
+
+
+### Bug Fixes
+
+* **security:** ignore spoofed bundle transfer origins ([f93f6ca](https://github.com/carrtech-dev/ct-ops/commit/f93f6cac4f66b3552138ccf0cc97115038b46701))
+
 ## [0.103.17](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.16...web/v0.103.17) (2026-05-05)
 
 

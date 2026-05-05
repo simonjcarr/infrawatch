@@ -18,6 +18,7 @@ import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
 import { getApiOrgSession } from '@/lib/auth/session'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import { buildHostDownloadScript } from '@/lib/tools/bundle-transfer/host-download-script'
+import { getBundleTransferDownloadOrigin } from '@/lib/tools/bundle-transfer/download-origin'
 
 export const runtime = 'nodejs'
 export const maxDuration = 900
@@ -628,17 +629,6 @@ async function getAuthorisedUser(request: NextRequest) {
   }
 }
 
-function getRequestOrigin(request: NextRequest) {
-  const configuredBaseUrl = process.env.AGENT_DOWNLOAD_BASE_URL?.trim()
-  if (configuredBaseUrl) return configuredBaseUrl.replace(/\/+$/, '')
-  const origin = request.headers.get('origin')
-  if (origin) return origin
-  const forwardedProto = request.headers.get('x-forwarded-proto')
-  const forwardedHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
-  if (forwardedProto && forwardedHost) return `${forwardedProto.split(',')[0]}://${forwardedHost.split(',')[0]}`
-  return request.nextUrl.origin
-}
-
 async function serveBundleDownload(request: NextRequest) {
   cleanupOldJobs()
   const user = await getAuthorisedUser(request)
@@ -739,7 +729,7 @@ export async function POST(request: NextRequest) {
     updatedAt: Date.now(),
   }
   transferJobs.set(job.id, job)
-  void runTransferJob(job, parsed.data, getRequestOrigin(request))
+  void runTransferJob(job, parsed.data, getBundleTransferDownloadOrigin(request))
 
   return NextResponse.json({
     ok: true,

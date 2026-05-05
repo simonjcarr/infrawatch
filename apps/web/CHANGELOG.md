@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.20](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.19...web/v0.103.20) (2026-05-05)
+
+
+### Bug Fixes
+
+* **audit:** record privileged lifecycle mutations ([c779ed0](https://github.com/carrtech-dev/ct-ops/commit/c779ed01df5de58969e26465d8fd3dabd3861bfc)), closes [#960](https://github.com/carrtech-dev/ct-ops/issues/960)
+
 ## [0.103.19](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.18...web/v0.103.19) (2026-05-05)
 
 

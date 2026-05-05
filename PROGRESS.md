@@ -15,6 +15,30 @@
 
 ## What Has Been Built
 
+### Session 105 — Password Manager compose wiring
+
+**Default single-host deployment** (`docker-compose.single.yml`, `deploy/customer-bundle/start.sh`, `.env.example`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-compose.sh`)
+- Added bundled `password-manager-db`, `password-manager-migrate`, and
+  `password-manager-api` services to the single-host compose profile.
+- Kept Password Manager off public host ports, added a dedicated
+  `password_manager_db_data` volume, and enforced migration ordering with
+  database health plus `service_completed_successfully` dependencies before
+  the API and web/nginx stack continue.
+- Wired the customer start path to pull the Password Manager services by
+  default and documented the temporary env fallbacks used until first-run
+  installer generation lands for the dedicated Password Manager secrets and
+  CT-Ops launch settings.
+- Added a rendered-compose regression test in CI that fails if the service set,
+  dependency ordering, dedicated volume, or no-host-port boundary drifts.
+
+**Validation**
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder docker compose -f docker-compose.single.yml config`
+- `bash -n deploy/customer-bundle/start.sh`
+- `bash deploy/scripts/test-start.sh`
+- `git diff --check`
+
 ### Session 104 — Password Manager direction reset
 
 **Historical note**

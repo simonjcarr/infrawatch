@@ -30,7 +30,7 @@ REQUIRED_VARS=(BETTER_AUTH_URL BETTER_AUTH_TRUSTED_ORIGINS BETTER_AUTH_SECRET PO
 
 # Optional variables — missing values get a warning, not an error. Most have
 # safe localhost defaults baked into docker-compose.yml.
-OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE)
+OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_API_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
 REQUIRED_FILES=(
   docker-compose.yml
   deploy/nginx/nginx.conf
@@ -363,7 +363,7 @@ start_stack() {
     fi
   else
     echo "Pulling release-pinned images from GHCR..."
-    if ! docker compose pull db web migrate ingest nginx tls-init; then
+    if ! docker compose pull db password-manager-db password-manager-migrate password-manager-api web migrate ingest nginx tls-init; then
       echo "" >&2
       echo "ERROR: failed to pull one or more images from GHCR." >&2
       echo "  - Check your network access to ghcr.io" >&2

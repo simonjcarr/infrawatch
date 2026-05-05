@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.9...web/v0.103.10) (2026-05-05)
+
+
+### Bug Fixes
+
+* **auth:** scope LDAP login to organisation slug ([f5e331e](https://github.com/carrtech-dev/ct-ops/commit/f5e331ed73e272a38ee8fe4a4ee203b396d67e9e))
+
 ## [0.103.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.8...web/v0.103.9) (2026-05-05)
 
 

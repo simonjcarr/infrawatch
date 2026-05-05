@@ -15,6 +15,31 @@
 
 ## What Has Been Built
 
+### Session 111 — Password Manager portable client and browser crypto
+
+**Reusable Password Manager product layer** (`apps/web/lib/password-manager/client.ts`, `apps/web/lib/password-manager/browser-crypto.ts`, `apps/web/lib/password-manager/client.test.mjs`, `apps/web/lib/password-manager/browser-crypto.test.mjs`)
+- Added a configurable Password Manager client abstraction that treats the API
+  base URL and CT-Ops launch path as configuration, covers launch, session
+  refresh/logout, setup, user-key, vault, entry, member, key-rotation, and
+  audit routes, and sends `credentials: include` on every Password Manager
+  request.
+- Added request payload helpers that serialize the Password Manager API’s
+  expected JSON field names while rejecting plaintext-shaped fields such as
+  `plaintext`, `password`, `secret`, `private_key`, `vault_key`, and
+  `entry_key` before anything is sent over the wire.
+- Added a browser-only crypto module for unlock-profile creation, PBKDF2-based
+  key derivation, encrypted private-key envelopes, RSA-OAEP vault-key wrapping,
+  AES-GCM entry payload encryption/decryption, and member public-key export.
+- Added route-coverage tests against the pinned Password Manager OpenAPI
+  contract so client route drift is caught locally when the API contract or
+  client surface changes.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `pnpm --dir apps/web type-check`
+- `node --experimental-strip-types --test apps/web/lib/password-manager/client.test.mjs apps/web/lib/password-manager/browser-crypto.test.mjs`
+- `git diff --check`
+
 ### Session 110 — Release bundle digest verification fix
 
 **Release workflow Password Manager digest scope** (`.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-agent-release-password-manager-image-ref.sh`)

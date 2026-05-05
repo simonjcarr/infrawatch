@@ -1,0 +1,265 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+import {
+  PASSWORD_MANAGER_CLIENT_ROUTE_SPECS,
+  PasswordManagerApiError,
+  createPasswordManagerClient,
+  createEntryPayload,
+  createMemberPayload,
+  createPasswordManagerLaunchPayload,
+  createRotateVaultKeysPayload,
+  createUserKeyPayload,
+  createVaultPayload,
+  updateEntryPayload,
+  updateMemberPayload,
+  updateVaultPayload,
+} from './client.ts'
+
+function loadPinnedContract() {
+  const filePath = fileURLToPath(
+    new URL('../../../../../ct-password-manager/docs/api-contract/openapi.json', import.meta.url),
+  )
+  return JSON.parse(readFileSync(filePath, 'utf8'))
+}
+
+function createJsonResponse(status, payload) {
+  return new Response(payload === undefined ? null : JSON.stringify(payload), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+test('PASSWORD_MANAGER_CLIENT_ROUTE_SPECS matches the pinned Password Manager contract', () => {
+  const contract = loadPinnedContract()
+  const actual = new Set(
+    Object.values(PASSWORD_MANAGER_CLIENT_ROUTE_SPECS).map(
+      ({ method, path }) => `${method.toUpperCase()} ${path}`,
+    ),
+  )
+  const expected = new Set(
+    Object.entries(contract.paths).flatMap(([path, methods]) =>
+      Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`),
+    ),
+  )
+  expected.delete('GET /healthz')
+
+  assert.deepEqual([...actual].sort(), [...expected].sort())
+})
+
+test('launch fetches a fresh assertion and exchanges it with Password Manager using credentials', async () => {
+  const calls = []
+  const client = createPasswordManagerClient({
+    apiBaseUrl: 'https://ops.example.test/password-manager-api/',
+    launchPath: '/api/password-manager/launch-assertion',
+    fetch: async (input, init = {}) => {
+      calls.push({
+        url: input instanceof Request ? input.url : String(input),
+        init,
+      })
+
+      if (calls.length === 1) {
+        return createJsonResponse(200, { assertion: 'signed-launch-assertion' })
+      }
+
+      return new Response(null, { status: 204 })
+    },
+  })
+
+  await client.launch()
+
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0].url, 'http://localhost/api/password-manager/launch-assertion')
+  assert.equal(calls[0].init.method, 'POST')
+  assert.equal(calls[0].init.credentials, 'include')
+
+  assert.equal(calls[1].url, 'https://ops.example.test/password-manager-api/launch/ct-ops')
+  assert.equal(calls[1].init.method, 'POST')
+  assert.equal(calls[1].init.credentials, 'include')
+  assert.match(String(calls[1].init.body), /signed-launch-assertion/)
+})
+
+test('createVault and rotateVaultKeys preserve the supplied Idempotency-Key header', async () => {
+  const calls = []
+  const client = createPasswordManagerClient({
+    apiBaseUrl: 'https://ops.example.test/password-manager-api',
+    fetch: async (input, init = {}) => {
+      calls.push({
+        url: input instanceof Request ? input.url : String(input),
+        init,
+      })
+      return createJsonResponse(201, {
+        id: 'vault-1',
+        encrypted_metadata: { ciphertext_b64: 'meta' },
+        wrapped_vault_key_envelope: { wrapped_key_b64: 'wrapped' },
+        role: 'owner',
+        current_key_epoch: 1,
+        created_at: '2026-05-05T18:00:00Z',
+        updated_at: '2026-05-05T18:00:00Z',
+      })
+    },
+  })
+
+  await client.createVault({
+    idempotencyKey: 'vault-create-key',
+    encryptedMetadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+  })
+
+  await client.rotateVaultKeys({
+    vaultId: 'vault-1',
+    idempotencyKey: 'rotate-key',
+    rotationReason: 'membership_revoked',
+    members: [{ userId: 'user-1', wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'ZA==' } }],
+  })
+
+  assert.equal(calls[0].init.headers['Idempotency-Key'], 'vault-create-key')
+  assert.equal(calls[1].init.headers['Idempotency-Key'], 'rotate-key')
+})
+
+test('audit routes send empty bodies only', async () => {
+  const calls = []
+  const client = createPasswordManagerClient({
+    apiBaseUrl: 'https://ops.example.test/password-manager-api',
+    fetch: async (input, init = {}) => {
+      calls.push({
+        url: input instanceof Request ? input.url : String(input),
+        init,
+      })
+      return new Response(null, { status: 204 })
+    },
+  })
+
+  await client.auditReveal({ vaultId: 'vault-1', entryId: 'entry-1' })
+  await client.auditCopy({ vaultId: 'vault-1', entryId: 'entry-1' })
+  await client.auditExport({ vaultId: 'vault-1' })
+
+  for (const call of calls) {
+    assert.equal(call.init.method, 'POST')
+    assert.equal(call.init.credentials, 'include')
+    assert.equal('body' in call.init, false)
+  }
+})
+
+test('request payload helpers reject plaintext-shaped fields', () => {
+  assert.throws(
+    () =>
+      createUserKeyPayload({
+        encryptedPrivateKeyEnvelope: { ciphertext_b64: 'abc', private_key: 'plaintext' },
+        kdfMetadata: { algorithm: 'pbkdf2-sha256', iterations: 600000, salt_b64: 'salt', derived_key_length: 32 },
+      }),
+    /plaintext-shaped field/i,
+  )
+
+  assert.throws(
+    () =>
+      createVaultPayload({
+        encryptedMetadata: { ciphertext_b64: 'abc', plaintext: 'secret' },
+        wrappedVaultKeyEnvelope: { wrapped_key_b64: 'wrapped' },
+      }),
+    /plaintext-shaped field/i,
+  )
+
+  assert.throws(
+    () =>
+      createEntryPayload({
+        encryptedPayload: { ciphertext_b64: 'abc', secret: 'plaintext' },
+        keyEpoch: 1,
+      }),
+    /plaintext-shaped field/i,
+  )
+
+  assert.throws(
+    () =>
+      createMemberPayload({
+        userId: 'user-1',
+        role: 'viewer',
+        wrappedVaultKeyEnvelope: { wrapped_key_b64: 'abc', vault_key: 'plaintext' },
+        keyEpoch: 1,
+      }),
+    /plaintext-shaped field/i,
+  )
+})
+
+test('request payload helpers serialize supported encrypted shapes', () => {
+  assert.deepEqual(createPasswordManagerLaunchPayload('assertion-token'), { assertion: 'assertion-token' })
+  assert.deepEqual(createVaultPayload({
+    encryptedMetadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+  }), {
+    encrypted_metadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    wrapped_vault_key_envelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+  })
+  assert.deepEqual(updateVaultPayload({
+    encryptedMetadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+  }), {
+    encrypted_metadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+  })
+  assert.deepEqual(createEntryPayload({
+    encryptedPayload: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    keyEpoch: 3,
+  }), {
+    encrypted_payload: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    key_epoch: 3,
+  })
+  assert.deepEqual(updateEntryPayload({
+    encryptedPayload: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    keyEpoch: 4,
+  }), {
+    encrypted_payload: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+    key_epoch: 4,
+  })
+  assert.deepEqual(createMemberPayload({
+    userId: 'user-1',
+    role: 'viewer',
+    wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+    keyEpoch: 1,
+  }), {
+    user_id: 'user-1',
+    role: 'viewer',
+    wrapped_vault_key_envelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+    key_epoch: 1,
+  })
+  assert.deepEqual(updateMemberPayload({
+    role: 'manager',
+    wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+    keyEpoch: 2,
+  }), {
+    role: 'manager',
+    wrapped_vault_key_envelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+    key_epoch: 2,
+  })
+  assert.deepEqual(createRotateVaultKeysPayload({
+    rotationReason: 'membership_revoked',
+    members: [
+      { userId: 'user-1', wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' } },
+    ],
+  }), {
+    rotation_reason: 'membership_revoked',
+    members: [
+      { user_id: 'user-1', wrapped_vault_key_envelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' } },
+    ],
+  })
+})
+
+test('non-success responses surface a normalized PasswordManagerApiError', async () => {
+  const client = createPasswordManagerClient({
+    apiBaseUrl: 'https://ops.example.test/password-manager-api',
+    fetch: async () => createJsonResponse(409, { error: 'idempotency_conflict' }),
+  })
+
+  await assert.rejects(
+    () =>
+      client.createVault({
+        idempotencyKey: 'vault-create-key',
+        encryptedMetadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+        wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+      }),
+    (error) =>
+      error instanceof PasswordManagerApiError &&
+      error.status === 409 &&
+      error.code === 'idempotency_conflict',
+  )
+})

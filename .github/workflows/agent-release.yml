@@ -182,6 +182,7 @@ jobs:
           fi
           PASSWORD_MANAGER_API_IMAGE_REF="$(python3 -c 'import json; print(json.load(open("deploy/password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
           export WEB_IMAGE_REF INGEST_IMAGE_REF PASSWORD_MANAGER_API_IMAGE_REF
+          echo "PASSWORD_MANAGER_API_IMAGE_REF=${PASSWORD_MANAGER_API_IMAGE_REF}" >> "$GITHUB_ENV"
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example

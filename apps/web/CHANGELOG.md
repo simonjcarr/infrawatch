@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.16](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.15...web/v0.103.16) (2026-05-05)
+
+
+### Bug Fixes
+
+* **db:** scope auth tables with tenant RLS ([#1027](https://github.com/carrtech-dev/ct-ops/issues/1027)) ([28bd8e9](https://github.com/carrtech-dev/ct-ops/commit/28bd8e937246c6822a619996c74e33cb5062a9f3))
+
 ## [0.103.15](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.14...web/v0.103.15) (2026-05-05)
 
 

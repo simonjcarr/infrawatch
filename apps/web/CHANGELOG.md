@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.4...web/v0.103.5) (2026-05-05)
+
+
+### Bug Fixes
+
+* **web:** verify agent enrolment TLS by default ([#958](https://github.com/carrtech-dev/ct-ops/issues/958)) ([1fe3dbc](https://github.com/carrtech-dev/ct-ops/commit/1fe3dbc4196dd7f93bccabd7ab8aca160e5e7b67))
+
 ## [0.103.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.3...web/v0.103.4) (2026-05-05)
 
 

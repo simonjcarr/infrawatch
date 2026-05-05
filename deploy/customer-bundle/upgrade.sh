@@ -293,6 +293,9 @@ install_new_bundle_files() {
   cp "$NEW_BUNDLE_DIR/docker-compose.yml" docker-compose.yml
   cp "$NEW_BUNDLE_DIR/.env.example" .env.example
   cp "$NEW_BUNDLE_DIR/README.md" README.md
+  if [ -f "$NEW_BUNDLE_DIR/password-manager-release.json" ]; then
+    cp "$NEW_BUNDLE_DIR/password-manager-release.json" password-manager-release.json
+  fi
   cp "$NEW_BUNDLE_DIR/start.sh" start.sh
   cp "$NEW_BUNDLE_DIR/backup.sh" backup.sh
   cp "$NEW_BUNDLE_DIR/build-offline-installer.sh" build-offline-installer.sh

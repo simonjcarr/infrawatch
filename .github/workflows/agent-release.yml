@@ -169,6 +169,7 @@ jobs:
           set -euo pipefail
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
+          python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json
           WEB_IMAGE_REF="${{ needs.build-web-image.outputs.image_ref }}"
           if [ -z "${WEB_IMAGE_REF}" ]; then
             echo "ERROR: missing web image digest output from build-web-image" >&2
@@ -184,6 +185,7 @@ jobs:
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
           cp .env.example                     dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
+          cp deploy/password-manager-release.json dist/ct-ops/password-manager-release.json
           cp deploy/customer-bundle/backup.sh dist/ct-ops/backup.sh
           cp deploy/customer-bundle/upgrade.sh dist/ct-ops/upgrade.sh
           cp deploy/customer-bundle/refresh_licence_key dist/ct-ops/refresh_licence_key
@@ -614,6 +616,7 @@ jobs:
             ct-ops-single.zip.sha256
             ${{ steps.bundle.outputs.compose_versioned }}
             docker-compose.single.yml
+            dist/ct-ops/password-manager-release.json
             ct-ops-web.spdx.json
 
       - name: Clean up runner disk

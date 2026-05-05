@@ -1,8 +1,9 @@
 import { logWarn } from '@/lib/logging'
+import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { REQUIRED_AGENT_VERSION } from './version'
-import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from './repo'
+import { REQUIRED_AGENT_VERSION } from './version.ts'
+import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from './repo.ts'
 
 const AGENT_DIST_DIR = process.env.AGENT_DIST_DIR ?? './data/agent-dist'
 const BAKED_AGENT_DIST_DIR = path.join(process.cwd(), 'data/agent-dist')
@@ -19,6 +20,8 @@ const PLATFORMS = [
 interface GitHubAsset {
   name: string
   browser_download_url: string
+  size: number
+  digest?: string
 }
 
 interface GitHubRelease {
@@ -35,9 +38,14 @@ interface GitHubRelease {
  * prewarm failure must never prevent the server from starting.
  */
 export async function prewarmAgentCache(): Promise<void> {
-  const missingBaked = PLATFORMS.filter(
-    ({ os, arch }) => !fs.existsSync(path.join(BAKED_AGENT_DIST_DIR, binaryBaseName(os, arch)))
+  const bakedAvailability = await Promise.all(
+    PLATFORMS.map(async ({ os, arch }) => {
+      const baseName = binaryBaseName(os, arch)
+      const isAvailable = await hasVerifiedLocalBinary(path.join(BAKED_AGENT_DIST_DIR, baseName), baseName)
+      return { os, arch, isAvailable }
+    })
   )
+  const missingBaked = bakedAvailability.filter(({ isAvailable }) => !isAvailable)
   if (missingBaked.length === 0) {
     console.log(`[agent-cache] Baked agent ${REQUIRED_AGENT_VERSION} binaries are available`)
     return
@@ -100,38 +108,116 @@ async function downloadIfMissing(
   const versionedName = `ct-ops-agent-${os}-${arch}-${version}${suffix}`
   const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
 
-  if (fs.existsSync(versionedPath)) {
+  if (await hasVerifiedLocalBinary(versionedPath, baseName)) {
     console.log(`[agent-cache] ${versionedName} already cached`)
     return
   }
 
   const asset = release.assets.find((a) => a.name === baseName)
-  if (!asset) {
+  const checksumAsset = release.assets.find((a) => a.name === `${baseName}.sha256`)
+  if (!asset || !checksumAsset) {
     // Platform binary not in this release — skip silently
     return
   }
 
   console.log(`[agent-cache] Downloading ${versionedName}...`)
   try {
-    const res = await fetch(asset.browser_download_url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...(process.env.GITHUB_TOKEN
-          ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
-          : {}),
-      },
-    })
-    if (!res.ok) {
-      console.warn(`[agent-cache] Failed to download ${baseName}: HTTP ${res.status}`)
+    const verified = await fetchVerifiedBinary(asset, checksumAsset, baseName)
+    if (!verified) {
+      console.warn(`[agent-cache] Failed to verify ${baseName} — skipping cache`)
       return
     }
-    const buffer = Buffer.from(await res.arrayBuffer())
+    const buffer = Buffer.from(verified.bytes)
     await fs.promises.writeFile(versionedPath, buffer, { mode: 0o755 })
+    await fs.promises.writeFile(`${versionedPath}.sha256`, verified.checksumLine, { mode: 0o644 })
     console.log(
       `[agent-cache] Cached ${versionedName} (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`
     )
   } catch (err) {
     logWarn(`[agent-cache] Error downloading ${baseName}:`, err)
   }
+}
+
+async function fetchVerifiedBinary(
+  asset: GitHubAsset,
+  checksumAsset: GitHubAsset,
+  baseName: string
+): Promise<{ bytes: ArrayBuffer; checksumLine: string } | null> {
+  const assetDigest = parseSha256Digest(asset.digest)
+  const checksumAssetDigest = parseSha256Digest(checksumAsset.digest)
+  if (!assetDigest || !checksumAssetDigest || asset.size <= 0 || checksumAsset.size <= 0) {
+    return null
+  }
+
+  const checksumBytes = await fetchBytes(checksumAsset.browser_download_url)
+  if (!checksumBytes) return null
+
+  const checksumBuffer = Buffer.from(checksumBytes)
+  if (
+    checksumBuffer.byteLength !== checksumAsset.size ||
+    sha256Hex(checksumBuffer) !== checksumAssetDigest
+  ) {
+    return null
+  }
+
+  const expectedDigest = parseSha256Sidecar(checksumBuffer.toString('utf8'), baseName)
+  if (!expectedDigest || expectedDigest !== assetDigest) return null
+
+  const binary = await fetchBytes(asset.browser_download_url)
+  if (!binary) return null
+
+  const binaryBuffer = Buffer.from(binary)
+  if (binaryBuffer.byteLength !== asset.size || sha256Hex(binaryBuffer) !== expectedDigest) {
+    return null
+  }
+
+  return { bytes: binary, checksumLine: `${expectedDigest}  ${baseName}\n` }
+}
+
+async function fetchBytes(url: string): Promise<ArrayBuffer | null> {
+  const res = await fetch(url, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(process.env.GITHUB_TOKEN
+        ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+        : {}),
+    },
+  })
+  if (!res.ok || !res.body) return null
+  return res.arrayBuffer()
+}
+
+async function hasVerifiedLocalBinary(filePath: string, baseName: string): Promise<boolean> {
+  try {
+    const [binary, checksumText] = await Promise.all([
+      fs.promises.readFile(filePath),
+      fs.promises.readFile(`${filePath}.sha256`, 'utf8'),
+    ])
+    const expectedDigest = parseSha256Sidecar(checksumText, baseName)
+    return Boolean(expectedDigest && sha256Hex(binary) === expectedDigest)
+  } catch {
+    return false
+  }
+}
+
+function parseSha256Digest(digest: string | undefined): string | null {
+  const match = digest?.match(/^sha256:([a-f0-9]{64})$/i)
+  const value = match?.[1]
+  return value ? value.toLowerCase() : null
+}
+
+function parseSha256Sidecar(contents: string, baseName: string): string | null {
+  for (const line of contents.split(/\r?\n/)) {
+    const match = line.trim().match(/^([a-f0-9]{64})\s+\*?(.+)$/i)
+    const value = match?.[1]
+    if (value && match?.[2] === baseName) {
+      return value.toLowerCase()
+    }
+  }
+  return null
+}
+
+function sha256Hex(data: Buffer): string {
+  return crypto.createHash('sha256').update(data).digest('hex')
 }

@@ -6,5 +6,5 @@
  * before public release, it's a one-time grep/replace per CLAUDE.md, not a
  * customer-facing toggle.
  */
-export const AGENT_REPO_OWNER = 'simonjcarr'
+export const AGENT_REPO_OWNER = 'carrtech-dev'
 export const AGENT_REPO_NAME = 'ct-ops'

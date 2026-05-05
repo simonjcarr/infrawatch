@@ -1,7 +1,8 @@
 import fs from 'fs'
 import path from 'path'
-import { REQUIRED_AGENT_VERSION } from './version'
-import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from './repo'
+import crypto from 'crypto'
+import { REQUIRED_AGENT_VERSION } from './version.ts'
+import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from './repo.ts'
 
 const AGENT_DIST_DIR = process.env.AGENT_DIST_DIR ?? './data/agent-dist'
 
@@ -15,6 +16,7 @@ interface GitHubAsset {
   name: string
   browser_download_url: string
   size: number
+  digest?: string
 }
 
 interface GitHubRelease {
@@ -43,33 +45,37 @@ export async function resolveAgentBinary(
   const versionedName = `ct-ops-agent-${os}-${arch}-${REQUIRED_AGENT_VERSION}${suffix}`
   const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
 
-  if (fs.existsSync(versionedPath)) {
-    return { bytes: await fs.promises.readFile(versionedPath), fileName: baseName }
+  const cachedVersioned = await readVerifiedLocalBinary(versionedPath, baseName)
+  if (cachedVersioned) {
+    return { bytes: cachedVersioned, fileName: baseName }
   }
 
   const tag = `agent/${REQUIRED_AGENT_VERSION}`
   const release = await fetchRelease(tag)
-  if (release) {
+  if (release?.tag_name === tag) {
     const asset = release.assets.find((a) => a.name === baseName)
-    if (asset) {
-      const binary = await fetchBinaryFromGitHub(asset.browser_download_url)
-      if (binary) {
-        await cacheLocally(versionedPath, binary)
-        return { bytes: Buffer.from(binary), fileName: baseName }
+    const checksumAsset = release.assets.find((a) => a.name === `${baseName}.sha256`)
+    if (asset && checksumAsset) {
+      const verified = await fetchVerifiedBinaryFromGitHub(asset, checksumAsset, baseName)
+      if (verified) {
+        await cacheLocally(versionedPath, verified.bytes, verified.checksumLine)
+        return { bytes: Buffer.from(verified.bytes), fileName: baseName }
       }
     }
   }
 
   const unversionedPath = path.join(AGENT_DIST_DIR, baseName)
-  if (fs.existsSync(unversionedPath)) {
-    return { bytes: await fs.promises.readFile(unversionedPath), fileName: baseName }
+  const cachedUnversioned = await readVerifiedLocalBinary(unversionedPath, baseName)
+  if (cachedUnversioned) {
+    return { bytes: cachedUnversioned, fileName: baseName }
   }
 
   const bakedDistDir = path.join(process.cwd(), 'data/agent-dist')
   if (path.resolve(bakedDistDir) !== path.resolve(AGENT_DIST_DIR)) {
     const bakedPath = path.join(bakedDistDir, baseName)
-    if (fs.existsSync(bakedPath)) {
-      return { bytes: await fs.promises.readFile(bakedPath), fileName: baseName }
+    const baked = await readVerifiedLocalBinary(bakedPath, baseName)
+    if (baked) {
+      return { bytes: baked, fileName: baseName }
     }
   }
 
@@ -79,8 +85,9 @@ export async function resolveAgentBinary(
 export function binaryUnavailableMessage(os: AgentOS, arch: AgentArch): string {
   return (
     `No binary available for ${os}/${arch} (required version: ${REQUIRED_AGENT_VERSION}). ` +
-    `Either place a binary in AGENT_DIST_DIR (${AGENT_DIST_DIR}) or ensure a GitHub release ` +
-    `exists for tag "agent/${REQUIRED_AGENT_VERSION}" in ${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}.`
+    `Either place a binary plus matching .sha256 sidecar in AGENT_DIST_DIR (${AGENT_DIST_DIR}) ` +
+    `or ensure a GitHub release exists for tag "agent/${REQUIRED_AGENT_VERSION}" in ` +
+    `${AGENT_REPO_OWNER}/${AGENT_REPO_NAME} with verified binary and checksum assets.`
   )
 }
 
@@ -105,7 +112,44 @@ async function fetchRelease(tag: string): Promise<GitHubRelease | null> {
   }
 }
 
-async function fetchBinaryFromGitHub(url: string): Promise<ArrayBuffer | null> {
+async function fetchVerifiedBinaryFromGitHub(
+  asset: GitHubAsset,
+  checksumAsset: GitHubAsset,
+  baseName: string,
+): Promise<{ bytes: ArrayBuffer; checksumLine: string } | null> {
+  const assetDigest = parseSha256Digest(asset.digest)
+  const checksumAssetDigest = parseSha256Digest(checksumAsset.digest)
+  if (!assetDigest || !checksumAssetDigest || asset.size <= 0 || checksumAsset.size <= 0) {
+    return null
+  }
+
+  const checksumBytes = await fetchBytesFromGitHub(checksumAsset.browser_download_url)
+  if (!checksumBytes) return null
+
+  const checksumBuffer = Buffer.from(checksumBytes)
+  if (
+    checksumBuffer.byteLength !== checksumAsset.size ||
+    sha256Hex(checksumBuffer) !== checksumAssetDigest
+  ) {
+    return null
+  }
+
+  const checksumText = checksumBuffer.toString('utf8')
+  const expectedDigest = parseSha256Sidecar(checksumText, baseName)
+  if (!expectedDigest || expectedDigest !== assetDigest) return null
+
+  const binary = await fetchBytesFromGitHub(asset.browser_download_url)
+  if (!binary) return null
+
+  const binaryBuffer = Buffer.from(binary)
+  if (binaryBuffer.byteLength !== asset.size || sha256Hex(binaryBuffer) !== expectedDigest) {
+    return null
+  }
+
+  return { bytes: binary, checksumLine: `${expectedDigest}  ${baseName}\n` }
+}
+
+async function fetchBytesFromGitHub(url: string): Promise<ArrayBuffer | null> {
   try {
     const res = await fetch(url, { headers: ghHeaders })
     if (!res.ok || !res.body) return null
@@ -115,10 +159,46 @@ async function fetchBinaryFromGitHub(url: string): Promise<ArrayBuffer | null> {
   }
 }
 
-async function cacheLocally(filePath: string, data: ArrayBuffer): Promise<void> {
+async function readVerifiedLocalBinary(filePath: string, baseName: string): Promise<Buffer | null> {
+  try {
+    const [binary, checksumText] = await Promise.all([
+      fs.promises.readFile(filePath),
+      fs.promises.readFile(`${filePath}.sha256`, 'utf8'),
+    ])
+    const expectedDigest = parseSha256Sidecar(checksumText, baseName)
+    if (!expectedDigest || sha256Hex(binary) !== expectedDigest) return null
+    return binary
+  } catch {
+    return null
+  }
+}
+
+function parseSha256Digest(digest: string | undefined): string | null {
+  const match = digest?.match(/^sha256:([a-f0-9]{64})$/i)
+  const value = match?.[1]
+  return value ? value.toLowerCase() : null
+}
+
+function parseSha256Sidecar(contents: string, baseName: string): string | null {
+  for (const line of contents.split(/\r?\n/)) {
+    const match = line.trim().match(/^([a-f0-9]{64})\s+\*?(.+)$/i)
+    const value = match?.[1]
+    if (value && match?.[2] === baseName) {
+      return value.toLowerCase()
+    }
+  }
+  return null
+}
+
+function sha256Hex(data: Buffer): string {
+  return crypto.createHash('sha256').update(data).digest('hex')
+}
+
+async function cacheLocally(filePath: string, data: ArrayBuffer, checksumLine: string): Promise<void> {
   try {
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
     await fs.promises.writeFile(filePath, Buffer.from(data), { mode: 0o755 })
+    await fs.promises.writeFile(`${filePath}.sha256`, checksumLine, { mode: 0o644 })
   } catch {
     // Cache failure is non-fatal
   }

@@ -393,6 +393,13 @@
       "when": 1777631000000,
       "tag": "0055_licence_verifier_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1777957423321,
+      "tag": "0056_ct_cve_service_nonces",
+      "breakpoints": true
     }
   ]
 }

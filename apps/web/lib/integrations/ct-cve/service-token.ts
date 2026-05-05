@@ -109,7 +109,23 @@ export function createInMemoryCtCveNonceStore(): CtCveNonceStore {
   }
 }
 
-export const ctCveNonceStore = createInMemoryCtCveNonceStore()
+let defaultNonceStore: CtCveNonceStore | undefined
+
+function getDefaultCtCveNonceStore(): CtCveNonceStore {
+  defaultNonceStore ??= {
+    async remember(tokenId, nonce, expiresAt, now) {
+      const { dbCtCveNonceStore } = await import('./db-nonce-store.ts')
+      return dbCtCveNonceStore.remember(tokenId, nonce, expiresAt, now)
+    },
+  }
+  return defaultNonceStore
+}
+
+export const ctCveNonceStore: CtCveNonceStore = {
+  remember(tokenId, nonce, expiresAt, now) {
+    return getDefaultCtCveNonceStore().remember(tokenId, nonce, expiresAt, now)
+  },
+}
 
 export async function verifyCtCveServiceRequest(options: {
   method: string
@@ -241,4 +257,3 @@ export function parseCtCveServiceTokens(input: string | undefined): CtCveService
 export function getConfiguredCtCveServiceTokens(): CtCveServiceToken[] {
   return parseCtCveServiceTokens(process.env.CT_CVE_SERVICE_TOKENS)
 }
-

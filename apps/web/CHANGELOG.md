@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.105.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.105.0...web/v0.105.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **security:** scope host checks to tenant ([#1059](https://github.com/carrtech-dev/ct-ops/issues/1059)) ([c137203](https://github.com/carrtech-dev/ct-ops/commit/c137203ebec8acfc36156f50cf3587896ac3b845))
+
 ## [0.105.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.104.0...web/v0.105.0) (2026-05-05)
 
 

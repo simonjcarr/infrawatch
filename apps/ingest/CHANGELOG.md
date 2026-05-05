@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.7](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.6...ingest/v0.8.7) (2026-05-05)
+
+
+### Bug Fixes
+
+* **security:** scope host checks to tenant ([#1059](https://github.com/carrtech-dev/ct-ops/issues/1059)) ([c137203](https://github.com/carrtech-dev/ct-ops/commit/c137203ebec8acfc36156f50cf3587896ac3b845))
+
 ## [0.8.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.5...ingest/v0.8.6) (2026-05-05)
 
 

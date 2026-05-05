@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.3...web/v0.103.4) (2026-05-05)
+
+
+### Bug Fixes
+
+* **authz:** restrict host task execution ([#954](https://github.com/carrtech-dev/ct-ops/issues/954)) ([8c2442a](https://github.com/carrtech-dev/ct-ops/commit/8c2442a33d31b1f6f812a5e32ebc205cb8b72ec2))
+
 ## [0.103.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.2...web/v0.103.3) (2026-05-04)
 
 

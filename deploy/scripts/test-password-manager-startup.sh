@@ -65,13 +65,20 @@ assert_file_mode_600() {
 assert_ed25519_pair_matches() {
   local public_key="$1"
   local private_key="$2"
-  local tmpdir private_der derived_public
+  local tmpdir private_der public_der public_key_bytes derived_public
 
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "'"$tmpdir"'"' RETURN
   private_der="${tmpdir}/private.der"
+  public_der="${tmpdir}/public.der"
   printf '%s' "$private_key" | openssl base64 -d -A > "$private_der"
-  derived_public="$(openssl pkey -inform DER -in "$private_der" -pubout -outform DER | base64 | tr -d '\n')"
+  printf '%s' "$public_key" | openssl base64 -d -A > "$public_der"
+  public_key_bytes="$(wc -c < "$public_der" | tr -d ' ')"
+  if [ "$public_key_bytes" != "32" ]; then
+    echo "expected generated public key to decode to 32 raw bytes, got ${public_key_bytes}" >&2
+    exit 1
+  fi
+  derived_public="$(openssl pkey -inform DER -in "$private_der" -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')"
 
   if [ "$derived_public" != "$public_key" ]; then
     echo "generated public key does not match generated private key" >&2

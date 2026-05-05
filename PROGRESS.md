@@ -15,6 +15,27 @@
 
 ## What Has Been Built
 
+### Session 108 — Password Manager release bundle pinning
+
+**Customer bundle Password Manager pinning** (`deploy/customer-bundle/upgrade.sh`, `deploy/customer-bundle/README.md`, `.github/workflows/customer-bundle-check.yml`, `.github/workflows/agent-release.yml`, `deploy/scripts/test-upgrade.sh`)
+- Stamped `PASSWORD_MANAGER_API_IMAGE` into staged customer bundles from
+  `deploy/password-manager-release.json` so online and air-gapped installs both
+  render against the reviewed Password Manager API digest instead of relying on
+  a floating operator edit.
+- Extended `upgrade.sh` so existing installs refresh the release-pinned
+  Password Manager API image reference alongside `WEB_IMAGE` and `INGEST_IMAGE`
+  while still preserving explicit custom overrides in `.env`.
+- Tightened bundle documentation to call out that Password Manager starts by
+  default, that its API image pin is refreshed during upgrades, and that
+  operators must include `password_manager_db_data`, `.env`, and
+  `password-manager-release.json` in backup/restore procedures.
+
+**Validation**
+- `bash deploy/scripts/test-upgrade.sh` (still fails on the current base with `tar: Write error`, tracked in [carrtech-dev/ct-ops#1033](https://github.com/carrtech-dev/ct-ops/issues/1033))
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash -n deploy/customer-bundle/upgrade.sh`
+- `git diff --check`
+
 ### Session 107 — Password Manager startup bootstrap
 
 **First-run Password Manager config** (`start.sh`, `deploy/customer-bundle/start.sh`, `docker-compose.single.yml`, `.env.example`, `deploy/customer-bundle/generate_support_data`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-startup.sh`, `deploy/scripts/test-support-data.sh`)

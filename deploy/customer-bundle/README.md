@@ -44,9 +44,11 @@ This will:
 1. Generate `BETTER_AUTH_SECRET` if it is still blank
 2. Generate dev TLS certificates under `./deploy/dev-tls/` for the ingest
    service
-3. Pull the release-pinned `web`, `ingest`, and `db` images from GHCR
+3. Pull the release-pinned `web`, `ingest`, `db`, and bundled Password Manager
+   images from GHCR
    (or load `images.tar.gz` if it is present — see *Air-gap installs* below)
-4. Start the stack
+4. Start the CT-Ops stack, including the bundled Password Manager services by
+   default
 5. A one-shot migration container applies database migrations before web and ingest start
 
 Open `https://localhost` (or whatever you set as `BETTER_AUTH_URL`) and
@@ -115,6 +117,10 @@ edit: update the digest, source commit, contract version, and contract checksum
 together only after compatibility validation against the selected Password
 Manager release.
 
+Customer bundles also stamp `PASSWORD_MANAGER_API_IMAGE` to that digest-pinned
+API image by default, and `upgrade.sh` refreshes it automatically unless you
+intentionally override it in `.env`.
+
 ## Backups
 
 ```sh
@@ -126,6 +132,11 @@ the local bundle files, `.env`, TLS material, `licence-keys/current.pem`, and a
 database dump when the `db` container is running. The archive contains secrets;
 store it securely. `upgrade.sh` calls this script automatically before replacing
 release files.
+
+The bundled Password Manager state lives in the dedicated
+`password_manager_db_data` Docker volume, and its deployment pin/configuration
+also live in the backed-up `.env` plus `password-manager-release.json`, so keep
+those together in any host-level backup or restore procedure.
 
 ## Licence verifier key
 
@@ -161,10 +172,11 @@ machine:
 ```
 
 This pulls every image referenced by `docker-compose.yml`, saves them to
-`images.tar.gz`, and writes `ct-ops-single-<version>-airgap.zip` next to
-the bundle directory. Transfer that zip to the air-gapped host, unzip,
-and run `./start.sh` — it detects `images.tar.gz` and loads the images
-locally instead of attempting a GHCR pull.
+`images.tar.gz`, including the bundled Password Manager API and database
+images, and writes `ct-ops-single-<version>-airgap.zip` next to the bundle
+directory. Transfer that zip to the air-gapped host, unzip, and run
+`./start.sh` — it detects `images.tar.gz` and loads the images locally
+instead of attempting a GHCR pull.
 
 To update an air-gapped host, repeat the process: produce a new airgap
 zip on the connected machine and ship it across.
@@ -189,7 +201,8 @@ logs, host information, file metadata, and TLS certificate fingerprints. It
 does not include raw `.env` files, private keys, or database dumps. Review the
 archive before attaching it to a ticket.
 
-Data lives in named Docker volumes (`db_data`, `ingest_data`, `agent_dist`).
+Data lives in named Docker volumes (`db_data`, `password_manager_db_data`,
+`ingest_data`, `agent_dist`).
 
 ## Uninstall
 

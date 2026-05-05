@@ -414,6 +414,13 @@
       "when": 1777986274530,
       "tag": "0058_auth_table_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1777990000000,
+      "tag": "0059_auth_bootstrap_rls",
+      "breakpoints": true
     }
   ]
 }

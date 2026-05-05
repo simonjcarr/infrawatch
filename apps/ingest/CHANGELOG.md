@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.5](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.4...ingest/v0.8.5) (2026-05-05)
+
+
+### Bug Fixes
+
+* **ingest:** reject cross-org agent re-registration ([1b2df29](https://github.com/carrtech-dev/ct-ops/commit/1b2df2900d9a59beab59359eb491bbcbeffaf374))
+
 ## [0.8.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.3...ingest/v0.8.4) (2026-05-04)
 
 

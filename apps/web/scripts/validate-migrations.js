@@ -18,6 +18,7 @@ const JOURNAL_PATH = path.resolve(
   __dirname,
   '../lib/db/migrations/meta/_journal.json'
 )
+const SNAPSHOT_DIR = path.dirname(JOURNAL_PATH)
 
 function validate() {
   if (!fs.existsSync(JOURNAL_PATH)) {
@@ -48,11 +49,26 @@ function validate() {
     }
   }
 
+  const latest = entries[entries.length - 1]
+  const latestPrefix = String(latest.idx).padStart(4, '0')
+  const latestSnapshotPath = path.join(
+    SNAPSHOT_DIR,
+    `${latestPrefix}_snapshot.json`
+  )
+
+  if (!fs.existsSync(latestSnapshotPath)) {
+    errors.push(
+      `Latest migration ${latest.idx} "${latest.tag}" has no matching ` +
+        `${latestPrefix}_snapshot.json. Drizzle may re-emit already-applied ` +
+        'schema changes as drift.'
+    )
+  }
+
   if (errors.length > 0) {
     console.error('Migration journal validation FAILED:\n')
     errors.forEach((e) => console.error(`  - ${e}`))
     console.error(
-      '\nFix: update the "when" field in _journal.json so timestamps are strictly increasing.'
+      '\nFix: ensure journal timestamps are strictly increasing and the latest migration has a matching snapshot.'
     )
     process.exit(1)
   }

@@ -46,6 +46,18 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
       await migrationClient.unsafe('GRANT USAGE ON SCHEMA public TO app_user')
       await migrationClient.unsafe('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_user')
       await migrationClient.unsafe('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_user')
+      await migrationClient.unsafe(`
+        INSERT INTO organisations (id, name, slug)
+        VALUES
+          ('org-a', 'Org A', 'org-a'),
+          ('org-b', 'Org B', 'org-b')
+      `)
+      await migrationClient.unsafe(`
+        INSERT INTO tags (id, organisation_id, key, value, usage_count)
+        VALUES
+          ('tag-a', 'org-a', 'env', 'prod', 1),
+          ('tag-b', 'org-b', 'env', 'dev', 1)
+      `)
     } finally {
       await migrationClient.end()
     }
@@ -57,20 +69,24 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
       import(pathToFileURL(path.join(webDir, 'lib', 'db', 'schema', 'index.ts')).href),
     ])
 
-    await db.insert(schema.organisations).values([
-      { id: 'org-a', name: 'Org A', slug: 'org-a' },
-      { id: 'org-b', name: 'Org B', slug: 'org-b' },
-    ])
-
-    await db.insert(schema.tags).values([
-      { id: 'tag-a', organisationId: 'org-a', key: 'env', value: 'prod', usageCount: 1 },
-      { id: 'tag-b', organisationId: 'org-b', key: 'env', value: 'dev', usageCount: 1 },
-    ])
-
-    const allRows = await db.query.tags.findMany({
+    const unscopedRows = await db.query.tags.findMany({
       orderBy: [asc(schema.tags.id)],
     })
-    assert.deepEqual(allRows.map((row) => row.id), ['tag-a', 'tag-b'])
+    assert.deepEqual(unscopedRows.map((row) => row.id), [])
+
+    await assert.rejects(
+      db.insert(schema.tags).values({
+        id: 'tag-unscoped',
+        organisationId: 'org-a',
+        key: 'team',
+        value: 'ops',
+        usageCount: 0,
+      }),
+      (error) => {
+        assert.match(error.message, /Failed query: insert into "tags"/)
+        return true
+      },
+    )
 
     const orgRows = await withOrgDatabaseScope('org-a', async (scopedDb) =>
       scopedDb.query.tags.findMany({

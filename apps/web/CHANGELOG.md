@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.107.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.106.0...web/v0.107.0) (2026-05-05)
+
+
+### Features
+
+* **web:** add password manager unlock flow ([#1064](https://github.com/carrtech-dev/ct-ops/issues/1064)) ([d697339](https://github.com/carrtech-dev/ct-ops/commit/d6973397babf346ff758f1b3aa8ed52bb0f77aad))
+
+
+### Bug Fixes
+
+* **authz:** require write access for tenant mutations ([1f2d660](https://github.com/carrtech-dev/ct-ops/commit/1f2d6606344d340a54ffd3ea98dbc8aa1d5cd1af))
+
 ## [0.106.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.105.1...web/v0.106.0) (2026-05-05)
 
 

@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -105,7 +105,7 @@ export async function createCheck(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const parsed = createCheckSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -145,7 +145,7 @@ export async function updateCheck(
   checkId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const parsed = updateCheckSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -179,7 +179,7 @@ export async function deleteCheckHistory(
   orgId: string,
   checkId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const existing = await db.query.checks.findFirst({
     where: and(
       eq(checks.id, checkId),
@@ -198,7 +198,7 @@ export async function deleteCheck(
   orgId: string,
   checkId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const existing = await db.query.checks.findFirst({
     where: and(
       eq(checks.id, checkId),

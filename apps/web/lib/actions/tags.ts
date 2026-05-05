@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -120,7 +120,7 @@ export async function assignTagsToResource(
   resourceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
@@ -157,7 +157,7 @@ export async function removeTagFromResource(
   orgId: string,
   resourceTagId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const row = await db.query.resourceTags.findFirst({
       where: and(eq(resourceTags.id, resourceTagId), eq(resourceTags.organisationId, orgId)),
@@ -186,7 +186,7 @@ export async function replaceResourceTags(
   resourceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
@@ -299,7 +299,7 @@ export async function updateOrgDefaultTags(
   orgId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }

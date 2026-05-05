@@ -43,7 +43,7 @@ test('alert mutations derive audit actors from the authenticated session', () =>
     )
     assert.match(
       segment,
-      /const session = await requireOrgAccess\(orgId\)/,
+      /const session = await requireOrg(?:Access|WriteAccess)\(orgId\)/,
       `${action} must capture the authenticated session`,
     )
     assert.match(

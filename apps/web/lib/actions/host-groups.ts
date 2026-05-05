@@ -1,13 +1,13 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { hostGroups, hostGroupMembers, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, sql } from 'drizzle-orm'
-import type { HostGroup, HostGroupMember } from '@/lib/db/schema'
+import type { HostGroup } from '@/lib/db/schema'
 import type { Host } from '@/lib/db/schema'
 
 export type HostGroupWithCount = HostGroup & { hostCount: number }
@@ -24,7 +24,7 @@ export async function createGroup(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; group: HostGroup } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const parsed = groupSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -52,7 +52,7 @@ export async function updateGroup(
   groupId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   const parsed = groupSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -76,7 +76,7 @@ export async function deleteGroup(
   orgId: string,
   groupId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     // Soft-delete the group
     const result = await db
@@ -140,7 +140,7 @@ export async function addHostToGroup(
   groupId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     // Check if already a member (including soft-deleted — restore if so)
     const existing = await db.query.hostGroupMembers.findFirst({
@@ -178,7 +178,7 @@ export async function removeHostFromGroup(
   groupId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgWriteAccess(orgId)
   try {
     const result = await db
       .update(hostGroupMembers)

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.109.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.108.0...web/v0.109.0) (2026-05-05)
+
+
+### Features
+
+* **password-manager:** add sharing and rotation workspace ([#1072](https://github.com/carrtech-dev/ct-ops/issues/1072)) ([f467941](https://github.com/carrtech-dev/ct-ops/commit/f467941a0d0871a00ad1db102b6a8e4673d2c59e))
+
 ## [0.108.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.107.0...web/v0.108.0) (2026-05-05)
 
 

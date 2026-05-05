@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { createHmac } from 'crypto'
@@ -493,7 +493,7 @@ export type NotificationChannelSafe = Omit<NotificationChannel, 'config' | 'type
         toAddresses: string[]
       }
     }
-  | { type: 'slack'; config: { webhookUrl: string } }
+  | { type: 'slack'; config: { hasWebhookUrl: boolean } }
   | { type: 'telegram'; config: { chatId: string; hasBotToken: boolean } }
 )
 
@@ -534,7 +534,7 @@ export async function getNotificationChannels(orgId: string): Promise<Notificati
       return {
         ...ch,
         type: 'slack' as const,
-        config: { webhookUrl: cfg.webhookUrl },
+        config: { hasWebhookUrl: !!(cfg.webhookUrl) },
       }
     }
     if (ch.type === 'telegram') {
@@ -561,8 +561,7 @@ export async function createNotificationChannel(
   orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
+  const session = await requireOrgAdminAccess(orgId)
   const parsed = createNotificationChannelSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -605,8 +604,7 @@ export async function deleteNotificationChannel(
   orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
+  const session = await requireOrgAdminAccess(orgId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
@@ -652,7 +650,10 @@ const updateSmtpChannelSchema = z.object({
 
 const updateSlackChannelSchema = z.object({
   name: z.string().min(1).max(100),
-  webhookUrl: httpsUrl,
+  webhookUrl: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    httpsUrl.optional(),
+  ),
 })
 
 const updateTelegramChannelSchema = z.object({
@@ -666,8 +667,7 @@ export async function updateNotificationChannel(
   channelId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const session = await getRequiredSession()
+  const session = await requireOrgAdminAccess(orgId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
@@ -713,7 +713,8 @@ export async function updateNotificationChannel(
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
       const { name, webhookUrl } = parsed.data
       nextName = name
-      const newConfig: SlackChannelConfig = { webhookUrl }
+      const existingConfig = existing.config as SlackChannelConfig
+      const newConfig: SlackChannelConfig = { webhookUrl: webhookUrl || existingConfig.webhookUrl }
       await validateStoredNotificationChannelConfig(existing.type, newConfig)
       await db
         .update(notificationChannels)
@@ -760,7 +761,7 @@ export async function sendTestNotification(
   orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireOrgAdminAccess(orgId)
   if (!await testNotificationLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before sending another test notification.' }
   }

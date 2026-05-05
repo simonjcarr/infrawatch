@@ -558,6 +558,15 @@ const slackFormSchema = z.object({
 
 type SlackFormValues = z.infer<typeof slackFormSchema>
 
+const editSlackFormSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  webhookUrl: z.string().trim().refine((value) => value === '' || z.string().url().safeParse(value).success, {
+    message: 'Must be a valid URL',
+  }),
+})
+
+type EditSlackFormValues = z.infer<typeof editSlackFormSchema>
+
 function AddSlackDialog({
   orgId,
   open,
@@ -645,13 +654,13 @@ function EditSlackDialog({
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<SlackFormValues>({ resolver: zodResolver(slackFormSchema) })
+  } = useForm<EditSlackFormValues>({ resolver: zodResolver(editSlackFormSchema) })
 
   useEffect(() => {
-    if (open) reset({ name: channel.name, webhookUrl: channel.config.webhookUrl })
+    if (open) reset({ name: channel.name, webhookUrl: '' })
   }, [open, channel, reset])
 
-  async function onSubmit(values: SlackFormValues) {
+  async function onSubmit(values: EditSlackFormValues) {
     const result = await updateNotificationChannel(orgId, channel.id, {
       name: values.name,
       webhookUrl: values.webhookUrl,
@@ -675,7 +684,12 @@ function EditSlackDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-slack-url">Incoming Webhook URL</Label>
-            <Input id="edit-slack-url" type="url" {...register('webhookUrl')} />
+            <Input
+              id="edit-slack-url"
+              type="url"
+              placeholder={channel.config.hasWebhookUrl ? 'Leave blank to keep existing URL' : 'https://hooks.slack.com/services/...'}
+              {...register('webhookUrl')}
+            />
             {errors.webhookUrl && <p className="text-sm text-red-600">{errors.webhookUrl.message}</p>}
           </div>
           <DialogFooter>
@@ -1549,7 +1563,7 @@ export function AlertsClient({
                           {ch.config.toAddresses.join(', ')}
                         </span>
                       ) : ch.type === 'slack' ? (
-                        <span className="font-mono truncate block max-w-xs">{ch.config.webhookUrl}</span>
+                        <span>{ch.config.hasWebhookUrl ? 'Webhook URL configured' : 'Webhook URL missing'}</span>
                       ) : ch.type === 'telegram' ? (
                         <span>Chat ID: {ch.config.chatId}</span>
                       ) : (

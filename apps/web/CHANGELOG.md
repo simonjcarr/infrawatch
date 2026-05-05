@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.17](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.16...web/v0.103.17) (2026-05-05)
+
+
+### Bug Fixes
+
+* **auth:** allow Better Auth bootstrap under RLS ([ac3cbd7](https://github.com/carrtech-dev/ct-ops/commit/ac3cbd7ced75bb1383de2f150f6249e02987bfaa)), closes [#1029](https://github.com/carrtech-dev/ct-ops/issues/1029)
+
 ## [0.103.16](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.15...web/v0.103.16) (2026-05-05)
 
 

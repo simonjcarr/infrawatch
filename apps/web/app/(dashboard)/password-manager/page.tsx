@@ -13,6 +13,7 @@ export default async function PasswordManagerPage() {
   if (!canAccessTooling(session.user)) redirect('/dashboard')
 
   const orgId = session.user.organisationId!
+  const currentUserId = session.user.id
 
-  return <PasswordManagerClientShell key={orgId} orgId={orgId} />
+  return <PasswordManagerClientShell key={orgId} orgId={orgId} currentUserId={currentUserId} />
 }

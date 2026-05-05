@@ -10,6 +10,7 @@ import {
   decryptUserPrivateKeyEnvelope,
   exportPublicKeyEnvelope,
   generateVaultKey,
+  importPublicKeyEnvelope,
   unwrapVaultKeyEnvelope,
   wrapVaultKeyForMember,
 } from './browser-crypto.ts'
@@ -101,4 +102,46 @@ test('exportPublicKeyEnvelope returns a portable encrypted member key target', a
   assert.equal(publicKeyEnvelope.algorithm, 'rsa-oaep-256')
   assert.equal(typeof publicKeyEnvelope.public_key_spki_b64, 'string')
   assert.equal(publicKeyEnvelope.public_key_spki_b64.length > 0, true)
+})
+
+test('importPublicKeyEnvelope rehydrates a wrapped-key target for member sharing', async () => {
+  const recipient = await createUnlockProfile('recipient password')
+  const recipientKeys = await decryptUserPrivateKeyEnvelope({
+    unlockPassword: 'recipient password',
+    encryptedPrivateKeyEnvelope: recipient.encryptedPrivateKeyEnvelope,
+    kdfMetadata: recipient.kdfMetadata,
+  })
+
+  const recipientEnvelope = await exportPublicKeyEnvelope(recipient.publicKey)
+  const importedRecipientPublicKey = await importPublicKeyEnvelope(recipientEnvelope)
+  const vaultKey = await generateVaultKey()
+  const wrappedVaultKeyEnvelope = await wrapVaultKeyForMember(vaultKey, importedRecipientPublicKey)
+  const unwrappedVaultKey = await unwrapVaultKeyEnvelope(wrappedVaultKeyEnvelope, recipientKeys.privateKey)
+  const encryptedPayload = await createEncryptedEntryPayload(
+    {
+      title: 'Shared SSH key',
+      username: 'ubuntu',
+      password: 'not-plaintext-over-the-wire',
+    },
+    unwrappedVaultKey,
+  )
+  const decryptedPayload = await decryptEntryPayload(encryptedPayload, unwrappedVaultKey)
+
+  assert.deepEqual(decryptedPayload, {
+    title: 'Shared SSH key',
+    username: 'ubuntu',
+    password: 'not-plaintext-over-the-wire',
+  })
+})
+
+test('importPublicKeyEnvelope rejects malformed member key envelopes', async () => {
+  await assert.rejects(
+    () => importPublicKeyEnvelope({ version: 1, algorithm: 'rsa-oaep-256', public_key_spki_b64: '' }),
+    /public_key_spki_b64/i,
+  )
+
+  await assert.rejects(
+    () => importPublicKeyEnvelope({ version: 2, algorithm: 'rsa-oaep-256', public_key_spki_b64: 'abcd' }),
+    /version/i,
+  )
 })

@@ -339,14 +339,15 @@ if ! $LOCAL; then
   # checkout to build from. To run a locally-built image instead, set
   # WEB_IMAGE / INGEST_IMAGE in your environment (or .env) before invoking this
   # script, or run `docker compose -f docker-compose.single.yml build` manually.
-  docker compose -f docker-compose.single.yml pull db web ingest
+  docker compose -f docker-compose.single.yml pull db password-manager-db password-manager-migrate password-manager-api web migrate ingest nginx tls-init
   docker compose -f docker-compose.single.yml down
+  echo "Running database migrations..."
+  docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate
+  docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate
   docker compose -f docker-compose.single.yml up -d --pull always
 
-  # Database migrations are applied automatically by the web container on
-  # startup (its CMD runs `node migrate.js && node server.js`), and the
-  # release-please manifest is baked into both web and ingest images at build
-  # time. Nothing else for this script to do.
+  # The release-please manifest is baked into both web and ingest images at
+  # build time. Nothing else for this script to do.
   exit 0
 fi
 

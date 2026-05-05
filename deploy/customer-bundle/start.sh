@@ -559,6 +559,23 @@ start_stack() {
 
   docker compose down --remove-orphans >/dev/null 2>&1 || true
 
+  echo "Running database migrations..."
+  if ! docker compose up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate; then
+    echo "" >&2
+    echo "ERROR: CT-Ops database migrations failed." >&2
+    echo "Recent migration logs:" >&2
+    docker compose logs --tail 50 migrate db || true
+    exit 1
+  fi
+
+  if ! docker compose up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate; then
+    echo "" >&2
+    echo "ERROR: Password Manager database migrations failed." >&2
+    echo "Recent migration logs:" >&2
+    docker compose logs --tail 50 password-manager-migrate password-manager-db || true
+    exit 1
+  fi
+
   echo "Starting CT-Ops..."
   if ! docker compose up -d; then
     echo "" >&2

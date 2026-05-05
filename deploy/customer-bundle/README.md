@@ -108,6 +108,13 @@ For air-gapped hosts, copy the new air-gap zip to the server and run:
 Do not edit only one image reference. `web` and `ingest` are released as a
 matched pair in each bundle.
 
+The bundle also ships `password-manager-release.json`, which pins the reviewed
+CT Password Manager API release metadata CT-Ops is expected to integrate
+against. Bumping that descriptor is a CT-Ops pull request, not an operator-side
+edit: update the digest, source commit, contract version, and contract checksum
+together only after compatibility validation against the selected Password
+Manager release.
+
 ## Backups
 
 ```sh

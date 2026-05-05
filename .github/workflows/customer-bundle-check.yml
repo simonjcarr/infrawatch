@@ -6,6 +6,8 @@ on:
       - ".github/workflows/agent-release.yml"
       - ".github/workflows/customer-bundle-check.yml"
       - "deploy/customer-bundle/**"
+      - "deploy/password-manager-release.json"
+      - "deploy/scripts/validate-password-manager-release.py"
       - "deploy/scripts/test-install.sh"
       - "deploy/scripts/test-start.sh"
       - "deploy/scripts/test-web-entrypoint.sh"
@@ -31,10 +33,12 @@ jobs:
           WEB_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/web@sha256:1111111111111111111111111111111111111111111111111111111111111111"
           INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@sha256:2222222222222222222222222222222222222222222222222222222222222222"
           export WEB_IMAGE_REF INGEST_IMAGE_REF
+          python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml dist/ct-ops/docker-compose.yml
           cp .env.example dist/ct-ops/.env.example
           cp deploy/customer-bundle/README.md dist/ct-ops/README.md
+          cp deploy/password-manager-release.json dist/ct-ops/password-manager-release.json
           cp deploy/customer-bundle/start.sh dist/ct-ops/start.sh
           cp deploy/customer-bundle/backup.sh dist/ct-ops/backup.sh
           cp deploy/customer-bundle/build-offline-installer.sh dist/ct-ops/build-offline-installer.sh
@@ -55,11 +59,13 @@ jobs:
           test -f docker-compose.yml
           test -f deploy/nginx/nginx.conf
           test -f .env.example
+          test -f password-manager-release.json
           test -f licence-keys/current.pem
           test -x backup.sh
           test -x refresh_licence_key
           test -x upgrade.sh
           test -x generate_support_data
+          python3 ../../deploy/scripts/validate-password-manager-release.py password-manager-release.json
           bash -n start.sh
           bash -n backup.sh
           bash -n build-offline-installer.sh

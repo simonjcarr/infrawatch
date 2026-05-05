@@ -142,6 +142,13 @@ docker compose -f docker-compose.single.yml up -d
 
 Migrations run automatically on container start. Release bundles ship with digest-pinned `WEB_IMAGE` and `INGEST_IMAGE` values in `.env.example`; when a new CT-Ops release is published, update both values to the new release digests before pulling.
 
+Password Manager compatibility is tracked separately in
+`deploy/password-manager-release.json`. That descriptor records the reviewed CT
+Password Manager API digest, source commit, contract version, and contract
+checksum that the current CT-Ops line is expected to integrate with. Bump it in
+the same CT-Ops pull request that validates compatibility against the selected
+Password Manager release; do not treat it as an operator override.
+
 ---
 
 ## Backups

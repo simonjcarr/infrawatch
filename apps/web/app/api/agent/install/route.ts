@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildAgentInstallScript } from '@/lib/agent/install-script'
+import { buildAgentInstallScript, validateAgentIngestAddress } from '@/lib/agent/install-script'
 import { getAgentPublicOrigin } from '@/lib/agent/public-origin'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
@@ -41,7 +41,15 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const bareHost = new URL(serverURL).hostname
-  const ingestAddress = searchParams.get('ingest') ?? `${bareHost}:9443`
+  let ingestAddress: string
+  try {
+    ingestAddress = validateAgentIngestAddress(searchParams.get('ingest') ?? `${bareHost}:9443`)
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid agent ingest address. Use host:port with a port from 1 to 65535.' },
+      { status: 400 },
+    )
+  }
   const skipVerify = searchParams.get('skip_verify') === 'true'
   const script = buildAgentInstallScript(serverURL, ingestAddress, skipVerify)
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.5...web/v0.103.6) (2026-05-05)
+
+
+### Bug Fixes
+
+* **alerts:** redact Slack webhook URLs ([046a74e](https://github.com/carrtech-dev/ct-ops/commit/046a74e9009fc43f19a61c5615b0df992f0e35a6))
+
 ## [0.103.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.4...web/v0.103.5) (2026-05-05)
 
 

@@ -89,6 +89,23 @@ assert_ed25519_pair_matches() {
   fi
 }
 
+generate_legacy_spki_keypair() {
+  local tmpdir private_pem private_der private_key legacy_public_key raw_public_key
+
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "'"$tmpdir"'"' RETURN
+  private_pem="${tmpdir}/private.pem"
+  private_der="${tmpdir}/private.der"
+
+  openssl genpkey -algorithm ED25519 -out "$private_pem" >/dev/null 2>&1
+  openssl pkey -in "$private_pem" -outform DER -out "$private_der" >/dev/null 2>&1
+  private_key="$(base64 < "$private_der" | tr -d '\n')"
+  legacy_public_key="$(openssl pkey -in "$private_pem" -pubout -outform DER | base64 | tr -d '\n')"
+  raw_public_key="$(openssl pkey -in "$private_pem" -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')"
+
+  printf '%s\n%s\n%s\n' "$private_key" "$legacy_public_key" "$raw_public_key"
+}
+
 assert_password_manager_bootstrap() {
   local env_file="$1"
   local expected_issuer="$2"
@@ -121,6 +138,55 @@ assert_password_manager_bootstrap() {
 
   assert_ed25519_pair_matches "$public_key" "$private_key"
   assert_file_mode_600 "$env_file"
+}
+
+run_bundle_start_repairs_legacy_public_key_test() {
+  local tmpdir mockbin bundle_dir docker_log keypair private_key legacy_public_key raw_public_key
+
+  tmpdir="$(mktemp -d)"
+  trap 'chmod -R u+w "'"$tmpdir"'" 2>/dev/null || true; rm -rf "'"$tmpdir"'"' RETURN
+  mockbin="${tmpdir}/mockbin"
+  bundle_dir="${tmpdir}/bundle"
+  docker_log="${tmpdir}/docker.log"
+  mkdir -p "$mockbin" "$bundle_dir/deploy/nginx" "$bundle_dir/deploy/dev-tls" "$bundle_dir/deploy/tls"
+  make_mock_docker "$mockbin"
+
+  keypair="$(generate_legacy_spki_keypair)"
+  private_key="$(printf '%s\n' "$keypair" | sed -n '1p')"
+  legacy_public_key="$(printf '%s\n' "$keypair" | sed -n '2p')"
+  raw_public_key="$(printf '%s\n' "$keypair" | sed -n '3p')"
+
+  cp "$BUNDLE_START_SCRIPT" "$bundle_dir/start.sh"
+  printf 'services: {}\n' > "$bundle_dir/docker-compose.yml"
+  printf 'events {}\nhttp { server { listen 443 ssl; } }\n' > "$bundle_dir/deploy/nginx/nginx.conf"
+  cat > "$bundle_dir/.env" <<EOF
+BETTER_AUTH_URL=https://ct-ops.example.test
+BETTER_AUTH_TRUSTED_ORIGINS=https://ct-ops.example.test
+BETTER_AUTH_SECRET=test-auth-secret
+POSTGRES_PASSWORD=test-postgres-password
+PASSWORD_MANAGER_DB_PASSWORD=pm-db-password
+CT_OPS_INSTANCE_ID=ct-ops-existing
+PASSWORD_MANAGER_CT_OPS_ISSUER=https://ct-ops.example.test
+PASSWORD_MANAGER_CT_OPS_AUDIENCE=ct-password-manager
+PASSWORD_MANAGER_CT_OPS_PRODUCT=ct-password-manager
+PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY=${legacy_public_key}
+PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=${private_key}
+PASSWORD_MANAGER_TRUSTED_ORIGINS=https://ct-ops.example.test
+PASSWORD_MANAGER_SESSION_COOKIE_SECURE=true
+EOF
+
+  (
+    cd "$bundle_dir" &&
+      PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" MOCK_DOCKER_LOG="$docker_log" ./start.sh >/dev/null 2>&1
+  )
+
+  [ "$(assert_env_value "$bundle_dir/.env" PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY)" = "$private_key" ]
+  [ "$(assert_env_value "$bundle_dir/.env" PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY)" = "$raw_public_key" ]
+  assert_password_manager_bootstrap \
+    "$bundle_dir/.env" \
+    "https://ct-ops.example.test" \
+    "https://ct-ops.example.test" \
+    "true"
 }
 
 run_root_start_bootstrap_test() {
@@ -214,6 +280,7 @@ EOF
 main() {
   run_root_start_bootstrap_test
   run_bundle_start_bootstrap_test
+  run_bundle_start_repairs_legacy_public_key_test
   echo "password manager startup bootstrap tests passed"
 }
 

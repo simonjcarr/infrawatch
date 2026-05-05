@@ -191,8 +191,66 @@ EOF
   printf '%s\n%s\n' "$private_key" "$public_key"
 }
 
+derive_password_manager_launch_public_key() {
+  local private_key="$1"
+  local tmpdir private_der public_der public_key python_bin node_bin
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/ct-ops-pm-launch-key.XXXXXX")"
+  private_der="${tmpdir}/private.der"
+  public_der="${tmpdir}/public.der"
+
+  if ! printf '%s' "$private_key" | openssl base64 -d -A > "$private_der" 2>/dev/null; then
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  if openssl pkey -inform DER -in "$private_der" -pubout -outform DER 2>/dev/null | tail -c 32 > "$public_der"; then
+    public_key="$(base64 < "$public_der" | tr -d '\n')"
+    rm -rf "$tmpdir"
+    printf '%s\n' "$public_key"
+    return 0
+  fi
+
+  if python_bin="$(find_python_for_ed25519)" && CT_PM_PRIVATE_KEY="$private_key" "$python_bin" - <<'EOF' 2>/dev/null
+import base64
+import os
+from cryptography.hazmat.primitives import serialization
+
+private_key = serialization.load_der_private_key(
+    base64.b64decode(os.environ["CT_PM_PRIVATE_KEY"]),
+    password=None,
+)
+print(base64.b64encode(private_key.public_key().public_bytes(
+    encoding=serialization.Encoding.Raw,
+    format=serialization.PublicFormat.Raw,
+)).decode("ascii"))
+EOF
+  then
+    rm -rf "$tmpdir"
+    return 0
+  fi
+
+  if node_bin="$(find_optional_command node)"; then
+    CT_PM_PRIVATE_KEY="$private_key" "$node_bin" - <<'EOF'
+const { createPrivateKey, createPublicKey } = require('node:crypto')
+
+const privateKey = createPrivateKey({
+  key: Buffer.from(process.env.CT_PM_PRIVATE_KEY, 'base64'),
+  format: 'der',
+  type: 'pkcs8',
+})
+process.stdout.write(createPublicKey(privateKey).export({ format: 'der', type: 'spki' }).subarray(-32).toString('base64') + '\n')
+EOF
+    rm -rf "$tmpdir"
+    return 0
+  fi
+
+  rm -rf "$tmpdir"
+  return 1
+}
+
 ensure_password_manager_bootstrap() {
-  local issuer trusted_origins cookie_secure instance_id generated_private_key generated_public_key keypair_output
+  local issuer trusted_origins cookie_secure instance_id generated_private_key generated_public_key keypair_output repaired_public_key
 
   if [ -z "${PASSWORD_MANAGER_DB_PASSWORD:-}" ]; then
     require_openssl "generate PASSWORD_MANAGER_DB_PASSWORD on first run"
@@ -236,6 +294,22 @@ ensure_password_manager_bootstrap() {
     esac
     upsert_env_var "PASSWORD_MANAGER_SESSION_COOKIE_SECURE" "$cookie_secure"
     echo "Set PASSWORD_MANAGER_SESSION_COOKIE_SECURE in .env."
+  fi
+
+  if [ -n "${PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY:-}" ]; then
+    if repaired_public_key="$(derive_password_manager_launch_public_key "$PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY")"; then
+      if [ "${PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY:-}" != "$repaired_public_key" ]; then
+        upsert_env_var "PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY" "$repaired_public_key"
+        PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY="$repaired_public_key"
+        echo "Repaired Password Manager launch-signing public key in .env."
+      fi
+    else
+      upsert_env_var "PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY" ""
+      upsert_env_var "PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY" ""
+      PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=""
+      PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY=""
+      echo "Discarded invalid Password Manager launch-signing keypair from .env."
+    fi
   fi
 
   if [ -z "${PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY:-}" ] || [ -z "${PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY:-}" ]; then

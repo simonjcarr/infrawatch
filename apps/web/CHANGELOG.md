@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.7...web/v0.103.8) (2026-05-05)
+
+
+### Bug Fixes
+
+* **db:** add licence verifier migration snapshot ([#966](https://github.com/carrtech-dev/ct-ops/issues/966)) ([aee2b9d](https://github.com/carrtech-dev/ct-ops/commit/aee2b9dd6e7359705e2f0dc968ad3c15fb6c9945))
+
 ## [0.103.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.6...web/v0.103.7) (2026-05-05)
 
 

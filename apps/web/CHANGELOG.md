@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.104.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.20...web/v0.104.0) (2026-05-05)
+
+
+### Features
+
+* **web:** add password manager launch assertions ([#1048](https://github.com/carrtech-dev/ct-ops/issues/1048)) ([cfc60dd](https://github.com/carrtech-dev/ct-ops/commit/cfc60dd8eeb2bb6c1ad571858819745ead52b825))
+
 ## [0.103.20](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.19...web/v0.103.20) (2026-05-05)
 
 

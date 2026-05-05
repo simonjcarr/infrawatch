@@ -15,6 +15,29 @@
 
 ## What Has Been Built
 
+### Session 106 — Password Manager nginx routing
+
+**CT-Ops origin routing** (`deploy/nginx/nginx.conf`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-nginx.sh`)
+- Added a dedicated `ct_password_manager_api` nginx upstream pointing at the
+  bundled `password-manager-api` service on the internal compose network.
+- Added `/password-manager-api/` reverse proxy routing that strips only the
+  CT-Ops prefix, preserves Password Manager-owned route suffixes, and clears
+  `Upgrade` and `Connection` headers so normal API traffic cannot smuggle h2c
+  upgrades to the backend.
+- Kept `/password-manager` on the existing CT-Ops web route by leaving the
+  broader `location /` proxy in place and handling only the more-specific API
+  prefix separately.
+- Added a dedicated nginx regression test and wired it into the customer-bundle
+  CI workflow so upstream target, prefix-stripping semantics, and header
+  clearing remain enforced.
+
+**Validation**
+- `bash deploy/scripts/test-password-manager-nginx.sh`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder docker compose -f docker-compose.single.yml config`
+- `bash deploy/scripts/test-start.sh`
+- `git diff --check`
+
 ### Session 105 — Password Manager compose wiring
 
 **Default single-host deployment** (`docker-compose.single.yml`, `deploy/customer-bundle/start.sh`, `.env.example`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-compose.sh`)

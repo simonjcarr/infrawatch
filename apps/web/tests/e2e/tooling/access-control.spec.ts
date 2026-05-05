@@ -22,9 +22,10 @@ test('read-only users cannot access tooling pages or certificate checker API', a
   try {
     await page.goto('/dashboard')
     await expect(page.getByText('Tooling')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Password Manager' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'SSL Certificate Checker' })).toHaveCount(0)
 
-    for (const path of ['/certificate-checker', '/directory-lookup', '/tasks', '/build-docs']) {
+    for (const path of ['/password-manager', '/certificate-checker', '/directory-lookup', '/tasks', '/build-docs']) {
       await page.goto(path)
       await expect(page).toHaveURL(/\/dashboard$/)
     }
@@ -40,6 +41,14 @@ test('read-only users cannot access tooling pages or certificate checker API', a
     })
     expect(response.status()).toBe(403)
     await expect(response.json()).resolves.toMatchObject({ ok: false, error: 'Forbidden' })
+
+    const launchAssertionResponse = await page.request.post(`${baseURL}/api/password-manager/launch-assertion`, {
+      headers: {
+        origin: baseURL!,
+      },
+    })
+    expect(launchAssertionResponse.status()).toBe(403)
+    await expect(launchAssertionResponse.json()).resolves.toMatchObject({ error: 'Forbidden' })
   } finally {
     await sql`UPDATE "user" SET role = 'org_admin', updated_at = NOW() WHERE id = ${userId}`
   }

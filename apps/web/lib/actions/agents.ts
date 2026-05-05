@@ -146,6 +146,22 @@ export async function approveAgent(
         actorId,
         reason: 'Approved by admin',
       })
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: actorId,
+        action: 'agent.approved',
+        targetType: 'agent',
+        targetId: agent.id,
+        summary: `Approved agent ${agent.hostname}`,
+        metadata: {
+          hostname: agent.hostname,
+          previousStatus: agent.status,
+          nextStatus: 'active',
+          agentVersion: agent.version,
+          os: agent.os,
+        },
+      })
     })
 
     // Apply defaults to the associated host (best-effort, outside transaction)
@@ -259,6 +275,23 @@ export async function rejectAgent(
           reason: 'Rejected by admin',
         }).onConflictDoNothing()
       }
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: actorId,
+        action: 'agent.rejected',
+        targetType: 'agent',
+        targetId: agent.id,
+        summary: `Rejected agent ${agent.hostname}`,
+        metadata: {
+          hostname: agent.hostname,
+          previousStatus: agent.status,
+          nextStatus: 'revoked',
+          agentVersion: agent.version,
+          os: agent.os,
+          revokedClientCertificate: Boolean(agent.clientCertSerial),
+        },
+      })
     })
 
     return { success: true }
@@ -590,14 +623,51 @@ export async function revokeEnrolmentToken(
   orgId: string,
   tokenId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  const session = await requireOrgToolingAccess(orgId)
   try {
-    await db
-      .update(agentEnrolmentTokens)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(eq(agentEnrolmentTokens.id, tokenId), eq(agentEnrolmentTokens.organisationId, orgId)),
-      )
+    const token = await db.query.agentEnrolmentTokens.findFirst({
+      where: and(
+        eq(agentEnrolmentTokens.id, tokenId),
+        eq(agentEnrolmentTokens.organisationId, orgId),
+        isNull(agentEnrolmentTokens.deletedAt),
+      ),
+      columns: {
+        id: true,
+        label: true,
+        autoApprove: true,
+        skipVerify: true,
+        maxUses: true,
+        usageCount: true,
+        expiresAt: true,
+      },
+    })
+    if (!token) return { error: 'Enrolment token not found' }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(agentEnrolmentTokens)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(eq(agentEnrolmentTokens.id, tokenId), eq(agentEnrolmentTokens.organisationId, orgId)),
+        )
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'agent.enrolment_token.revoked',
+        targetType: 'agent_enrolment_token',
+        targetId: token.id,
+        summary: `Revoked enrolment token ${token.label}`,
+        metadata: {
+          label: token.label,
+          autoApprove: token.autoApprove,
+          skipVerify: token.skipVerify,
+          maxUses: token.maxUses,
+          usageCount: token.usageCount,
+          expiresAt: token.expiresAt,
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {

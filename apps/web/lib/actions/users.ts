@@ -78,10 +78,28 @@ export async function inviteUser(
     })
     if (removedUser) {
       await assertCanReserveUserSeat(orgId)
-      await db
-        .update(users)
-        .set({ deletedAt: null, isActive: true, role: nextRole, roles: nextRoles, updatedAt: new Date() })
-        .where(eq(users.id, removedUser.id))
+      await db.transaction(async (tx) => {
+        await tx
+          .update(users)
+          .set({ deletedAt: null, isActive: true, role: nextRole, roles: nextRoles, updatedAt: new Date() })
+          .where(eq(users.id, removedUser.id))
+
+        await writeAuditEvent(tx, {
+          organisationId: orgId,
+          actorUserId: session.user.id,
+          action: 'user.restored',
+          targetType: 'user',
+          targetId: removedUser.id,
+          summary: `Restored ${removedUser.email} to the organisation`,
+          metadata: {
+            targetEmail: removedUser.email,
+            previousRole: removedUser.role,
+            previousRoles: normalizeAssignedRoles(removedUser.roles, removedUser.role),
+            nextRole,
+            nextRoles,
+          },
+        })
+      })
       return { restored: true }
     }
 
@@ -114,17 +132,38 @@ export async function inviteUser(
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
 
-    const [invite] = await db
-      .insert(invitations)
-      .values({
-        email: parsed.data.email,
-        role: nextRole,
-        roles: nextRoles,
+    const invite = await db.transaction(async (tx) => {
+      const [createdInvite] = await tx
+        .insert(invitations)
+        .values({
+          email: parsed.data.email,
+          role: nextRole,
+          roles: nextRoles,
+          organisationId: orgId,
+          invitedById: session.user.id,
+          expiresAt,
+        })
+        .returning()
+
+      if (!createdInvite) return null
+
+      await writeAuditEvent(tx, {
         organisationId: orgId,
-        invitedById: session.user.id,
-        expiresAt,
+        actorUserId: session.user.id,
+        action: 'invitation.created',
+        targetType: 'invitation',
+        targetId: createdInvite.id,
+        summary: `Invited ${createdInvite.email} to the organisation`,
+        metadata: {
+          targetEmail: createdInvite.email,
+          role: createdInvite.role,
+          roles: normalizeAssignedRoles(createdInvite.roles, createdInvite.role),
+          expiresAt: createdInvite.expiresAt,
+        },
       })
-      .returning()
+
+      return createdInvite
+    })
 
     if (!invite) return { error: 'Failed to create invitation' }
 
@@ -219,6 +258,14 @@ export async function deactivateUser(
       return { error: 'You cannot deactivate your own account' }
     }
 
+    const targetUser = await db.query.users.findFirst({
+      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      columns: { id: true, email: true, isActive: true, role: true, roles: true },
+    })
+    if (!targetUser) {
+      return { error: 'User not found' }
+    }
+
     const activeSuperAdmins = await db.query.users.findMany({
       where: and(
         eq(users.organisationId, orgId),
@@ -232,12 +279,30 @@ export async function deactivateUser(
       return { error: 'Cannot deactivate the last active super admin' }
     }
 
-    await db
-      .update(users)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
 
-    await db.delete(sessions).where(eq(sessions.userId, targetUserId))
+      await tx.delete(sessions).where(eq(sessions.userId, targetUserId))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'user.deactivated',
+        targetType: 'user',
+        targetId: targetUser.id,
+        summary: `Deactivated ${targetUser.email}`,
+        metadata: {
+          targetEmail: targetUser.email,
+          previousActive: targetUser.isActive,
+          nextActive: false,
+          role: targetUser.role,
+          roles: normalizeAssignedRoles(targetUser.roles, targetUser.role),
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {
@@ -252,11 +317,11 @@ export async function reactivateUser(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
-    await requireOrgAdminAccess(orgId)
+    const session = await requireOrgAdminAccess(orgId)
 
     const targetUser = await db.query.users.findFirst({
       where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
-      columns: { id: true, isActive: true },
+      columns: { id: true, email: true, isActive: true, role: true, roles: true },
     })
     if (!targetUser) {
       return { error: 'User not found' }
@@ -266,10 +331,28 @@ export async function reactivateUser(
       await assertCanReserveUserSeat(orgId)
     }
 
-    await db
-      .update(users)
-      .set({ isActive: true, updatedAt: new Date() })
-      .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ isActive: true, updatedAt: new Date() })
+        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'user.reactivated',
+        targetType: 'user',
+        targetId: targetUser.id,
+        summary: `Reactivated ${targetUser.email}`,
+        metadata: {
+          targetEmail: targetUser.email,
+          previousActive: targetUser.isActive,
+          nextActive: true,
+          role: targetUser.role,
+          roles: normalizeAssignedRoles(targetUser.roles, targetUser.role),
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {
@@ -351,12 +434,37 @@ export async function cancelInvite(
 ): Promise<{ success: true } | { error: string }> {
   await requireOrgAccess(orgId)
   try {
-    await requireOrgAdminAccess(orgId)
+    const session = await requireOrgAdminAccess(orgId)
 
-    await db
-      .update(invitations)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(invitations.id, inviteId), eq(invitations.organisationId, orgId)))
+    const invite = await db.query.invitations.findFirst({
+      where: and(eq(invitations.id, inviteId), eq(invitations.organisationId, orgId), isNull(invitations.deletedAt)),
+      columns: { id: true, email: true, role: true, roles: true, expiresAt: true },
+    })
+    if (!invite) {
+      return { error: 'Invitation not found' }
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(invitations)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(invitations.id, inviteId), eq(invitations.organisationId, orgId)))
+
+      await writeAuditEvent(tx, {
+        organisationId: orgId,
+        actorUserId: session.user.id,
+        action: 'invitation.cancelled',
+        targetType: 'invitation',
+        targetId: invite.id,
+        summary: `Cancelled invitation for ${invite.email}`,
+        metadata: {
+          targetEmail: invite.email,
+          role: invite.role,
+          roles: normalizeAssignedRoles(invite.roles, invite.role),
+          expiresAt: invite.expiresAt,
+        },
+      })
+    })
 
     return { success: true }
   } catch (err) {

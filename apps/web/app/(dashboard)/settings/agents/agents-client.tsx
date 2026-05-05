@@ -129,7 +129,7 @@ export function AgentsSettingsClient({
     defaultValues: {
       label: '',
       autoApprove: false,
-      skipVerify: true,
+      skipVerify: false,
       maxUses: String(DEFAULT_ENROLMENT_TOKEN_MAX_USES),
       expiresInDays: String(DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS),
     },
@@ -426,10 +426,10 @@ export function AgentsSettingsClient({
                 />
                 <div>
                   <Label htmlFor="skipVerify" className="font-normal cursor-pointer">
-                    Accept self-signed certificates
+                    Skip TLS certificate verification
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Enable if your ingest service uses a self-signed or private CA certificate.
+                    Insecure. Only enable for controlled development or break-glass installs.
                   </p>
                 </div>
               </div>
@@ -520,7 +520,7 @@ function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogP
   const [tokenLabel, setTokenLabel] = useState('Install bundle')
   const [expiresInDays, setExpiresInDays] = useState('7')
   const [autoApprove, setAutoApprove] = useState(false)
-  const [skipVerify, setSkipVerify] = useState(true)
+  const [skipVerify, setSkipVerify] = useState(false)
   const [ingestAddress, setIngestAddress] = useState('')
   const [existingTokenId, setExistingTokenId] = useState<string>(activeTokens[0]?.id ?? '')
   const [bundleTags, setBundleTags] = useState<EditorTag[]>([])
@@ -767,9 +767,14 @@ function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogP
                   checked={skipVerify}
                   onChange={(e) => setSkipVerify(e.target.checked)}
                 />
-                <Label htmlFor="bundle-skipverify" className="font-normal cursor-pointer">
-                  Accept self-signed TLS certificates
-                </Label>
+                <div>
+                  <Label htmlFor="bundle-skipverify" className="font-normal cursor-pointer">
+                    Skip TLS certificate verification
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Insecure. Only enable for controlled development or break-glass installs.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -802,7 +807,7 @@ function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogP
                 onChange={(e) => setSkipVerify(e.target.checked)}
               />
               <Label htmlFor="bundle-skipverify-none" className="font-normal cursor-pointer">
-                Write <code>tls_skip_verify = true</code> in the config
+                Write insecure <code>tls_skip_verify = true</code> in the config
               </Label>
             </div>
           )}

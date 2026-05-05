@@ -1,7 +1,7 @@
 import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users, accounts, sessions, ldapConfigurations, verifications } from '@/lib/db/schema'
+import { users, accounts, sessions, ldapConfigurations, verifications, organisations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
@@ -10,6 +10,7 @@ import { createRateLimiter } from '@/lib/rate-limit'
 import { getBetterAuthSecret } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
 import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
+import { normalizeLdapTenantSlug } from '@/lib/auth/ldap-tenant'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 import { SeatAdmissionError, assertUserCanAccessSeat } from '@/lib/seat-admission'
 import {
@@ -52,7 +53,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { username, password } = body as { username?: string; password?: string }
+    const { username, password, organisationSlug } = body as {
+      username?: string
+      password?: string
+      organisationSlug?: string
+    }
+    const tenantSlug = normalizeLdapTenantSlug(organisationSlug)
 
     const authSecret = getBetterAuthSecret()
 
@@ -60,7 +66,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
     }
 
-    const accountStatus = await passwordLoginAttemptGuard.check(username)
+    if (!tenantSlug) {
+      return NextResponse.json({ error: 'Organisation slug is required' }, { status: 400 })
+    }
+
+    const accountKey = `${tenantSlug}:${username}`
+    const accountStatus = await passwordLoginAttemptGuard.check(accountKey)
     if (!accountStatus.allowed) {
       return NextResponse.json(
         { error: 'Too many login attempts — please wait before trying again.' },
@@ -68,9 +79,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find all enabled LDAP configs that allow login
+    const organisation = await db.query.organisations.findFirst({
+      where: and(
+        eq(organisations.slug, tenantSlug),
+        isNull(organisations.deletedAt),
+      ),
+      columns: { id: true },
+    })
+    if (!organisation) {
+      return NextResponse.json({ error: 'LDAP login is not configured for this organisation' }, { status: 400 })
+    }
+
+    // Authenticate only against the tenant explicitly selected by the caller.
     const configs = await db.query.ldapConfigurations.findMany({
       where: and(
+        eq(ldapConfigurations.organisationId, organisation.id),
         eq(ldapConfigurations.enabled, true),
         eq(ldapConfigurations.allowLogin, true),
         isNull(ldapConfigurations.deletedAt),
@@ -78,10 +101,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (configs.length === 0) {
-      return NextResponse.json({ error: 'LDAP login is not configured' }, { status: 400 })
+      return NextResponse.json({ error: 'LDAP login is not configured for this organisation' }, { status: 400 })
     }
 
-    // Try each config until one succeeds
     const errors: string[] = []
     for (const config of configs) {
       const result = await authenticateUser(config, username, password)
@@ -169,7 +191,7 @@ export async function POST(request: NextRequest) {
       if (!user || !user.isActive || user.deletedAt) {
         // Log internally but return the same generic error to avoid leaking account existence.
         console.warn(`[LDAP] Login rejected — account inactive or deleted: userId=${userId}`)
-        await passwordLoginAttemptGuard.recordFailure(username)
+        await passwordLoginAttemptGuard.recordFailure(accountKey)
         return withAuthDelay(
           requestStart,
           NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
@@ -235,12 +257,12 @@ export async function POST(request: NextRequest) {
         `better-auth.session_token=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
       )
 
-      await passwordLoginAttemptGuard.reset(username)
+      await passwordLoginAttemptGuard.reset(accountKey)
       return withAuthDelay(requestStart, response)
     }
 
     logError(`[LDAP] All configs failed for user "${username}":`, errors)
-    await passwordLoginAttemptGuard.recordFailure(username)
+    await passwordLoginAttemptGuard.recordFailure(accountKey)
     return withAuthDelay(
       requestStart,
       NextResponse.json({ error: 'Invalid credentials' }, { status: 401 }),

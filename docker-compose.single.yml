@@ -43,6 +43,7 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://localhost}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-https://localhost}
       REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+      CT_OPS_TRUST_PROXY_HEADERS: ${CT_OPS_TRUST_PROXY_HEADERS:-true}
       NODE_ENV: production
       AGENT_DIST_DIR: /var/lib/ct-ops/agent-dist
       AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL:-https://localhost}

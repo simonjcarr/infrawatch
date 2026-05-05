@@ -12,7 +12,7 @@ test('normalizeVerificationEmail lowercases and trims email input', () => {
   assert.equal(normalizeVerificationEmail(' User@Example.COM '), 'user@example.com')
 })
 
-test('getVerificationResendClientIp prefers the first forwarded address', () => {
+test('getVerificationResendClientIp ignores untrusted forwarded addresses', () => {
   const request = new Request('https://ct-ops.example.com/api/auth/resend-verification-email', {
     headers: {
       'x-forwarded-for': '203.0.113.10, 198.51.100.7',
@@ -20,7 +20,7 @@ test('getVerificationResendClientIp prefers the first forwarded address', () => 
     },
   })
 
-  assert.equal(getVerificationResendClientIp(request), '203.0.113.10')
+  assert.equal(getVerificationResendClientIp(request), 'unknown')
 })
 
 test('sanitizeVerificationCallbackPath only allows local paths', () => {

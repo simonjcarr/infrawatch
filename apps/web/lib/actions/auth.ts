@@ -7,6 +7,7 @@ import { invitations, users } from '@/lib/db/schema'
 import { eq, and, isNull, gt } from 'drizzle-orm'
 import type { Invitation } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 import { getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 
@@ -23,7 +24,7 @@ function normalizeEmail(email: string): string {
 
 async function getClientIp(): Promise<string> {
   const h = await headers()
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? h.get('x-real-ip') ?? 'unknown'
+  return getClientIpFromHeaders(h)
 }
 
 export async function getInviteByToken(token: string): Promise<Invitation | null> {

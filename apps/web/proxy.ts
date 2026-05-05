@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hasBetterAuthSessionCookie } from '@/lib/auth/session-cookie-names'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 
 const AUTH_ROUTES = ['/login', '/register']
 
@@ -50,8 +51,7 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-request-id', requestId)
 
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const ip = getClientIpFromHeaders(request.headers)
 
   // Rate-limit credential-bearing auth endpoints to prevent brute-force attacks.
   if (

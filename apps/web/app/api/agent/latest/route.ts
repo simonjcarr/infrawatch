@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { AGENT_REPO_OWNER, AGENT_REPO_NAME } from '@/lib/agent/repo'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 
 interface GitHubRelease {
   tag_name: string
@@ -31,7 +32,7 @@ const latestRateLimit = createRateLimiter({
 
 export async function GET() {
   const reqHeaders = await headers()
-  const ip = reqHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const ip = getClientIpFromHeaders(reqHeaders)
 
   if (!await latestRateLimit.check(ip)) {
     return NextResponse.json(

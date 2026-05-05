@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildAgentInstallScript } from '@/lib/agent/install-script'
 import { getAgentPublicOrigin } from '@/lib/agent/public-origin'
 import { createRateLimiter } from '@/lib/rate-limit'
+import { getClientIpFromHeaders } from '@/lib/client-ip'
 
 // 30 requests per IP per 60 s — generous for CI/CD pipelines but throttles enumeration/DoS.
 const installRateLimit = createRateLimiter({
@@ -28,10 +29,7 @@ const installRateLimit = createRateLimiter({
  *   skip_verify - Set to "true" to disable TLS certificate verification (for self-signed certs)
  */
 export async function GET(request: NextRequest) {
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown'
+  const ip = getClientIpFromHeaders(request.headers)
   if (!await installRateLimit.check(ip)) {
     return NextResponse.json(
       { error: 'Too many requests — please wait before trying again.' },

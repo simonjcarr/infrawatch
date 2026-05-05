@@ -27,6 +27,8 @@ on it, and exits. Open `.env` in your editor and set:
   local email/password users should be allowed in without verifying email
 - `AGENT_DOWNLOAD_BASE_URL` — public URL agents will hit to self-update;
   must be reachable from every agent host, not just `localhost`
+- `CT_OPS_TRUST_PROXY_HEADERS` — keep `true` for the bundled nginx; set it
+  only when your reverse proxy overwrites forwarded IP headers
 
 Leave `BETTER_AUTH_SECRET` blank — `start.sh` will generate one for you on
 the next run and write it back to `.env`.

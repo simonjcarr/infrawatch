@@ -142,7 +142,7 @@ generate_password_manager_launch_keypair() {
       echo "ERROR: failed to encode Password Manager launch-signing private key." >&2
       exit 1
     fi
-    if ! openssl pkey -in "$private_pem" -pubout -outform DER -out "$public_der" >/dev/null 2>&1; then
+    if ! openssl pkey -in "$private_pem" -pubout -outform DER | tail -c 32 > "$public_der"; then
       rm -rf "$tmpdir"
       echo "ERROR: failed to derive Password Manager launch-signing public key." >&2
       exit 1
@@ -161,8 +161,8 @@ print(b64encode(private_key.private_bytes(
     encryption_algorithm=serialization.NoEncryption(),
 )).decode("ascii"))
 print(b64encode(public_key.public_bytes(
-    encoding=serialization.Encoding.DER,
-    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    encoding=serialization.Encoding.Raw,
+    format=serialization.PublicFormat.Raw,
 )).decode("ascii"))
 EOF
   then
@@ -174,7 +174,7 @@ const { generateKeyPairSync } = require('node:crypto')
 
 const { privateKey, publicKey } = generateKeyPairSync('ed25519')
 process.stdout.write(privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64') + '\n')
-process.stdout.write(publicKey.export({ format: 'der', type: 'spki' }).toString('base64') + '\n')
+process.stdout.write(publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('base64') + '\n')
 EOF
     rm -rf "$tmpdir"
     return 0

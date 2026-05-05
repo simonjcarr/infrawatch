@@ -104,8 +104,14 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	authMsg.Password = ""
 	if err != nil {
 		slog.Warn("terminal ws: SSH connection failed", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
-		_ = queries.SetTerminalSessionError(context.Background(), h.pool, sessionID, "ssh authentication failed")
-		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "SSH authentication failed"})
+		reason := "ssh authentication failed"
+		message := "SSH authentication failed"
+		if errors.Is(err, queries.ErrSSHHostKeyNotTrusted) || errors.Is(err, queries.ErrSSHHostKeyMismatch) {
+			reason = "ssh host key verification failed"
+			message = "SSH host key verification failed"
+		}
+		_ = queries.SetTerminalSessionError(context.Background(), h.pool, sessionID, reason)
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: message})
 		return
 	}
 	defer sshClient.Close()
@@ -246,7 +252,7 @@ func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, us
 			}),
 		},
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
-			return queries.VerifyOrTrustSSHHostKey(ctx, h.pool, hostID, ssh.FingerprintSHA256(key))
+			return queries.VerifySSHHostKey(ctx, h.pool, hostID, ssh.FingerprintSHA256(key))
 		},
 		Timeout: 30 * time.Second,
 	}

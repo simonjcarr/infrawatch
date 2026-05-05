@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -16,6 +17,11 @@ type TerminalSessionInfo struct {
 	Username       string
 	LoggingEnabled bool
 }
+
+var (
+	ErrSSHHostKeyNotTrusted = errors.New("SSH host key is not trusted")
+	ErrSSHHostKeyMismatch   = errors.New("SSH host key mismatch")
+)
 
 // ValidateAndActivateTerminalSession looks up a terminal session by session_id
 // and a one-time WebSocket token hash, verifies it is pending and unexpired,
@@ -54,7 +60,7 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 	return &info, nil
 }
 
-func VerifyOrTrustSSHHostKey(ctx context.Context, pool *pgxpool.Pool, hostID string, fingerprint string) error {
+func VerifySSHHostKey(ctx context.Context, pool *pgxpool.Pool, hostID string, fingerprint string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -75,28 +81,20 @@ func VerifyOrTrustSSHHostKey(ctx context.Context, pool *pgxpool.Pool, hostID str
 		}
 		return err
 	}
-	if current != nil && *current != "" {
-		if *current != fingerprint {
-			return fmt.Errorf("SSH host key mismatch")
-		}
-		return tx.Commit(ctx)
-	}
-
-	const updateQ = `
-		UPDATE hosts
-		SET metadata = jsonb_set(
-		      COALESCE(metadata, '{}'::jsonb),
-		      '{sshHostKeySha256}',
-		      to_jsonb($2::text),
-		      true
-		    ),
-		    updated_at = NOW()
-		WHERE id = $1
-	`
-	if _, err := tx.Exec(ctx, updateQ, hostID, fingerprint); err != nil {
+	if err := verifySSHHostKeyFingerprint(current, fingerprint); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func verifySSHHostKeyFingerprint(current *string, fingerprint string) error {
+	if current == nil || *current == "" {
+		return ErrSSHHostKeyNotTrusted
+	}
+	if *current != fingerprint {
+		return ErrSSHHostKeyMismatch
+	}
+	return nil
 }
 
 // SetTerminalSessionEnded marks a terminal session as 'ended' with duration and

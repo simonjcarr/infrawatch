@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.109.0...web/v0.110.0) (2026-05-05)
+
+
+### Features
+
+* **web:** add password manager audit hooks ([#1074](https://github.com/carrtech-dev/ct-ops/issues/1074)) ([e956dfc](https://github.com/carrtech-dev/ct-ops/commit/e956dfc138c93a9becd1388da64aee631aaee41b))
+
 ## [0.109.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.108.0...web/v0.109.0) (2026-05-05)
 
 

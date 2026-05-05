@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.19](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.18...web/v0.103.19) (2026-05-05)
+
+
+### Bug Fixes
+
+* **web:** tighten production script csp ([ca642c6](https://github.com/carrtech-dev/ct-ops/commit/ca642c6b573ae2e5016c002dfece01d9883b0984)), closes [#950](https://github.com/carrtech-dev/ct-ops/issues/950)
+
 ## [0.103.18](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.17...web/v0.103.18) (2026-05-05)
 
 

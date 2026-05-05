@@ -28,7 +28,6 @@ test('admin can create and revoke an enrolment token from agent settings', async
   await page.getByTestId('agent-enrolment-create-open').click()
 
   await page.getByTestId('agent-enrolment-label').fill('Datacenter Linux')
-  await page.getByTestId('agent-enrolment-skip-verify').click()
   await page.getByTestId('agent-enrolment-max-uses').fill('3')
   await page.getByTestId('agent-enrolment-expires-days').fill('14')
   await page.getByTestId('agent-enrolment-create-submit').click()
@@ -108,7 +107,7 @@ test('admin can create and revoke an enrolment token from agent settings', async
     .toBeTruthy()
 })
 
-test('admin can create an auto-approved token that skips TLS verification', async ({ authenticatedPage: page }) => {
+test('admin cannot create an auto-approved token without super admin privileges', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { orgId } = await getOrgAndUserIds(sql)
 
@@ -210,4 +209,41 @@ test('admin can generate an install bundle with an existing token and bundle tag
     })
 
   await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('admin can generate an install bundle that verifies TLS by default', async ({ authenticatedPage: page }) => {
+  let capturedBody: Record<string, unknown> | null = null
+
+  await page.route('**/api/agent/bundle', async (route) => {
+    capturedBody = route.request().postDataJSON() as Record<string, unknown>
+
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': 'attachment; filename=\"ct-ops-agent-linux-amd64.zip\"',
+      },
+      body: 'bundle-zip-placeholder',
+    })
+  })
+
+  await page.goto('/settings/agents')
+
+  await expect(page.getByTestId('agent-enrolment-heading')).toBeVisible()
+  await page.getByRole('button', { name: 'Download Install Bundle' }).click()
+
+  const downloadButton = page.getByRole('dialog').getByRole('button', { name: 'Download' })
+  await downloadButton.scrollIntoViewIfNeeded()
+  await downloadButton.evaluate((button: HTMLButtonElement) => button.click())
+
+  await expect
+    .poll(() => capturedBody)
+    .toMatchObject({
+      os: 'linux',
+      arch: 'amd64',
+      createToken: {
+        label: 'Install bundle',
+        skipVerify: false,
+      },
+    })
 })

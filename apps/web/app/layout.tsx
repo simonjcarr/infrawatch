@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { QueryProvider } from '@/components/shared/query-provider'
 import '@mdxeditor/editor/style.css'
@@ -34,6 +34,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   const cookieStore = await cookies()
+  const nonce = (await headers()).get('x-nonce') ?? undefined
   const theme = cookieStore.get('theme')?.value ?? 'system'
   const isDark = theme === 'dark'
 
@@ -44,7 +45,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-full antialiased">
         <QueryProvider>

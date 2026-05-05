@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hasBetterAuthSessionCookie } from '@/lib/auth/session-cookie-names'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
+import { buildContentSecurityPolicy } from '@/lib/security/csp'
 
 const AUTH_ROUTES = ['/login', '/register']
 
@@ -28,6 +29,12 @@ const BETTER_AUTH_SENSITIVE_PATHS = [
 ]
 const authRateLimitHits = new Map<string, number[]>()
 
+function generateNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
+}
+
 function checkAuthRateLimit(ip: string, now = Date.now()): boolean {
   const cutoff = now - 60_000
   const hits = (authRateLimitHits.get(ip) ?? []).filter((timestamp) => timestamp > cutoff)
@@ -48,8 +55,12 @@ export function proxy(request: NextRequest) {
 
   // Honour an upstream-supplied request ID (load balancer, proxy) or generate one.
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
+  const nonce = generateNonce()
+  const csp = buildContentSecurityPolicy(nonce, process.env.NODE_ENV === 'development')
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-request-id', requestId)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', csp)
 
   const ip = getClientIpFromHeaders(request.headers)
 
@@ -64,6 +75,7 @@ export function proxy(request: NextRequest) {
         { status: 429 },
       )
       limitResponse.headers.set('X-Request-Id', requestId)
+      limitResponse.headers.set('Content-Security-Policy', csp)
       return limitResponse
     }
   }
@@ -71,6 +83,7 @@ export function proxy(request: NextRequest) {
   if (!isAuthenticated && isProtectedRoute) {
     const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
     redirectResponse.headers.set('X-Request-Id', requestId)
+    redirectResponse.headers.set('Content-Security-Policy', csp)
     return redirectResponse
   }
 
@@ -79,6 +92,7 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   // Echo the ID back to the client so it appears in browser DevTools / client logs.
   response.headers.set('X-Request-Id', requestId)
+  response.headers.set('Content-Security-Policy', csp)
   return response
 }
 

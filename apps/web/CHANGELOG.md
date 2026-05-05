@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.15](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.14...web/v0.103.15) (2026-05-05)
+
+
+### Bug Fixes
+
+* **security:** restrict agent ca rotation ([fbab9f9](https://github.com/carrtech-dev/ct-ops/commit/fbab9f95f234358c05b2c79b00052d13341274f9))
+
 ## [0.103.14](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.13...web/v0.103.14) (2026-05-05)
 
 

@@ -64,10 +64,10 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 		return status.Errorf(codes.Internal, "receiving first heartbeat: %v", err)
 	}
 
-	// Validate JWT
-	agentID, _, err := h.issuer.ValidateAgentToken(first.AgentId)
+	// Validate the JWT and bind it to the verified mTLS client identity.
+	agentID, _, err := h.authenticateFirstHeartbeat(ctx, first.AgentId)
 	if err != nil {
-		return status.Error(codes.Unauthenticated, "invalid or missing JWT")
+		return err
 	}
 
 	// Verify agent is active
@@ -275,6 +275,21 @@ loop:
 
 	slog.Info("heartbeat stream ended, agent marked offline", "agent_id", agentID)
 	return nil
+}
+
+func (h *HeartbeatHandler) authenticateFirstHeartbeat(ctx context.Context, token string) (agentID string, orgID string, err error) {
+	agentID, orgID, err = h.issuer.ValidateAgentToken(token)
+	if err != nil {
+		return "", "", status.Error(codes.Unauthenticated, "invalid or missing JWT")
+	}
+	id, ok := pki.IdentityFromContext(ctx)
+	if !ok || id == nil {
+		return "", "", status.Error(codes.Unauthenticated, "missing client identity")
+	}
+	if id.AgentID != agentID || id.OrgID != orgID {
+		return "", "", status.Error(codes.Unauthenticated, "client identity mismatch")
+	}
+	return agentID, orgID, nil
 }
 
 func (h *HeartbeatHandler) processHeartbeat(

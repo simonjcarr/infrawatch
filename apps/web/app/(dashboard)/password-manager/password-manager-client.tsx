@@ -14,6 +14,7 @@ import {
 import {
   AlertCircle,
   Copy,
+  Download,
   Eye,
   EyeOff,
   RotateCcw,
@@ -63,6 +64,8 @@ import {
   type VaultRecord,
   createPasswordManagerClient,
 } from '@/lib/password-manager/client'
+import { normalizePasswordManagerUiError, shouldLogPasswordManagerError } from '@/lib/password-manager/errors'
+import { createPasswordManagerVaultExportBundle } from '@/lib/password-manager/export'
 import {
   createInitialPasswordManagerShellState,
   mapPasswordManagerErrorToShellView,
@@ -97,14 +100,6 @@ function createIdempotencyKey() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function isObjectUnavailableError(error: unknown): boolean {
-  return error instanceof PasswordManagerApiError && error.status === 404
-}
-
-function isSessionScopedError(error: unknown): boolean {
-  return error instanceof PasswordManagerApiError && (error.status === 401 || error.status === 403)
-}
-
 function isMembershipConflictError(error: unknown): boolean {
   return error instanceof PasswordManagerApiError && error.status === 409 && error.code === 'membership_conflict'
 }
@@ -127,6 +122,15 @@ function upsertVaultEpochKey(vaultKeyCache: Map<string, Map<number, CryptoKey>>,
 
 function readVaultEpochKey(vaultKeyCache: Map<string, Map<number, CryptoKey>>, vaultId: string, epoch: number): CryptoKey | null {
   return vaultKeyCache.get(vaultId)?.get(epoch) ?? null
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string) {
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }
 
 export function PasswordManagerClientShell({
@@ -212,48 +216,72 @@ export function PasswordManagerClientShell({
   const filteredEntries = filterPasswordManagerEntries(entries, deferredEntryFilter)
   const selectedEntry = entries.find((entry) => entry.id === workspaceState.selectedEntryId) ?? null
 
-  const handleWorkspaceEffectError = useEffectEvent((error: unknown, fallbackMessage: string) => {
-    if (isSessionScopedError(error)) {
+  function logPasswordManagerWarning(message: string, error: unknown, context?: unknown) {
+    if (!shouldLogPasswordManagerError(error)) {
+      return
+    }
+    logWarn(message, error, context)
+  }
+
+  function handleWorkspaceUiError(error: unknown, fallbackMessage: string) {
+    const normalized = normalizePasswordManagerUiError(error, fallbackMessage)
+
+    if (normalized.kind === 'shell-view') {
       dispatch({
         type: 'launch-failed',
-        view: mapPasswordManagerErrorToShellView(error),
+        view: normalized.view,
       })
       return
     }
-    if (isObjectUnavailableError(error)) {
+
+    if (normalized.kind === 'object-unavailable') {
       workspaceDispatch({ type: 'object-unavailable' })
-      setWorkspaceError('The requested vault or entry is no longer available. Refresh the workspace state and try again.')
+      setWorkspaceError(normalized.message)
       return
     }
 
-    logWarn('[password-manager] workspace operation failed', error, {
+    setWorkspaceError(normalized.message)
+  }
+
+  function recordAuditHookFailure(actionLabel: string, error: unknown) {
+    const normalized = normalizePasswordManagerUiError(
+      error,
+      `The ${actionLabel} completed locally, but the audit hook could not be recorded safely.`,
+    )
+
+    if (normalized.kind === 'shell-view') {
+      dispatch({
+        type: 'launch-failed',
+        view: normalized.view,
+      })
+      return
+    }
+
+    if (normalized.kind === 'object-unavailable') {
+      workspaceDispatch({ type: 'object-unavailable' })
+      setWorkspaceError(normalized.message)
+      return
+    }
+
+    setWorkspaceError(normalized.message)
+  }
+
+  const handleWorkspaceEffectError = useEffectEvent((error: unknown, fallbackMessage: string) => {
+    logPasswordManagerWarning('[password-manager] workspace operation failed', error, {
       organisationId: state.organisationId,
       selectedVaultId: workspaceState.selectedVaultId,
       selectedEntryId: workspaceState.selectedEntryId,
     })
-    setWorkspaceError(fallbackMessage)
+    handleWorkspaceUiError(error, fallbackMessage)
   })
 
   function handleWorkspaceActionError(error: unknown, fallbackMessage: string) {
-    if (isSessionScopedError(error)) {
-      dispatch({
-        type: 'launch-failed',
-        view: mapPasswordManagerErrorToShellView(error),
-      })
-      return
-    }
-    if (isObjectUnavailableError(error)) {
-      workspaceDispatch({ type: 'object-unavailable' })
-      setWorkspaceError('The requested vault or entry is no longer available. Refresh the workspace state and try again.')
-      return
-    }
-
-    logWarn('[password-manager] workspace operation failed', error, {
+    logPasswordManagerWarning('[password-manager] workspace operation failed', error, {
       organisationId: state.organisationId,
       selectedVaultId: workspaceState.selectedVaultId,
       selectedEntryId: workspaceState.selectedEntryId,
     })
-    setWorkspaceError(fallbackMessage)
+    handleWorkspaceUiError(error, fallbackMessage)
   }
 
   useEffect(() => {
@@ -281,7 +309,7 @@ export function PasswordManagerClientShell({
         }
 
         const view = mapPasswordManagerErrorToShellView(error)
-        logWarn('[password-manager] route shell launch failed', error, {
+        logPasswordManagerWarning('[password-manager] route shell launch failed', error, {
           organisationId: state.organisationId,
           shellView: view,
         })
@@ -319,15 +347,23 @@ export function PasswordManagerClientShell({
           return
         }
 
-        if (error instanceof PasswordManagerApiError) {
+        const normalized = normalizePasswordManagerUiError(
+          error,
+          'Password Manager could not load the unlock profile metadata safely.',
+        )
+        if (normalized.kind !== 'message') {
           dispatch({
             type: 'launch-failed',
-            view: mapPasswordManagerErrorToShellView(error),
+            view: normalized.view,
           })
           return
         }
 
-        dispatch({ type: 'launch-failed', view: 'operational-failure' })
+        dispatch({
+          type: 'unlock-failed',
+          message: normalized.message,
+          needsRelaunch: false,
+        })
       }
     }
 
@@ -632,19 +668,26 @@ export function PasswordManagerClientShell({
           setStatusNotice('An unlock profile already exists for this account. Enter your unlock password to continue.')
           return
         }
-        if (error.status === 401 || error.status === 403 || error.status === 404) {
-          dispatch({
-            type: 'launch-failed',
-            view: mapPasswordManagerErrorToShellView(error),
-          })
-          return
+        if (error.status === 401 || error.status === 403 || error.status === 404 || error.status >= 500) {
+          const normalized = normalizePasswordManagerUiError(error, GENERIC_SETUP_FAILURE)
+          if (normalized.kind !== 'message') {
+            dispatch({
+              type: 'launch-failed',
+              view: normalized.view,
+            })
+            return
+          }
         }
       }
 
-      logWarn('[password-manager] setup failed', error, {
+      const normalized = normalizePasswordManagerUiError(error, GENERIC_SETUP_FAILURE)
+      logPasswordManagerWarning('[password-manager] setup failed', error, {
         organisationId: state.organisationId,
       })
-      dispatch({ type: 'setup-failed', message: GENERIC_SETUP_FAILURE })
+      dispatch({
+        type: 'setup-failed',
+        message: normalized.message,
+      })
     } finally {
       setSetupPending(false)
     }
@@ -703,13 +746,21 @@ export function PasswordManagerClientShell({
       setUnlockPassword('')
       setStatusNotice('Password Manager unlocked in browser memory only.')
     } catch (error) {
-      logWarn('[password-manager] unlock failed', error, {
+      logPasswordManagerWarning('[password-manager] unlock failed', error, {
         organisationId: state.organisationId,
       })
+      const normalized = normalizePasswordManagerUiError(error, GENERIC_UNLOCK_FAILURE)
+      if (normalized.kind !== 'message') {
+        dispatch({
+          type: 'launch-failed',
+          view: normalized.view,
+        })
+        return
+      }
       dispatch({
         type: 'unlock-failed',
-        message: GENERIC_UNLOCK_FAILURE,
-        needsRelaunch: error instanceof PasswordManagerApiError && error.status === 401,
+        message: normalized.message,
+        needsRelaunch: false,
       })
     } finally {
       setUnlockPending(false)
@@ -727,17 +778,21 @@ export function PasswordManagerClientShell({
       await client.refreshSession()
       setStatusNotice('Password Manager session refreshed.')
     } catch (error) {
-      logWarn('[password-manager] session refresh failed', error, {
+      logPasswordManagerWarning('[password-manager] session refresh failed', error, {
         organisationId: state.organisationId,
       })
-      if (error instanceof PasswordManagerApiError) {
+      const normalized = normalizePasswordManagerUiError(
+        error,
+        'Password Manager could not refresh the current session safely.',
+      )
+      if (normalized.kind !== 'message') {
         dispatch({
           type: 'launch-failed',
-          view: mapPasswordManagerErrorToShellView(error),
+          view: normalized.view,
         })
         return
       }
-      dispatch({ type: 'launch-failed', view: 'operational-failure' })
+      setStatusNotice(normalized.message)
     } finally {
       setRefreshPending(false)
     }
@@ -753,7 +808,7 @@ export function PasswordManagerClientShell({
     try {
       await client.logout()
     } catch (error) {
-      logWarn('[password-manager] logout failed', error, {
+      logPasswordManagerWarning('[password-manager] logout failed', error, {
         organisationId: state.organisationId,
       })
     } finally {
@@ -1201,8 +1256,80 @@ export function PasswordManagerClientShell({
     try {
       await navigator.clipboard.writeText(entry.payload.password)
       setStatusNotice(`Password copied for ${entry.payload.title}.`)
+      await client.auditCopy({
+        vaultId: entry.vaultId,
+        entryId: entry.id,
+      })
     } catch (error) {
-      handleWorkspaceActionError(error, 'The password could not be copied safely in this browser.')
+      if (!(error instanceof PasswordManagerApiError)) {
+        handleWorkspaceActionError(error, 'The password could not be copied safely in this browser.')
+        return
+      }
+
+      logPasswordManagerWarning('[password-manager] copy audit failed', error, {
+        organisationId: state.organisationId,
+        selectedVaultId: entry.vaultId,
+        selectedEntryId: entry.id,
+      })
+      recordAuditHookFailure('password copy', error)
+    }
+  }
+
+  async function handleEntryRevealToggle(entry: PasswordManagerEntrySummary) {
+    if (entryRevealId === entry.id) {
+      setEntryRevealId(null)
+      return
+    }
+
+    setEntryRevealId(entry.id)
+    setStatusNotice(`Password revealed locally for ${entry.payload.title}.`)
+
+    try {
+      await client.auditReveal({
+        vaultId: entry.vaultId,
+        entryId: entry.id,
+      })
+    } catch (error) {
+      logPasswordManagerWarning('[password-manager] reveal audit failed', error, {
+        organisationId: state.organisationId,
+        selectedVaultId: entry.vaultId,
+        selectedEntryId: entry.id,
+      })
+      recordAuditHookFailure('password reveal', error)
+    }
+  }
+
+  async function handleVaultExport() {
+    if (!selectedVault) {
+      setWorkspaceError('Select a vault before exporting it.')
+      return
+    }
+
+    setWorkspacePending(true)
+    setWorkspaceError(null)
+    try {
+      const bundle = createPasswordManagerVaultExportBundle({
+        vault: selectedVault,
+        entries: entries.filter((entry) => entry.vaultId === selectedVault.id),
+      })
+      triggerBlobDownload(bundle.blob, bundle.fileName)
+      setStatusNotice(`Vault export packaged locally for ${selectedVault.metadata.name}.`)
+      await client.auditExport({
+        vaultId: selectedVault.id,
+      })
+    } catch (error) {
+      if (error instanceof PasswordManagerApiError) {
+        logPasswordManagerWarning('[password-manager] export audit failed', error, {
+          organisationId: state.organisationId,
+          selectedVaultId: selectedVault.id,
+        })
+        recordAuditHookFailure('vault export', error)
+        return
+      }
+
+      handleWorkspaceActionError(error, 'The vault could not be exported safely.')
+    } finally {
+      setWorkspacePending(false)
     }
   }
 
@@ -1289,11 +1416,11 @@ export function PasswordManagerClientShell({
           onEntryFilterChange={setEntryFilter}
           onEntryNotesChange={setEntryNotes}
           onEntryPasswordChange={setEntryPassword}
-          onEntryRevealIdChange={setEntryRevealId}
           onEntrySave={handleEntrySave}
           onEntryTitleChange={setEntryTitle}
           onEntryUrlChange={setEntryUrl}
           onEntryUsernameChange={setEntryUsername}
+          onExportVault={handleVaultExport}
           onMemberPublicKeyEnvelopeChange={setMemberPublicKeyEnvelopeText}
           onMemberPublicKeyEnvelopeInputChange={(userId, value) =>
             setMemberPublicKeyEnvelopeInputs((current) => ({ ...current, [userId]: value }))
@@ -1326,6 +1453,7 @@ export function PasswordManagerClientShell({
             setEntryUrl(entry.payload.url ?? '')
             setEntryNotes(entry.payload.notes ?? '')
           }}
+          onToggleReveal={handleEntryRevealToggle}
           onUpdateMemberRole={handleMemberRoleUpdate}
           onVaultFilterChange={setVaultFilter}
           renameVaultDescription={renameVaultDescription}
@@ -1691,11 +1819,11 @@ function PasswordManagerWorkspace({
   onEntryFilterChange,
   onEntryNotesChange,
   onEntryPasswordChange,
-  onEntryRevealIdChange,
   onEntrySave,
   onEntryTitleChange,
   onEntryUrlChange,
   onEntryUsernameChange,
+  onExportVault,
   onMemberPublicKeyEnvelopeChange,
   onMemberPublicKeyEnvelopeInputChange,
   onMemberRemove,
@@ -1712,6 +1840,7 @@ function PasswordManagerWorkspace({
   onSelectVault,
   onStartCreateEntry,
   onStartEditEntry,
+  onToggleReveal,
   onUpdateMemberRole,
   onVaultFilterChange,
   renameVaultDescription,
@@ -1757,11 +1886,11 @@ function PasswordManagerWorkspace({
   onEntryFilterChange: (value: string) => void
   onEntryNotesChange: (value: string) => void
   onEntryPasswordChange: (value: string) => void
-  onEntryRevealIdChange: (value: string | null) => void
   onEntrySave: () => Promise<void>
   onEntryTitleChange: (value: string) => void
   onEntryUrlChange: (value: string) => void
   onEntryUsernameChange: (value: string) => void
+  onExportVault: () => Promise<void>
   onMemberPublicKeyEnvelopeChange: (value: string) => void
   onMemberPublicKeyEnvelopeInputChange: (userId: string, value: string) => void
   onMemberRemove: (member: MemberRecord) => Promise<void>
@@ -1778,6 +1907,7 @@ function PasswordManagerWorkspace({
   onSelectVault: (vaultId: string) => void
   onStartCreateEntry: () => void
   onStartEditEntry: (entry: PasswordManagerEntrySummary) => void
+  onToggleReveal: (entry: PasswordManagerEntrySummary) => Promise<void>
   onUpdateMemberRole: (member: MemberRecord) => Promise<void>
   onVaultFilterChange: (value: string) => void
   renameVaultDescription: string
@@ -2076,12 +2206,18 @@ function PasswordManagerWorkspace({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <CardTitle>Entries</CardTitle>
-                <CardDescription>Reveal, copy, and edit entry payloads without sending plaintext back to the API.</CardDescription>
+                <CardDescription>Reveal, copy, export, and edit entry payloads without sending plaintext back to the API.</CardDescription>
               </div>
-              <Button variant="outline" onClick={onStartCreateEntry} disabled={!selectedVault || workspacePending}>
-                <Plus className="mr-2 size-4" />
-                New entry
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => void onExportVault()} disabled={!selectedVault || workspacePending}>
+                  <Download className="mr-2 size-4" />
+                  Export vault
+                </Button>
+                <Button variant="outline" onClick={onStartCreateEntry} disabled={!selectedVault || workspacePending}>
+                  <Plus className="mr-2 size-4" />
+                  New entry
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -2124,7 +2260,7 @@ function PasswordManagerWorkspace({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onEntryRevealIdChange(entryRevealId === entry.id ? null : entry.id)}
+                        onClick={() => void onToggleReveal(entry)}
                       >
                         {entryRevealId === entry.id ? <EyeOff className="mr-2 size-4" /> : <Eye className="mr-2 size-4" />}
                         {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}

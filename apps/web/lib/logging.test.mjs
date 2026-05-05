@@ -60,3 +60,24 @@ test('redactLogValue handles circular references', () => {
     self: '[Circular]',
   })
 })
+
+test('redactLogValue redacts Password Manager assertions, envelopes, ciphertext, and wrapped keys', () => {
+  const value = redactLogValue({
+    assertion: 'signed-jwt',
+    encrypted_payload: {
+      ciphertext_b64: 'ciphertext',
+      iv_b64: 'iv',
+    },
+    wrapped_vault_key_envelope: {
+      wrapped_key_b64: 'wrapped',
+    },
+    session_token: 'session-token',
+  })
+
+  assert.deepEqual(value, {
+    assertion: '[REDACTED]',
+    encrypted_payload: '[REDACTED]',
+    wrapped_vault_key_envelope: '[REDACTED]',
+    session_token: '[REDACTED]',
+  })
+})

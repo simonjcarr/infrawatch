@@ -22,6 +22,9 @@ const localLoginSchema = z.object({
 })
 
 const domainLoginSchema = z.object({
+  organisationSlug: z.string().trim().min(2, 'Organisation slug is required').regex(/^[a-z0-9-]+$/, {
+    message: 'Use lowercase letters, numbers, and hyphens',
+  }),
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
 })
@@ -94,6 +97,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
               twoFactorMethod: ldapTwoFactorMethod,
             }
           : {
+              organisationSlug: values.organisationSlug,
               username: values.username,
               password: values.password,
             }),
@@ -353,6 +357,20 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
               </>
             ) : (
               <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="domain-organisation">Organisation slug</Label>
+                  <Input
+                    id="domain-organisation"
+                    type="text"
+                    autoComplete="organization"
+                    placeholder="acme"
+                    {...domainForm.register('organisationSlug')}
+                    data-testid="domain-login-organisation"
+                  />
+                  {domainForm.formState.errors.organisationSlug && (
+                    <p className="text-xs text-destructive">{domainForm.formState.errors.organisationSlug.message}</p>
+                  )}
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="domain-username">Username</Label>
                   <Input

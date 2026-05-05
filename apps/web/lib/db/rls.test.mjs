@@ -104,6 +104,44 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
     })
     assert.deepEqual(unscopedRows.map((row) => row.id), [])
 
+    const unscopedSessions = await db.query.sessions.findMany({
+      orderBy: [asc(schema.sessions.id)],
+    })
+    assert.deepEqual(unscopedSessions.map((row) => row.id), [])
+
+    const authBootstrapClient = postgres(`${appDatabaseUrl}?options=-c%20app.auth_bootstrap%3Don`, {
+      prepare: false,
+      max: 1,
+    })
+    try {
+      const authBootstrapDb = drizzle(authBootstrapClient, { schema })
+      const bootstrapSessions = await authBootstrapDb.query.sessions.findMany({
+        where: eq(schema.sessions.token, 'token-a'),
+        orderBy: [asc(schema.sessions.id)],
+      })
+      assert.deepEqual(bootstrapSessions.map((row) => row.id), ['session-a'])
+
+      const bootstrapAccounts = await authBootstrapDb.query.accounts.findMany({
+        where: eq(schema.accounts.userId, 'user-a'),
+        orderBy: [asc(schema.accounts.id)],
+      })
+      assert.deepEqual(bootstrapAccounts.map((row) => row.id), ['account-a'])
+
+      const bootstrapTotpCredentials = await authBootstrapDb.query.totpCredentials.findMany({
+        where: eq(schema.totpCredentials.userId, 'user-a'),
+        orderBy: [asc(schema.totpCredentials.id)],
+      })
+      assert.deepEqual(bootstrapTotpCredentials.map((row) => row.id), ['totp-a'])
+
+      const bootstrapVerifications = await authBootstrapDb.query.verifications.findMany({
+        where: eq(schema.verifications.identifier, 'user-a@example.com'),
+        orderBy: [asc(schema.verifications.id)],
+      })
+      assert.deepEqual(bootstrapVerifications.map((row) => row.id), ['verification-a'])
+    } finally {
+      await authBootstrapClient.end()
+    }
+
     await assert.rejects(
       db.insert(schema.tags).values({
         id: 'tag-unscoped',

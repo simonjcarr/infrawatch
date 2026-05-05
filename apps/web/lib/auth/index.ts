@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { twoFactor } from 'better-auth/plugins'
-import { db } from '@/lib/db'
+import { authDb, db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import {
@@ -45,7 +45,7 @@ async function getAuthEmailConfigForUser(userId: string) {
 }
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
+  database: drizzleAdapter(authDb, {
     provider: 'pg',
     schema: {
       user: schema.users,

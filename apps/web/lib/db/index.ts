@@ -5,14 +5,18 @@ import { runWithOrgDatabaseScope } from './rls.ts'
 import { getDatabaseUrl } from './connection-string.ts'
 
 const connectionString = getDatabaseUrl()
+const authBootstrapConnectionString = getAuthBootstrapConnectionString(connectionString)
 const maxConnections = getMaxConnections()
 
 // Disable prefetch as it is not supported for "transaction" pool mode
 export const client = getPostgresClient()
+export const authBootstrapClient = getAuthBootstrapPostgresClient()
 
 const rootDb = drizzle(client, { schema })
+const authBootstrapRootDb = drizzle(authBootstrapClient, { schema })
 
 export const db = rootDb
+export const authDb = authBootstrapRootDb
 export type Database = typeof rootDb
 export type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 
@@ -45,12 +49,40 @@ function getPostgresClient(): Sql {
   return globalForDb.__ctOpsPostgresClient
 }
 
+function getAuthBootstrapPostgresClient(): Sql {
+  if (!shouldCacheClient()) return createAuthBootstrapPostgresClient()
+
+  const globalForDb = globalThis as typeof globalThis & {
+    __ctOpsAuthBootstrapPostgresClient?: Sql
+  }
+  globalForDb.__ctOpsAuthBootstrapPostgresClient ??= createAuthBootstrapPostgresClient()
+  return globalForDb.__ctOpsAuthBootstrapPostgresClient
+}
+
 function createPostgresClient(): Sql {
   return postgres(connectionString, {
     prepare: false,
     max: maxConnections,
     ...getConnectionLifecycleOptions(),
   })
+}
+
+function createAuthBootstrapPostgresClient(): Sql {
+  return postgres(authBootstrapConnectionString, {
+    prepare: false,
+    max: maxConnections,
+    ...getConnectionLifecycleOptions(),
+  })
+}
+
+function getAuthBootstrapConnectionString(rawConnectionString: string): string {
+  const url = new URL(rawConnectionString)
+  const existingOptions = url.searchParams.get('options')?.trim()
+  url.searchParams.set(
+    'options',
+    existingOptions ? `${existingOptions} -c app.auth_bootstrap=on` : '-c app.auth_bootstrap=on',
+  )
+  return url.toString()
 }
 
 function shouldCacheClient(): boolean {

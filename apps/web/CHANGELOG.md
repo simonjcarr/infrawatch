@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.6...web/v0.103.7) (2026-05-05)
+
+
+### Bug Fixes
+
+* **agent:** verify downloaded agent binaries ([4846ba0](https://github.com/carrtech-dev/ct-ops/commit/4846ba0abdb82ca7406c936ddc998a7ca4042fd1)), closes [#959](https://github.com/carrtech-dev/ct-ops/issues/959)
+
 ## [0.103.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.5...web/v0.103.6) (2026-05-05)
 
 

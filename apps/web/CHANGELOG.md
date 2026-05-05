@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.106.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.105.1...web/v0.106.0) (2026-05-05)
+
+
+### Features
+
+* **web:** add password manager route shell ([#1062](https://github.com/carrtech-dev/ct-ops/issues/1062)) ([778202f](https://github.com/carrtech-dev/ct-ops/commit/778202f8b5f4ab758d44f701c14c798a4b77b904))
+
 ## [0.105.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.105.0...web/v0.105.1) (2026-05-05)
 
 

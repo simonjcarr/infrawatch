@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.12](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.11...web/v0.103.12) (2026-05-05)
+
+
+### Bug Fixes
+
+* **web:** gate client ip proxy headers ([#986](https://github.com/carrtech-dev/ct-ops/issues/986)) ([806e4e9](https://github.com/carrtech-dev/ct-ops/commit/806e4e9d1ea668a2fd7c0f4821ab9045ff0b483e))
+
 ## [0.103.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.10...web/v0.103.11) (2026-05-05)
 
 

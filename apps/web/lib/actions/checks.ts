@@ -4,7 +4,7 @@ import { requireOrgAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { checks, checkResults } from '@/lib/db/schema'
+import { checks, checkResults, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, desc } from 'drizzle-orm'
 import type { Check, CheckConfig, CheckType, CheckResultRow } from '@/lib/db/schema'
 
@@ -111,6 +111,14 @@ export async function createCheck(
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }
   const data = parsed.data
+  const host = await db.query.hosts.findFirst({
+    where: and(
+      eq(hosts.id, data.hostId),
+      eq(hosts.organisationId, orgId),
+      isNull(hosts.deletedAt),
+    ),
+  })
+  if (!host) return { error: 'Host not found' }
 
   try {
     const [row] = await db

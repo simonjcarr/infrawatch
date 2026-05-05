@@ -325,7 +325,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 	if hostID != "" {
 		// Build a checkID → checkType map once per heartbeat to route cert results.
 		checkTypeMap := make(map[string]string)
-		if hostChecks, err := queries.GetChecksForHost(ctx, h.pool, hostID); err == nil {
+		if hostChecks, err := queries.GetChecksForHost(ctx, h.pool, hostID, orgID); err == nil {
 			for _, c := range hostChecks {
 				checkTypeMap[c.ID] = c.CheckType
 			}
@@ -469,7 +469,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 
 	// Push active check definitions to the agent
 	if hostID != "" {
-		checkRows, err := queries.GetChecksForHost(ctx, h.pool, hostID)
+		checkRows, err := queries.GetChecksForHost(ctx, h.pool, hostID, orgID)
 		if err != nil {
 			slog.Warn("fetching checks for host", "host_id", hostID, "err", err)
 		} else {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.8](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.7...ingest/v0.8.8) (2026-05-05)
+
+
+### Bug Fixes
+
+* **ingest:** bind heartbeat JWT to mTLS identity ([62d113f](https://github.com/carrtech-dev/ct-ops/commit/62d113fba8de32cdb4ce7ba22d52f44943ed0647)), closes [#1055](https://github.com/carrtech-dev/ct-ops/issues/1055)
+
 ## [0.8.7](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.6...ingest/v0.8.7) (2026-05-05)
 
 

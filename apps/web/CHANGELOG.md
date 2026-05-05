@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.108.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.107.0...web/v0.108.0) (2026-05-05)
+
+
+### Features
+
+* **web:** add password manager vault workspace ([#1067](https://github.com/carrtech-dev/ct-ops/issues/1067)) ([79dfa04](https://github.com/carrtech-dev/ct-ops/commit/79dfa04736d39a47e46f4f7cad9ba17ecf7fe82a))
+
 ## [0.107.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.106.0...web/v0.107.0) (2026-05-05)
 
 

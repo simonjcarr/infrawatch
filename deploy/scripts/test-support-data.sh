@@ -47,6 +47,8 @@ services:
       BETTER_AUTH_URL: https://ct-ops.example.com
       BETTER_AUTH_SECRET: compose-secret-value
       POSTGRES_PASSWORD: compose-postgres-value
+      PASSWORD_MANAGER_DB_PASSWORD: compose-password-manager-db-value
+      PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY: compose-password-manager-private-key
 OUT
         ;;
       ps)
@@ -104,6 +106,8 @@ BETTER_AUTH_TRUSTED_ORIGINS=https://ct-ops.example.com
 BETTER_AUTH_SECRET=env-better-auth-secret
 POSTGRES_PASSWORD=env-postgres-password
 CT_OPS_LOADTEST_ADMIN_KEY=env-loadtest-key
+PASSWORD_MANAGER_DB_PASSWORD=env-password-manager-db-password
+PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=env-password-manager-private-key
 WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:abc
 EOF
 
@@ -143,12 +147,18 @@ EOF
   grep -Fq "BETTER_AUTH_SECRET=[REDACTED]" "${root}/environment.env"
   grep -Fq "POSTGRES_PASSWORD=[REDACTED]" "${root}/environment.env"
   grep -Fq "CT_OPS_LOADTEST_ADMIN_KEY=[REDACTED]" "${root}/environment.env"
+  grep -Fq "PASSWORD_MANAGER_DB_PASSWORD=[REDACTED]" "${root}/environment.env"
+  grep -Fq "PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=[REDACTED]" "${root}/environment.env"
 
   assert_not_contains "${root}/environment.env" "env-better-auth-secret"
   assert_not_contains "${root}/environment.env" "env-postgres-password"
   assert_not_contains "${root}/environment.env" "env-loadtest-key"
+  assert_not_contains "${root}/environment.env" "env-password-manager-db-password"
+  assert_not_contains "${root}/environment.env" "env-password-manager-private-key"
   assert_not_contains "${root}/docker-compose-config.txt" "compose-secret-value"
   assert_not_contains "${root}/docker-compose-config.txt" "compose-postgres-value"
+  assert_not_contains "${root}/docker-compose-config.txt" "compose-password-manager-db-value"
+  assert_not_contains "${root}/docker-compose-config.txt" "compose-password-manager-private-key"
   assert_not_contains "${root}/docker-logs.txt" "log-postgres-value"
   assert_not_contains "${root}/docker-logs.txt" "log-bearer-token"
 

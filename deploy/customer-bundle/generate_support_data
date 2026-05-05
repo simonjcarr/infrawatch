@@ -217,6 +217,8 @@ collect_docker_info() {
       export POSTGRES_PASSWORD=support-redacted
       export LDAP_ENCRYPTION_KEY=support-redacted
       export CT_OPS_LOADTEST_ADMIN_KEY=support-redacted
+      export PASSWORD_MANAGER_DB_PASSWORD=support-redacted
+      export PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=support-redacted
       docker compose -f docker-compose.yml config
     ) 2>&1 | redact_stream > "${BUNDLE_DIR}/docker-compose-config.txt" || true
   else

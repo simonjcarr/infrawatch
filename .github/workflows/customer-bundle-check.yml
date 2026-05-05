@@ -10,6 +10,7 @@ on:
       - "deploy/scripts/validate-password-manager-release.py"
       - "deploy/scripts/test-install.sh"
       - "deploy/scripts/test-password-manager-nginx.sh"
+      - "deploy/scripts/test-password-manager-startup.sh"
       - "deploy/scripts/test-start.sh"
       - "deploy/scripts/test-web-entrypoint.sh"
       - "deploy/scripts/test-upgrade.sh"
@@ -81,6 +82,7 @@ jobs:
           bash deploy/scripts/test-install.sh
           bash deploy/scripts/test-password-manager-compose.sh
           bash deploy/scripts/test-password-manager-nginx.sh
+          bash deploy/scripts/test-password-manager-startup.sh
           bash deploy/scripts/test-start.sh
           bash deploy/scripts/test-web-entrypoint.sh
           bash deploy/scripts/test-upgrade.sh

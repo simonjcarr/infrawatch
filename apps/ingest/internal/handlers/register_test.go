@@ -79,3 +79,17 @@ func TestDecideHostCollisionRejectsOnlineOrActiveHost(t *testing.T) {
 		})
 	}
 }
+
+func TestExistingAgentBelongsToTokenOrgRejectsOrgMismatch(t *testing.T) {
+	t.Parallel()
+
+	existing := &queries.AgentRow{
+		ID:             "agent_existing",
+		OrganisationID: "org_original",
+		Status:         "active",
+	}
+
+	if existingAgentBelongsToTokenOrg(existing, "org_attacker") {
+		t.Fatal("existing agent matched a different enrolment token organisation")
+	}
+}

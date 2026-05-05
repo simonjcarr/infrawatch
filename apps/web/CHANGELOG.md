@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.105.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.104.0...web/v0.105.0) (2026-05-05)
+
+
+### Features
+
+* **web:** add password manager client and browser crypto ([#1053](https://github.com/carrtech-dev/ct-ops/issues/1053)) ([23884c9](https://github.com/carrtech-dev/ct-ops/commit/23884c9f0dcb331c950f6f7c90d4faa3d1e4e6d8))
+
 ## [0.104.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.20...web/v0.104.0) (2026-05-05)
 
 

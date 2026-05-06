@@ -281,9 +281,14 @@ export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: Lic
         <NavGroup label="Administration" items={adminNav} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-2">
-        <p className="text-xs text-muted-foreground px-2 py-1">
-          {TIER_LABEL[tier]} <span className="font-mono">{WEB_VERSION}</span>
-        </p>
+        <div className="space-y-1 px-2 py-1 text-xs text-muted-foreground">
+          <p>
+            {TIER_LABEL[tier]} <span className="font-mono">{WEB_VERSION}</span>
+          </p>
+          <Link href="/legal-notice" className="inline-flex text-sidebar-foreground/70 underline-offset-2 hover:text-sidebar-foreground hover:underline">
+            Legal notice
+          </Link>
+        </div>
       </SidebarFooter>
     </Sidebar>
   )

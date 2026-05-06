@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.113.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.113.0...web/v0.113.1) (2026-05-06)
+
+
+### Bug Fixes
+
+* **password-manager:** require confirmation for vault exports ([acedafc](https://github.com/carrtech-dev/ct-ops/commit/acedafc254166b1b6119c062741f1a01112708fd))
+
 ## [0.113.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.112.0...web/v0.113.0) (2026-05-06)
 
 

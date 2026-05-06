@@ -15,6 +15,34 @@
 
 ## What Has Been Built
 
+### Session 116 — Password Manager member recipient lookup
+
+**Vault member selector and public-key lookup** (`apps/web/app/(dashboard)/password-manager/page.tsx`, `apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/client.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Replaced the manual CT-Ops user ID and pasted public-key JSON add-member
+  controls with a searchable organisation-user selector that disables existing
+  members and users who have not completed Password Manager setup.
+- Added a Password Manager client call for the new vault-scoped
+  `/member-recipients` lookup, caching returned public-key envelopes in browser
+  memory and using the mapped Password Manager user ID when adding members.
+- Pinned the bundled Password Manager API descriptor and compose image refs to
+  `api/v0.1.3`, which contains the recipient-readiness endpoint.
+- Extended the hosted Password Manager Playwright mock and seed data so E2E
+  coverage exercises recipient readiness lookup without sending unlock
+  passwords, plaintext entry values, private-key envelopes, or KDF metadata.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `pnpm --dir apps/web type-check`
+- `node --experimental-strip-types --test apps/web/lib/password-manager/browser-crypto.test.mjs`
+- `node --experimental-strip-types --test apps/web/lib/password-manager/browser-crypto.test.mjs apps/web/lib/password-manager/client.test.mjs`
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'lib/password-manager/client.ts' 'tests/e2e/fixtures/password-manager.ts' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts`
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash deploy/scripts/test-password-manager-release-contract.sh`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `git diff --check`
+
 ### Session 115 — Password Manager API image source of truth
 
 **Descriptor-derived bundled API image** (`docker-compose.single.yml`, `.env.example`, `start.sh`, `deploy/customer-bundle/start.sh`, `deploy/customer-bundle/upgrade.sh`, `.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-compose.sh`, `deploy/scripts/test-password-manager-release-contract.sh`, `deploy/scripts/test-password-manager-startup.sh`, `deploy/scripts/test-upgrade.sh`, `deploy/customer-bundle/README.md`, `apps/docs/docs/deployment/docker-compose.md`, `apps/web/lib/password-manager/client.test.mjs`)

@@ -8,6 +8,11 @@ export const TEST_USER = {
   name: 'E2E Test User',
 } as const
 
+export const TEST_PASSWORD_MANAGER_MEMBER = {
+  email: 'password-manager-member@example.com',
+  name: 'Password Manager Member',
+} as const
+
 export const TEST_ORG = {
   name: 'E2E Test Org',
   slug: 'e2e-test-org',
@@ -69,6 +74,42 @@ export async function seedOrgAndUser(): Promise<void> {
         role = EXCLUDED.role,
         roles = EXCLUDED.roles,
         is_active = EXCLUDED.is_active
+  `
+
+  await sql`
+    INSERT INTO "user" (
+      id,
+      name,
+      email,
+      email_verified,
+      created_at,
+      updated_at,
+      organisation_id,
+      role,
+      roles,
+      is_active
+    )
+    VALUES (
+      ${createId()},
+      ${TEST_PASSWORD_MANAGER_MEMBER.name},
+      ${TEST_PASSWORD_MANAGER_MEMBER.email},
+      true,
+      NOW(),
+      NOW(),
+      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+      'member',
+      '[]'::jsonb,
+      true
+    )
+    ON CONFLICT (email) DO UPDATE
+    SET name = EXCLUDED.name,
+        email_verified = EXCLUDED.email_verified,
+        updated_at = NOW(),
+        organisation_id = EXCLUDED.organisation_id,
+        role = EXCLUDED.role,
+        roles = EXCLUDED.roles,
+        is_active = EXCLUDED.is_active,
+        deleted_at = NULL
   `
 
   await sql`

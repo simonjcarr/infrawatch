@@ -43,6 +43,7 @@ export const PASSWORD_MANAGER_CLIENT_ROUTE_SPECS = {
   auditReveal: { method: 'POST', path: '/vaults/{vaultID}/entries/{entryID}/reveal-audit' },
   auditExport: { method: 'POST', path: '/vaults/{vaultID}/export-audit' },
   listMembers: { method: 'GET', path: '/vaults/{vaultID}/members' },
+  lookupMemberRecipients: { method: 'POST', path: '/vaults/{vaultID}/member-recipients' },
   addMember: { method: 'POST', path: '/vaults/{vaultID}/members' },
   updateMember: { method: 'PATCH', path: '/vaults/{vaultID}/members/{userID}' },
   removeMember: { method: 'DELETE', path: '/vaults/{vaultID}/members/{userID}' },
@@ -107,6 +108,15 @@ export interface MemberRecord {
   key_epoch: number
   created_at: string
   updated_at: string
+}
+
+export interface MemberRecipientRecord {
+  external_user_id: string
+  user_id: string
+  email: string
+  display_name: string
+  setup_configured: boolean
+  public_key_envelope: JsonObject | null
 }
 
 export interface KeyEpochRecord {
@@ -351,6 +361,14 @@ export function createMemberPayload(input: {
   }
 }
 
+export function lookupMemberRecipientsPayload(input: {
+  externalUserIds: string[]
+}): JsonObject {
+  return {
+    external_user_ids: input.externalUserIds.map((userId) => requireNonEmptyString(userId, 'externalUserId')),
+  }
+}
+
 export function updateMemberPayload(input: {
   role: string
   wrappedVaultKeyEnvelope: JsonObject
@@ -525,6 +543,16 @@ export function createPasswordManagerClient(options: PasswordManagerClientOption
     async listMembers(vaultId: string): Promise<{ members: MemberRecord[] }> {
       return requestJson<{ members: MemberRecord[] }>(fetchImpl, apiBaseUrl, PASSWORD_MANAGER_CLIENT_ROUTE_SPECS.listMembers, {
         pathParams: { vaultID: requireNonEmptyString(vaultId, 'vaultId') },
+      })
+    },
+
+    async lookupMemberRecipients(input: {
+      vaultId: string
+      externalUserIds: string[]
+    }): Promise<{ recipients: MemberRecipientRecord[] }> {
+      return requestJson<{ recipients: MemberRecipientRecord[] }>(fetchImpl, apiBaseUrl, PASSWORD_MANAGER_CLIENT_ROUTE_SPECS.lookupMemberRecipients, {
+        pathParams: { vaultID: requireNonEmptyString(input.vaultId, 'vaultId') },
+        body: lookupMemberRecipientsPayload(input),
       })
     },
 

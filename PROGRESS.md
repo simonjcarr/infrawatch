@@ -24,6 +24,8 @@
 - Added a Password Manager client call for the new vault-scoped
   `/member-recipients` lookup, caching returned public-key envelopes in browser
   memory and using the mapped Password Manager user ID when adding members.
+- Pinned the bundled Password Manager API descriptor and compose image refs to
+  `api/v0.1.3`, which contains the recipient-readiness endpoint.
 - Extended the hosted Password Manager Playwright mock and seed data so E2E
   coverage exercises recipient readiness lookup without sending unlock
   passwords, plaintext entry values, private-key envelopes, or KDF metadata.
@@ -32,10 +34,13 @@
 - `pnpm install --frozen-lockfile`
 - `pnpm --dir apps/web type-check`
 - `node --experimental-strip-types --test apps/web/lib/password-manager/browser-crypto.test.mjs`
-- `PASSWORD_MANAGER_OPENAPI_CONTRACT_PATH=/Volumes/MacBookStorage-Dev/dev/carrtech/ct-password-manager-recipient-public-keys/docs/api-contract/openapi.json node --experimental-strip-types --test apps/web/lib/password-manager/browser-crypto.test.mjs apps/web/lib/password-manager/client.test.mjs`
+- `node --experimental-strip-types --test apps/web/lib/password-manager/browser-crypto.test.mjs apps/web/lib/password-manager/client.test.mjs`
 - `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'lib/password-manager/client.ts' 'tests/e2e/fixtures/password-manager.ts' 'tests/e2e/tooling/password-manager.spec.ts'`
 - `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
 - `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts`
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash deploy/scripts/test-password-manager-release-contract.sh`
+- `bash deploy/scripts/test-password-manager-compose.sh`
 - `git diff --check`
 
 ### Session 115 — Password Manager API image source of truth

@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ROOT_START_SCRIPT="${REPO_ROOT}/start.sh"
 BUNDLE_START_SCRIPT="${REPO_ROOT}/deploy/customer-bundle/start.sh"
+ROOT_COMPOSE_FILE="${REPO_ROOT}/docker-compose.single.yml"
+PASSWORD_MANAGER_RELEASE_DESCRIPTOR="${REPO_ROOT}/deploy/password-manager-release.json"
 
 make_mock_docker() {
   local dir="$1"
@@ -157,7 +159,8 @@ run_bundle_start_repairs_legacy_public_key_test() {
   raw_public_key="$(printf '%s\n' "$keypair" | sed -n '3p')"
 
   cp "$BUNDLE_START_SCRIPT" "$bundle_dir/start.sh"
-  printf 'services: {}\n' > "$bundle_dir/docker-compose.yml"
+  cp "$ROOT_COMPOSE_FILE" "$bundle_dir/docker-compose.yml"
+  cp "$PASSWORD_MANAGER_RELEASE_DESCRIPTOR" "$bundle_dir/password-manager-release.json"
   printf 'events {}\nhttp { server { listen 443 ssl; } }\n' > "$bundle_dir/deploy/nginx/nginx.conf"
   cat > "$bundle_dir/.env" <<EOF
 BETTER_AUTH_URL=https://ct-ops.example.test
@@ -173,6 +176,7 @@ PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY=${legacy_public_key}
 PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=${private_key}
 PASSWORD_MANAGER_TRUSTED_ORIGINS=https://ct-ops.example.test
 PASSWORD_MANAGER_SESSION_COOKIE_SECURE=true
+PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:0000000000000000000000000000000000000000000000000000000000000000
 EOF
 
   (
@@ -182,6 +186,7 @@ EOF
 
   [ "$(assert_env_value "$bundle_dir/.env" PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY)" = "$private_key" ]
   [ "$(assert_env_value "$bundle_dir/.env" PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY)" = "$raw_public_key" ]
+  ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "$bundle_dir/.env"
   assert_password_manager_bootstrap \
     "$bundle_dir/.env" \
     "https://ct-ops.example.test" \
@@ -201,6 +206,9 @@ run_root_start_bootstrap_test() {
   make_mock_docker "$mockbin"
 
   cp "$ROOT_START_SCRIPT" "$repo_dir/start.sh"
+  cp "$ROOT_COMPOSE_FILE" "$repo_dir/docker-compose.single.yml"
+  mkdir -p "$repo_dir/deploy"
+  cp "$PASSWORD_MANAGER_RELEASE_DESCRIPTOR" "$repo_dir/deploy/password-manager-release.json"
   cat > "$repo_dir/.env" <<'EOF'
 BETTER_AUTH_URL=https://ct-ops.example.test
 BETTER_AUTH_TRUSTED_ORIGINS=https://ct-ops.example.test,https://ops-alt.example.test
@@ -215,6 +223,7 @@ PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY=
 PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=
 PASSWORD_MANAGER_TRUSTED_ORIGINS=
 PASSWORD_MANAGER_SESSION_COOKIE_SECURE=
+PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:0000000000000000000000000000000000000000000000000000000000000000
 EOF
 
   (
@@ -224,6 +233,7 @@ EOF
 
   grep -q 'docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate' "$docker_log"
   grep -q 'docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate' "$docker_log"
+  ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "$repo_dir/.env"
 
   assert_password_manager_bootstrap \
     "$repo_dir/.env" \
@@ -244,7 +254,8 @@ run_bundle_start_bootstrap_test() {
   make_mock_docker "$mockbin"
 
   cp "$BUNDLE_START_SCRIPT" "$bundle_dir/start.sh"
-  printf 'services: {}\n' > "$bundle_dir/docker-compose.yml"
+  cp "$ROOT_COMPOSE_FILE" "$bundle_dir/docker-compose.yml"
+  cp "$PASSWORD_MANAGER_RELEASE_DESCRIPTOR" "$bundle_dir/password-manager-release.json"
   printf 'events {}\nhttp { server { listen 443 ssl; } }\n' > "$bundle_dir/deploy/nginx/nginx.conf"
   cat > "$bundle_dir/.env" <<'EOF'
 BETTER_AUTH_URL=http://ct-ops.example.test
@@ -260,6 +271,7 @@ PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY=
 PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=
 PASSWORD_MANAGER_TRUSTED_ORIGINS=
 PASSWORD_MANAGER_SESSION_COOKIE_SECURE=
+PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:0000000000000000000000000000000000000000000000000000000000000000
 EOF
 
   (
@@ -269,6 +281,7 @@ EOF
 
   grep -q 'docker compose up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate' "$docker_log"
   grep -q 'docker compose up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate' "$docker_log"
+  ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "$bundle_dir/.env"
 
   assert_password_manager_bootstrap \
     "$bundle_dir/.env" \

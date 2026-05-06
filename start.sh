@@ -97,6 +97,78 @@ upsert_env_var() {
   export "${key}=${value}"
 }
 
+remove_legacy_password_manager_api_image_env() {
+  if ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' .env 2>/dev/null; then
+    return 0
+  fi
+
+  echo "WARN: removing legacy PASSWORD_MANAGER_API_IMAGE from .env; CT-Ops now pins the bundled Password Manager API from deploy/password-manager-release.json." >&2
+  awk '$0 !~ /^PASSWORD_MANAGER_API_IMAGE=/' .env > .env.tmp && mv .env.tmp .env
+  chmod 600 .env
+  unset PASSWORD_MANAGER_API_IMAGE
+}
+
+read_password_manager_digest_reference() {
+  local descriptor="$1"
+  sed -n 's/.*"digest_reference"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor" | head -n1
+}
+
+compose_service_image() {
+  local compose_file="$1"
+  local service_name="$2"
+
+  awk -v name="$service_name" '
+    $0 == "  " name ":" {
+      in_block = 1
+      next
+    }
+    in_block && $0 ~ /^  [^ ]/ {
+      exit
+    }
+    in_block && $0 ~ /^[[:space:]]+image:[[:space:]]*/ {
+      sub(/^[[:space:]]+image:[[:space:]]*/, "")
+      gsub(/^"|"$/, "")
+      print
+      exit
+    }
+  ' "$compose_file"
+}
+
+validate_password_manager_image_pin() {
+  local compose_file="$1"
+  local descriptor="$2"
+  local expected api_image migrate_image
+
+  if [ ! -f "$descriptor" ]; then
+    echo "ERROR: missing Password Manager release descriptor: $descriptor" >&2
+    exit 1
+  fi
+
+  expected="$(read_password_manager_digest_reference "$descriptor")"
+  if [ -z "$expected" ]; then
+    echo "ERROR: could not read digest_reference from $descriptor" >&2
+    exit 1
+  fi
+
+  api_image="$(compose_service_image "$compose_file" password-manager-api)"
+  migrate_image="$(compose_service_image "$compose_file" password-manager-migrate)"
+
+  if [[ "$api_image" == *'PASSWORD_MANAGER_API_IMAGE'* || "$migrate_image" == *'PASSWORD_MANAGER_API_IMAGE'* ]]; then
+    echo "ERROR: $compose_file still allows PASSWORD_MANAGER_API_IMAGE to override the bundled Password Manager API image." >&2
+    exit 1
+  fi
+
+  if [ "$api_image" != "$expected" ] || [ "$migrate_image" != "$expected" ]; then
+    echo "ERROR: Password Manager compose image does not match $descriptor." >&2
+    echo "Expected: $expected" >&2
+    echo "password-manager-api:     ${api_image:-<missing>}" >&2
+    echo "password-manager-migrate: ${migrate_image:-<missing>}" >&2
+    exit 1
+  fi
+}
+
+remove_legacy_password_manager_api_image_env
+
 require_openssl() {
   local purpose="$1"
   if ! command -v openssl >/dev/null 2>&1; then
@@ -366,6 +438,7 @@ if [ -z "${POSTGRES_PASSWORD:-}" ]; then
 fi
 
 ensure_password_manager_bootstrap
+validate_password_manager_image_pin docker-compose.single.yml deploy/password-manager-release.json
 
 # Generate dev TLS certificates for the ingest service if they don't exist
 CERT_DIR="$SCRIPT_DIR/deploy/dev-tls"

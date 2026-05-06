@@ -334,7 +334,7 @@ install_new_bundle_files() {
 refresh_release_image_env_refs() {
   local var new_value current_value
 
-  for var in WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_API_IMAGE; do
+  for var in WEB_IMAGE INGEST_IMAGE; do
     new_value="$(sed -n "s/^${var}=//p" .env.example | head -n1)"
     if [ -z "$new_value" ] || ! grep -q "^${var}=" .env; then
       continue
@@ -352,14 +352,21 @@ refresh_release_image_env_refs() {
         ;;
       *)
         echo "WARN: preserving custom ${var} override in .env." >&2
-        if [ "$var" = "PASSWORD_MANAGER_API_IMAGE" ]; then
-          echo "      Ensure PASSWORD_MANAGER_API_IMAGE stays aligned with password-manager-release.json." >&2
-        else
-          echo "      Ensure WEB_IMAGE and INGEST_IMAGE come from the same CT-Ops release." >&2
-        fi
+        echo "      Ensure WEB_IMAGE and INGEST_IMAGE come from the same CT-Ops release." >&2
         ;;
     esac
   done
+}
+
+remove_legacy_password_manager_api_image_env() {
+  if ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' .env 2>/dev/null; then
+    return 0
+  fi
+
+  echo "WARN: removing legacy PASSWORD_MANAGER_API_IMAGE from .env; the upgraded bundle pins the Password Manager API from password-manager-release.json." >&2
+  awk '$0 !~ /^PASSWORD_MANAGER_API_IMAGE=/' .env > .env.tmp
+  mv .env.tmp .env
+  chmod 600 .env
 }
 
 start_stack() {
@@ -410,6 +417,7 @@ ensure_licence_key_path_writable
 stop_stack
 install_new_bundle_files
 refresh_release_image_env_refs
+remove_legacy_password_manager_api_image_env
 start_stack
 
 echo ""

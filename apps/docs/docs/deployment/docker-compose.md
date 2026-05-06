@@ -152,9 +152,10 @@ checksum that the current CT-Ops line is expected to integrate with. Bump it in
 the same CT-Ops pull request that validates compatibility against the selected
 Password Manager release; do not treat it as an operator override.
 
-Release bundles also stamp `PASSWORD_MANAGER_API_IMAGE` to that digest-pinned
-reference by default, so the bundled `password-manager-migrate` and
-`password-manager-api` services stay aligned with the reviewed descriptor.
+Release bundles embed that digest-pinned reference directly in compose for both
+`password-manager-migrate` and `password-manager-api`. Operators should not set
+`PASSWORD_MANAGER_API_IMAGE`; upgrades remove that legacy override so the
+bundled UI and API stay aligned with the reviewed descriptor.
 
 ---
 

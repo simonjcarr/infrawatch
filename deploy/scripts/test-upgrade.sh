@@ -101,17 +101,26 @@ EOF
 write_bundle() {
   local dir="$1"
   local version="$2"
+  local digest
+  digest="$(printf '%064d' "${version//[^0-9]/}")"
 
   mkdir -p "${dir}/ct-ops/deploy/nginx" "${dir}/ct-ops/licence-keys"
-  printf 'services:\n  web:\n    image: example/web:%s\n' "$version" > "${dir}/ct-ops/docker-compose.yml"
+  cat > "${dir}/ct-ops/docker-compose.yml" <<EOF
+services:
+  web:
+    image: example/web:${version}
+  password-manager-migrate:
+    image: ghcr.io/carrtech-dev/ct-password-manager/api@sha256:${digest}
+  password-manager-api:
+    image: ghcr.io/carrtech-dev/ct-password-manager/api@sha256:${digest}
+EOF
   {
     printf 'BETTER_AUTH_URL=https://example.test\n'
-    printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' "${version//[^0-9]/}"
-    printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' "${version//[^0-9]/}"
-    printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' "${version//[^0-9]/}"
+    printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%s\n' "$digest"
+    printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%s\n' "$digest"
   } > "${dir}/ct-ops/.env.example"
   cat > "${dir}/ct-ops/password-manager-release.json" <<EOF
-{"schema_version":1,"repository":"carrtech-dev/ct-password-manager","git_tag":"api/${version}","source_commit_sha":"53ecd8f3cacbb8617cc05f4847ad506b1988fd99","image_repository":"ghcr.io/carrtech-dev/ct-password-manager/api","image_digest":"sha256:$(printf '%064d' "${version//[^0-9]/}")","digest_reference":"ghcr.io/carrtech-dev/ct-password-manager/api@sha256:$(printf '%064d' "${version//[^0-9]/}")","api_contract_version":"1.0.0","api_contract_checksum_sha256":"a07ffa6c4c8a6f0b57611a1a7c380a8b8ea1a889f4449c4f2ce02f914c05cf95"}
+{"schema_version":1,"repository":"carrtech-dev/ct-password-manager","git_tag":"api/${version}","source_commit_sha":"53ecd8f3cacbb8617cc05f4847ad506b1988fd99","image_repository":"ghcr.io/carrtech-dev/ct-password-manager/api","image_digest":"sha256:${digest}","digest_reference":"ghcr.io/carrtech-dev/ct-password-manager/api@sha256:${digest}","api_contract_version":"1.0.0","api_contract_checksum_sha256":"a07ffa6c4c8a6f0b57611a1a7c380a8b8ea1a889f4449c4f2ce02f914c05cf95"}
 EOF
   printf '# README %s\n' "$version" > "${dir}/ct-ops/README.md"
   printf '#!/usr/bin/env bash\necho start %s\n' "$version" > "${dir}/ct-ops/start.sh"
@@ -174,7 +183,7 @@ main() {
   grep -q 'customer-secret=true' "${old_install}/.env"
   grep -q 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:.*999' "${old_install}/.env"
   grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env"
-  assert_env_value "${old_install}/.env" PASSWORD_MANAGER_API_IMAGE "$(read_env_value "${new_src}/ct-ops/.env.example" PASSWORD_MANAGER_API_IMAGE)"
+  ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "${old_install}/.env"
   grep -q '"git_tag":"api/v9.9.9"' "${old_install}/password-manager-release.json"
   grep -q 'tls-cert' "${old_install}/deploy/tls/server.crt"
   grep -q 'dev-cert' "${old_install}/deploy/dev-tls/server.crt"
@@ -264,7 +273,7 @@ main() {
   grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
   grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
   grep -q 'example/web:v0.100.0' "${old_install}/docker-compose.yml"
-  assert_env_value "${old_install}/.env" PASSWORD_MANAGER_API_IMAGE "$(read_env_value "${new_src}/ct-ops/.env.example" PASSWORD_MANAGER_API_IMAGE)"
+  ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "${old_install}/.env"
   grep -q '"git_tag":"api/v0.100.0"' "${old_install}/password-manager-release.json"
   unset MOCK_CURL_LOG MOCK_RELEASES_JSON_PAGE_2
 

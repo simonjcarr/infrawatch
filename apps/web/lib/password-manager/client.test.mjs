@@ -242,6 +242,40 @@ test('request payload helpers reject plaintext-shaped fields', () => {
   )
 })
 
+test('createUserKeyPayload accepts the CT-Ops browser-envelope setup payload', () => {
+  const payload = createUserKeyPayload({
+    encryptedPrivateKeyEnvelope: {
+      version: 1,
+      algorithm: 'rsa-oaep-256',
+      public_key_spki_b64: 'cHVibGljLWtleQ==',
+      iv_b64: 'MDEyMzQ1Njc4OWFi',
+      ciphertext_b64: 'Y2lwaGVydGV4dA==',
+    },
+    kdfMetadata: {
+      algorithm: 'pbkdf2-sha256',
+      salt_b64: 'MDEyMzQ1Njc4OWFiY2RlZg==',
+      iterations: 600000,
+      derived_key_length: 32,
+    },
+  })
+
+  assert.deepEqual(payload, {
+    encrypted_private_key_envelope: {
+      version: 1,
+      algorithm: 'rsa-oaep-256',
+      public_key_spki_b64: 'cHVibGljLWtleQ==',
+      iv_b64: 'MDEyMzQ1Njc4OWFi',
+      ciphertext_b64: 'Y2lwaGVydGV4dA==',
+    },
+    kdf_metadata: {
+      algorithm: 'pbkdf2-sha256',
+      salt_b64: 'MDEyMzQ1Njc4OWFiY2RlZg==',
+      iterations: 600000,
+      derived_key_length: 32,
+    },
+  })
+})
+
 test('request payload helpers serialize supported encrypted shapes', () => {
   assert.deepEqual(createPasswordManagerLaunchPayload('assertion-token'), { assertion: 'assertion-token' })
   assert.deepEqual(createVaultPayload({

@@ -117,9 +117,11 @@ edit: update the digest, source commit, contract version, and contract checksum
 together only after compatibility validation against the selected Password
 Manager release.
 
-Customer bundles also stamp `PASSWORD_MANAGER_API_IMAGE` to that digest-pinned
-API image by default, and `upgrade.sh` refreshes it automatically unless you
-intentionally override it in `.env`.
+Customer bundles embed that digest-pinned API image directly in
+`docker-compose.yml` for both `password-manager-migrate` and
+`password-manager-api`. Do not add `PASSWORD_MANAGER_API_IMAGE` to `.env`;
+`upgrade.sh` removes that legacy override so the UI and bundled API cannot
+silently drift.
 
 ## Backups
 

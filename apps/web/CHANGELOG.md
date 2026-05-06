@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.2...web/v0.110.3) (2026-05-06)
+
+
+### Bug Fixes
+
+* **password-manager:** pin api image from release descriptor ([5238842](https://github.com/carrtech-dev/ct-ops/commit/523884232557138f3e5cb8fd706c9fbef2c5c653))
+
 ## [0.110.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.1...web/v0.110.2) (2026-05-06)
 
 

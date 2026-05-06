@@ -15,6 +15,29 @@
 
 ## What Has Been Built
 
+### Session 118 — Password Manager export hardening
+
+**Risk-gated vault export flow** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/export.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Replaced the one-click vault export with an export dialog that requires
+  fresh unlock-password re-authentication and the typed acknowledgement
+  `I understand the risks` before any download is generated.
+- Added an encrypted ZIP export as the default path. The ZIP contains a
+  manifest plus an AES-256-GCM encrypted vault payload derived from the user's
+  export file password with PBKDF2-SHA256.
+- Kept explicit plaintext JSON export available as an advanced option with
+  destructive styling and warning copy, while continuing to audit successful
+  export events without sending plaintext secrets or export passwords to the
+  Password Manager API.
+
+**Validation**
+- `node --experimental-strip-types --test lib/password-manager/export.test.mjs`
+- `pnpm --filter web type-check`
+- `pnpm --filter web lint` (passes with existing unrelated warnings)
+- `pnpm --filter web test:e2e -- tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --filter web test:unit` (one unrelated existing failure filed as
+  https://github.com/carrtech-dev/ct-ops/issues/1109)
+- `git diff --check`
+
 ### Session 117 — Password Manager focused workspace layout
 
 **Passwords-first vault workspace** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

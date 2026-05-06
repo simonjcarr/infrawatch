@@ -80,7 +80,10 @@ import {
   createPasswordManagerClient,
 } from '@/lib/password-manager/client'
 import { normalizePasswordManagerUiError, shouldLogPasswordManagerError } from '@/lib/password-manager/errors'
-import { createPasswordManagerVaultExportBundle } from '@/lib/password-manager/export'
+import {
+  createPasswordManagerEncryptedVaultExportBundle,
+  createPasswordManagerVaultExportBundle,
+} from '@/lib/password-manager/export'
 import {
   createInitialPasswordManagerShellState,
   mapPasswordManagerErrorToShellView,
@@ -107,6 +110,9 @@ const GENERIC_UNLOCK_FAILURE =
 const GENERIC_SETUP_FAILURE = 'Password Manager setup could not be completed safely. Retry or relaunch.'
 const PASSWORD_MANAGER_MEMBER_ROLES = ['viewer', 'member', 'manager', 'owner'] as const
 const PASSWORD_MANAGER_CRYPTO_BATCH_SIZE = 8
+const PASSWORD_MANAGER_EXPORT_ACKNOWLEDGEMENT = 'I understand the risks'
+
+type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
 
 export type PasswordManagerOrganisationUser = {
   id: string
@@ -245,6 +251,13 @@ export function PasswordManagerClientShell({
   const [entryNotes, setEntryNotes] = useState('')
   const [entryRevealId, setEntryRevealId] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<PasswordManagerExportFormat>('encrypted')
+  const [exportUnlockPassword, setExportUnlockPassword] = useState('')
+  const [exportPassword, setExportPassword] = useState('')
+  const [exportPasswordConfirm, setExportPasswordConfirm] = useState('')
+  const [exportAcknowledgement, setExportAcknowledgement] = useState('')
+  const [exportError, setExportError] = useState<string | null>(null)
   const vaultKeyCacheRef = useRef(new Map<string, Map<number, CryptoKey>>())
   const memberPublicKeyEnvelopeCacheRef = useRef<Record<string, PasswordManagerPublicKeyEnvelope>>({})
   const pendingVaultCreateRef = useRef<{
@@ -466,6 +479,7 @@ export function PasswordManagerClientShell({
     setEntryNotes('')
     setEntryRevealId(null)
     setEditingEntryId(null)
+    resetVaultExportDialog()
     setWorkspaceError(null)
     workspaceDispatch({ type: 'restart' })
   }, [state.view])
@@ -1471,21 +1485,83 @@ export function PasswordManagerClientShell({
     }
   }
 
-  async function handleVaultExport() {
+  function resetVaultExportDialog() {
+    setExportFormat('encrypted')
+    setExportUnlockPassword('')
+    setExportPassword('')
+    setExportPasswordConfirm('')
+    setExportAcknowledgement('')
+    setExportError(null)
+  }
+
+  function handleStartVaultExport() {
     if (!selectedVault) {
       setWorkspaceError('Select a vault before exporting it.')
       return
     }
 
+    resetVaultExportDialog()
+    setExportDialogOpen(true)
+  }
+
+  async function handleVaultExport() {
+    if (!selectedVault) {
+      setExportError('Select a vault before exporting it.')
+      return
+    }
+    if (!state.encryptedPrivateKeyEnvelope || !state.unlockMetadata) {
+      setExportError('Relaunch and unlock Password Manager before exporting a vault.')
+      return
+    }
+    if (!exportUnlockPassword) {
+      setExportError('Enter your unlock password to re-authenticate before exporting.')
+      return
+    }
+    if (exportAcknowledgement !== PASSWORD_MANAGER_EXPORT_ACKNOWLEDGEMENT) {
+      setExportError(`Type "${PASSWORD_MANAGER_EXPORT_ACKNOWLEDGEMENT}" before exporting.`)
+      return
+    }
+    if (exportFormat === 'encrypted') {
+      if (exportPassword.length < 12) {
+        setExportError('Choose an export file password with at least 12 characters.')
+        return
+      }
+      if (exportPassword !== exportPasswordConfirm) {
+        setExportError('The export file passwords do not match.')
+        return
+      }
+    }
+
     setWorkspacePending(true)
+    setExportError(null)
     setWorkspaceError(null)
     try {
-      const bundle = createPasswordManagerVaultExportBundle({
+      await decryptUserPrivateKeyEnvelope({
+        unlockPassword: exportUnlockPassword,
+        encryptedPrivateKeyEnvelope: state.encryptedPrivateKeyEnvelope,
+        kdfMetadata: state.unlockMetadata,
+      })
+
+      const exportInput = {
         vault: selectedVault,
         entries: entries.filter((entry) => entry.vaultId === selectedVault.id),
-      })
+      }
+      const bundle =
+        exportFormat === 'encrypted'
+          ? await createPasswordManagerEncryptedVaultExportBundle({
+              ...exportInput,
+              exportPassword,
+            })
+          : createPasswordManagerVaultExportBundle(exportInput)
+
       triggerBlobDownload(bundle.blob, bundle.fileName)
-      setStatusNotice(`Vault export packaged locally for ${selectedVault.metadata.name}.`)
+      setStatusNotice(
+        exportFormat === 'encrypted'
+          ? `Encrypted vault export packaged locally for ${selectedVault.metadata.name}.`
+          : `Plaintext vault export packaged locally for ${selectedVault.metadata.name}. Delete it as soon as it is no longer needed.`,
+      )
+      setExportDialogOpen(false)
+      resetVaultExportDialog()
       await client.auditExport({
         vaultId: selectedVault.id,
       })
@@ -1499,7 +1575,8 @@ export function PasswordManagerClientShell({
         return
       }
 
-      handleWorkspaceActionError(error, 'The vault could not be exported safely.')
+      const normalized = normalizePasswordManagerUiError(error, 'The vault could not be exported safely.')
+      setExportError(normalized.kind === 'message' ? normalized.message : 'The vault could not be exported safely.')
     } finally {
       setWorkspacePending(false)
     }
@@ -1601,7 +1678,7 @@ export function PasswordManagerClientShell({
           onEntryTitleChange={setEntryTitle}
           onEntryUrlChange={setEntryUrl}
           onEntryUsernameChange={setEntryUsername}
-          onExportVault={handleVaultExport}
+          onExportVault={handleStartVaultExport}
           onMemberPublicKeyEnvelopeInputChange={(userId, value) =>
             setMemberPublicKeyEnvelopeInputs((current) => ({ ...current, [userId]: value }))
           }
@@ -1648,6 +1725,124 @@ export function PasswordManagerClientShell({
           workspaceState={workspaceState}
         />
       ) : null}
+      <Dialog
+        open={exportDialogOpen}
+        onOpenChange={(open) => {
+          setExportDialogOpen(open)
+          if (!open && !workspacePending) {
+            resetVaultExportDialog()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export vault</DialogTitle>
+            <DialogDescription>
+              Vault exports can contain plaintext passwords, API keys, URLs, usernames, and notes. Anyone with access to
+              an unencrypted export can use those secrets.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <Alert variant={exportFormat === 'plaintext' ? 'destructive' : 'default'}>
+              <ShieldAlert className="size-4" />
+              <AlertTitle>{exportFormat === 'plaintext' ? 'Plaintext export selected' : 'Encrypted export recommended'}</AlertTitle>
+              <AlertDescription>
+                {exportFormat === 'plaintext'
+                  ? 'Plain JSON is readable immediately after download. Use it only for a short migration window, then delete it securely.'
+                  : 'The ZIP contains an AES-GCM encrypted vault export protected by the export file password you choose below.'}
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid gap-2">
+              <Label htmlFor="password-manager-export-format">Export format</Label>
+              <Select
+                value={exportFormat}
+                onValueChange={(value) => setExportFormat(value as PasswordManagerExportFormat)}
+                disabled={workspacePending}
+              >
+                <SelectTrigger id="password-manager-export-format">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="encrypted">Encrypted ZIP</SelectItem>
+                  <SelectItem value="plaintext">Plain JSON</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="password-manager-export-unlock-password">Unlock password</Label>
+              <Input
+                id="password-manager-export-unlock-password"
+                type="password"
+                value={exportUnlockPassword}
+                onChange={(event) => setExportUnlockPassword(event.target.value)}
+                autoComplete="current-password"
+                disabled={workspacePending}
+              />
+            </div>
+
+            {exportFormat === 'encrypted' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-export-file-password">Export file password</Label>
+                  <Input
+                    id="password-manager-export-file-password"
+                    type="password"
+                    value={exportPassword}
+                    onChange={(event) => setExportPassword(event.target.value)}
+                    autoComplete="new-password"
+                    disabled={workspacePending}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-export-file-password-confirm">Confirm export file password</Label>
+                  <Input
+                    id="password-manager-export-file-password-confirm"
+                    type="password"
+                    value={exportPasswordConfirm}
+                    onChange={(event) => setExportPasswordConfirm(event.target.value)}
+                    autoComplete="new-password"
+                    disabled={workspacePending}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <Label htmlFor="password-manager-export-acknowledgement">
+                Type &quot;{PASSWORD_MANAGER_EXPORT_ACKNOWLEDGEMENT}&quot;
+              </Label>
+              <Input
+                id="password-manager-export-acknowledgement"
+                value={exportAcknowledgement}
+                onChange={(event) => setExportAcknowledgement(event.target.value)}
+                disabled={workspacePending}
+              />
+            </div>
+
+            {exportError ? (
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Export blocked</AlertTitle>
+                <AlertDescription>{exportError}</AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)} disabled={workspacePending}>
+              Cancel
+            </Button>
+            <Button
+              variant={exportFormat === 'plaintext' ? 'destructive' : 'default'}
+              onClick={() => void handleVaultExport()}
+              disabled={workspacePending}
+            >
+              {workspacePending ? 'Exporting...' : exportFormat === 'encrypted' ? 'Export encrypted ZIP' : 'Export plain JSON'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
@@ -2059,7 +2254,7 @@ function PasswordManagerWorkspace({
   onEntryTitleChange: (value: string) => void
   onEntryUrlChange: (value: string) => void
   onEntryUsernameChange: (value: string) => void
-  onExportVault: () => Promise<void>
+  onExportVault: () => void
   onMemberPublicKeyEnvelopeInputChange: (userId: string, value: string) => void
   onMemberRemove: (member: MemberRecord) => Promise<void>
   onMemberRecipientLookupRequest: () => void

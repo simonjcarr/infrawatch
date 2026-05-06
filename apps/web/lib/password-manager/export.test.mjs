@@ -96,11 +96,13 @@ test('createPasswordManagerVaultExportBundle packages decrypted vault data for e
     entries: [
       {
         id: 'entry-1',
+        type: 'login',
         title: 'Grafana',
         username: 'admin',
         password: 'super-secret',
         url: 'https://grafana.example.test',
         notes: 'Rotate quarterly',
+        fields: null,
         key_epoch: 3,
         updated_at: '2026-05-06T09:10:00Z',
       },

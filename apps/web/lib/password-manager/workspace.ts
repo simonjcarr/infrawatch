@@ -9,10 +9,12 @@ export interface PasswordManagerVaultMetadata {
 
 export interface PasswordManagerEntryPayload {
   title: string
-  username: string
-  password: string
+  type?: 'login' | 'card' | 'identity' | 'secure-note'
+  username?: string
+  password?: string
   notes?: string
   url?: string
+  fields?: Record<string, string>
 }
 
 export interface PasswordManagerVaultSummary {
@@ -82,7 +84,7 @@ export function filterPasswordManagerEntries(
   const normalizedQuery = normalizeSearchQuery(query)
   const filtered = normalizedQuery
     ? entries.filter((entry) =>
-        `${entry.payload.title} ${entry.payload.username} ${entry.payload.url ?? ''} ${entry.payload.notes ?? ''}`
+        `${entry.payload.title} ${entry.payload.username ?? ''} ${entry.payload.url ?? ''} ${entry.payload.notes ?? ''} ${Object.values(entry.payload.fields ?? {}).join(' ')}`
           .toLowerCase()
           .includes(normalizedQuery),
       )

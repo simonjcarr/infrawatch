@@ -15,6 +15,30 @@
 
 ## What Has Been Built
 
+### Session 119 — Password Manager entry templates
+
+**Template-driven entry modal** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/workspace.ts`, `apps/web/lib/password-manager/export.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Replaced the inline entry editor with a modal so the Passwords tab gives its
+  full content area to entries in the selected vault.
+- Added a split New entry button with a template dropdown. Login remains the
+  default template, and users can also choose Card, Identity, or Secure note
+  templates before opening the modal.
+- Extended encrypted entry payloads to carry a template type and template
+  fields while keeping login username/password fields compatible with existing
+  entries, filtering, reveal/copy, and export behavior.
+- Expanded the hosted Password Manager E2E flow to create both Card and Login
+  entries through the modal and assert plaintext template fields stay out of API
+  requests, console output, and outbound bodies.
+
+**Validation**
+- `pnpm install`
+- `pnpm --filter web type-check`
+- `cd apps/web && node --experimental-strip-types --test lib/password-manager/export.test.mjs lib/password-manager/workspace.test.mjs`
+- `pnpm --filter web lint` (passes with existing unrelated warnings)
+- `pnpm --filter web test:e2e tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --filter web test:unit` (one unrelated existing failure tracked as
+  https://github.com/carrtech-dev/ct-ops/issues/1109)
+
 ### Session 118 — Password Manager export hardening
 
 **Risk-gated vault export flow** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/export.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

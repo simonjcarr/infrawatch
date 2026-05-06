@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.111.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.111.0...web/v0.111.1) (2026-05-06)
+
+
+### Performance Improvements
+
+* **password-manager:** reduce browser workload ([55b4681](https://github.com/carrtech-dev/ct-ops/commit/55b468102fb8eaa113451276b8d0c69290f2fa34))
+
 ## [0.111.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.4...web/v0.111.0) (2026-05-06)
 
 

@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -68,23 +69,45 @@ func VerifySSHHostKey(ctx context.Context, pool *pgxpool.Pool, hostID string, fi
 	defer tx.Rollback(ctx)
 
 	const selectQ = `
-		SELECT metadata->>'sshHostKeySha256'
+		SELECT COALESCE(metadata, '{}'::jsonb)
 		FROM hosts
 		WHERE id = $1
 		  AND deleted_at IS NULL
 		FOR UPDATE
 	`
-	var current *string
-	if err := tx.QueryRow(ctx, selectQ, hostID).Scan(&current); err != nil {
+	var metadata []byte
+	if err := tx.QueryRow(ctx, selectQ, hostID).Scan(&metadata); err != nil {
 		if err == pgx.ErrNoRows {
 			return fmt.Errorf("host not found")
 		}
 		return err
 	}
-	if err := verifySSHHostKeyFingerprint(current, fingerprint); err != nil {
+	if err := verifySSHHostKeyMetadata(metadata, fingerprint); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func verifySSHHostKeyMetadata(metadata []byte, fingerprint string) error {
+	var parsed sshHostKeyMetadata
+	if len(metadata) > 0 {
+		if err := json.Unmarshal(metadata, &parsed); err != nil {
+			return err
+		}
+	}
+	if parsed.SSHHostKeyStatus == "changed" && len(parsed.PendingSSHHostKeys) > 0 {
+		return ErrSSHHostKeyMismatch
+	}
+	trusted := normaliseSSHHostKeys(parsed.SSHHostKeys)
+	if len(trusted) == 0 {
+		return verifySSHHostKeyFingerprint(ptrOrNil(parsed.SSHHostKeySha256), fingerprint)
+	}
+	for _, key := range trusted {
+		if key.FingerprintSHA256 == fingerprint {
+			return nil
+		}
+	}
+	return ErrSSHHostKeyMismatch
 }
 
 func verifySSHHostKeyFingerprint(current *string, fingerprint string) error {
@@ -95,6 +118,13 @@ func verifySSHHostKeyFingerprint(current *string, fingerprint string) error {
 		return ErrSSHHostKeyMismatch
 	}
 	return nil
+}
+
+func ptrOrNil(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // SetTerminalSessionEnded marks a terminal session as 'ended' with duration and

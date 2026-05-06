@@ -32,6 +32,11 @@ export interface HostCollectionSettings {
   }
 }
 
+export interface SshHostKeyMetadata {
+  algorithm?: string
+  fingerprintSha256: string
+}
+
 export const DEFAULT_COLLECTION_SETTINGS: HostCollectionSettings = {
   cpu: true,
   memory: true,
@@ -79,6 +84,16 @@ export const hostMetadataSchema = z.object({
   terminalEnabled: z.boolean().optional().catch(undefined),
   terminalAllowedUsers: z.array(z.string()).catch([]).optional(),
   sshHostKeySha256: z.string().optional().catch(undefined),
+  sshHostKeys: z.array(z.object({
+    algorithm: z.string().optional().catch(undefined),
+    fingerprintSha256: z.string(),
+  }).strip()).catch([]).optional(),
+  pendingSshHostKeys: z.array(z.object({
+    algorithm: z.string().optional().catch(undefined),
+    fingerprintSha256: z.string(),
+  }).strip()).catch([]).optional(),
+  sshHostKeyStatus: z.enum(['changed']).optional().catch(undefined),
+  sshHostKeyChangedAt: z.string().optional().catch(undefined),
   lastSoftwareScanAt: z.string().optional().catch(undefined),
   pendingTags: z.array(tagPairSchema).catch([]).optional(),
 }).strip()
@@ -109,6 +124,10 @@ export interface HostMetadata {
   terminalEnabled?: boolean
   terminalAllowedUsers?: string[]
   sshHostKeySha256?: string
+  sshHostKeys?: SshHostKeyMetadata[]
+  pendingSshHostKeys?: SshHostKeyMetadata[]
+  sshHostKeyStatus?: 'changed'
+  sshHostKeyChangedAt?: string
   lastSoftwareScanAt?: string    // ISO timestamp; avoid Date in JSONB (use .toISOString())
   // Tags supplied via the agent CLI --tag flag / token metadata at register
   // time. Stashed here until approveAgent merges them with org defaults and

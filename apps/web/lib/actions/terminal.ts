@@ -10,7 +10,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { createHash, randomBytes } from 'node:crypto'
 import { getRequiredSession } from '@/lib/auth/session'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
-import { parseHostMetadata } from '@/lib/db/schema/hosts'
+import { parseHostMetadata, type SshHostKeyMetadata } from '@/lib/db/schema/hosts'
 import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
 import { hasRole } from '@/lib/auth/guards'
 import { writeAuditEvent } from '@/lib/audit/events'
@@ -235,6 +235,10 @@ export async function updateOrgTerminalSettings(
 export interface HostTerminalSettings {
   terminalEnabled: boolean
   terminalAllowedUsers: string[]
+  sshHostKeys: SshHostKeyMetadata[]
+  pendingSshHostKeys: SshHostKeyMetadata[]
+  sshHostKeyStatus?: 'changed'
+  sshHostKeyChangedAt?: string
 }
 
 export async function getHostTerminalSettings(
@@ -250,6 +254,10 @@ export async function getHostTerminalSettings(
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalAllowedUsers: meta.terminalAllowedUsers ?? [],
+    sshHostKeys: normaliseHostKeys(meta.sshHostKeys, meta.sshHostKeySha256),
+    pendingSshHostKeys: normaliseHostKeys(meta.pendingSshHostKeys),
+    sshHostKeyStatus: meta.sshHostKeyStatus,
+    sshHostKeyChangedAt: meta.sshHostKeyChangedAt,
   }
 }
 
@@ -305,4 +313,88 @@ export async function updateHostTerminalSettings(
     logError('Failed to update host terminal settings:', err)
     return { error: 'An unexpected error occurred' }
   }
+}
+
+export async function trustPendingSshHostKeys(
+  orgId: string,
+  hostId: string,
+): Promise<{ success: true } | { error: string }> {
+  let session
+  try {
+    session = await requireOrgAdminAccess(orgId)
+  } catch {
+    return { error: 'You do not have permission to perform this action' }
+  }
+
+  try {
+    const host = await db.query.hosts.findFirst({
+      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+      columns: { id: true, metadata: true },
+    })
+    if (!host) return { error: 'Host not found' }
+
+    const currentMetadata = parseHostMetadata(host.metadata)
+    const pendingKeys = normaliseHostKeys(currentMetadata.pendingSshHostKeys)
+    if (pendingKeys.length === 0) {
+      return { error: 'No pending SSH host key is available to trust' }
+    }
+
+    const updatedMetadata = {
+      ...currentMetadata,
+      sshHostKeys: pendingKeys,
+      sshHostKeySha256: pendingKeys[0]?.fingerprintSha256,
+      pendingSshHostKeys: [],
+      sshHostKeyStatus: undefined,
+      sshHostKeyChangedAt: undefined,
+    }
+
+    await db
+      .update(hosts)
+      .set({ metadata: updatedMetadata, updatedAt: new Date() })
+      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+
+    await writeAuditEvent(db, {
+      organisationId: orgId,
+      actorUserId: session.user.id,
+      action: 'terminal.host_ssh_key.trusted',
+      targetType: 'host',
+      targetId: hostId,
+      summary: 'Trusted pending SSH host key for terminal access',
+      metadata: {
+        previous: {
+          sshHostKeys: normaliseHostKeys(currentMetadata.sshHostKeys, currentMetadata.sshHostKeySha256),
+          pendingSshHostKeys: pendingKeys,
+          sshHostKeyStatus: currentMetadata.sshHostKeyStatus,
+          sshHostKeyChangedAt: currentMetadata.sshHostKeyChangedAt,
+        },
+        next: {
+          sshHostKeys: pendingKeys,
+        },
+      },
+    })
+
+    return { success: true }
+  } catch (err) {
+    logError('Failed to trust pending SSH host key:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
+function normaliseHostKeys(keys?: SshHostKeyMetadata[], legacyFingerprint?: string): SshHostKeyMetadata[] {
+  const result: SshHostKeyMetadata[] = []
+  const seen = new Set<string>()
+  for (const key of keys ?? []) {
+    if (!key.fingerprintSha256) continue
+    const identity = `${key.algorithm ?? ''}\0${key.fingerprintSha256}`
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    result.push({
+      algorithm: key.algorithm,
+      fingerprintSha256: key.fingerprintSha256,
+    })
+  }
+  if (result.length === 0 && legacyFingerprint) {
+    result.push({ fingerprintSha256: legacyFingerprint })
+  }
+  return result
 }

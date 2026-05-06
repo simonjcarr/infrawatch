@@ -780,6 +780,58 @@ func (x *AgentTaskResult) GetError() string {
 	return ""
 }
 
+type SSHHostKey struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Algorithm         string                 `protobuf:"bytes,1,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	FingerprintSha256 string                 `protobuf:"bytes,2,opt,name=fingerprint_sha256,json=fingerprintSha256,proto3" json:"fingerprint_sha256,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *SSHHostKey) Reset() {
+	*x = SSHHostKey{}
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SSHHostKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SSHHostKey) ProtoMessage() {}
+
+func (x *SSHHostKey) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SSHHostKey.ProtoReflect.Descriptor instead.
+func (*SSHHostKey) Descriptor() ([]byte, []int) {
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SSHHostKey) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *SSHHostKey) GetFingerprintSha256() string {
+	if x != nil {
+		return x.FingerprintSha256
+	}
+	return ""
+}
+
 type HeartbeatRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	AgentId           string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
@@ -805,14 +857,15 @@ type HeartbeatRequest struct {
 	// on mismatch, it returns the current cert in pending_server_cert_pem so
 	// the agent can continue to verify downloads after an operator swap
 	// without manual CA distribution on each agent host.
-	PinnedServerCertFingerprint string `protobuf:"bytes,17,opt,name=pinned_server_cert_fingerprint,json=pinnedServerCertFingerprint,proto3" json:"pinned_server_cert_fingerprint,omitempty"`
+	PinnedServerCertFingerprint string        `protobuf:"bytes,17,opt,name=pinned_server_cert_fingerprint,json=pinnedServerCertFingerprint,proto3" json:"pinned_server_cert_fingerprint,omitempty"`
+	SshHostKeys                 []*SSHHostKey `protobuf:"bytes,18,rep,name=ssh_host_keys,json=sshHostKeys,proto3" json:"ssh_host_keys,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[11]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -824,7 +877,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[11]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -837,7 +890,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{11}
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HeartbeatRequest) GetAgentId() string {
@@ -959,6 +1012,13 @@ func (x *HeartbeatRequest) GetPinnedServerCertFingerprint() string {
 	return ""
 }
 
+func (x *HeartbeatRequest) GetSshHostKeys() []*SSHHostKey {
+	if x != nil {
+		return x.SshHostKeys
+	}
+	return nil
+}
+
 type HeartbeatResponse struct {
 	state                   protoimpl.MessageState    `protogen:"open.v1"`
 	Ok                      bool                      `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
@@ -992,7 +1052,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[12]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1004,7 +1064,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_heartbeat_proto_msgTypes[12]
+	mi := &file_agent_v1_heartbeat_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1017,7 +1077,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{12}
+	return file_agent_v1_heartbeat_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *HeartbeatResponse) GetOk() bool {
@@ -1206,7 +1266,11 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12\x1f\n" +
 	"\vresult_json\x18\x04 \x01(\tR\n" +
 	"resultJson\x12\x14\n" +
-	"\x05error\x18\x05 \x01(\tR\x05error\"\x85\x06\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\"Y\n" +
+	"\n" +
+	"SSHHostKey\x12\x1c\n" +
+	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12-\n" +
+	"\x12fingerprint_sha256\x18\x02 \x01(\tR\x11fingerprintSha256\"\xbf\x06\n" +
 	"\x10HeartbeatRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1f\n" +
 	"\vcpu_percent\x18\x02 \x01(\x02R\n" +
@@ -1227,7 +1291,8 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\rquery_results\x18\x0e \x03(\v2\x1a.agent.v1.AgentQueryResultR\fqueryResults\x12@\n" +
 	"\rtask_progress\x18\x0f \x03(\v2\x1b.agent.v1.AgentTaskProgressR\ftaskProgress\x12<\n" +
 	"\ftask_results\x18\x10 \x03(\v2\x19.agent.v1.AgentTaskResultR\vtaskResults\x12C\n" +
-	"\x1epinned_server_cert_fingerprint\x18\x11 \x01(\tR\x1bpinnedServerCertFingerprint\"\xa9\x06\n" +
+	"\x1epinned_server_cert_fingerprint\x18\x11 \x01(\tR\x1bpinnedServerCertFingerprint\x128\n" +
+	"\rssh_host_keys\x18\x12 \x03(\v2\x14.agent.v1.SSHHostKeyR\vsshHostKeys\"\xa9\x06\n" +
 	"\x11HeartbeatResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12'\n" +
@@ -1259,7 +1324,7 @@ func file_agent_v1_heartbeat_proto_rawDescGZIP() []byte {
 	return file_agent_v1_heartbeat_proto_rawDescData
 }
 
-var file_agent_v1_heartbeat_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_agent_v1_heartbeat_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_agent_v1_heartbeat_proto_goTypes = []any{
 	(*DiskInfo)(nil),               // 0: agent.v1.DiskInfo
 	(*NetworkInterface)(nil),       // 1: agent.v1.NetworkInterface
@@ -1272,9 +1337,10 @@ var file_agent_v1_heartbeat_proto_goTypes = []any{
 	(*AgentTask)(nil),              // 8: agent.v1.AgentTask
 	(*AgentTaskProgress)(nil),      // 9: agent.v1.AgentTaskProgress
 	(*AgentTaskResult)(nil),        // 10: agent.v1.AgentTaskResult
-	(*HeartbeatRequest)(nil),       // 11: agent.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),      // 12: agent.v1.HeartbeatResponse
-	(*TerminalSessionRequest)(nil), // 13: agent.v1.TerminalSessionRequest
+	(*SSHHostKey)(nil),             // 11: agent.v1.SSHHostKey
+	(*HeartbeatRequest)(nil),       // 12: agent.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),      // 13: agent.v1.HeartbeatResponse
+	(*TerminalSessionRequest)(nil), // 14: agent.v1.TerminalSessionRequest
 }
 var file_agent_v1_heartbeat_proto_depIdxs = []int32{
 	5,  // 0: agent.v1.AgentQueryResult.ports:type_name -> agent.v1.PortInfo
@@ -1285,15 +1351,16 @@ var file_agent_v1_heartbeat_proto_depIdxs = []int32{
 	7,  // 5: agent.v1.HeartbeatRequest.query_results:type_name -> agent.v1.AgentQueryResult
 	9,  // 6: agent.v1.HeartbeatRequest.task_progress:type_name -> agent.v1.AgentTaskProgress
 	10, // 7: agent.v1.HeartbeatRequest.task_results:type_name -> agent.v1.AgentTaskResult
-	2,  // 8: agent.v1.HeartbeatResponse.checks:type_name -> agent.v1.CheckDefinition
-	4,  // 9: agent.v1.HeartbeatResponse.pending_queries:type_name -> agent.v1.AgentQuery
-	8,  // 10: agent.v1.HeartbeatResponse.pending_task:type_name -> agent.v1.AgentTask
-	13, // 11: agent.v1.HeartbeatResponse.pending_terminal_sessions:type_name -> agent.v1.TerminalSessionRequest
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	11, // 8: agent.v1.HeartbeatRequest.ssh_host_keys:type_name -> agent.v1.SSHHostKey
+	2,  // 9: agent.v1.HeartbeatResponse.checks:type_name -> agent.v1.CheckDefinition
+	4,  // 10: agent.v1.HeartbeatResponse.pending_queries:type_name -> agent.v1.AgentQuery
+	8,  // 11: agent.v1.HeartbeatResponse.pending_task:type_name -> agent.v1.AgentTask
+	14, // 12: agent.v1.HeartbeatResponse.pending_terminal_sessions:type_name -> agent.v1.TerminalSessionRequest
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_heartbeat_proto_init() }
@@ -1308,7 +1375,7 @@ func file_agent_v1_heartbeat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_heartbeat_proto_rawDesc), len(file_agent_v1_heartbeat_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

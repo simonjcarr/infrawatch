@@ -1,6 +1,7 @@
 import * as tls from 'tls'
 import * as crypto from 'crypto'
 import * as forge from 'node-forge'
+import { assertPublicHost } from '../net/ssrf-guard.ts'
 
 export interface ParsedSAN {
   type: string
@@ -67,6 +68,10 @@ export interface FetchUrlResult {
   host: string
   port: number
   serverName: string
+}
+
+export interface FetchCertificateFromUrlOptions {
+  enforcePublicHost?: boolean
 }
 
 interface DerNode {
@@ -629,7 +634,11 @@ const MAX_CERT_BYTES = 65_536
 // Practical PKI chains are ≤ 5; cap at 10 to prevent memory exhaustion from crafted loops.
 const MAX_CHAIN_DEPTH = 10
 
-export function fetchCertPemsFromUrl(host: string, port: number, serverName: string): Promise<string[]> {
+export function fetchCertPemsFromUrl(
+  host: string,
+  port: number,
+  serverName: string,
+): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const socket = tls.connect(
       { host, port, servername: serverName, rejectUnauthorized: false, timeout: 10_000 },
@@ -668,9 +677,11 @@ export async function fetchCertificateFromUrl(
   rawUrl: string,
   portOverride?: number,
   serverNameOverride?: string,
+  options: FetchCertificateFromUrlOptions = {},
 ): Promise<FetchUrlResult> {
   const { host, port, serverName } = resolveUrlTarget(rawUrl, portOverride, serverNameOverride)
-  const pems = await fetchCertPemsFromUrl(host, port, serverName)
+  const dialHost = options.enforcePublicHost ? await assertPublicHost(host) : host
+  const pems = await fetchCertPemsFromUrl(dialHost, port, serverName)
   const chain = pems.length > 1 ? buildChain(pems) : []
   const certificate = parseCertPem(pems[0]!)
   certificate.chain = chain

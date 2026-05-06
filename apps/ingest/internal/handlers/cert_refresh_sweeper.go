@@ -179,8 +179,9 @@ func fetchLeafAndChain(ctx context.Context, trackedURL string, skipVerify bool) 
 }
 
 type fetchLeafAndChainOptions struct {
-	rootCAs    *x509.CertPool
-	skipVerify bool
+	rootCAs          *x509.CertPool
+	skipVerify       bool
+	allowPrivateHost bool
 }
 
 func fetchLeafAndChainWithOptions(
@@ -193,8 +194,16 @@ func fetchLeafAndChainWithOptions(
 		return nil, nil, err
 	}
 
+	dialHost := host
+	if !opts.allowPrivateHost {
+		dialHost, err = assertPublicHost(host)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	dialer := &net.Dialer{Timeout: certRefreshDialTimout}
-	rawConn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	rawConn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(dialHost, strconv.Itoa(port)))
 	if err != nil {
 		return nil, nil, fmt.Errorf("tcp dial: %w", err)
 	}

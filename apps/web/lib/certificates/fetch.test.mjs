@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { parseCertificateBuffer } from './fetch.ts'
+import { fetchCertificateFromUrl, parseCertificateBuffer } from './fetch.ts'
 
 function generateCertificatePem() {
   const dir = mkdtempSync(join(tmpdir(), 'ct-ops-cert-'))
@@ -110,5 +110,12 @@ test('parseCertificateBuffer rejects oversized PEM payloads before parsing', () 
   assert.throws(
     () => parseCertificateBuffer(oversizedPem),
     /certificate PEM exceeds the 65536-byte size limit/,
+  )
+})
+
+test('fetchCertificateFromUrl rejects private resolved hosts before dialing TLS', async () => {
+  await assert.rejects(
+    () => fetchCertificateFromUrl('https://localhost', undefined, undefined, { enforcePublicHost: true }),
+    /private or reserved address/,
   )
 })

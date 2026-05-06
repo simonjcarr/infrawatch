@@ -16,9 +16,11 @@ import {
   Check,
   ChevronsUpDown,
   Copy,
+  CreditCard,
   Download,
   Eye,
   EyeOff,
+  IdCard,
   RotateCcw,
   KeyRound,
   Lock,
@@ -29,6 +31,7 @@ import {
   Search,
   Settings,
   ShieldAlert,
+  StickyNote,
   Trash2,
   Vault,
 } from 'lucide-react'
@@ -45,6 +48,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -113,6 +124,68 @@ const PASSWORD_MANAGER_CRYPTO_BATCH_SIZE = 8
 const PASSWORD_MANAGER_EXPORT_ACKNOWLEDGEMENT = 'I understand the risks'
 
 type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
+type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note'
+
+type PasswordManagerEntryTemplateField = {
+  id: string
+  label: string
+  type?: string
+  multiline?: boolean
+  required?: boolean
+}
+
+const PASSWORD_MANAGER_ENTRY_TEMPLATES: Array<{
+  id: PasswordManagerEntryTemplateId
+  label: string
+  dialogLabel: string
+  description: string
+  fields: PasswordManagerEntryTemplateField[]
+}> = [
+  {
+    id: 'login',
+    label: 'Login',
+    dialogLabel: 'login',
+    description: 'Username, password, URL, and notes.',
+    fields: [
+      { id: 'username', label: 'Username', required: true },
+      { id: 'password', label: 'Password', type: 'password', required: true },
+      { id: 'url', label: 'URL' },
+    ],
+  },
+  {
+    id: 'card',
+    label: 'Card',
+    dialogLabel: 'card',
+    description: 'Payment card details and billing notes.',
+    fields: [
+      { id: 'cardholderName', label: 'Cardholder name', required: true },
+      { id: 'cardNumber', label: 'Card number', required: true },
+      { id: 'expiryMonth', label: 'Expiry month' },
+      { id: 'expiryYear', label: 'Expiry year' },
+      { id: 'securityCode', label: 'Security code', type: 'password' },
+    ],
+  },
+  {
+    id: 'identity',
+    label: 'Identity',
+    dialogLabel: 'identity',
+    description: 'Names, contact details, and address information.',
+    fields: [
+      { id: 'fullName', label: 'Full name', required: true },
+      { id: 'email', label: 'Email' },
+      { id: 'phone', label: 'Phone' },
+      { id: 'address', label: 'Address', multiline: true },
+    ],
+  },
+  {
+    id: 'secure-note',
+    label: 'Secure note',
+    dialogLabel: 'secure note',
+    description: 'Free-form encrypted notes without a password field.',
+    fields: [{ id: 'note', label: 'Secure note', multiline: true, required: true }],
+  },
+]
+const DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID: PasswordManagerEntryTemplateId = 'login'
 
 export type PasswordManagerOrganisationUser = {
   id: string
@@ -184,6 +257,42 @@ async function mapPasswordManagerCryptoBatch<TInput, TOutput>(
   return results
 }
 
+function getPasswordManagerEntryTemplate(templateId: string | undefined) {
+  return (
+    PASSWORD_MANAGER_ENTRY_TEMPLATES.find((template) => template.id === templateId) ??
+    PASSWORD_MANAGER_ENTRY_TEMPLATES.find((template) => template.id === DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID)!
+  )
+}
+
+function getPasswordManagerEntrySummaryText(entry: PasswordManagerEntrySummary): string {
+  const payload = entry.payload
+  switch (payload.type) {
+    case 'card':
+      return payload.fields?.cardholderName || 'Card'
+    case 'identity':
+      return payload.fields?.fullName || payload.fields?.email || 'Identity'
+    case 'secure-note':
+      return 'Secure note'
+    case 'login':
+    default:
+      return payload.username || 'Login'
+  }
+}
+
+function getPasswordManagerEntryIcon(templateId: string | undefined): ReactNode {
+  switch (templateId) {
+    case 'card':
+      return <CreditCard className="size-4 text-muted-foreground" />
+    case 'identity':
+      return <IdCard className="size-4 text-muted-foreground" />
+    case 'secure-note':
+      return <StickyNote className="size-4 text-muted-foreground" />
+    case 'login':
+    default:
+      return <KeyRound className="size-4 text-muted-foreground" />
+  }
+}
+
 export function PasswordManagerClientShell({
   currentUserId,
   orgId,
@@ -244,11 +353,18 @@ export function PasswordManagerClientShell({
   const [memberRoleEdits, setMemberRoleEdits] = useState<Record<string, string>>({})
   const [memberPublicKeyEnvelopeInputs, setMemberPublicKeyEnvelopeInputs] = useState<Record<string, string>>({})
   const [rotationPrompt, setRotationPrompt] = useState<string | null>(null)
+  const [selectedEntryTemplateId, setSelectedEntryTemplateId] = useState<PasswordManagerEntryTemplateId>(
+    DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID,
+  )
+  const [entryTemplateId, setEntryTemplateId] = useState<PasswordManagerEntryTemplateId>(
+    DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID,
+  )
   const [entryTitle, setEntryTitle] = useState('')
   const [entryUsername, setEntryUsername] = useState('')
   const [entryPassword, setEntryPassword] = useState('')
   const [entryUrl, setEntryUrl] = useState('')
   const [entryNotes, setEntryNotes] = useState('')
+  const [entryFields, setEntryFields] = useState<Record<string, string>>({})
   const [entryRevealId, setEntryRevealId] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
@@ -790,14 +906,17 @@ export function PasswordManagerClientShell({
       setEntryPassword('')
       setEntryUrl('')
       setEntryNotes('')
+      setEntryFields({})
       return
     }
 
     setEntryTitle(selectedEntry.payload.title)
-    setEntryUsername(selectedEntry.payload.username)
-    setEntryPassword(selectedEntry.payload.password)
+    setEntryTemplateId(getPasswordManagerEntryTemplate(selectedEntry.payload.type).id)
+    setEntryUsername(selectedEntry.payload.username ?? '')
+    setEntryPassword(selectedEntry.payload.password ?? '')
     setEntryUrl(selectedEntry.payload.url ?? '')
     setEntryNotes(selectedEntry.payload.notes ?? '')
+    setEntryFields(selectedEntry.payload.fields ?? {})
   }, [selectedEntry])
 
   async function handleSetupSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1355,31 +1474,55 @@ export function PasswordManagerClientShell({
     }
   }
 
-  async function handleEntrySave() {
+  async function handleEntrySave(): Promise<boolean> {
     if (!workspaceState.selectedVaultId || !selectedVault) {
       setWorkspaceError('Select a vault before saving an entry.')
-      return
+      return false
     }
     const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, workspaceState.selectedVaultId, selectedVault.currentKeyEpoch)
     if (!vaultKey) {
       setWorkspaceError('The selected vault key is no longer available in browser memory. Relock or relaunch.')
-      return
+      return false
     }
 
+    const template = getPasswordManagerEntryTemplate(entryTemplateId)
     const title = entryTitle.trim()
     const username = entryUsername.trim()
     const password = entryPassword.trim()
-    if (!title || !username || !password) {
-      setWorkspaceError('Entry title, username, and password are required.')
-      return
+    const fields = Object.fromEntries(
+      template.fields
+        .filter((field) => field.id !== 'username' && field.id !== 'password' && field.id !== 'url')
+        .map((field) => [field.id, (entryFields[field.id] ?? '').trim()])
+        .filter(([, value]) => value),
+    )
+    const missingRequiredField = template.fields.some((field) => {
+      if (!field.required) {
+        return false
+      }
+      if (field.id === 'username') {
+        return !username
+      }
+      if (field.id === 'password') {
+        return !password
+      }
+      if (field.id === 'url') {
+        return !entryUrl.trim()
+      }
+      return !(entryFields[field.id] ?? '').trim()
+    })
+    if (!title || missingRequiredField) {
+      setWorkspaceError('Entry title and required template fields are required.')
+      return false
     }
 
     const payload: PasswordManagerEntryPayload = {
       title,
-      username,
-      password,
-      url: entryUrl.trim() || undefined,
+      type: template.id,
+      username: template.id === 'login' ? username : fields.cardholderName || fields.fullName || fields.email,
+      password: template.id === 'login' ? password : undefined,
+      url: template.id === 'login' ? entryUrl.trim() || undefined : undefined,
       notes: entryNotes.trim() || undefined,
+      fields: Object.keys(fields).length ? fields : undefined,
     }
 
     setWorkspacePending(true)
@@ -1409,8 +1552,10 @@ export function PasswordManagerClientShell({
         setStatusNotice('Entry created with encrypted payload only.')
       }
       setEditingEntryId(null)
+      return true
     } catch (error) {
       handleWorkspaceActionError(error, 'The entry could not be saved safely.')
+      return false
     } finally {
       setWorkspacePending(false)
     }
@@ -1439,6 +1584,11 @@ export function PasswordManagerClientShell({
   }
 
   async function handleCopyPassword(entry: PasswordManagerEntrySummary) {
+    if (!entry.payload.password) {
+      setWorkspaceError('This entry template does not include a password to copy.')
+      return
+    }
+
     try {
       await navigator.clipboard.writeText(entry.payload.password)
       setStatusNotice(`Password copied for ${entry.payload.title}.`)
@@ -1649,10 +1799,12 @@ export function PasswordManagerClientShell({
           editingEntryId={editingEntryId}
           entries={filteredEntries}
           entriesPending={entriesPending}
+          entryFields={entryFields}
           entryFilter={entryFilter}
           entryNotes={entryNotes}
           entryPassword={entryPassword}
           entryRevealId={entryRevealId}
+          entryTemplateId={entryTemplateId}
           entryTitle={entryTitle}
           entryUrl={entryUrl}
           entryUsername={entryUsername}
@@ -1672,9 +1824,11 @@ export function PasswordManagerClientShell({
           onDeleteEntry={handleEntryDelete}
           onDeleteVault={handleVaultDelete}
           onEntryFilterChange={setEntryFilter}
+          onEntryFieldChange={(fieldId, value) => setEntryFields((current) => ({ ...current, [fieldId]: value }))}
           onEntryNotesChange={setEntryNotes}
           onEntryPasswordChange={setEntryPassword}
           onEntrySave={handleEntrySave}
+          onEntryTemplateChange={setSelectedEntryTemplateId}
           onEntryTitleChange={setEntryTitle}
           onEntryUrlChange={setEntryUrl}
           onEntryUsernameChange={setEntryUsername}
@@ -1697,19 +1851,24 @@ export function PasswordManagerClientShell({
           onSelectVault={(vaultId) => workspaceDispatch({ type: 'vault-selected', vaultId })}
           onStartCreateEntry={() => {
             setEditingEntryId(null)
+            setEntryTemplateId(selectedEntryTemplateId)
             setEntryTitle('')
             setEntryUsername('')
             setEntryPassword('')
             setEntryUrl('')
             setEntryNotes('')
+            setEntryFields({})
           }}
           onStartEditEntry={(entry) => {
+            const templateId = getPasswordManagerEntryTemplate(entry.payload.type).id
             setEditingEntryId(entry.id)
+            setEntryTemplateId(templateId)
             setEntryTitle(entry.payload.title)
-            setEntryUsername(entry.payload.username)
-            setEntryPassword(entry.payload.password)
+            setEntryUsername(entry.payload.username ?? '')
+            setEntryPassword(entry.payload.password ?? '')
             setEntryUrl(entry.payload.url ?? '')
             setEntryNotes(entry.payload.notes ?? '')
+            setEntryFields(entry.payload.fields ?? {})
           }}
           onToggleReveal={handleEntryRevealToggle}
           onUpdateMemberRole={handleMemberRoleUpdate}
@@ -1717,6 +1876,7 @@ export function PasswordManagerClientShell({
           renameVaultName={renameVaultName}
           rotationPrompt={rotationPrompt}
           selectedEntry={selectedEntry}
+          selectedEntryTemplateId={selectedEntryTemplateId}
           selectedVault={selectedVault}
           vaults={filteredVaults}
           vaultsPending={vaultsPending}
@@ -2159,10 +2319,12 @@ function PasswordManagerWorkspace({
   editingEntryId,
   entries,
   entriesPending,
+  entryFields,
   entryFilter,
   entryNotes,
   entryPassword,
   entryRevealId,
+  entryTemplateId,
   entryTitle,
   entryUrl,
   entryUsername,
@@ -2182,9 +2344,11 @@ function PasswordManagerWorkspace({
   onDeleteEntry,
   onDeleteVault,
   onEntryFilterChange,
+  onEntryFieldChange,
   onEntryNotesChange,
   onEntryPasswordChange,
   onEntrySave,
+  onEntryTemplateChange,
   onEntryTitleChange,
   onEntryUrlChange,
   onEntryUsernameChange,
@@ -2211,6 +2375,7 @@ function PasswordManagerWorkspace({
   renameVaultName,
   rotationPrompt,
   selectedEntry,
+  selectedEntryTemplateId,
   selectedVault,
   vaults,
   vaultsPending,
@@ -2225,10 +2390,12 @@ function PasswordManagerWorkspace({
   editingEntryId: string | null
   entries: PasswordManagerEntrySummary[]
   entriesPending: boolean
+  entryFields: Record<string, string>
   entryFilter: string
   entryNotes: string
   entryPassword: string
   entryRevealId: string | null
+  entryTemplateId: PasswordManagerEntryTemplateId
   entryTitle: string
   entryUrl: string
   entryUsername: string
@@ -2248,9 +2415,11 @@ function PasswordManagerWorkspace({
   onDeleteEntry: () => Promise<void>
   onDeleteVault: () => Promise<void>
   onEntryFilterChange: (value: string) => void
+  onEntryFieldChange: (fieldId: string, value: string) => void
   onEntryNotesChange: (value: string) => void
   onEntryPasswordChange: (value: string) => void
-  onEntrySave: () => Promise<void>
+  onEntrySave: () => Promise<boolean>
+  onEntryTemplateChange: (templateId: PasswordManagerEntryTemplateId) => void
   onEntryTitleChange: (value: string) => void
   onEntryUrlChange: (value: string) => void
   onEntryUsernameChange: (value: string) => void
@@ -2277,6 +2446,7 @@ function PasswordManagerWorkspace({
   renameVaultName: string
   rotationPrompt: string | null
   selectedEntry: PasswordManagerEntrySummary | null
+  selectedEntryTemplateId: PasswordManagerEntryTemplateId
   selectedVault: PasswordManagerVaultSummary | null
   vaults: PasswordManagerVaultSummary[]
   vaultsPending: boolean
@@ -2286,9 +2456,11 @@ function PasswordManagerWorkspace({
 }) {
   const [memberSelectorOpen, setMemberSelectorOpen] = useState(false)
   const [createVaultDialogOpen, setCreateVaultDialogOpen] = useState(false)
+  const [entryDialogOpen, setEntryDialogOpen] = useState(false)
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
+  const activeEntryTemplate = getPasswordManagerEntryTemplate(entryTemplateId)
   const selectedMemberLabel = selectedOrganisationUser
     ? `${selectedOrganisationUser.name || selectedOrganisationUser.email} (${selectedOrganisationUser.email})`
     : 'Select user'
@@ -2298,6 +2470,29 @@ function PasswordManagerWorkspace({
     if (createVaultName.trim()) {
       setCreateVaultDialogOpen(false)
     }
+  }
+
+  function handleStartCreateEntryDialog() {
+    onStartCreateEntry()
+    setEntryDialogOpen(true)
+  }
+
+  function handleStartEditEntryDialog(entry: PasswordManagerEntrySummary) {
+    onSelectEntry(entry.id)
+    onStartEditEntry(entry)
+    setEntryDialogOpen(true)
+  }
+
+  async function handleEntrySaveFromDialog() {
+    const saved = await onEntrySave()
+    if (saved) {
+      setEntryDialogOpen(false)
+    }
+  }
+
+  async function handleEntryDeleteFromDialog() {
+    await onDeleteEntry()
+    setEntryDialogOpen(false)
   }
 
   return (
@@ -2412,10 +2607,46 @@ function PasswordManagerWorkspace({
                     <Download className="mr-2 size-4" />
                     Export vault
                   </Button>
-                  <Button variant="outline" onClick={onStartCreateEntry} disabled={!selectedVault || workspacePending}>
-                    <Plus className="mr-2 size-4" />
-                    New entry
-                  </Button>
+                  <div className="inline-flex rounded-md shadow-xs">
+                    <Button
+                      variant="outline"
+                      className="rounded-r-none border-r-0"
+                      onClick={handleStartCreateEntryDialog}
+                      disabled={!selectedVault || workspacePending}
+                    >
+                      <Plus className="mr-2 size-4" />
+                      New entry
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="rounded-l-none px-2"
+                          aria-label="Choose entry template"
+                          data-testid="password-manager-entry-template-menu"
+                          disabled={!selectedVault || workspacePending}
+                        >
+                          <ChevronsUpDown className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                        <DropdownMenuLabel>Entry template</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={selectedEntryTemplateId}
+                          onValueChange={(value) => onEntryTemplateChange(value as PasswordManagerEntryTemplateId)}
+                        >
+                          {PASSWORD_MANAGER_ENTRY_TEMPLATES.map((template) => (
+                            <DropdownMenuRadioItem key={template.id} value={template.id}>
+                              <div className="grid gap-0.5">
+                                <span>{template.label}</span>
+                                <span className="text-xs text-muted-foreground">{template.description}</span>
+                              </div>
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -2437,124 +2668,148 @@ function PasswordManagerWorkspace({
                   No entries match <span className="font-medium">{deferredEntryFilter || 'the current view'}</span>.
                 </p>
               ) : null}
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                <div className="space-y-2">
-                  {entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={`rounded-xl border px-4 py-3 ${
-                        selectedEntry?.id === entry.id ? 'border-primary bg-primary/5' : 'border-border/60'
-                      }`}
-                      data-testid={`password-manager-entry-${entry.id}`}
-                    >
-                      <button type="button" className="w-full text-left" onClick={() => onSelectEntry(entry.id)}>
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-medium">{entry.payload.title}</p>
-                          <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {entries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={`rounded-xl border px-4 py-3 ${
+                      selectedEntry?.id === entry.id ? 'border-primary bg-primary/5' : 'border-border/60'
+                    }`}
+                    data-testid={`password-manager-entry-${entry.id}`}
+                  >
+                    <button type="button" className="w-full text-left" onClick={() => onSelectEntry(entry.id)}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-2">
+                          {getPasswordManagerEntryIcon(entry.payload.type)}
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{entry.payload.title}</p>
+                            <p className="truncate text-sm text-muted-foreground">{getPasswordManagerEntrySummaryText(entry)}</p>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">{entry.payload.username}</p>
-                        {entry.payload.url ? <p className="text-xs text-muted-foreground">{entry.payload.url}</p> : null}
-                      </button>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => void onToggleReveal(entry)}>
-                          {entryRevealId === entry.id ? <EyeOff className="mr-2 size-4" /> : <Eye className="mr-2 size-4" />}
-                          {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => void onCopyPassword(entry)}>
-                          <Copy className="mr-2 size-4" />
-                          Copy password
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => onStartEditEntry(entry)}>
-                          <Pencil className="mr-2 size-4" />
-                          Edit
-                        </Button>
+                        <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
                       </div>
-                      {entryRevealId === entry.id ? (
-                        <p className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-sm">
-                          {entry.payload.password}
-                        </p>
+                      {entry.payload.url ? <p className="mt-2 truncate text-xs text-muted-foreground">{entry.payload.url}</p> : null}
+                    </button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {entry.payload.password ? (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => void onToggleReveal(entry)}>
+                            {entryRevealId === entry.id ? <EyeOff className="mr-2 size-4" /> : <Eye className="mr-2 size-4" />}
+                            {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => void onCopyPassword(entry)}>
+                            <Copy className="mr-2 size-4" />
+                            Copy password
+                          </Button>
+                        </>
                       ) : null}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-xl border border-border/60 p-4">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{editingEntryId ? 'Edit entry' : 'Create entry'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {editingEntryId ? 'Updating re-encrypts the entire payload.' : 'The payload is encrypted locally before upload.'}
-                      </p>
-                    </div>
-                    {selectedEntry ? (
-                      <Button variant="ghost" size="sm" onClick={() => onSelectEntry(null)}>
-                        Clear selection
+                      <Button variant="outline" size="sm" onClick={() => handleStartEditEntryDialog(entry)}>
+                        <Pencil className="mr-2 size-4" />
+                        Edit
                       </Button>
+                    </div>
+                    {entryRevealId === entry.id && entry.payload.password ? (
+                      <p className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-sm">
+                        {entry.payload.password}
+                      </p>
                     ) : null}
                   </div>
-                  <div className="grid gap-3">
-                    <div className="grid gap-2">
-                      <Label htmlFor="password-manager-entry-title">Title</Label>
-                      <Input
-                        id="password-manager-entry-title"
-                        value={entryTitle}
-                        onChange={(event) => onEntryTitleChange(event.target.value)}
-                        disabled={!selectedVault}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="password-manager-entry-username">Username</Label>
-                      <Input
-                        id="password-manager-entry-username"
-                        value={entryUsername}
-                        onChange={(event) => onEntryUsernameChange(event.target.value)}
-                        disabled={!selectedVault}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="password-manager-entry-password">Password</Label>
-                      <Input
-                        id="password-manager-entry-password"
-                        type="password"
-                        value={entryPassword}
-                        onChange={(event) => onEntryPasswordChange(event.target.value)}
-                        disabled={!selectedVault}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="password-manager-entry-url">URL</Label>
-                      <Input
-                        id="password-manager-entry-url"
-                        value={entryUrl}
-                        onChange={(event) => onEntryUrlChange(event.target.value)}
-                        disabled={!selectedVault}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="password-manager-entry-notes">Notes</Label>
-                      <Textarea
-                        id="password-manager-entry-notes"
-                        value={entryNotes}
-                        onChange={(event) => onEntryNotesChange(event.target.value)}
-                        disabled={!selectedVault}
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => void onEntrySave()} disabled={!selectedVault || workspacePending}>
-                        {workspacePending ? 'Saving...' : editingEntryId ? 'Save encrypted entry' : 'Create encrypted entry'}
-                      </Button>
-                      {selectedEntry ? (
-                        <Button variant="destructive" onClick={() => void onDeleteEntry()} disabled={workspacePending}>
-                          <Trash2 className="mr-2 size-4" />
-                          Delete entry
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
+
+          <Dialog open={entryDialogOpen} onOpenChange={setEntryDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingEntryId ? 'Edit' : 'New'} {activeEntryTemplate.dialogLabel}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingEntryId
+                    ? 'Updating re-encrypts the entire payload in browser memory before upload.'
+                    : 'The template payload is encrypted locally before it leaves the browser.'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-entry-title">Title</Label>
+                  <Input
+                    id="password-manager-entry-title"
+                    value={entryTitle}
+                    onChange={(event) => onEntryTitleChange(event.target.value)}
+                    disabled={!selectedVault}
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {activeEntryTemplate.fields.map((field) => {
+                    const fieldId = `password-manager-entry-${field.id}`
+                    const value =
+                      field.id === 'username'
+                        ? entryUsername
+                        : field.id === 'password'
+                          ? entryPassword
+                          : field.id === 'url'
+                            ? entryUrl
+                            : entryFields[field.id] ?? ''
+                    const handleChange = (nextValue: string) => {
+                      if (field.id === 'username') {
+                        onEntryUsernameChange(nextValue)
+                      } else if (field.id === 'password') {
+                        onEntryPasswordChange(nextValue)
+                      } else if (field.id === 'url') {
+                        onEntryUrlChange(nextValue)
+                      } else {
+                        onEntryFieldChange(field.id, nextValue)
+                      }
+                    }
+
+                    return (
+                      <div key={field.id} className={field.multiline ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'}>
+                        <Label htmlFor={fieldId}>{field.label}</Label>
+                        {field.multiline ? (
+                          <Textarea
+                            id={fieldId}
+                            value={value}
+                            onChange={(event) => handleChange(event.target.value)}
+                            disabled={!selectedVault}
+                          />
+                        ) : (
+                          <Input
+                            id={fieldId}
+                            type={field.type}
+                            value={value}
+                            onChange={(event) => handleChange(event.target.value)}
+                            disabled={!selectedVault}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-entry-notes">Notes</Label>
+                  <Textarea
+                    id="password-manager-entry-notes"
+                    value={entryNotes}
+                    onChange={(event) => onEntryNotesChange(event.target.value)}
+                    disabled={!selectedVault}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                {editingEntryId && selectedEntry ? (
+                  <Button variant="destructive" onClick={() => void handleEntryDeleteFromDialog()} disabled={workspacePending}>
+                    <Trash2 className="mr-2 size-4" />
+                    Delete entry
+                  </Button>
+                ) : null}
+                <Button onClick={() => void handleEntrySaveFromDialog()} disabled={!selectedVault || workspacePending}>
+                  {workspacePending ? 'Saving...' : editingEntryId ? 'Save encrypted entry' : 'Create encrypted entry'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

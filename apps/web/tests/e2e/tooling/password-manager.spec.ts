@@ -14,6 +14,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   const entryPassword = 'SuperSecretPassword!99'
   const updatedEntryPassword = 'RotatedPassword!100'
   const entryNotes = 'Recovery codes and production notes'
+  const cardNumber = '4111111111111111'
 
   const consoleMessages: string[] = []
   const pageErrors: string[] = []
@@ -53,6 +54,25 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   const vaultButton = page.getByTestId('password-manager-vault-vault-1')
   await expect(vaultButton).toContainText('Shared production')
 
+  await expect(page.getByLabel('Title')).toHaveCount(0)
+  await page.getByTestId('password-manager-entry-template-menu').click()
+  await expect(page.getByRole('menuitemradio', { name: /Login/ })).toBeChecked()
+  await page.getByRole('menuitemradio', { name: /Card/ }).click()
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New card' })).toBeVisible()
+  await page.getByLabel('Title').fill('Company card')
+  await page.getByLabel('Cardholder name').fill('Ops Admin')
+  await page.getByLabel('Card number').fill(cardNumber)
+  await page.getByLabel('Expiry month').fill('12')
+  await page.getByLabel('Expiry year').fill('2030')
+  await page.getByLabel('Security code').fill('123')
+  await page.getByRole('button', { name: 'Create encrypted entry' }).click()
+  await expect(page.getByTestId('password-manager-entry-entry-1')).toContainText('Company card')
+
+  await page.getByTestId('password-manager-entry-template-menu').click()
+  await page.getByRole('menuitemradio', { name: /Login/ }).click()
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New login' })).toBeVisible()
   await page.getByLabel('Title').fill('Grafana admin')
   await page.getByLabel('Username').fill('ops-admin')
   await page.getByLabel('Password', { exact: true }).fill(entryPassword)
@@ -60,7 +80,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByLabel('Notes').fill(entryNotes)
   await page.getByRole('button', { name: 'Create encrypted entry' }).click()
 
-  const entryCard = page.getByTestId('password-manager-entry-entry-1')
+  const entryCard = page.getByTestId('password-manager-entry-entry-2')
   await expect(entryCard).toContainText('Grafana admin')
   await expect(entryCard).toContainText('ops-admin')
 
@@ -83,6 +103,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await downloadPromise
 
   await entryCard.getByRole('button', { name: 'Edit' }).click()
+  await expect(page.getByRole('dialog', { name: 'Edit login' })).toBeVisible()
   await page.getByLabel('Password', { exact: true }).fill(updatedEntryPassword)
   await page.getByRole('button', { name: 'Save encrypted entry' }).click()
   await expect(entryCard.getByRole('button', { name: 'Hide password' })).toBeVisible()
@@ -119,8 +140,9 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await expect(page.getByText('Vault key rotated safely for the current active members.')).toBeVisible()
 
   await page.getByRole('tab', { name: 'Passwords' }).click()
+  await entryCard.getByRole('button', { name: 'Edit' }).click()
   await page.getByRole('button', { name: 'Delete entry' }).click()
-  await expect(page.getByTestId('password-manager-entry-entry-1')).toHaveCount(0)
+  await expect(page.getByTestId('password-manager-entry-entry-2')).toHaveCount(0)
 
   await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Delete vault' }).click()
@@ -136,8 +158,8 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   const auditPaths = passwordManagerMock.auditRequests().map((request) => request.path)
   expect(auditPaths).toEqual([
-    '/vaults/vault-1/entries/entry-1/reveal-audit',
-    '/vaults/vault-1/entries/entry-1/copy-audit',
+    '/vaults/vault-1/entries/entry-2/reveal-audit',
+    '/vaults/vault-1/entries/entry-2/copy-audit',
     '/vaults/vault-1/export-audit',
   ])
 
@@ -155,6 +177,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(request.credentialsCookie).toBe(true)
     expect(request.rawBody).not.toContain(setupPassword)
     expect(request.rawBody).not.toContain(exportPassword)
+    expect(request.rawBody).not.toContain(cardNumber)
     expect(request.rawBody).not.toContain(entryPassword)
     expect(request.rawBody).not.toContain(updatedEntryPassword)
     expect(request.rawBody).not.toContain(entryNotes)
@@ -165,6 +188,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   for (const message of consoleMessages) {
     expect(message).not.toContain(setupPassword)
     expect(message).not.toContain(exportPassword)
+    expect(message).not.toContain(cardNumber)
     expect(message).not.toContain(entryPassword)
     expect(message).not.toContain(updatedEntryPassword)
     expect(message).not.toContain(entryNotes)
@@ -175,6 +199,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   for (const request of outboundBodies) {
     expect(request.body).not.toContain(setupPassword)
     expect(request.body).not.toContain(exportPassword)
+    expect(request.body).not.toContain(cardNumber)
     expect(request.body).not.toContain(entryPassword)
     expect(request.body).not.toContain(updatedEntryPassword)
     expect(request.body).not.toContain(entryNotes)

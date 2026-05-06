@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Users, Cpu, HardDrive, MemoryStick, Plus, X, TerminalSquare, Tag as TagIcon } from 'lucide-react'
+import { AlertTriangle, KeyRound, Settings, Users, Cpu, HardDrive, MemoryStick, Plus, X, TerminalSquare, Tag as TagIcon } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CheckCircle2 } from 'lucide-react'
 import { getHostCollectionSettings, updateHostCollectionSettings } from '@/lib/actions/host-settings'
-import { getHostTerminalSettings, updateHostTerminalSettings } from '@/lib/actions/terminal'
+import { getHostTerminalSettings, trustPendingSshHostKeys, updateHostTerminalSettings } from '@/lib/actions/terminal'
 import type { HostTerminalSettings } from '@/lib/actions/terminal'
 import { getOrgUsers } from '@/lib/actions/users'
 import { listResourceTags, replaceResourceTags } from '@/lib/actions/tags'
@@ -37,7 +37,7 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
     queryFn: () => getHostCollectionSettings(orgId, hostId),
   })
 
-  const { data: terminalSettings, isLoading: terminalLoading } = useQuery({
+  const { data: terminalSettings } = useQuery({
     queryKey: ['host-terminal-settings', orgId, hostId],
     queryFn: () => getHostTerminalSettings(orgId, hostId),
   })
@@ -62,8 +62,21 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
     },
   })
 
+  const trustSshHostKeyMutation = useMutation({
+    mutationFn: () => trustPendingSshHostKeys(orgId, hostId),
+    onSuccess: (result) => {
+      if ('error' in result) return
+      queryClient.invalidateQueries({ queryKey: ['host-terminal-settings', orgId, hostId] })
+    },
+  })
+
   function updateTerminalSetting(patch: Partial<HostTerminalSettings>) {
-    const base = currentTerminalSettings ?? { terminalEnabled: true, terminalAllowedUsers: [] }
+    const base = currentTerminalSettings ?? {
+      terminalEnabled: true,
+      terminalAllowedUsers: [],
+      sshHostKeys: [],
+      pendingSshHostKeys: [],
+    }
     setLocalTerminalSettings({ ...base, ...patch })
   }
 
@@ -92,6 +105,10 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
   })
   const currentTags: EditorTag[] =
     localTags ?? (hostTags ?? []).map((t) => ({ id: t.resourceTagId, key: t.key, value: t.value }))
+  const trustSshHostKeyError =
+    trustSshHostKeyMutation.data && 'error' in trustSshHostKeyMutation.data
+      ? trustSshHostKeyMutation.data.error
+      : null
 
   const tagMutation = useMutation({
     mutationFn: (pairs: EditorTag[]) =>
@@ -496,6 +513,68 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
                 </div>
               </div>
             )}
+
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="size-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">SSH Host Keys</Label>
+              </div>
+              {currentTerminalSettings.sshHostKeys.length > 0 ? (
+                <div className="space-y-1">
+                  {currentTerminalSettings.sshHostKeys.map((key) => (
+                    <code
+                      key={`${key.algorithm ?? 'unknown'}:${key.fingerprintSha256}`}
+                      className="block overflow-hidden text-ellipsis rounded bg-muted px-2 py-1 text-xs"
+                      title={`${key.algorithm ?? 'unknown'} ${key.fingerprintSha256}`}
+                    >
+                      {key.algorithm ? `${key.algorithm} ` : ''}
+                      {key.fingerprintSha256}
+                    </code>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No SSH host key has been reported by the agent yet.
+                </p>
+              )}
+
+              {currentTerminalSettings.sshHostKeyStatus === 'changed' &&
+                currentTerminalSettings.pendingSshHostKeys.length > 0 && (
+                  <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">SSH host key changed</p>
+                        <p className="text-xs">
+                          Terminal sessions will stay blocked until an admin verifies and trusts the newly observed key.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      {currentTerminalSettings.pendingSshHostKeys.map((key) => (
+                        <code
+                          key={`${key.algorithm ?? 'unknown'}:${key.fingerprintSha256}`}
+                          className="block overflow-hidden text-ellipsis rounded bg-white/70 px-2 py-1 text-xs"
+                          title={`${key.algorithm ?? 'unknown'} ${key.fingerprintSha256}`}
+                        >
+                          {key.algorithm ? `${key.algorithm} ` : ''}
+                          {key.fingerprintSha256}
+                        </code>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={trustSshHostKeyMutation.isPending}
+                      onClick={() => trustSshHostKeyMutation.mutate()}
+                    >
+                      {trustSshHostKeyMutation.isPending ? 'Trusting...' : 'Trust new SSH host key'}
+                    </Button>
+                    {trustSshHostKeyError && <p className="text-xs text-destructive">{trustSshHostKeyError}</p>}
+                  </div>
+                )}
+            </div>
 
             {/* Terminal Save */}
             <div className="flex items-center gap-3 pt-2 border-t">

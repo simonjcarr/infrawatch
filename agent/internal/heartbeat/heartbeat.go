@@ -812,6 +812,7 @@ func (r *Runner) sendHeartbeatWithAgentID(stream agentv1.IngestService_Heartbeat
 		TaskProgress:                r.drainTaskProgress(),
 		TaskResults:                 r.drainTaskResults(),
 		PinnedServerCertFingerprint: r.currentPinnedFingerprint(),
+		SshHostKeys:                 collectSSHHostKeys(),
 	}
 
 	if err := stream.Send(req); err != nil {

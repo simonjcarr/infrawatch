@@ -37,6 +37,52 @@ func TestVerifySSHHostKeyFingerprintAllowsPinnedMatch(t *testing.T) {
 	}
 }
 
+func TestVerifySSHHostKeyMetadataAllowsTrustedListMatch(t *testing.T) {
+	metadata := []byte(`{
+		"sshHostKeys": [
+			{"algorithm": "ssh-ed25519", "fingerprintSha256": "SHA256:ed25519"},
+			{"algorithm": "ecdsa-sha2-nistp256", "fingerprintSha256": "SHA256:ecdsa"}
+		]
+	}`)
+
+	if err := verifySSHHostKeyMetadata(metadata, "SHA256:ecdsa"); err != nil {
+		t.Fatalf("verifySSHHostKeyMetadata() error = %v, want nil", err)
+	}
+}
+
+func TestVerifySSHHostKeyMetadataRejectsTrustedListMismatch(t *testing.T) {
+	metadata := []byte(`{
+		"sshHostKeys": [
+			{"algorithm": "ssh-ed25519", "fingerprintSha256": "SHA256:ed25519"}
+		],
+		"pendingSshHostKeys": [
+			{"algorithm": "ssh-ed25519", "fingerprintSha256": "SHA256:new"}
+		]
+	}`)
+
+	err := verifySSHHostKeyMetadata(metadata, "SHA256:new")
+	if !errors.Is(err, ErrSSHHostKeyMismatch) {
+		t.Fatalf("verifySSHHostKeyMetadata() error = %v, want ErrSSHHostKeyMismatch", err)
+	}
+}
+
+func TestVerifySSHHostKeyMetadataBlocksWhenPendingChangeExists(t *testing.T) {
+	metadata := []byte(`{
+		"sshHostKeys": [
+			{"algorithm": "ssh-ed25519", "fingerprintSha256": "SHA256:old"}
+		],
+		"pendingSshHostKeys": [
+			{"algorithm": "ssh-ed25519", "fingerprintSha256": "SHA256:new"}
+		],
+		"sshHostKeyStatus": "changed"
+	}`)
+
+	err := verifySSHHostKeyMetadata(metadata, "SHA256:old")
+	if !errors.Is(err, ErrSSHHostKeyMismatch) {
+		t.Fatalf("verifySSHHostKeyMetadata() error = %v, want ErrSSHHostKeyMismatch", err)
+	}
+}
+
 func ptr(value string) *string {
 	return &value
 }

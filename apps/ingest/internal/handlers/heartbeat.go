@@ -322,6 +322,22 @@ func (h *HeartbeatHandler) processHeartbeat(
 		slog.Warn("updating host vitals", "err", err)
 	}
 
+	if hostID != "" && len(req.SshHostKeys) > 0 {
+		keys := make([]queries.SSHHostKey, 0, len(req.SshHostKeys))
+		for _, key := range req.SshHostKeys {
+			if key == nil {
+				continue
+			}
+			keys = append(keys, queries.SSHHostKey{
+				Algorithm:         key.Algorithm,
+				FingerprintSHA256: key.FingerprintSha256,
+			})
+		}
+		if err := queries.ReportSSHHostKeys(ctx, h.pool, hostID, keys); err != nil {
+			slog.Warn("recording SSH host keys", "host_id", hostID, "err", err)
+		}
+	}
+
 	// Sync host↔network memberships based on current IP addresses.
 	if hostID != "" && len(ipAddresses) > 0 {
 		if err := queries.SyncHostNetworks(ctx, h.pool, orgID, hostID, ipAddresses); err != nil {

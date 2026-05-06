@@ -421,6 +421,13 @@
       "when": 1777990000000,
       "tag": "0059_auth_bootstrap_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1778076269000,
+      "tag": "0060_password_manager_user_lookup_index",
+      "breakpoints": true
     }
   ]
 }

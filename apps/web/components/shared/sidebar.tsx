@@ -54,6 +54,7 @@ interface NavChild {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
+  prefetch?: boolean
 }
 
 interface NavItem {
@@ -61,6 +62,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
+  prefetch?: boolean
   testId?: string
   children?: NavChild[]
 }
@@ -172,7 +174,7 @@ function CollapsibleNavItem({
               return (
                 <SidebarMenuSubItem key={child.href}>
                   <SidebarMenuSubButton asChild isActive={isActive}>
-                    <Link href={child.href}>
+                    <Link href={child.href} prefetch={child.prefetch}>
                       <child.icon
                         className={cn(
                           'size-3.5',
@@ -213,7 +215,7 @@ function NavGroupItems({ items }: { items: NavItem[] }) {
         return (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton asChild isActive={isActive}>
-              <Link href={item.href} data-testid={item.testId}>
+              <Link href={item.href} prefetch={item.prefetch} data-testid={item.testId}>
                 <item.icon className={cn('size-4', isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/70')} />
                 <span>{item.title}</span>
               </Link>

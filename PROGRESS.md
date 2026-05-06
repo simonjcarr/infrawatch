@@ -15,6 +15,32 @@
 
 ## What Has Been Built
 
+### Session 114 — Password Manager release readiness closeout
+
+**Bundled Password Manager release evidence refresh** (`apps/docs/docs/deployment/docker-compose.md`)
+- Updated the deployment docs so the public compose guide now names the
+  bundled `password-manager-db`, `password-manager-migrate`, and
+  `password-manager-api` services explicitly instead of describing only the
+  original CT-Ops web/ingest/database stack.
+- Documented that the bundled Password Manager API digest stays pinned through
+  `deploy/password-manager-release.json` and `PASSWORD_MANAGER_API_IMAGE`, so
+  operator upgrades continue to follow the reviewed CT-Ops compatibility
+  descriptor rather than drifting to a floating tag.
+- Added explicit backup and restore guidance for the bundled Password Manager
+  state: preserve `password_manager_db_data`, `.env`, and
+  `deploy/password-manager-release.json` together before restarting a restored
+  host.
+
+**Validation**
+- `python3` Markdown sanity checks for `apps/docs/docs/deployment/docker-compose.md`
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `bash deploy/scripts/test-password-manager-nginx.sh`
+- `bash deploy/scripts/test-password-manager-startup.sh`
+- `bash deploy/scripts/test-support-data.sh`
+- `BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=build-time-placeholder docker compose -f docker-compose.single.yml config`
+- `git diff --check`
+
 ### Session 113 — Password Manager hosted no-plaintext E2E coverage
 
 **Hosted Password Manager E2E leak assertions** (`apps/web/tests/e2e/fixtures/test.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.1...web/v0.110.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* **certs:** block DNS rebinding in tracked refresh ([73ade2b](https://github.com/carrtech-dev/ct-ops/commit/73ade2b6faca91c6373417bd132aff452e60ac33)), closes [#968](https://github.com/carrtech-dev/ct-ops/issues/968)
+
 ## [0.110.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.0...web/v0.110.1) (2026-05-06)
 
 

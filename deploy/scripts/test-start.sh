@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 START_SCRIPT="${REPO_ROOT}/deploy/customer-bundle/start.sh"
+ROOT_COMPOSE_FILE="${REPO_ROOT}/docker-compose.single.yml"
+PASSWORD_MANAGER_RELEASE_DESCRIPTOR="${REPO_ROOT}/deploy/password-manager-release.json"
 
 make_mock_bin() {
   local dir="$1"
@@ -34,7 +36,8 @@ main() {
   make_mock_bin "$mockbin"
 
   cp "$START_SCRIPT" "$install_dir/start.sh"
-  printf 'services: {}\n' > "$install_dir/docker-compose.yml"
+  cp "$ROOT_COMPOSE_FILE" "$install_dir/docker-compose.yml"
+  cp "$PASSWORD_MANAGER_RELEASE_DESCRIPTOR" "$install_dir/password-manager-release.json"
   printf 'nginx config\n' > "$install_dir/deploy/nginx/nginx.conf"
   printf 'dev cert\n' > "$install_dir/deploy/dev-tls/server.crt"
   printf 'dev key\n' > "$install_dir/deploy/dev-tls/server.key"

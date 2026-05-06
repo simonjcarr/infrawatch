@@ -30,9 +30,10 @@ REQUIRED_VARS=(BETTER_AUTH_URL BETTER_AUTH_TRUSTED_ORIGINS BETTER_AUTH_SECRET PO
 
 # Optional variables — missing values get a warning, not an error. Most have
 # safe localhost defaults baked into docker-compose.yml.
-OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_API_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
+OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
 REQUIRED_FILES=(
   docker-compose.yml
+  password-manager-release.json
   deploy/nginx/nginx.conf
 )
 
@@ -75,6 +76,71 @@ upsert_env_var() {
 
   chmod 600 .env
   export "${key}=${value}"
+}
+
+remove_legacy_password_manager_api_image_env() {
+  if ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' .env 2>/dev/null; then
+    return 0
+  fi
+
+  echo "WARN: removing legacy PASSWORD_MANAGER_API_IMAGE from .env; CT-Ops now pins the bundled Password Manager API from password-manager-release.json." >&2
+  awk '$0 !~ /^PASSWORD_MANAGER_API_IMAGE=/' .env > .env.tmp && mv .env.tmp .env
+  chmod 600 .env
+  unset PASSWORD_MANAGER_API_IMAGE
+}
+
+read_password_manager_digest_reference() {
+  local descriptor="$1"
+  sed -n 's/.*"digest_reference"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor" | head -n1
+}
+
+compose_service_image() {
+  local compose_file="$1"
+  local service_name="$2"
+
+  awk -v name="$service_name" '
+    $0 == "  " name ":" {
+      in_block = 1
+      next
+    }
+    in_block && $0 ~ /^  [^ ]/ {
+      exit
+    }
+    in_block && $0 ~ /^[[:space:]]+image:[[:space:]]*/ {
+      sub(/^[[:space:]]+image:[[:space:]]*/, "")
+      gsub(/^"|"$/, "")
+      print
+      exit
+    }
+  ' "$compose_file"
+}
+
+validate_password_manager_image_pin() {
+  local compose_file="$1"
+  local descriptor="$2"
+  local expected api_image migrate_image
+
+  expected="$(read_password_manager_digest_reference "$descriptor")"
+  if [ -z "$expected" ]; then
+    echo "ERROR: could not read digest_reference from $descriptor" >&2
+    exit 1
+  fi
+
+  api_image="$(compose_service_image "$compose_file" password-manager-api)"
+  migrate_image="$(compose_service_image "$compose_file" password-manager-migrate)"
+
+  if [[ "$api_image" == *'PASSWORD_MANAGER_API_IMAGE'* || "$migrate_image" == *'PASSWORD_MANAGER_API_IMAGE'* ]]; then
+    echo "ERROR: $compose_file still allows PASSWORD_MANAGER_API_IMAGE to override the bundled Password Manager API image." >&2
+    exit 1
+  fi
+
+  if [ "$api_image" != "$expected" ] || [ "$migrate_image" != "$expected" ]; then
+    echo "ERROR: Password Manager compose image does not match $descriptor." >&2
+    echo "Expected: $expected" >&2
+    echo "password-manager-api:     ${api_image:-<missing>}" >&2
+    echo "password-manager-migrate: ${migrate_image:-<missing>}" >&2
+    exit 1
+  fi
 }
 
 require_openssl() {
@@ -426,6 +492,7 @@ check_env() {
   # shellcheck disable=SC1091
   source .env
   set +a
+  remove_legacy_password_manager_api_image_env
 
   # Auto-generate BETTER_AUTH_SECRET on first run if the operator left it blank.
   # Anyone with this value can forge sessions, so it must never be empty in
@@ -606,6 +673,7 @@ start_stack() {
   check_bundle_files
   require_docker
   check_env
+  validate_password_manager_image_pin docker-compose.yml password-manager-release.json
   warn_legacy_env
   check_ports_free
   ensure_tls_certs

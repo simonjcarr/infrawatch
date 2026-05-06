@@ -10,6 +10,8 @@ on:
       - "deploy/scripts/validate-password-manager-release.py"
       - "deploy/scripts/test-install.sh"
       - "deploy/scripts/test-agent-release-password-manager-image-ref.sh"
+      - "deploy/scripts/test-password-manager-compose.sh"
+      - "deploy/scripts/test-password-manager-release-contract.sh"
       - "deploy/scripts/test-password-manager-nginx.sh"
       - "deploy/scripts/test-password-manager-startup.sh"
       - "deploy/scripts/test-start.sh"
@@ -36,8 +38,7 @@ jobs:
           WEB_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/web@sha256:1111111111111111111111111111111111111111111111111111111111111111"
           INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@sha256:2222222222222222222222222222222222222222222222222222222222222222"
           python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json
-          PASSWORD_MANAGER_API_IMAGE_REF="$(python3 -c 'import json; print(json.load(open("deploy/password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
-          export WEB_IMAGE_REF INGEST_IMAGE_REF PASSWORD_MANAGER_API_IMAGE_REF
+          export WEB_IMAGE_REF INGEST_IMAGE_REF
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml dist/ct-ops/docker-compose.yml
           cp .env.example dist/ct-ops/.env.example
@@ -53,7 +54,7 @@ jobs:
           cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
           echo "test" > dist/ct-ops/VERSION
           perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
-          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m; s/^# PASSWORD_MANAGER_API_IMAGE=.*$/PASSWORD_MANAGER_API_IMAGE=$ENV{PASSWORD_MANAGER_API_IMAGE_REF}/m' dist/ct-ops/.env.example
+          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
           chmod +x dist/ct-ops/start.sh dist/ct-ops/backup.sh dist/ct-ops/build-offline-installer.sh dist/ct-ops/refresh_licence_key dist/ct-ops/upgrade.sh dist/ct-ops/generate_support_data
 
       - name: Validate scripts and required files
@@ -65,7 +66,8 @@ jobs:
           test -f .env.example
           test -f password-manager-release.json
           test -f licence-keys/current.pem
-          grep -q '^PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:' .env.example
+          ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' .env.example
+          ! grep -q 'PASSWORD_MANAGER_API_IMAGE' docker-compose.yml
           test -x backup.sh
           test -x refresh_licence_key
           test -x upgrade.sh
@@ -85,6 +87,7 @@ jobs:
           bash deploy/scripts/test-install.sh
           bash deploy/scripts/test-agent-release-password-manager-image-ref.sh
           bash deploy/scripts/test-password-manager-compose.sh
+          bash deploy/scripts/test-password-manager-release-contract.sh
           bash deploy/scripts/test-password-manager-nginx.sh
           bash deploy/scripts/test-password-manager-startup.sh
           bash deploy/scripts/test-start.sh
@@ -101,7 +104,8 @@ jobs:
           set -euo pipefail
           refs="$(docker compose config --images)"
           echo "$refs"
-          grep -Eq '^ghcr\.io/carrtech-dev/ct-password-manager/api@sha256:[0-9a-f]{64}$' <<< "$refs"
+          expected_password_manager_ref="$(python3 -c 'import json; print(json.load(open("password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
+          grep -Fxq "$expected_password_manager_ref" <<< "$refs"
           grep -Eq '^postgres:17-alpine@sha256:[0-9a-f]{64}$' <<< "$refs"
           while IFS= read -r ref; do
             case "$ref" in

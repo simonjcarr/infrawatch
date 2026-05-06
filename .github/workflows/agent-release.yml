@@ -170,6 +170,7 @@ jobs:
           TAG="${{ needs.release-please.outputs.web_tag_name }}"
           VERSION="${TAG#web/}"
           python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json
+          bash deploy/scripts/test-password-manager-release-contract.sh
           WEB_IMAGE_REF="${{ needs.build-web-image.outputs.image_ref }}"
           if [ -z "${WEB_IMAGE_REF}" ]; then
             echo "ERROR: missing web image digest output from build-web-image" >&2
@@ -181,7 +182,7 @@ jobs:
             INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@${INGEST_IMAGE_REF}"
           fi
           PASSWORD_MANAGER_API_IMAGE_REF="$(python3 -c 'import json; print(json.load(open("deploy/password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
-          export WEB_IMAGE_REF INGEST_IMAGE_REF PASSWORD_MANAGER_API_IMAGE_REF
+          export WEB_IMAGE_REF INGEST_IMAGE_REF
           echo "PASSWORD_MANAGER_API_IMAGE_REF=${PASSWORD_MANAGER_API_IMAGE_REF}" >> "$GITHUB_ENV"
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
@@ -197,7 +198,7 @@ jobs:
           echo "$VERSION" > dist/ct-ops/VERSION
 
           perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
-          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m; s/^# PASSWORD_MANAGER_API_IMAGE=.*$/PASSWORD_MANAGER_API_IMAGE=$ENV{PASSWORD_MANAGER_API_IMAGE_REF}/m' dist/ct-ops/.env.example
+          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
 
           # The customer start.sh is generated here rather than checked into
           # the repo so the only source of truth lives next to the workflow
@@ -598,6 +599,8 @@ jobs:
           export POSTGRES_PASSWORD=verify-placeholder
           refs="$(docker compose -f dist/ct-ops/docker-compose.yml --env-file dist/ct-ops/.env.example config --images)"
           echo "$refs"
+          ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' dist/ct-ops/.env.example
+          ! grep -q 'PASSWORD_MANAGER_API_IMAGE' dist/ct-ops/docker-compose.yml
           grep -Fxq "${PASSWORD_MANAGER_API_IMAGE_REF}" <<< "$refs"
           grep -Eq '^postgres:17-alpine@sha256:[0-9a-f]{64}$' <<< "$refs"
           while IFS= read -r ref; do

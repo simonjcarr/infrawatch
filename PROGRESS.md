@@ -15,6 +15,38 @@
 
 ## What Has Been Built
 
+### Session 115 — Password Manager API image source of truth
+
+**Descriptor-derived bundled API image** (`docker-compose.single.yml`, `.env.example`, `start.sh`, `deploy/customer-bundle/start.sh`, `deploy/customer-bundle/upgrade.sh`, `.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`, `deploy/scripts/test-password-manager-compose.sh`, `deploy/scripts/test-password-manager-release-contract.sh`, `deploy/scripts/test-password-manager-startup.sh`, `deploy/scripts/test-upgrade.sh`, `deploy/customer-bundle/README.md`, `apps/docs/docs/deployment/docker-compose.md`, `apps/web/lib/password-manager/client.test.mjs`)
+- Removed the operator-facing `PASSWORD_MANAGER_API_IMAGE` override from
+  `.env.example`, customer bundle staging, optional env handling, and release
+  bundle docs. Legacy `.env` entries are now removed with a warning during
+  `start.sh` and `upgrade.sh`.
+- Stamped `password-manager-api` and `password-manager-migrate` directly to the
+  reviewed digest in `deploy/password-manager-release.json`, with startup
+  guards that fail before Docker starts if compose drifts from the descriptor or
+  reintroduces an env override.
+- Added release and bundle checks that assert the pinned image is
+  `api/v0.1.2` at
+  `ghcr.io/carrtech-dev/ct-password-manager/api@sha256:55669d3af9bfc0ab80388ff3c69ac4f75db86d768adf9a35b33402f87feaa033`,
+  and that CT-Ops still sends the browser-envelope `/user-key` setup payload.
+
+**Validation**
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash deploy/scripts/test-password-manager-release-contract.sh`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `bash deploy/scripts/test-password-manager-nginx.sh`
+- `bash deploy/scripts/test-password-manager-startup.sh`
+- `bash deploy/scripts/test-upgrade.sh`
+- `BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=build-time-placeholder docker compose -f docker-compose.single.yml config`
+- `node --experimental-strip-types --test apps/web/lib/password-manager/client.test.mjs`
+- `pnpm install --frozen-lockfile`
+- `pnpm --dir apps/web type-check`
+- `go test ./internal/userkey ./internal/httpapi` in a temporary
+  `ct-password-manager` worktree at
+  `cb714edc1e6d813655fc3dd352c7c0fd92f4699a`
+- `git diff --check`
+
 ### Session 114 — Password Manager release readiness closeout
 
 **Bundled Password Manager release evidence refresh** (`PROGRESS.md`, `apps/docs/docs/deployment/docker-compose.md`, `apps/web/lib/password-manager/client.ts`, `apps/web/lib/password-manager/client.test.mjs`, `apps/web/tests/e2e/runner.mjs`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

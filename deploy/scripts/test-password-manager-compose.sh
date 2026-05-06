@@ -8,6 +8,14 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "'"$tmpdir"'"' EXIT
 
 rendered="${tmpdir}/compose.rendered.yml"
+expected_api_image="$(
+  python3 - <<'EOF' "${REPO_ROOT}/deploy/password-manager-release.json"
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    print(json.load(fh)["digest_reference"])
+EOF
+)"
 
 (
   cd "$REPO_ROOT"
@@ -53,6 +61,18 @@ password_manager_api_block="$(service_block "password-manager-api")"
 password_manager_db_block="$(service_block "password-manager-db")"
 password_manager_migrate_block="$(service_block "password-manager-migrate")"
 
+service_image() {
+  local service_name="$1"
+
+  service_block "$service_name" | awk '
+    /^[[:space:]]+image:[[:space:]]*/ {
+      sub(/^[[:space:]]+image:[[:space:]]*/, "")
+      print
+      exit
+    }
+  '
+}
+
 require_line '^  password-manager-db:$'
 require_line '^  password-manager-migrate:$'
 require_line '^  password-manager-api:$'
@@ -61,6 +81,22 @@ require_line '^  password_manager_db_data:$'
 
 if [[ -z "$password_manager_api_block" || -z "$password_manager_db_block" || -z "$password_manager_migrate_block" ]]; then
   echo "expected rendered compose to include password manager service blocks" >&2
+  exit 1
+fi
+
+if { command -v rg >/dev/null 2>&1 && rg -q 'PASSWORD_MANAGER_API_IMAGE' "${REPO_ROOT}/.env.example" "${REPO_ROOT}/docker-compose.single.yml"; } \
+  || { ! command -v rg >/dev/null 2>&1 && grep -q 'PASSWORD_MANAGER_API_IMAGE' "${REPO_ROOT}/.env.example" "${REPO_ROOT}/docker-compose.single.yml"; }; then
+  echo "PASSWORD_MANAGER_API_IMAGE must not be operator-facing or used by compose" >&2
+  exit 1
+fi
+
+api_image="$(service_image "password-manager-api")"
+migrate_image="$(service_image "password-manager-migrate")"
+if [[ "$api_image" != "$expected_api_image" || "$migrate_image" != "$expected_api_image" ]]; then
+  echo "password manager api and migrate images must match deploy/password-manager-release.json" >&2
+  echo "expected: $expected_api_image" >&2
+  echo "api:      ${api_image:-<missing>}" >&2
+  echo "migrate:  ${migrate_image:-<missing>}" >&2
   exit 1
 fi
 

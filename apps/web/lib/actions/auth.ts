@@ -4,10 +4,11 @@ import { logError } from '@/lib/logging'
 import { headers } from 'next/headers'
 import { db } from '@/lib/db'
 import { invitations, users } from '@/lib/db/schema'
-import { eq, and, isNull, gt } from 'drizzle-orm'
+import { eq, and, isNull, gt, sql } from 'drizzle-orm'
 import type { Invitation } from '@/lib/db/schema'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
+import { getRequireEmailVerification } from '@/lib/auth/env'
 import { getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 
@@ -34,6 +35,21 @@ export async function getInviteByToken(token: string): Promise<Invitation | null
   const invite = await db.query.invitations.findFirst({
     where: and(
       eq(invitations.token, token),
+      isNull(invitations.deletedAt),
+      isNull(invitations.acceptedAt),
+      gt(invitations.expiresAt, new Date()),
+    ),
+  })
+  return invite ?? null
+}
+
+export async function getPendingInviteForEmail(email: string): Promise<Invitation | null> {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail) return null
+
+  const invite = await db.query.invitations.findFirst({
+    where: and(
+      sql`lower(${invitations.email}) = ${normalizedEmail}`,
       isNull(invitations.deletedAt),
       isNull(invitations.acceptedAt),
       gt(invitations.expiresAt, new Date()),
@@ -77,7 +93,7 @@ export async function acceptInvite(
       return { error: 'This account already belongs to an organisation' }
     }
 
-    if (!user.emailVerified) {
+    if (getRequireEmailVerification() && !user.emailVerified) {
       return { error: 'Verify your email before accepting this invitation' }
     }
 

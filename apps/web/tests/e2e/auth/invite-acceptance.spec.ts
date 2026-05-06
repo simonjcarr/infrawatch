@@ -3,6 +3,8 @@ import { getTestDb } from '../fixtures/db'
 import { TEST_USER, TEST_ORG } from '../fixtures/seed'
 import { issueTestLicence } from '../fixtures/licence'
 
+const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false'
+
 test('invite acceptance rejects logged-in users whose email does not match the invitation', async ({
   page,
 }) => {
@@ -66,7 +68,7 @@ test('invite acceptance rejects logged-in users whose email does not match the i
 
   await page.goto(`/accept-invite?token=${inviteToken}`)
 
-  await page.waitForURL('**/onboarding')
+  await page.waitForURL(/\/onboarding(?:\?|$)/)
   await expect(page.getByText('Create your organisation', { exact: true })).toBeVisible()
 
   const [attacker] = await sql<Array<{ organisation_id: string | null; role: string }>>`
@@ -163,6 +165,80 @@ test('invite acceptance attaches the matching user to the organisation', async (
     LIMIT 1
   `
   expect(invite?.accepted_at).not.toBeNull()
+})
+
+test('invite signup without required email verification joins the inviting organisation', async ({
+  page,
+}) => {
+  test.skip(requireEmailVerification, 'email verification is required for this run')
+
+  const sql = getTestDb()
+  const suffix = Date.now().toString()
+  const invitedEmail = `invite-signup-${suffix}@example.com`
+  const invitedPassword = 'TestPassword123!'
+  const inviteToken = `invite-signup-token-${suffix}`
+
+  await sql`
+    INSERT INTO invitations (
+      id,
+      email,
+      role,
+      token,
+      organisation_id,
+      invited_by_id,
+      expires_at,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${`invite-signup-${suffix}`},
+      ${invitedEmail},
+      'org_admin',
+      ${inviteToken},
+      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM "user" WHERE email = ${TEST_USER.email}),
+      NOW() + INTERVAL '1 day',
+      NOW(),
+      NOW()
+    )
+  `
+
+  await page.goto(`/register?invite=${inviteToken}`)
+  await expect(page.getByLabel('Email')).toHaveValue(invitedEmail)
+  await page.getByLabel('Full name').fill('Invite Signup User')
+  await page.getByLabel(/^Password$/).fill(invitedPassword)
+  await page.getByLabel(/^Confirm password$/).fill(invitedPassword)
+  await page.getByRole('button', { name: 'Create account' }).click()
+
+  await page.waitForURL('**/dashboard')
+  await expect(page.getByTestId('dashboard-heading')).toBeVisible()
+  await expect(page.getByText('Create your organisation', { exact: true })).toHaveCount(0)
+
+  const [invitee] = await sql<Array<{
+    organisation_id: string | null
+    role: string
+    roles: string[]
+    email_verified: boolean
+  }>>`
+    SELECT organisation_id, role, roles, email_verified
+    FROM "user"
+    WHERE email = ${invitedEmail}
+    LIMIT 1
+  `
+  expect(invitee?.organisation_id).not.toBeNull()
+  expect(invitee?.role).toBe('org_admin')
+  expect(invitee?.roles).toEqual(['org_admin'])
+  expect(invitee?.email_verified).toBe(false)
+
+  const [invite] = await sql<Array<{ accepted_at: Date | null; email: string; token: string }>>`
+    SELECT accepted_at, email, token
+    FROM invitations
+    WHERE token = ${inviteToken}
+    LIMIT 1
+  `
+  expect(invite?.accepted_at).not.toBeNull()
+  expect(invite?.email).toBe(invitedEmail)
+  expect(invite?.token).toBe(inviteToken)
 })
 
 test('authenticated invited user without an organisation redeems invite link instead of onboarding', async ({

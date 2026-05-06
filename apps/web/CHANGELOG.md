@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.111.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.4...web/v0.111.0) (2026-05-06)
+
+
+### Features
+
+* **password-manager:** add member recipient selector ([#1101](https://github.com/carrtech-dev/ct-ops/issues/1101)) ([1695481](https://github.com/carrtech-dev/ct-ops/commit/1695481d59d222187592f6049dc51a52c986d86f))
+
 ## [0.110.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.3...web/v0.110.4) (2026-05-06)
 
 

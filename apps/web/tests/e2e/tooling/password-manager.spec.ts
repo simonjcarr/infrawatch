@@ -44,6 +44,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await expect(page.getByTestId('password-manager-workspace')).toBeVisible()
   await expect(page.getByText('Unlock profile created and loaded locally for this browser session.')).toBeVisible()
 
+  await page.getByRole('button', { name: 'Create vault' }).click()
   await page.getByLabel('Vault name').fill('Shared production')
   await page.getByLabel('Description').fill('Primary production credentials')
   await page.getByRole('button', { name: 'Create encrypted vault' }).click()
@@ -53,7 +54,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   await page.getByLabel('Title').fill('Grafana admin')
   await page.getByLabel('Username').fill('ops-admin')
-  await page.getByLabel('Password').fill(entryPassword)
+  await page.getByLabel('Password', { exact: true }).fill(entryPassword)
   await page.getByLabel('URL').fill('https://grafana.example.test')
   await page.getByLabel('Notes').fill(entryNotes)
   await page.getByRole('button', { name: 'Create encrypted entry' }).click()
@@ -75,10 +76,11 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await downloadPromise
 
   await entryCard.getByRole('button', { name: 'Edit' }).click()
-  await page.getByLabel('Password').fill(updatedEntryPassword)
+  await page.getByLabel('Password', { exact: true }).fill(updatedEntryPassword)
   await page.getByRole('button', { name: 'Save encrypted entry' }).click()
   await expect(entryCard.getByRole('button', { name: 'Hide password' })).toBeVisible()
 
+  await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByTestId('password-manager-member-user-selector').click()
   await page.getByText(TEST_PASSWORD_MANAGER_MEMBER.email).click()
   await page.getByRole('button', { name: 'Add member' }).click()
@@ -90,7 +92,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
       : ''
   await expect(page.getByText(addedMemberUserId)).toBeVisible()
 
-  const memberCard = page.locator('div.rounded-2xl').filter({ hasText: addedMemberUserId })
+  const memberCard = page.getByTestId(`password-manager-member-${addedMemberUserId}`)
   await memberCard.getByRole('button', { name: 'Save role' }).click()
   await memberCard.getByRole('button', { name: 'Remove' }).click()
   await expect(page.getByText('Key rotation recommended')).toBeVisible()
@@ -105,12 +107,15 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByRole('button', { name: 'Unlock' }).click()
   await expect(page.getByTestId('password-manager-workspace')).toBeVisible()
 
+  await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Rotate vault key' }).click()
   await expect(page.getByText('Vault key rotated safely for the current active members.')).toBeVisible()
 
+  await page.getByRole('tab', { name: 'Passwords' }).click()
   await page.getByRole('button', { name: 'Delete entry' }).click()
   await expect(page.getByTestId('password-manager-entry-entry-1')).toHaveCount(0)
 
+  await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Delete vault' }).click()
   await expect(page.getByTestId('password-manager-vault-vault-1')).toHaveCount(0)
 

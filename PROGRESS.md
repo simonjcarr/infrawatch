@@ -15,6 +15,26 @@
 
 ## What Has Been Built
 
+### Session 117 — Password Manager focused workspace layout
+
+**Passwords-first vault workspace** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Reworked the unlocked Password Manager workspace so the selected vault's
+  password entries are the default primary content instead of sitting beneath
+  vault administration and member management.
+- Replaced the left-hand vault list and inline create form with a compact vault
+  drop-down plus a create-vault dialog, keeping the first viewport focused on
+  saved credentials.
+- Moved vault rename/delete controls, member role management, member addition,
+  and key rotation into a dedicated Settings tab that is hidden until selected.
+- Kept the browser-only crypto and API flows intact while updating E2E coverage
+  to exercise the new tab and dialog workflow.
+
+**Validation**
+- `pnpm install`
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts`
+
 ### Session 116 — Password Manager member recipient lookup
 
 **Vault member selector and public-key lookup** (`apps/web/app/(dashboard)/password-manager/page.tsx`, `apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/client.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

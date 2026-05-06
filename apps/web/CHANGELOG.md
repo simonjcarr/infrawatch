@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.114.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.113.1...web/v0.114.0) (2026-05-06)
+
+
+### Features
+
+* **auth:** add user two-factor enforcement ([9f41683](https://github.com/carrtech-dev/ct-ops/commit/9f41683939c724a56ce0ea77669d7846105955e7))
+* **password-manager:** add entry templates ([c6789fb](https://github.com/carrtech-dev/ct-ops/commit/c6789fbb55bdb7e9b0b3acc7adc667501b92c302))
+
 ## [0.113.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.113.0...web/v0.113.1) (2026-05-06)
 
 

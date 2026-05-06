@@ -10,6 +10,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
 
   const setupPassword = 'LocalUnlockPassword!42'
+  const exportPassword = 'EncryptedVaultExport!42'
   const entryPassword = 'SuperSecretPassword!99'
   const updatedEntryPassword = 'RotatedPassword!100'
   const entryNotes = 'Recovery codes and production notes'
@@ -73,6 +74,12 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export vault' }).click()
+  await expect(page.getByRole('dialog', { name: 'Export vault' })).toBeVisible()
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
+  await page.getByLabel('Export file password', { exact: true }).fill(exportPassword)
+  await page.getByLabel('Confirm export file password').fill(exportPassword)
+  await page.getByLabel('Type "I understand the risks"').fill('I understand the risks')
+  await page.getByRole('button', { name: 'Export encrypted ZIP' }).click()
   await downloadPromise
 
   await entryCard.getByRole('button', { name: 'Edit' }).click()
@@ -147,6 +154,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   for (const request of passwordManagerMock.apiRequests()) {
     expect(request.credentialsCookie).toBe(true)
     expect(request.rawBody).not.toContain(setupPassword)
+    expect(request.rawBody).not.toContain(exportPassword)
     expect(request.rawBody).not.toContain(entryPassword)
     expect(request.rawBody).not.toContain(updatedEntryPassword)
     expect(request.rawBody).not.toContain(entryNotes)
@@ -156,6 +164,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   for (const message of consoleMessages) {
     expect(message).not.toContain(setupPassword)
+    expect(message).not.toContain(exportPassword)
     expect(message).not.toContain(entryPassword)
     expect(message).not.toContain(updatedEntryPassword)
     expect(message).not.toContain(entryNotes)
@@ -165,6 +174,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   for (const request of outboundBodies) {
     expect(request.body).not.toContain(setupPassword)
+    expect(request.body).not.toContain(exportPassword)
     expect(request.body).not.toContain(entryPassword)
     expect(request.body).not.toContain(updatedEntryPassword)
     expect(request.body).not.toContain(entryNotes)

@@ -96,6 +96,7 @@ const GENERIC_UNLOCK_FAILURE =
   'Password Manager could not unlock with the provided materials. Retry or relaunch.'
 const GENERIC_SETUP_FAILURE = 'Password Manager setup could not be completed safely. Retry or relaunch.'
 const PASSWORD_MANAGER_MEMBER_ROLES = ['viewer', 'member', 'manager', 'owner'] as const
+const PASSWORD_MANAGER_CRYPTO_BATCH_SIZE = 8
 
 export type PasswordManagerOrganisationUser = {
   id: string
@@ -146,6 +147,25 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
   link.download = fileName
   link.click()
   URL.revokeObjectURL(objectUrl)
+}
+
+async function yieldToBrowser() {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+async function mapPasswordManagerCryptoBatch<TInput, TOutput>(
+  values: TInput[],
+  mapper: (value: TInput) => Promise<TOutput>,
+): Promise<TOutput[]> {
+  const results: TOutput[] = []
+  for (let index = 0; index < values.length; index += PASSWORD_MANAGER_CRYPTO_BATCH_SIZE) {
+    const batch = values.slice(index, index + PASSWORD_MANAGER_CRYPTO_BATCH_SIZE)
+    results.push(...await Promise.all(batch.map(mapper)))
+    if (index + PASSWORD_MANAGER_CRYPTO_BATCH_SIZE < values.length) {
+      await yieldToBrowser()
+    }
+  }
+  return results
 }
 
 export function PasswordManagerClientShell({
@@ -203,6 +223,7 @@ export function PasswordManagerClientShell({
   const [memberRole, setMemberRole] = useState<(typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]>('viewer')
   const [memberRecipients, setMemberRecipients] = useState<Record<string, MemberRecipientRecord>>({})
   const [memberRecipientsPending, setMemberRecipientsPending] = useState(false)
+  const [memberRecipientLookupVaultId, setMemberRecipientLookupVaultId] = useState<string | null>(null)
   const [currentPasswordManagerUserId, setCurrentPasswordManagerUserId] = useState<string | null>(null)
   const [memberRoleEdits, setMemberRoleEdits] = useState<Record<string, string>>({})
   const [memberPublicKeyEnvelopeInputs, setMemberPublicKeyEnvelopeInputs] = useState<Record<string, string>>({})
@@ -230,10 +251,18 @@ export function PasswordManagerClientShell({
     vaultKey: CryptoKey
   } | null>(null)
 
-  const filteredVaults = filterPasswordManagerVaults(vaults, deferredVaultFilter)
+  const filteredVaults = useMemo(
+    () => filterPasswordManagerVaults(vaults, deferredVaultFilter),
+    [deferredVaultFilter, vaults],
+  )
   const selectedVault = vaults.find((vault) => vault.id === workspaceState.selectedVaultId) ?? null
-  const filteredEntries = filterPasswordManagerEntries(entries, deferredEntryFilter)
+  const filteredEntries = useMemo(
+    () => filterPasswordManagerEntries(entries, deferredEntryFilter),
+    [deferredEntryFilter, entries],
+  )
   const selectedEntry = entries.find((entry) => entry.id === workspaceState.selectedEntryId) ?? null
+  const selectedVaultIdRef = useRef(workspaceState.selectedVaultId)
+  const selectedEntryIdRef = useRef(workspaceState.selectedEntryId)
 
   function logPasswordManagerWarning(message: string, error: unknown, context?: unknown) {
     if (!shouldLogPasswordManagerError(error)) {
@@ -415,6 +444,7 @@ export function PasswordManagerClientShell({
     setMemberRole('viewer')
     setMemberRecipients({})
     setMemberRecipientsPending(false)
+    setMemberRecipientLookupVaultId(null)
     setCurrentPasswordManagerUserId(null)
     setMemberRoleEdits({})
     setMemberPublicKeyEnvelopeInputs({})
@@ -457,7 +487,27 @@ export function PasswordManagerClientShell({
   }, [currentPasswordManagerUserId, currentUserId, state.activeKeyPair, state.view])
 
   useEffect(() => {
-    if (state.view !== 'unlocked' || !selectedVault || !canManageVaultRole(selectedVault.role)) {
+    selectedVaultIdRef.current = workspaceState.selectedVaultId
+  }, [workspaceState.selectedVaultId])
+
+  useEffect(() => {
+    selectedEntryIdRef.current = workspaceState.selectedEntryId
+  }, [workspaceState.selectedEntryId])
+
+  useEffect(() => {
+    setMemberRecipients({})
+    setMemberRecipientsPending(false)
+    setMemberRecipientLookupVaultId(null)
+    setMemberUserId('')
+  }, [workspaceState.selectedVaultId])
+
+  useEffect(() => {
+    if (
+      state.view !== 'unlocked' ||
+      !selectedVault ||
+      !canManageVaultRole(selectedVault.role) ||
+      memberRecipientLookupVaultId !== selectedVault.id
+    ) {
       setMemberRecipients({})
       setMemberRecipientsPending(false)
       return
@@ -533,7 +583,7 @@ export function PasswordManagerClientShell({
     return () => {
       cancelled = true
     }
-  }, [client, currentUserId, organisationUsers, selectedVault, state.view])
+  }, [client, currentUserId, memberRecipientLookupVaultId, organisationUsers, selectedVault, state.view])
 
   useEffect(() => {
     if (state.view !== 'unlocked' || !state.activeKeyPair) {
@@ -547,8 +597,9 @@ export function PasswordManagerClientShell({
       setWorkspaceError(null)
       try {
         const response = await client.listVaults()
-        const decryptedVaults = await Promise.all(
-          response.vaults.map(async (record) => {
+        const decryptedVaults = await mapPasswordManagerCryptoBatch(
+          response.vaults,
+          async (record) => {
             const vaultKey = await unwrapVaultKeyEnvelope(
               record.wrapped_vault_key_envelope as unknown as PasswordManagerWrappedVaultKeyEnvelope,
               state.activeKeyPair!.privateKey as CryptoKey,
@@ -559,7 +610,7 @@ export function PasswordManagerClientShell({
             )
             upsertVaultEpochKey(vaultKeyCacheRef.current, record.id, record.current_key_epoch, vaultKey)
             return createVaultSummary(record, metadata)
-          }),
+          },
         )
         if (cancelled) {
           return
@@ -573,8 +624,9 @@ export function PasswordManagerClientShell({
         }
 
         setVaults(decryptedVaults)
+        const currentSelectedVaultId = selectedVaultIdRef.current
         const preferredVaultId =
-          decryptedVaults.find((vault) => vault.id === workspaceState.selectedVaultId)?.id ?? decryptedVaults[0]?.id ?? null
+          decryptedVaults.find((vault) => vault.id === currentSelectedVaultId)?.id ?? decryptedVaults[0]?.id ?? null
         workspaceDispatch({
           type: 'workspace-loaded',
           hasVaults: decryptedVaults.length > 0,
@@ -597,7 +649,7 @@ export function PasswordManagerClientShell({
     return () => {
       cancelled = true
     }
-  }, [client, state.activeKeyPair, state.launchNonce, state.view, workspaceState.selectedVaultId])
+  }, [client, state.activeKeyPair, state.launchNonce, state.view])
 
   useEffect(() => {
     if (state.view !== 'unlocked' || !workspaceState.selectedVaultId) {
@@ -612,8 +664,9 @@ export function PasswordManagerClientShell({
       setWorkspaceError(null)
       try {
         const response = await client.listEntries(workspaceState.selectedVaultId!)
-        const decryptedEntries = await Promise.all(
-          response.entries.map(async (record) => {
+        const decryptedEntries = await mapPasswordManagerCryptoBatch(
+          response.entries,
+          async (record) => {
             const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, record.vault_id, record.key_epoch)
             if (!vaultKey) {
               throw new Error('The required vault key epoch is no longer available in browser memory. Rotate or relaunch.')
@@ -625,14 +678,15 @@ export function PasswordManagerClientShell({
                 vaultKey,
               ),
             )
-          }),
+          },
         )
         if (cancelled) {
           return
         }
 
         setEntries(decryptedEntries)
-        if (!decryptedEntries.find((entry) => entry.id === workspaceState.selectedEntryId)) {
+        const currentSelectedEntryId = selectedEntryIdRef.current
+        if (!decryptedEntries.find((entry) => entry.id === currentSelectedEntryId)) {
           workspaceDispatch({ type: 'entry-selected', entryId: decryptedEntries[0]?.id ?? null })
         }
       } catch (error) {
@@ -652,7 +706,7 @@ export function PasswordManagerClientShell({
     return () => {
       cancelled = true
     }
-  }, [client, state.view, workspaceState.selectedEntryId, workspaceState.selectedVaultId])
+  }, [client, state.view, workspaceState.selectedVaultId])
 
   useEffect(() => {
     if (state.view !== 'unlocked' || !workspaceState.selectedVaultId) {
@@ -1441,6 +1495,14 @@ export function PasswordManagerClientShell({
     }
   }
 
+  function handleMemberRecipientLookupRequest() {
+    if (!selectedVault || !canManageVaultRole(selectedVault.role)) {
+      return
+    }
+
+    setMemberRecipientLookupVaultId((current) => current ?? selectedVault.id)
+  }
+
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6" data-testid="password-manager-shell">
       <header className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-linear-to-br from-background via-background to-muted/40 p-6 shadow-xs">
@@ -1537,6 +1599,7 @@ export function PasswordManagerClientShell({
           onMemberRemove={handleMemberRemove}
           onMemberRoleChange={setMemberRole}
           onMemberRoleEditChange={(userId, role) => setMemberRoleEdits((current) => ({ ...current, [userId]: role }))}
+          onMemberRecipientLookupRequest={handleMemberRecipientLookupRequest}
           onMemberSave={handleMemberAdd}
           onMemberUserIdChange={setMemberUserId}
           onRenameVault={handleVaultRename}
@@ -1937,6 +2000,7 @@ function PasswordManagerWorkspace({
   onExportVault,
   onMemberPublicKeyEnvelopeInputChange,
   onMemberRemove,
+  onMemberRecipientLookupRequest,
   onMemberRoleChange,
   onMemberRoleEditChange,
   onMemberSave,
@@ -2005,6 +2069,7 @@ function PasswordManagerWorkspace({
   onExportVault: () => Promise<void>
   onMemberPublicKeyEnvelopeInputChange: (userId: string, value: string) => void
   onMemberRemove: (member: MemberRecord) => Promise<void>
+  onMemberRecipientLookupRequest: () => void
   onMemberRoleChange: (role: (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]) => void
   onMemberRoleEditChange: (userId: string, role: string) => void
   onMemberSave: () => Promise<void>
@@ -2273,7 +2338,15 @@ function PasswordManagerWorkspace({
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="grid gap-2">
                     <Label>Organisation user</Label>
-                    <Popover open={memberSelectorOpen} onOpenChange={setMemberSelectorOpen}>
+                    <Popover
+                      open={memberSelectorOpen}
+                      onOpenChange={(open) => {
+                        setMemberSelectorOpen(open)
+                        if (open) {
+                          onMemberRecipientLookupRequest()
+                        }
+                      }}
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           type="button"

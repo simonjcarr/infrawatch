@@ -1,26 +1,38 @@
-import { pgTable, text, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, jsonb, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { organisations } from './organisations.ts'
 
 // Better Auth core tables
-export const users = pgTable('user', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  emailVerified: boolean('email_verified').notNull().default(false),
-  image: text('image'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  // Extended fields
-  organisationId: text('organisation_id').references(() => organisations.id),
-  role: text('role').notNull().default('engineer'),
-  roles: jsonb('roles').$type<string[]>().notNull().default([]),
-  isActive: boolean('is_active').notNull().default(true),
-  twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
-  deletedAt: timestamp('deleted_at', { withTimezone: true }),
-  theme: text('theme').notNull().default('system'),
-  notificationsEnabled: boolean('notifications_enabled').notNull().default(true),
-})
+export const users = pgTable(
+  'user',
+  {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    name: text('name').notNull(),
+    email: text('email').notNull().unique(),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    image: text('image'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // Extended fields
+    organisationId: text('organisation_id').references(() => organisations.id),
+    role: text('role').notNull().default('engineer'),
+    roles: jsonb('roles').$type<string[]>().notNull().default([]),
+    isActive: boolean('is_active').notNull().default(true),
+    twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    theme: text('theme').notNull().default('system'),
+    notificationsEnabled: boolean('notifications_enabled').notNull().default(true),
+  },
+  (table) => [
+    index('users_org_active_deleted_name_email_idx').on(
+      table.organisationId,
+      table.isActive,
+      table.deletedAt,
+      table.name,
+      table.email,
+    ),
+  ],
+)
 
 export const sessions = pgTable('session', {
   id: text('id').primaryKey().$defaultFn(() => createId()),

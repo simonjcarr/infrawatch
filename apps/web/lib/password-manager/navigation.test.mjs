@@ -9,6 +9,7 @@ import {
 test('Password Manager sidebar navigation targets the hosted route', () => {
   assert.equal(PASSWORD_MANAGER_NAV_ITEM.title, 'Password Manager')
   assert.equal(PASSWORD_MANAGER_NAV_ITEM.href, '/password-manager')
+  assert.equal(PASSWORD_MANAGER_NAV_ITEM.prefetch, false)
   assert.equal(PASSWORD_MANAGER_NAV_ITEM.testId, 'sidebar-password-manager')
 })
 

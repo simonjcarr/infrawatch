@@ -4,6 +4,7 @@ export const PASSWORD_MANAGER_NAV_ITEM = {
   title: 'Password Manager',
   href: '/password-manager',
   icon: Lock,
+  prefetch: false,
   testId: 'sidebar-password-manager',
 } as const
 

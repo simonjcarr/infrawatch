@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.0...web/v0.110.1) (2026-05-06)
+
+
+### Bug Fixes
+
+* **password-manager:** close hosted readiness gaps ([#1087](https://github.com/carrtech-dev/ct-ops/issues/1087)) ([ab85db7](https://github.com/carrtech-dev/ct-ops/commit/ab85db72e4fa5ac6c14fbd937a5e1b93c3bcfe3b))
+
 ## [0.110.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.109.0...web/v0.110.0) (2026-05-05)
 
 

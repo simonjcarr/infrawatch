@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.113.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.112.0...web/v0.113.0) (2026-05-06)
+
+
+### Features
+
+* **terminal:** trust SSH host keys from agents ([2ab4e2e](https://github.com/carrtech-dev/ct-ops/commit/2ab4e2eb590663bc3c6643fd2ff8bd7d464d05fc))
+
 ## [0.112.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.111.1...web/v0.112.0) (2026-05-06)
 
 

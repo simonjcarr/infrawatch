@@ -15,6 +15,34 @@
 
 ## What Has Been Built
 
+### Session 113 — Password Manager hosted no-plaintext E2E coverage
+
+**Hosted Password Manager E2E leak assertions** (`apps/web/tests/e2e/fixtures/test.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Added a Password Manager Playwright mock fixture that intercepts the hosted
+  `/password-manager-api/` traffic, simulates session launch/setup/unlock,
+  vault and entry CRUD, member sharing and revocation, key rotation, audit
+  hooks, session expiry, and organisation switches, and records outbound
+  request bodies plus headers for leak checks.
+- Added a targeted hosted Password Manager E2E spec that covers launch,
+  browser-only setup, relaunch + unlock, vault create/delete, entry
+  create/reveal/copy/export/edit/delete, member add/remove, rotation prompts,
+  session refresh expiry handling, and organisation switching from the CT-Ops
+  hosted route shell.
+- Added network and browser-surface assertions proving the hosted flow does not
+  send unlock passwords, plaintext entry values, or plaintext-shaped key fields
+  to either the CT-Ops launch-assertion route or the proxied Password Manager
+  API, keeps audit POST bodies empty, reuses credentialed session requests, and
+  avoids leaking secrets through browser console output or page errors.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint 'tests/e2e/fixtures/test.ts' 'tests/e2e/fixtures/password-manager.ts' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `BETTER_AUTH_URL=https://ops.example.test BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=build-time-placeholder pnpm --dir apps/web build`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime on this machine)
+- `git diff --check`
+
 ### Session 112 — Password Manager sharing and key rotation UI
 
 **Hosted sharing and revocation workflow** (`apps/web/app/(dashboard)/password-manager/page.tsx`, `apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/browser-crypto.ts`, `apps/web/lib/password-manager/browser-crypto.test.mjs`, `apps/web/lib/password-manager/client.test.mjs`)

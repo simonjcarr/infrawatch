@@ -1,11 +1,13 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { truncateAppTables } from './db'
 import { getStorageStatePath } from './auth'
+import { createPasswordManagerMock, type PasswordManagerMockController } from './password-manager'
 import { seedOrgAndUser } from './seed'
 
 type Fixtures = {
   autoTruncate: void
   authenticatedPage: Page
+  passwordManagerMock: PasswordManagerMockController
 }
 
 export const test = base.extend<Fixtures>({
@@ -28,6 +30,11 @@ export const test = base.extend<Fixtures>({
     } finally {
       await context.close()
     }
+  },
+
+  passwordManagerMock: async ({ authenticatedPage }, use) => {
+    const mock = await createPasswordManagerMock(authenticatedPage.context())
+    await use(mock)
   },
 })
 

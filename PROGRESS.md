@@ -15,6 +15,38 @@
 
 ## What Has Been Built
 
+### Session 114 — Password Manager release readiness closeout
+
+**Bundled Password Manager release evidence refresh** (`PROGRESS.md`, `apps/docs/docs/deployment/docker-compose.md`, `apps/web/lib/password-manager/client.ts`, `apps/web/lib/password-manager/client.test.mjs`, `apps/web/tests/e2e/runner.mjs`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Closed the hosted-client portability gap that surfaced during the task-16
+  verification pass: relative CT-Ops launch assertion paths now stay relative
+  instead of being rewritten to `http://localhost/...`, and browser-side
+  idempotency keys now come from runtime Web Crypto rather than `node:crypto`.
+- Strengthened the hosted Password Manager regression coverage so the client
+  contract test asserts the relative launch-path behavior, the E2E runner
+  supplies the launch-signing key and instance ID required by the hosted flow,
+  and the Playwright spec uses more stable selectors around unlock and member
+  actions.
+- Updated the public deployment guide so the bundled Password Manager services
+  are named explicitly in the single-host compose stack, the digest-pinned
+  `PASSWORD_MANAGER_API_IMAGE` flow is called out in the update path, and
+  backup or restore guidance now includes `password_manager_db_data`, `.env`,
+  and `deploy/password-manager-release.json`.
+
+**Validation**
+- `node --experimental-strip-types --test apps/web/lib/password-manager/client.test.mjs`
+- `pnpm install --frozen-lockfile`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts`
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `bash deploy/scripts/test-password-manager-nginx.sh`
+- `bash deploy/scripts/test-password-manager-startup.sh`
+- `bash deploy/scripts/test-support-data.sh`
+- `BETTER_AUTH_SECRET=build-time-placeholder POSTGRES_PASSWORD=build-time-placeholder PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY=build-time-placeholder docker compose -f docker-compose.single.yml config`
+- `git diff --check`
+
 ### Session 113 — Password Manager hosted no-plaintext E2E coverage
 
 **Hosted Password Manager E2E leak assertions** (`apps/web/tests/e2e/fixtures/test.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

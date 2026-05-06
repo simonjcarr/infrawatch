@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.111.1...web/v0.112.0) (2026-05-06)
+
+
+### Features
+
+* **password-manager:** focus workspace on passwords ([94d6d39](https://github.com/carrtech-dev/ct-ops/commit/94d6d3946bef58d490837d9a6585fb4c2b269746))
+
 ## [0.111.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.111.0...web/v0.111.1) (2026-05-06)
 
 

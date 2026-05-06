@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test'
+import { TEST_PASSWORD_MANAGER_MEMBER } from '../fixtures/seed'
 
 test('hosted password manager flow keeps plaintext and key material inside the browser', async ({
   authenticatedPage: page,
@@ -78,14 +79,18 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByRole('button', { name: 'Save encrypted entry' }).click()
   await expect(entryCard.getByRole('button', { name: 'Hide password' })).toBeVisible()
 
-  await page.getByLabel('CT-Ops user ID').fill('user-2')
-  await page
-    .getByLabel('Member public-key envelope JSON')
-    .fill(JSON.stringify(passwordManagerMock.getMemberEnvelope('user-2')))
+  await page.getByTestId('password-manager-member-user-selector').click()
+  await page.getByText(TEST_PASSWORD_MANAGER_MEMBER.email).click()
   await page.getByRole('button', { name: 'Add member' }).click()
-  await expect(page.getByText('user-2')).toBeVisible()
+  await expect.poll(() => passwordManagerMock.requestsFor('POST', '/vaults/vault-1/members').length).toBe(1)
+  const addMemberRequest = passwordManagerMock.requestsFor('POST', '/vaults/vault-1/members')[0]
+  const addedMemberUserId =
+    addMemberRequest?.jsonBody && typeof addMemberRequest.jsonBody === 'object' && !Array.isArray(addMemberRequest.jsonBody)
+      ? String(addMemberRequest.jsonBody.user_id)
+      : ''
+  await expect(page.getByText(addedMemberUserId)).toBeVisible()
 
-  const memberCard = page.locator('div.rounded-2xl').filter({ hasText: 'user-2' })
+  const memberCard = page.locator('div.rounded-2xl').filter({ hasText: addedMemberUserId })
   await memberCard.getByRole('button', { name: 'Save role' }).click()
   await memberCard.getByRole('button', { name: 'Remove' }).click()
   await expect(page.getByText('Key rotation recommended')).toBeVisible()
@@ -113,7 +118,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.reload()
   await expect(page.getByTestId('password-manager-state-setup-required')).toBeVisible()
 
-  expect(passwordManagerMock.launchAssertions()).toHaveLength(2)
+  expect(passwordManagerMock.launchAssertions()).toHaveLength(3)
   expect(passwordManagerMock.requestsFor('POST', '/vaults')).toHaveLength(1)
   expect(passwordManagerMock.requestsFor('POST', '/vaults/vault-1/key-epochs')).toHaveLength(1)
 

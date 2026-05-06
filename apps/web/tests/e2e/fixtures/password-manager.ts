@@ -1,7 +1,7 @@
 import { randomUUID, generateKeyPairSync } from 'node:crypto'
 import type { BrowserContext, Route } from '@playwright/test'
 import { getTestDb } from './db'
-import { TEST_USER } from './seed'
+import { TEST_PASSWORD_MANAGER_MEMBER, TEST_USER } from './seed'
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 
@@ -108,6 +108,19 @@ function readRecordStringValue(record: Record<string, JsonValue>, key: string, f
   return typeof value === 'string' ? value : fallback
 }
 
+function readObjectNumberValue(record: { [key: string]: JsonValue }, key: string, fallback: number): number {
+  const value = record[key]
+  return typeof value === 'number' ? value : fallback
+}
+
+function publicEnvelopeJson(envelope: PasswordManagerMemberEnvelope): { [key: string]: JsonValue } {
+  return {
+    version: envelope.version,
+    algorithm: envelope.algorithm,
+    public_key_spki_b64: envelope.public_key_spki_b64,
+  }
+}
+
 function isPlainObject(value: JsonValue): value is { [key: string]: JsonValue } {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -164,6 +177,20 @@ async function getCurrentUserState() {
   return rows[0]
 }
 
+async function getPasswordManagerMemberState() {
+  const sql = getTestDb()
+  const rows = await sql<Array<{ user_id: string; organisation_id: string }>>`
+    SELECT id AS user_id, organisation_id
+    FROM "user"
+    WHERE email = ${TEST_PASSWORD_MANAGER_MEMBER.email}
+    LIMIT 1
+  `
+  if (rows.length !== 1 || !rows[0]?.organisation_id) {
+    throw new Error('expected seeded Password Manager member with organisation')
+  }
+  return rows[0]
+}
+
 async function fulfillJson(route: Route, status: number, body: JsonValue, headers: Record<string, string> = {}) {
   await route.fulfill({
     status,
@@ -185,7 +212,8 @@ async function fulfillEmpty(route: Route, status: number, headers: Record<string
 
 export async function createPasswordManagerMock(context: BrowserContext): Promise<PasswordManagerMockController> {
   const currentUser = await getCurrentUserState()
-  const memberEnvelopes = new Map<string, PasswordManagerMemberEnvelope>([['user-2', createMemberEnvelope()]])
+  const passwordManagerMember = await getPasswordManagerMemberState()
+  const memberEnvelopes = new Map<string, PasswordManagerMemberEnvelope>([[passwordManagerMember.user_id, createMemberEnvelope()]])
 
   const state: PasswordManagerMockState = {
     sessionToken: null,
@@ -306,6 +334,49 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
       await fulfillJson(route, 200, {
         vaults: Array.from(state.vaults.values()).map((vault) => vault.record),
       })
+      return
+    }
+
+    const memberRecipientsMatch = path.match(/^\/vaults\/([^/]+)\/member-recipients$/)
+    if (memberRecipientsMatch && method === 'POST' && isPlainObject(jsonBody) && Array.isArray(jsonBody.external_user_ids)) {
+      const vault = state.vaults.get(memberRecipientsMatch[1]!)
+      if (!vault) {
+        await fulfillJson(route, 404, { error: 'not_found' })
+        return
+      }
+
+      const recipients: JsonValue[] = jsonBody.external_user_ids
+        .filter((value): value is string => typeof value === 'string')
+        .map((externalUserId) => {
+          const currentEncryptedEnvelope = state.userKey?.encrypted_private_key_envelope
+          if (externalUserId === state.currentUserId && currentEncryptedEnvelope !== undefined && isPlainObject(currentEncryptedEnvelope)) {
+            const encryptedEnvelope = currentEncryptedEnvelope
+            return {
+              external_user_id: externalUserId,
+              user_id: externalUserId,
+              email: TEST_USER.email,
+              display_name: TEST_USER.name,
+              setup_configured: true,
+              public_key_envelope: {
+                version: readObjectNumberValue(encryptedEnvelope, 'version', 1),
+                algorithm: readRecordStringValue(encryptedEnvelope, 'algorithm', 'rsa-oaep-256'),
+                public_key_spki_b64: readRecordStringValue(encryptedEnvelope, 'public_key_spki_b64', ''),
+              },
+            }
+          }
+
+          const memberEnvelope = memberEnvelopes.get(externalUserId)
+          return {
+            external_user_id: externalUserId,
+            user_id: externalUserId,
+            email: externalUserId === passwordManagerMember.user_id ? TEST_PASSWORD_MANAGER_MEMBER.email : `${externalUserId}@example.test`,
+            display_name: externalUserId === passwordManagerMember.user_id ? TEST_PASSWORD_MANAGER_MEMBER.name : externalUserId,
+            setup_configured: Boolean(memberEnvelope),
+            public_key_envelope: memberEnvelope ? publicEnvelopeJson(memberEnvelope) : null,
+          }
+        })
+
+      await fulfillJson(route, 200, { recipients })
       return
     }
 

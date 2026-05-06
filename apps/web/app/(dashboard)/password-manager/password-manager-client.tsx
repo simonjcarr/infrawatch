@@ -13,6 +13,8 @@ import {
 } from 'react'
 import {
   AlertCircle,
+  Check,
+  ChevronsUpDown,
   Copy,
   Download,
   Eye,
@@ -33,8 +35,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
@@ -61,6 +65,7 @@ import {
   PasswordManagerApiError,
   type EntryRecord,
   type MemberRecord,
+  type MemberRecipientRecord,
   type VaultRecord,
   createPasswordManagerClient,
 } from '@/lib/password-manager/client'
@@ -92,6 +97,12 @@ const GENERIC_UNLOCK_FAILURE =
 const GENERIC_SETUP_FAILURE = 'Password Manager setup could not be completed safely. Retry or relaunch.'
 const PASSWORD_MANAGER_MEMBER_ROLES = ['viewer', 'member', 'manager', 'owner'] as const
 
+export type PasswordManagerOrganisationUser = {
+  id: string
+  name: string | null
+  email: string
+}
+
 function toClientPayload<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
@@ -102,6 +113,10 @@ function createIdempotencyKey() {
 
 function isMembershipConflictError(error: unknown): boolean {
   return error instanceof PasswordManagerApiError && error.status === 409 && error.code === 'membership_conflict'
+}
+
+function canManageVaultRole(role: string): boolean {
+  return role === 'owner' || role === 'manager'
 }
 
 function sortMembers(members: MemberRecord[]): MemberRecord[] {
@@ -136,9 +151,11 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
 export function PasswordManagerClientShell({
   currentUserId,
   orgId,
+  organisationUsers,
 }: {
   currentUserId: string
   orgId: string
+  organisationUsers: PasswordManagerOrganisationUser[]
 }) {
   const client = useMemo(
     () =>
@@ -184,7 +201,9 @@ export function PasswordManagerClientShell({
   const [renameVaultDescription, setRenameVaultDescription] = useState('')
   const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState<(typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]>('viewer')
-  const [memberPublicKeyEnvelopeText, setMemberPublicKeyEnvelopeText] = useState('')
+  const [memberRecipients, setMemberRecipients] = useState<Record<string, MemberRecipientRecord>>({})
+  const [memberRecipientsPending, setMemberRecipientsPending] = useState(false)
+  const [currentPasswordManagerUserId, setCurrentPasswordManagerUserId] = useState<string | null>(null)
   const [memberRoleEdits, setMemberRoleEdits] = useState<Record<string, string>>({})
   const [memberPublicKeyEnvelopeInputs, setMemberPublicKeyEnvelopeInputs] = useState<Record<string, string>>({})
   const [rotationPrompt, setRotationPrompt] = useState<string | null>(null)
@@ -394,7 +413,9 @@ export function PasswordManagerClientShell({
     setRenameVaultDescription('')
     setMemberUserId('')
     setMemberRole('viewer')
-    setMemberPublicKeyEnvelopeText('')
+    setMemberRecipients({})
+    setMemberRecipientsPending(false)
+    setCurrentPasswordManagerUserId(null)
     setMemberRoleEdits({})
     setMemberPublicKeyEnvelopeInputs({})
     setRotationPrompt(null)
@@ -424,6 +445,7 @@ export function PasswordManagerClientShell({
       memberPublicKeyEnvelopeCacheRef.current = {
         ...memberPublicKeyEnvelopeCacheRef.current,
         [currentUserId]: envelope,
+        ...(currentPasswordManagerUserId ? { [currentPasswordManagerUserId]: envelope } : {}),
       }
     }
 
@@ -432,7 +454,86 @@ export function PasswordManagerClientShell({
     return () => {
       cancelled = true
     }
-  }, [currentUserId, state.activeKeyPair, state.view])
+  }, [currentPasswordManagerUserId, currentUserId, state.activeKeyPair, state.view])
+
+  useEffect(() => {
+    if (state.view !== 'unlocked' || !selectedVault || !canManageVaultRole(selectedVault.role)) {
+      setMemberRecipients({})
+      setMemberRecipientsPending(false)
+      return
+    }
+
+    const externalUserIds = organisationUsers.map((user) => user.id)
+    if (externalUserIds.length === 0) {
+      setMemberRecipients({})
+      setMemberRecipientsPending(false)
+      return
+    }
+
+    let cancelled = false
+
+    async function loadMemberRecipients() {
+      setMemberRecipientsPending(true)
+      try {
+        const chunks: string[][] = []
+        for (let index = 0; index < externalUserIds.length; index += 100) {
+          chunks.push(externalUserIds.slice(index, index + 100))
+        }
+        const responses = await Promise.all(
+          chunks.map((chunk) =>
+            client.lookupMemberRecipients({
+              vaultId: selectedVault!.id,
+              externalUserIds: chunk,
+            }),
+          ),
+        )
+        if (cancelled) {
+          return
+        }
+
+        const nextRecipients: Record<string, MemberRecipientRecord> = {}
+        const nextEnvelopeCache: Record<string, PasswordManagerPublicKeyEnvelope> = {}
+        let nextCurrentPasswordManagerUserId: string | null = null
+        for (const recipient of responses.flatMap((response) => response.recipients)) {
+          nextRecipients[recipient.external_user_id] = recipient
+          if (recipient.external_user_id === currentUserId) {
+            nextCurrentPasswordManagerUserId = recipient.user_id
+          }
+          if (recipient.setup_configured && recipient.public_key_envelope) {
+            nextEnvelopeCache[recipient.user_id] = recipient.public_key_envelope as unknown as PasswordManagerPublicKeyEnvelope
+          }
+        }
+
+        setMemberRecipients(nextRecipients)
+        setCurrentPasswordManagerUserId(nextCurrentPasswordManagerUserId)
+        memberPublicKeyEnvelopeCacheRef.current = {
+          ...memberPublicKeyEnvelopeCacheRef.current,
+          ...nextEnvelopeCache,
+        }
+        setMemberPublicKeyEnvelopeInputs((current) => {
+          const next = { ...current }
+          for (const [userId, envelope] of Object.entries(nextEnvelopeCache)) {
+            next[userId] = JSON.stringify(envelope, null, 2)
+          }
+          return next
+        })
+      } catch (error) {
+        if (!cancelled) {
+          handleWorkspaceEffectError(error, 'Password Manager member recipients could not be loaded safely.')
+        }
+      } finally {
+        if (!cancelled) {
+          setMemberRecipientsPending(false)
+        }
+      }
+    }
+
+    void loadMemberRecipients()
+
+    return () => {
+      cancelled = true
+    }
+  }, [client, currentUserId, organisationUsers, selectedVault, state.view])
 
   useEffect(() => {
     if (state.view !== 'unlocked' || !state.activeKeyPair) {
@@ -954,21 +1055,31 @@ export function PasswordManagerClientShell({
       return
     }
 
-    const userId = memberUserId.trim()
-    if (!userId) {
-      setWorkspaceError('Enter a CT-Ops user ID to add a member safely.')
+    const externalUserId = memberUserId.trim()
+    if (!externalUserId) {
+      setWorkspaceError('Select an organisation user to add as a member.')
+      return
+    }
+
+    const recipient = memberRecipients[externalUserId]
+    if (!recipient) {
+      setWorkspaceError('Password Manager has not seen that organisation user yet. Ask them to launch Password Manager once, then retry.')
+      return
+    }
+    if (!recipient.setup_configured || !recipient.public_key_envelope) {
+      setWorkspaceError('That user has not set up Password Manager yet. Ask them to launch and set up Password Manager before adding them.')
       return
     }
 
     setWorkspacePending(true)
     setWorkspaceError(null)
     try {
-      const parsedEnvelope = JSON.parse(memberPublicKeyEnvelopeText) as PasswordManagerPublicKeyEnvelope
+      const parsedEnvelope = recipient.public_key_envelope as unknown as PasswordManagerPublicKeyEnvelope
       const memberPublicKey = await importPublicKeyEnvelope(parsedEnvelope)
       const wrappedVaultKeyEnvelope = await wrapVaultKeyForMember(vaultKey, memberPublicKey)
       const created = await client.addMember({
         vaultId: selectedVault.id,
-        userId,
+        userId: recipient.user_id,
         role: memberRole,
         wrappedVaultKeyEnvelope: toClientPayload(wrappedVaultKeyEnvelope) as never,
         keyEpoch: selectedVault.currentKeyEpoch,
@@ -982,13 +1093,10 @@ export function PasswordManagerClientShell({
       setMemberPublicKeyEnvelopeInputs((current) => ({ ...current, [created.user_id]: JSON.stringify(parsedEnvelope, null, 2) }))
       setMemberUserId('')
       setMemberRole('viewer')
-      setMemberPublicKeyEnvelopeText('')
       setStatusNotice('Member added with a wrapped vault key only.')
     } catch (error) {
       if (isMembershipConflictError(error)) {
         setWorkspaceError('Password Manager rejected that membership change because owner safety or current membership state would be violated. Refresh and retry.')
-      } else if (error instanceof SyntaxError) {
-        setWorkspaceError('Paste a valid Password Manager public-key envelope JSON document for the new member.')
       } else {
         handleWorkspaceActionError(error, 'The member could not be added safely.')
       }
@@ -1051,7 +1159,7 @@ export function PasswordManagerClientShell({
 
       for (const member of members) {
         let memberPublicKey: CryptoKey
-        if (member.user_id === currentUserId) {
+        if (member.user_id === currentPasswordManagerUserId) {
           memberPublicKey = state.activeKeyPair.publicKey as CryptoKey
         } else {
           const cachedEnvelope = memberPublicKeyEnvelopeCacheRef.current[member.user_id]
@@ -1118,7 +1226,7 @@ export function PasswordManagerClientShell({
       )
       pendingRotationRef.current = null
       setRotationPrompt(null)
-      setStatusNotice('Vault key rotated for active members using browser-only key wrapping.')
+      setStatusNotice('Vault key rotated safely for the current active members.')
     } catch (error) {
       handleWorkspaceActionError(error, 'The vault key could not be rotated safely. Retry the same encrypted request.')
     } finally {
@@ -1139,7 +1247,7 @@ export function PasswordManagerClientShell({
         userId: member.user_id,
       })
 
-      if (member.user_id === currentUserId) {
+      if (member.user_id === currentPasswordManagerUserId) {
         vaultKeyCacheRef.current.delete(selectedVault.id)
         setVaults((current) => current.filter((vault) => vault.id !== selectedVault.id))
         setEntries([])
@@ -1387,7 +1495,7 @@ export function PasswordManagerClientShell({
         <PasswordManagerWorkspace
           createVaultDescription={createVaultDescription}
           createVaultName={createVaultName}
-          currentUserId={currentUserId}
+          currentPasswordManagerUserId={currentPasswordManagerUserId}
           deferredEntryFilter={deferredEntryFilter}
           deferredVaultFilter={deferredVaultFilter}
           editingEntryId={editingEntryId}
@@ -1401,12 +1509,14 @@ export function PasswordManagerClientShell({
           entryUrl={entryUrl}
           entryUsername={entryUsername}
           memberPublicKeyEnvelopeInputs={memberPublicKeyEnvelopeInputs}
-          memberPublicKeyEnvelopeText={memberPublicKeyEnvelopeText}
+          memberRecipients={memberRecipients}
+          memberRecipientsPending={memberRecipientsPending}
           memberRole={memberRole}
           memberRoleEdits={memberRoleEdits}
           memberUserId={memberUserId}
           members={members}
           membersPending={membersPending}
+          organisationUsers={organisationUsers}
           onCopyPassword={handleCopyPassword}
           onCreateVault={runVaultCreate}
           onCreateVaultDescriptionChange={setCreateVaultDescription}
@@ -1421,7 +1531,6 @@ export function PasswordManagerClientShell({
           onEntryUrlChange={setEntryUrl}
           onEntryUsernameChange={setEntryUsername}
           onExportVault={handleVaultExport}
-          onMemberPublicKeyEnvelopeChange={setMemberPublicKeyEnvelopeText}
           onMemberPublicKeyEnvelopeInputChange={(userId, value) =>
             setMemberPublicKeyEnvelopeInputs((current) => ({ ...current, [userId]: value }))
           }
@@ -1790,7 +1899,7 @@ function ShellCard({
 function PasswordManagerWorkspace({
   createVaultDescription,
   createVaultName,
-  currentUserId,
+  currentPasswordManagerUserId,
   deferredEntryFilter,
   deferredVaultFilter,
   editingEntryId,
@@ -1804,12 +1913,14 @@ function PasswordManagerWorkspace({
   entryUrl,
   entryUsername,
   memberPublicKeyEnvelopeInputs,
-  memberPublicKeyEnvelopeText,
+  memberRecipients,
+  memberRecipientsPending,
   memberRole,
   memberRoleEdits,
   memberUserId,
   members,
   membersPending,
+  organisationUsers,
   onCopyPassword,
   onCreateVault,
   onCreateVaultDescriptionChange,
@@ -1824,7 +1935,6 @@ function PasswordManagerWorkspace({
   onEntryUrlChange,
   onEntryUsernameChange,
   onExportVault,
-  onMemberPublicKeyEnvelopeChange,
   onMemberPublicKeyEnvelopeInputChange,
   onMemberRemove,
   onMemberRoleChange,
@@ -1857,7 +1967,7 @@ function PasswordManagerWorkspace({
 }: {
   createVaultDescription: string
   createVaultName: string
-  currentUserId: string
+  currentPasswordManagerUserId: string | null
   deferredEntryFilter: string
   deferredVaultFilter: string
   editingEntryId: string | null
@@ -1871,12 +1981,14 @@ function PasswordManagerWorkspace({
   entryUrl: string
   entryUsername: string
   memberPublicKeyEnvelopeInputs: Record<string, string>
-  memberPublicKeyEnvelopeText: string
+  memberRecipients: Record<string, MemberRecipientRecord>
+  memberRecipientsPending: boolean
   memberRole: (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]
   memberRoleEdits: Record<string, string>
   memberUserId: string
   members: MemberRecord[]
   membersPending: boolean
+  organisationUsers: PasswordManagerOrganisationUser[]
   onCopyPassword: (entry: PasswordManagerEntrySummary) => Promise<void>
   onCreateVault: () => Promise<void>
   onCreateVaultDescriptionChange: (value: string) => void
@@ -1891,7 +2003,6 @@ function PasswordManagerWorkspace({
   onEntryUrlChange: (value: string) => void
   onEntryUsernameChange: (value: string) => void
   onExportVault: () => Promise<void>
-  onMemberPublicKeyEnvelopeChange: (value: string) => void
   onMemberPublicKeyEnvelopeInputChange: (userId: string, value: string) => void
   onMemberRemove: (member: MemberRecord) => Promise<void>
   onMemberRoleChange: (role: (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]) => void
@@ -1922,6 +2033,14 @@ function PasswordManagerWorkspace({
   workspacePending: boolean
   workspaceState: PasswordManagerWorkspaceState
 }) {
+  const [memberSelectorOpen, setMemberSelectorOpen] = useState(false)
+  const memberIds = new Set(members.map((member) => member.user_id))
+  const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
+  const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
+  const selectedMemberLabel = selectedOrganisationUser
+    ? `${selectedOrganisationUser.name || selectedOrganisationUser.email} (${selectedOrganisationUser.email})`
+    : 'Select user'
+
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]" data-testid="password-manager-workspace">
       <Card className="border-border/60 shadow-xs">
@@ -2074,7 +2193,7 @@ function PasswordManagerWorkspace({
               <div>
                 <CardTitle>Members</CardTitle>
                 <CardDescription>
-                  Share and revoke access with wrapped vault keys only. Public-key envelopes stay in browser memory unless you paste them again.
+                  Share and revoke access with wrapped vault keys only. Public-key envelopes stay in browser memory for active sessions.
                 </CardDescription>
               </div>
               {selectedVault ? <Badge variant="outline">Vault role: {selectedVault.role}</Badge> : null}
@@ -2136,11 +2255,11 @@ function PasswordManagerWorkspace({
                         value={memberPublicKeyEnvelopeInputs[member.user_id] ?? ''}
                         onChange={(event) => onMemberPublicKeyEnvelopeInputChange(member.user_id, event.target.value)}
                         placeholder={
-                          member.user_id === currentUserId
+                          member.user_id === currentPasswordManagerUserId
                             ? 'Current session key is already available locally.'
                             : '{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
                         }
-                        disabled={member.user_id === currentUserId}
+                        disabled={member.user_id === currentPasswordManagerUserId}
                       />
                     </div>
                   ) : null}
@@ -2153,13 +2272,65 @@ function PasswordManagerWorkspace({
                 <Separator />
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="password-manager-member-user-id">CT-Ops user ID</Label>
-                    <Input
-                      id="password-manager-member-user-id"
-                      value={memberUserId}
-                      onChange={(event) => onMemberUserIdChange(event.target.value)}
-                      placeholder="user-1234"
-                    />
+                    <Label>Organisation user</Label>
+                    <Popover open={memberSelectorOpen} onOpenChange={setMemberSelectorOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 justify-between"
+                          disabled={workspacePending || memberRecipientsPending || !canManageVaultRole(selectedVault.role)}
+                          data-testid="password-manager-member-user-selector"
+                        >
+                          <span className="truncate">{memberRecipientsPending ? 'Loading users...' : selectedMemberLabel}</span>
+                          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[360px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search organisation users..." />
+                          <CommandList>
+                            <CommandEmpty>No organisation users found.</CommandEmpty>
+                            <CommandGroup>
+                              {organisationUsers.map((user) => {
+                                const recipient = memberRecipients[user.id]
+                                const alreadyMember = recipient ? memberIds.has(recipient.user_id) : false
+                                const ready = Boolean(recipient?.setup_configured && recipient.public_key_envelope && !alreadyMember)
+                                const status = alreadyMember
+                                  ? 'Already a member'
+                                  : recipient?.setup_configured
+                                    ? 'Ready'
+                                    : 'Password Manager not set up'
+                                return (
+                                  <CommandItem
+                                    key={user.id}
+                                    value={`${user.name ?? ''} ${user.email}`}
+                                    disabled={!ready}
+                                    onSelect={() => {
+                                      onMemberUserIdChange(user.id)
+                                      setMemberSelectorOpen(false)
+                                    }}
+                                    data-testid={`password-manager-member-user-option-${user.id}`}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="truncate font-medium">{user.name || user.email}</div>
+                                      <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                                    </div>
+                                    <Badge variant={ready ? 'secondary' : 'outline'} className="ml-auto shrink-0">
+                                      {status}
+                                    </Badge>
+                                    {memberUserId === user.id ? <Check className="size-4" /> : null}
+                                  </CommandItem>
+                                )
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {selectedRecipient && !selectedRecipient.setup_configured ? (
+                      <p className="text-xs text-muted-foreground">This user must launch and set up Password Manager before receiving a vault key.</p>
+                    ) : null}
                   </div>
                   <div className="grid gap-2">
                     <Label>Role</Label>
@@ -2177,23 +2348,23 @@ function PasswordManagerWorkspace({
                     </Select>
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password-manager-member-public-key-envelope">Member public-key envelope JSON</Label>
-                  <Textarea
-                    id="password-manager-member-public-key-envelope"
-                    value={memberPublicKeyEnvelopeText}
-                    onChange={(event) => onMemberPublicKeyEnvelopeChange(event.target.value)}
-                    placeholder='{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
-                  />
-                </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => void onMemberSave()} disabled={workspacePending || !selectedVault}>
+                  <Button
+                    onClick={() => void onMemberSave()}
+                    disabled={
+                      workspacePending ||
+                      memberRecipientsPending ||
+                      !selectedVault ||
+                      !selectedRecipient?.setup_configured ||
+                      !selectedRecipient.public_key_envelope
+                    }
+                  >
                     <Plus className="mr-2 size-4" />
                     Add member
                   </Button>
                   <Button variant="outline" onClick={() => void onRetryRotation()} disabled={workspacePending || !selectedVault}>
                     <RotateCcw className="mr-2 size-4" />
-                    {rotationPrompt ? 'Rotate vault key' : 'Retry saved rotation'}
+                    Rotate vault key
                   </Button>
                 </div>
               </>

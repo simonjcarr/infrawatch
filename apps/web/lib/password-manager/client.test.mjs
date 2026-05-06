@@ -14,12 +14,17 @@ import {
   createRotateVaultKeysPayload,
   createUserKeyPayload,
   createVaultPayload,
+  lookupMemberRecipientsPayload,
   updateEntryPayload,
   updateMemberPayload,
   updateVaultPayload,
 } from './client.ts'
 
 function loadPinnedContract() {
+  if (process.env.PASSWORD_MANAGER_OPENAPI_CONTRACT_PATH) {
+    return JSON.parse(readFileSync(process.env.PASSWORD_MANAGER_OPENAPI_CONTRACT_PATH, 'utf8'))
+  }
+
   const currentFilePath = fileURLToPath(import.meta.url)
   let currentDir = path.dirname(currentFilePath)
 
@@ -132,6 +137,45 @@ test('createVault and rotateVaultKeys preserve the supplied Idempotency-Key head
 
   assert.equal(calls[0].init.headers['Idempotency-Key'], 'vault-create-key')
   assert.equal(calls[1].init.headers['Idempotency-Key'], 'rotate-key')
+})
+
+test('lookupMemberRecipients posts CT-Ops user IDs for a vault-scoped public key lookup', async () => {
+  const calls = []
+  const client = createPasswordManagerClient({
+    apiBaseUrl: 'https://ops.example.test/password-manager-api',
+    fetch: async (input, init = {}) => {
+      calls.push({
+        url: input instanceof Request ? input.url : String(input),
+        init,
+      })
+      return createJsonResponse(200, {
+        recipients: [
+          {
+            external_user_id: 'ct-user-2',
+            user_id: 'pm-user-2',
+            email: 'two@example.test',
+            display_name: 'User Two',
+            setup_configured: true,
+            public_key_envelope: {
+              version: 1,
+              algorithm: 'rsa-oaep-256',
+              public_key_spki_b64: 'cHVibGljLWtleQ==',
+            },
+          },
+        ],
+      })
+    },
+  })
+
+  const response = await client.lookupMemberRecipients({
+    vaultId: 'vault-1',
+    externalUserIds: ['ct-user-2'],
+  })
+
+  assert.equal(calls[0].url, 'https://ops.example.test/password-manager-api/vaults/vault-1/member-recipients')
+  assert.equal(calls[0].init.method, 'POST')
+  assert.deepEqual(JSON.parse(calls[0].init.body), { external_user_ids: ['ct-user-2'] })
+  assert.equal(response.recipients[0].public_key_envelope.public_key_spki_b64, 'cHVibGljLWtleQ==')
 })
 
 test('createVault generates an Idempotency-Key through the runtime crypto API when one is not supplied', async () => {
@@ -303,6 +347,11 @@ test('request payload helpers serialize supported encrypted shapes', () => {
   }), {
     encrypted_payload: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
     key_epoch: 4,
+  })
+  assert.deepEqual(lookupMemberRecipientsPayload({
+    externalUserIds: ['user-1', 'user-2'],
+  }), {
+    external_user_ids: ['user-1', 'user-2'],
   })
   assert.deepEqual(createMemberPayload({
     userId: 'user-1',

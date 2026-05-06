@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -11,10 +12,13 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { CheckCircle2, ShieldCheck, Sun, Moon, Monitor, Bell } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { CheckCircle2, ShieldCheck, Sun, Moon, Monitor, Bell, Copy, KeyRound } from 'lucide-react'
 import { updateName, updatePassword, updateTheme, updateNotificationPreference } from '@/lib/actions/profile'
 import { getOrgNotificationSettings } from '@/lib/actions/notification-settings'
 import type { SessionUser } from '@/lib/auth/session'
+import { authClient } from '@/lib/auth/client'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -62,6 +66,7 @@ interface ProfileClientProps {
 }
 
 export function ProfileClient({ user, orgId }: ProfileClientProps) {
+  const searchParams = useSearchParams()
   const [nameSaveSuccess, setNameSaveSuccess] = useState(false)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
@@ -70,6 +75,23 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(user.notificationsEnabled)
   const [notifSaveSuccess, setNotifSaveSuccess] = useState(false)
   const [notifError, setNotifError] = useState<string | null>(null)
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user.twoFactorEnabled)
+  const [twoFactorPassword, setTwoFactorPassword] = useState('')
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [twoFactorUri, setTwoFactorUri] = useState('')
+  const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState<string[]>([])
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null)
+  const [twoFactorSuccess, setTwoFactorSuccess] = useState<string | null>(null)
+
+  const twoFactorSecret = useMemo(() => {
+    if (!twoFactorUri) return ''
+    try {
+      return new URL(twoFactorUri).searchParams.get('secret') ?? ''
+    } catch {
+      return ''
+    }
+  }, [twoFactorUri])
+  const requireTwoFactorSetup = searchParams.get('setup') === 'two-factor' && !twoFactorEnabled
 
   const { data: orgNotifSettings } = useQuery({
     queryKey: ['org-notification-settings', orgId],
@@ -130,12 +152,89 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
     },
   })
 
+  const startTwoFactorMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authClient.twoFactor.enable({
+        password: twoFactorPassword,
+        issuer: 'CT-Ops',
+      })
+      if (res.error) throw new Error(res.error.message ?? 'Unable to start two-factor setup')
+      return res.data
+    },
+    onSuccess: (data) => {
+      setTwoFactorUri(data.totpURI)
+      setTwoFactorBackupCodes(data.backupCodes ?? [])
+      setTwoFactorError(null)
+      setTwoFactorSuccess(null)
+      setTwoFactorCode('')
+    },
+    onError: (err) => {
+      setTwoFactorError(err instanceof Error ? err.message : 'Unable to start two-factor setup')
+      setTwoFactorSuccess(null)
+    },
+  })
+
+  const verifyTwoFactorMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authClient.twoFactor.verifyTotp({
+        code: twoFactorCode.replace(/\s+/g, ''),
+      })
+      if (res.error) throw new Error(res.error.message ?? 'Invalid authenticator code')
+      return res.data
+    },
+    onSuccess: () => {
+      setTwoFactorEnabled(true)
+      setTwoFactorPassword('')
+      setTwoFactorCode('')
+      setTwoFactorUri('')
+      setTwoFactorError(null)
+      setTwoFactorSuccess('Two-factor authentication is enabled')
+    },
+    onError: (err) => {
+      setTwoFactorError(err instanceof Error ? err.message : 'Invalid authenticator code')
+      setTwoFactorSuccess(null)
+    },
+  })
+
+  const disableTwoFactorMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authClient.twoFactor.disable({
+        password: twoFactorPassword,
+      })
+      if (res.error) throw new Error(res.error.message ?? 'Unable to disable two-factor authentication')
+      return res.data
+    },
+    onSuccess: () => {
+      setTwoFactorEnabled(false)
+      setTwoFactorPassword('')
+      setTwoFactorCode('')
+      setTwoFactorUri('')
+      setTwoFactorBackupCodes([])
+      setTwoFactorError(null)
+      setTwoFactorSuccess('Two-factor authentication is disabled')
+    },
+    onError: (err) => {
+      setTwoFactorError(err instanceof Error ? err.message : 'Unable to disable two-factor authentication')
+      setTwoFactorSuccess(null)
+    },
+  })
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Profile</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your personal settings</p>
       </div>
+
+      {requireTwoFactorSetup && (
+        <Alert data-testid="profile-two-factor-required">
+          <KeyRound className="size-4" />
+          <AlertTitle>Two-factor authentication is required</AlertTitle>
+          <AlertDescription>
+            Your organisation requires an authenticator app before you can continue.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Personal info */}
       <Card>
@@ -261,23 +360,150 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
             Add an extra layer of security to your account with TOTP
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="size-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {user.twoFactorEnabled ? '2FA is enabled' : '2FA is not enabled'}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {user.twoFactorEnabled
-                  ? 'Your account is protected with an authenticator app'
-                  : 'Use an authenticator app to generate one-time codes'}
-              </p>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="size-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {twoFactorEnabled ? '2FA is enabled' : '2FA is not enabled'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {twoFactorEnabled
+                    ? 'Your account is protected with an authenticator app'
+                    : 'Use an authenticator app to generate one-time codes'}
+                </p>
+              </div>
             </div>
+            <Badge variant={twoFactorEnabled ? 'default' : 'outline'}>
+              {twoFactorEnabled ? 'Enabled' : 'Disabled'}
+            </Badge>
           </div>
-          <Badge variant={user.twoFactorEnabled ? 'default' : 'outline'}>
-            {user.twoFactorEnabled ? 'Enabled' : 'Disabled'}
-          </Badge>
+
+          {twoFactorError && (
+            <p className="text-sm text-destructive">{twoFactorError}</p>
+          )}
+          {twoFactorSuccess && (
+            <p className="flex items-center gap-1 text-sm text-green-700" data-testid="profile-two-factor-success">
+              <CheckCircle2 className="size-4" />
+              {twoFactorSuccess}
+            </p>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-two-factor-password">Current password</Label>
+            <Input
+              id="profile-two-factor-password"
+              type="password"
+              autoComplete="current-password"
+              value={twoFactorPassword}
+              data-testid="profile-two-factor-password"
+              onChange={(e) => setTwoFactorPassword(e.target.value)}
+            />
+          </div>
+
+          {!twoFactorEnabled && !twoFactorUri && (
+            <Button
+              type="button"
+              size="sm"
+              disabled={!twoFactorPassword || startTwoFactorMutation.isPending}
+              data-testid="profile-two-factor-start"
+              onClick={() => {
+                setTwoFactorError(null)
+                setTwoFactorSuccess(null)
+                startTwoFactorMutation.mutate()
+              }}
+            >
+              {startTwoFactorMutation.isPending ? 'Starting…' : 'Set up authenticator'}
+            </Button>
+          )}
+
+          {!twoFactorEnabled && twoFactorUri && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-two-factor-secret">Authenticator setup key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="profile-two-factor-secret"
+                    value={twoFactorSecret}
+                    readOnly
+                    className="font-mono text-xs"
+                    data-testid="profile-two-factor-secret"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Copy setup key"
+                    onClick={() => void navigator.clipboard.writeText(twoFactorSecret)}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-two-factor-uri">Authenticator URI</Label>
+                <Textarea
+                  id="profile-two-factor-uri"
+                  value={twoFactorUri}
+                  readOnly
+                  rows={3}
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-two-factor-code">Verification code</Label>
+                <Input
+                  id="profile-two-factor-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={twoFactorCode}
+                  data-testid="profile-two-factor-code"
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                />
+              </div>
+              {twoFactorBackupCodes.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Backup codes</Label>
+                  <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/40 p-3 font-mono text-xs">
+                    {twoFactorBackupCodes.map((code) => (
+                      <span key={code}>{code}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                disabled={twoFactorCode.replace(/\s+/g, '').length < 6 || verifyTwoFactorMutation.isPending}
+                data-testid="profile-two-factor-verify"
+                onClick={() => {
+                  setTwoFactorError(null)
+                  setTwoFactorSuccess(null)
+                  verifyTwoFactorMutation.mutate()
+                }}
+              >
+                {verifyTwoFactorMutation.isPending ? 'Verifying…' : 'Verify and enable'}
+              </Button>
+            </div>
+          )}
+
+          {twoFactorEnabled && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!twoFactorPassword || disableTwoFactorMutation.isPending}
+              data-testid="profile-two-factor-disable"
+              onClick={() => {
+                setTwoFactorError(null)
+                setTwoFactorSuccess(null)
+                disableTwoFactorMutation.mutate()
+              }}
+            >
+              {disableTwoFactorMutation.isPending ? 'Disabling…' : 'Disable 2FA'}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

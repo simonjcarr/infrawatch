@@ -19,6 +19,10 @@ export interface SoftwareInventorySettings {
   includeWindowsStore?: boolean
 }
 
+export interface OrgSecuritySettings {
+  requireTwoFactor?: boolean
+}
+
 export interface OrgMetadata {
   defaultCollectionSettings?: HostCollectionSettings
   defaultTags?: Array<{ key: string; value: string }>
@@ -28,6 +32,7 @@ export interface OrgMetadata {
   terminalDirectAccess?: boolean
   notificationSettings?: OrgNotificationSettings
   softwareInventorySettings?: SoftwareInventorySettings
+  securitySettings?: OrgSecuritySettings
 }
 
 const tagPairSchema = z.object({
@@ -60,6 +65,10 @@ const softwareInventorySettingsSchema = z.object({
   includeWindowsStore: z.boolean().optional().catch(undefined),
 }).strip()
 
+const orgSecuritySettingsSchema = z.object({
+  requireTwoFactor: z.boolean().optional().catch(undefined),
+}).strip()
+
 export const orgMetadataSchema = z.object({
   defaultCollectionSettings: hostCollectionSettingsSchema.optional().catch(undefined),
   defaultTags: z.array(tagPairSchema).catch([]).optional(),
@@ -69,6 +78,7 @@ export const orgMetadataSchema = z.object({
   terminalDirectAccess: z.boolean().optional().catch(undefined),
   notificationSettings: orgNotificationSettingsSchema.optional().catch(undefined),
   softwareInventorySettings: softwareInventorySettingsSchema.optional().catch(undefined),
+  securitySettings: orgSecuritySettingsSchema.optional().catch(undefined),
 }).strip()
 
 export function parseOrgMetadata(input: unknown): OrgMetadata {

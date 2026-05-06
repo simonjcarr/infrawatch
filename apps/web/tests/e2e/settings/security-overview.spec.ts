@@ -151,3 +151,30 @@ test('admin can review the current agent CA and upload a replacement CA from sec
     '/settings/security/terminal',
   )
 })
+
+test('admin can require two-factor authentication for the organisation', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+
+  await page.goto('/settings/security')
+
+  const toggle = page.getByTestId('security-require-2fa-toggle')
+  await expect(toggle).toBeVisible()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+  await toggle.click()
+
+  await expect(page.getByTestId('security-require-2fa-success')).toBeVisible()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ require_two_factor: boolean | null }>>`
+        SELECT (metadata #>> '{securitySettings,requireTwoFactor}')::boolean AS require_two_factor
+        FROM organisations
+        LIMIT 1
+      `
+
+      return rows[0]?.require_two_factor ?? null
+    })
+    .toBe(true)
+})

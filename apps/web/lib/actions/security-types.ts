@@ -1,4 +1,7 @@
 export interface SecurityOverview {
+  accountAuth: {
+    requireTwoFactor: boolean
+  }
   serverTls: {
     certFile: string
     subject: string

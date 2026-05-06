@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { getSecurityOverview, uploadAgentCA } from '@/lib/actions/security'
+import { Switch } from '@/components/ui/switch'
+import { getSecurityOverview, updateAccountAuthenticationSettings, uploadAgentCA } from '@/lib/actions/security'
 import type { SecurityOverview } from '@/lib/actions/security-types'
 
 type OverviewResult = SecurityOverview | { error: string }
@@ -37,6 +38,9 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
   const [keyPem, setKeyPem] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadOk, setUploadOk] = useState<string | null>(null)
+  const [accountAuthError, setAccountAuthError] = useState<string | null>(null)
+  const [accountAuthOk, setAccountAuthOk] = useState(false)
+  const [requireTwoFactorOverride, setRequireTwoFactorOverride] = useState<boolean | null>(null)
 
   const { data = initialOverview } = useQuery<OverviewResult>({
     queryKey: ['security-overview'],
@@ -64,6 +68,26 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
     },
   })
 
+  const accountAuthMutation = useMutation({
+    mutationFn: (requireTwoFactor: boolean) =>
+      updateAccountAuthenticationSettings({ requireTwoFactor }),
+    onSuccess: (res) => {
+      if ('error' in res) {
+        setAccountAuthError(res.error)
+        setAccountAuthOk(false)
+        setRequireTwoFactorOverride(null)
+        return
+      }
+      setAccountAuthError(null)
+      setAccountAuthOk(true)
+      setTimeout(() => setAccountAuthOk(false), 3000)
+    },
+    onError: (err) => {
+      setAccountAuthError(err instanceof Error ? err.message : String(err))
+      setAccountAuthOk(false)
+    },
+  })
+
   if ('error' in data) {
     return (
       <div className="p-6">
@@ -74,6 +98,8 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
       </div>
     )
   }
+
+  const requireTwoFactor = requireTwoFactorOverride ?? data.accountAuth.requireTwoFactor
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
@@ -87,6 +113,44 @@ export function SecuritySettingsClient({ initialOverview }: Props) {
           server auto-generates an internal CA on first boot if none is supplied.
         </p>
       </div>
+
+      <Card data-testid="security-account-auth-card">
+        <CardHeader>
+          <CardTitle>Account authentication</CardTitle>
+          <CardDescription>
+            Require users to set up an authenticator app before using CT-Ops.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label className="text-sm">Require two-factor authentication</Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Users without 2FA can only access their profile until setup is complete.
+              </p>
+            </div>
+            <Switch
+              checked={requireTwoFactor}
+              disabled={accountAuthMutation.isPending}
+              data-testid="security-require-2fa-toggle"
+              onCheckedChange={(checked) => {
+                setRequireTwoFactorOverride(checked)
+                setAccountAuthError(null)
+                setAccountAuthOk(false)
+                accountAuthMutation.mutate(checked)
+              }}
+            />
+          </div>
+          {accountAuthError && (
+            <p className="text-sm text-destructive">{accountAuthError}</p>
+          )}
+          {accountAuthOk && (
+            <p className="text-sm text-green-700" data-testid="security-require-2fa-success">
+              Saved
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card data-testid="security-server-tls-card">
         <CardHeader>

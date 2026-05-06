@@ -9,6 +9,9 @@ import { requireActiveUser, requireOrgAdmin } from './guards'
 import { EXPIRED_SESSION_LOGIN_PATH } from './redirects'
 import { getPrimaryRole, normalizeAssignedRoles } from './roles'
 import { SEAT_LIMIT_EXCEEDED_PATH, assertUserCanAccessSeat } from '@/lib/seat-admission'
+import { organisations } from '@/lib/db/schema'
+import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { getTwoFactorPolicyRedirect } from './two-factor-policy'
 
 // Re-export User as SessionUser for convenience
 export type { User as SessionUser }
@@ -64,8 +67,45 @@ async function loadSessionWithUser(requestHeaders: Headers): Promise<RequiredSes
   }
 }
 
+function getRequestPathname(requestHeaders: Headers): string {
+  const headerPath = requestHeaders.get('x-pathname')
+  if (headerPath?.startsWith('/')) return headerPath
+
+  const referer = requestHeaders.get('referer')
+  if (referer) {
+    try {
+      return new URL(referer).pathname
+    } catch {
+      return '/'
+    }
+  }
+
+  return '/'
+}
+
+async function getTwoFactorPolicyRedirectForSession(
+  session: RequiredSession,
+  requestHeaders: Headers,
+): Promise<string | null> {
+  const organisationId = session.user.organisationId
+  if (!organisationId) return null
+
+  const organisation = await db.query.organisations.findFirst({
+    where: eq(organisations.id, organisationId),
+    columns: { metadata: true },
+  })
+  if (!organisation) return null
+
+  return getTwoFactorPolicyRedirect({
+    metadata: parseOrgMetadata(organisation.metadata),
+    userTwoFactorEnabled: session.user.twoFactorEnabled,
+    pathname: getRequestPathname(requestHeaders),
+  })
+}
+
 export async function getRequiredSession(): Promise<RequiredSession> {
-  const session = await loadSessionWithUser(await headers())
+  const requestHeaders = await headers()
+  const session = await loadSessionWithUser(requestHeaders)
   if (!session) redirect(EXPIRED_SESSION_LOGIN_PATH)
 
   try {
@@ -82,11 +122,15 @@ export async function getRequiredSession(): Promise<RequiredSession> {
     }
   }
 
+  const twoFactorRedirect = await getTwoFactorPolicyRedirectForSession(session, requestHeaders)
+  if (twoFactorRedirect) redirect(twoFactorRedirect)
+
   return session
 }
 
 export async function getApiSession(requestHeaders?: Headers): Promise<RequiredSession> {
-  const session = await loadSessionWithUser(requestHeaders ?? await headers())
+  const effectiveHeaders = requestHeaders ?? await headers()
+  const session = await loadSessionWithUser(effectiveHeaders)
   if (!session) {
     throw new ApiAuthError(401, 'Unauthorized')
   }
@@ -103,6 +147,11 @@ export async function getApiSession(requestHeaders?: Headers): Promise<RequiredS
     } catch {
       throw new ApiAuthError(403, 'User seat limit exceeded')
     }
+  }
+
+  const twoFactorRedirect = await getTwoFactorPolicyRedirectForSession(session, effectiveHeaders)
+  if (twoFactorRedirect) {
+    throw new ApiAuthError(403, 'Two-factor authentication setup required')
   }
 
   return session

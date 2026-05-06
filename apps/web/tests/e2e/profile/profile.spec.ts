@@ -2,6 +2,25 @@ import { test, expect } from '../fixtures/test'
 import { request as playwrightRequest } from '@playwright/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+import { generateTotpCode } from '../../../lib/auth/ldap-two-factor'
+
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+function decodeBase32Secret(encoded: string): string {
+  let bits = ''
+  for (const char of encoded.replace(/=+$/g, '').toUpperCase()) {
+    const value = BASE32_ALPHABET.indexOf(char)
+    if (value < 0) throw new Error(`Invalid base32 character: ${char}`)
+    bits += value.toString(2).padStart(5, '0')
+  }
+
+  const bytes: number[] = []
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(Number.parseInt(bits.slice(i, i + 8), 2))
+  }
+
+  return new TextDecoder().decode(new Uint8Array(bytes))
+}
 
 async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
   const rows = await sql<Array<{ org_id: string; user_id: string }>>`
@@ -100,6 +119,64 @@ test('authenticated user can change their password from profile', async ({ authe
   } finally {
     await authRequest.dispose()
   }
+})
+
+test('authenticated user can enable and disable authenticator app 2FA from profile', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+
+  await page.goto('/profile')
+
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
+  await expect(page.getByText('2FA is not enabled')).toBeVisible()
+
+  await page.getByTestId('profile-two-factor-password').fill(TEST_USER.password)
+  await page.getByTestId('profile-two-factor-start').click()
+
+  const secretInput = page.getByTestId('profile-two-factor-secret')
+  await expect(secretInput).toBeVisible()
+  const secret = decodeBase32Secret(await secretInput.inputValue())
+  const code = generateTotpCode({ secret })
+
+  await page.getByTestId('profile-two-factor-code').fill(code)
+  await page.getByTestId('profile-two-factor-verify').click()
+
+  await expect(page.getByTestId('profile-two-factor-success')).toContainText('enabled')
+  await expect(page.getByText('2FA is enabled')).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ two_factor_enabled: boolean; verified: boolean | null }>>`
+        SELECT "user".two_factor_enabled, totp_credential.verified
+        FROM "user"
+        LEFT JOIN totp_credential ON totp_credential.user_id = "user".id
+        WHERE "user".email = ${TEST_USER.email}
+        LIMIT 1
+      `
+
+      return rows[0] ?? null
+    })
+    .toEqual({ two_factor_enabled: true, verified: true })
+
+  await page.getByTestId('profile-two-factor-password').fill(TEST_USER.password)
+  await page.getByTestId('profile-two-factor-disable').click()
+
+  await expect(page.getByTestId('profile-two-factor-success')).toContainText('disabled')
+  await expect(page.getByText('2FA is not enabled')).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ two_factor_enabled: boolean; credential_count: number }>>`
+        SELECT "user".two_factor_enabled, COUNT(totp_credential.id)::int AS credential_count
+        FROM "user"
+        LEFT JOIN totp_credential ON totp_credential.user_id = "user".id
+        WHERE "user".email = ${TEST_USER.email}
+        GROUP BY "user".id
+        LIMIT 1
+      `
+
+      return rows[0] ?? null
+    })
+    .toEqual({ two_factor_enabled: false, credential_count: 0 })
 })
 
 test('authenticated user can switch profile theme preferences and persist the selection', async ({ authenticatedPage: page }) => {

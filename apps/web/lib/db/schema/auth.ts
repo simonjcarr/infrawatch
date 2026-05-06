@@ -76,6 +76,7 @@ export const totpCredentials = pgTable('totp_credential', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   secret: text('secret').notNull(),
   backupCodes: text('backup_codes'),
+  verified: boolean('verified').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

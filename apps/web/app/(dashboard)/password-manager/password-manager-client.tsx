@@ -27,6 +27,7 @@ import {
   Plus,
   RefreshCcw,
   Search,
+  Settings,
   ShieldAlert,
   Trash2,
   Vault,
@@ -36,11 +37,20 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { logWarn } from '@/lib/logging'
 import {
@@ -1559,7 +1569,6 @@ export function PasswordManagerClientShell({
           createVaultName={createVaultName}
           currentPasswordManagerUserId={currentPasswordManagerUserId}
           deferredEntryFilter={deferredEntryFilter}
-          deferredVaultFilter={deferredVaultFilter}
           editingEntryId={editingEntryId}
           entries={filteredEntries}
           entriesPending={entriesPending}
@@ -1627,13 +1636,11 @@ export function PasswordManagerClientShell({
           }}
           onToggleReveal={handleEntryRevealToggle}
           onUpdateMemberRole={handleMemberRoleUpdate}
-          onVaultFilterChange={setVaultFilter}
           renameVaultDescription={renameVaultDescription}
           renameVaultName={renameVaultName}
           rotationPrompt={rotationPrompt}
           selectedEntry={selectedEntry}
           selectedVault={selectedVault}
-          vaultFilter={vaultFilter}
           vaults={filteredVaults}
           vaultsPending={vaultsPending}
           workspaceError={workspaceError}
@@ -1825,8 +1832,8 @@ function PasswordManagerShellCard({
         <ShellCard
           icon={Vault}
           eyebrow="Unlocked"
-          title="Password Manager workspace is active"
-          description="The unlock keypair is loaded in browser memory. Vault and entry workflows attach to this shell next."
+          title="Workspace active"
+          description="Unlocked for this browser session."
           statusLabel="Unlocked"
           statusVariant="secondary"
           testId="password-manager-state-unlocked"
@@ -1835,16 +1842,6 @@ function PasswordManagerShellCard({
               <Lock className="mr-2 size-4" />
               Lock now
             </Button>
-          }
-          footer={
-            <Alert>
-              <KeyRound className="size-4" />
-              <AlertTitle>Decrypted state is ephemeral</AlertTitle>
-              <AlertDescription>
-                Manual lock, logout, relaunch, and organisation changes purge the active Password Manager key material
-                from browser memory.
-              </AlertDescription>
-            </Alert>
           }
         />
       )
@@ -1964,7 +1961,6 @@ function PasswordManagerWorkspace({
   createVaultName,
   currentPasswordManagerUserId,
   deferredEntryFilter,
-  deferredVaultFilter,
   editingEntryId,
   entries,
   entriesPending,
@@ -2016,13 +2012,11 @@ function PasswordManagerWorkspace({
   onStartEditEntry,
   onToggleReveal,
   onUpdateMemberRole,
-  onVaultFilterChange,
   renameVaultDescription,
   renameVaultName,
   rotationPrompt,
   selectedEntry,
   selectedVault,
-  vaultFilter,
   vaults,
   vaultsPending,
   workspaceError,
@@ -2033,7 +2027,6 @@ function PasswordManagerWorkspace({
   createVaultName: string
   currentPasswordManagerUserId: string | null
   deferredEntryFilter: string
-  deferredVaultFilter: string
   editingEntryId: string | null
   entries: PasswordManagerEntrySummary[]
   entriesPending: boolean
@@ -2085,13 +2078,11 @@ function PasswordManagerWorkspace({
   onStartEditEntry: (entry: PasswordManagerEntrySummary) => void
   onToggleReveal: (entry: PasswordManagerEntrySummary) => Promise<void>
   onUpdateMemberRole: (member: MemberRecord) => Promise<void>
-  onVaultFilterChange: (value: string) => void
   renameVaultDescription: string
   renameVaultName: string
   rotationPrompt: string | null
   selectedEntry: PasswordManagerEntrySummary | null
   selectedVault: PasswordManagerVaultSummary | null
-  vaultFilter: string
   vaults: PasswordManagerVaultSummary[]
   vaultsPending: boolean
   workspaceError: string | null
@@ -2099,6 +2090,7 @@ function PasswordManagerWorkspace({
   workspaceState: PasswordManagerWorkspaceState
 }) {
   const [memberSelectorOpen, setMemberSelectorOpen] = useState(false)
+  const [createVaultDialogOpen, setCreateVaultDialogOpen] = useState(false)
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
@@ -2106,57 +2098,66 @@ function PasswordManagerWorkspace({
     ? `${selectedOrganisationUser.name || selectedOrganisationUser.email} (${selectedOrganisationUser.email})`
     : 'Select user'
 
+  async function handleCreateVaultFromDialog() {
+    await onCreateVault()
+    if (createVaultName.trim()) {
+      setCreateVaultDialogOpen(false)
+    }
+  }
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]" data-testid="password-manager-workspace">
-      <Card className="border-border/60 shadow-xs">
-        <CardHeader>
-          <CardTitle>Vaults</CardTitle>
-          <CardDescription>Filter and manage vault names locally after decrypting metadata in browser memory.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              value={vaultFilter}
-              onChange={(event) => onVaultFilterChange(event.target.value)}
-              placeholder="Filter vaults locally"
-              data-testid="password-manager-vault-filter"
-            />
-          </div>
-          <div className="space-y-2">
-            {vaultsPending ? <p className="text-sm text-muted-foreground">Loading encrypted vault metadata…</p> : null}
-            {!vaultsPending && vaults.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No vaults match <span className="font-medium">{deferredVaultFilter || 'the current view'}</span>.
-              </p>
-            ) : null}
-            {vaults.map((vault) => (
-              <button
-                key={vault.id}
-                type="button"
-                className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                  selectedVault?.id === vault.id ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'
-                }`}
-                onClick={() => onSelectVault(vault.id)}
-                data-testid={`password-manager-vault-${vault.id}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium text-foreground">{vault.metadata.name}</p>
-                  <Badge variant="outline">{vault.role}</Badge>
-                </div>
-                {vault.metadata.description ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{vault.metadata.description}</p>
-                ) : null}
-              </button>
-            ))}
-          </div>
-          <Separator />
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Plus className="size-4 text-muted-foreground" />
-              <p className="text-sm font-medium">Create vault</p>
-            </div>
+    <div className="space-y-4" data-testid="password-manager-workspace">
+      {workspaceError ? (
+        <Alert variant={workspaceState.view === 'object-unavailable' ? 'destructive' : 'default'}>
+          <AlertCircle className="size-4" />
+          <AlertTitle>
+            {workspaceState.view === 'object-unavailable' ? 'Object unavailable' : 'Workspace status'}
+          </AlertTitle>
+          <AlertDescription>{workspaceError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-xs md:flex-row md:items-end md:justify-between">
+        <div className="grid gap-2 md:min-w-80">
+          <Label htmlFor="password-manager-vault-selector">Vault</Label>
+          <Select value={selectedVault?.id ?? ''} onValueChange={onSelectVault} disabled={vaultsPending || vaults.length === 0}>
+            <SelectTrigger
+              id="password-manager-vault-selector"
+              className="w-full"
+              data-testid={selectedVault ? `password-manager-vault-${selectedVault.id}` : 'password-manager-vault-selector'}
+            >
+              <SelectValue placeholder={vaultsPending ? 'Loading vaults...' : 'Select a vault'} />
+            </SelectTrigger>
+            <SelectContent>
+              {vaults.map((vault) => (
+                <SelectItem key={vault.id} value={vault.id}>
+                  {vault.metadata.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {selectedVault ? (
+            <>
+              <Badge variant="secondary">Key epoch {selectedVault.currentKeyEpoch}</Badge>
+              <Badge variant="outline">{selectedVault.role}</Badge>
+            </>
+          ) : null}
+          <Button variant="outline" onClick={() => setCreateVaultDialogOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            Create vault
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={createVaultDialogOpen} onOpenChange={setCreateVaultDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create vault</DialogTitle>
+            <DialogDescription>Vault metadata is encrypted locally before it leaves the browser.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="password-manager-vault-name">Vault name</Label>
               <Input
@@ -2175,121 +2176,406 @@ function PasswordManagerWorkspace({
                 placeholder="Who should use this vault and for what"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void onCreateVault()} disabled={workspacePending}>
-                {workspacePending ? 'Saving…' : 'Create encrypted vault'}
-              </Button>
-              <Button variant="outline" onClick={() => void onRetryCreateVault()} disabled={workspacePending}>
-                Retry same request
-              </Button>
-            </div>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => void onRetryCreateVault()} disabled={workspacePending}>
+              Retry same request
+            </Button>
+            <Button onClick={() => void handleCreateVaultFromDialog()} disabled={workspacePending}>
+              {workspacePending ? 'Saving...' : 'Create encrypted vault'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <div className="space-y-6">
-        {workspaceError ? (
-          <Alert variant={workspaceState.view === 'object-unavailable' ? 'destructive' : 'default'}>
-            <AlertCircle className="size-4" />
-            <AlertTitle>
-              {workspaceState.view === 'object-unavailable' ? 'Object unavailable' : 'Workspace status'}
-            </AlertTitle>
-            <AlertDescription>{workspaceError}</AlertDescription>
-          </Alert>
-        ) : null}
+      <Tabs defaultValue="passwords" className="gap-4">
+        <TabsList>
+          <TabsTrigger value="passwords">
+            <KeyRound className="size-4" />
+            Passwords
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="size-4" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
 
-        {selectedVault ? (
+        <TabsContent value="passwords" className="space-y-4">
           <Card className="border-border/60 shadow-xs">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <CardTitle>{selectedVault.metadata.name}</CardTitle>
-                  <CardDescription>Rename or remove this vault. Only encrypted metadata leaves the browser.</CardDescription>
+                  <CardTitle>Passwords</CardTitle>
+                  <CardDescription>
+                    {selectedVault
+                      ? `Showing entries in ${selectedVault.metadata.name}.`
+                      : 'Select or create a vault to view saved passwords.'}
+                  </CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Badge variant="secondary">Key epoch {selectedVault.currentKeyEpoch}</Badge>
-                  <Badge variant="outline">{selectedVault.role}</Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => void onExportVault()} disabled={!selectedVault || workspacePending}>
+                    <Download className="mr-2 size-4" />
+                    Export vault
+                  </Button>
+                  <Button variant="outline" onClick={onStartCreateEntry} disabled={!selectedVault || workspacePending}>
+                    <Plus className="mr-2 size-4" />
+                    New entry
+                  </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-4 lg:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="password-manager-vault-rename-name">Vault name</Label>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground" />
                 <Input
-                  id="password-manager-vault-rename-name"
-                  value={renameVaultName}
-                  onChange={(event) => onRenameVaultNameChange(event.target.value)}
+                  className="pl-9"
+                  value={entryFilter}
+                  onChange={(event) => onEntryFilterChange(event.target.value)}
+                  placeholder="Filter entries locally"
+                  disabled={!selectedVault}
+                  data-testid="password-manager-entry-filter"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password-manager-vault-rename-description">Description</Label>
-                <Textarea
-                  id="password-manager-vault-rename-description"
-                  value={renameVaultDescription}
-                  onChange={(event) => onRenameVaultDescriptionChange(event.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void onRenameVault()} disabled={workspacePending}>
-                <Pencil className="mr-2 size-4" />
-                Rename vault
-              </Button>
-              <Button variant="destructive" onClick={() => void onDeleteVault()} disabled={workspacePending}>
-                <Trash2 className="mr-2 size-4" />
-                Delete vault
-              </Button>
-            </CardFooter>
-          </Card>
-        ) : (
-          <Card className="border-dashed border-border/60 shadow-xs">
-            <CardHeader>
-              <CardTitle>Select or create a vault</CardTitle>
-              <CardDescription>
-                Password Manager filtering stays local in browser memory after the encrypted records are decrypted.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
+              {entriesPending ? <p className="text-sm text-muted-foreground">Loading encrypted entries...</p> : null}
+              {!entriesPending && selectedVault && entries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No entries match <span className="font-medium">{deferredEntryFilter || 'the current view'}</span>.
+                </p>
+              ) : null}
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <div className="space-y-2">
+                  {entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`rounded-xl border px-4 py-3 ${
+                        selectedEntry?.id === entry.id ? 'border-primary bg-primary/5' : 'border-border/60'
+                      }`}
+                      data-testid={`password-manager-entry-${entry.id}`}
+                    >
+                      <button type="button" className="w-full text-left" onClick={() => onSelectEntry(entry.id)}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium">{entry.payload.title}</p>
+                          <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{entry.payload.username}</p>
+                        {entry.payload.url ? <p className="text-xs text-muted-foreground">{entry.payload.url}</p> : null}
+                      </button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => void onToggleReveal(entry)}>
+                          {entryRevealId === entry.id ? <EyeOff className="mr-2 size-4" /> : <Eye className="mr-2 size-4" />}
+                          {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => void onCopyPassword(entry)}>
+                          <Copy className="mr-2 size-4" />
+                          Copy password
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => onStartEditEntry(entry)}>
+                          <Pencil className="mr-2 size-4" />
+                          Edit
+                        </Button>
+                      </div>
+                      {entryRevealId === entry.id ? (
+                        <p className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-sm">
+                          {entry.payload.password}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
 
-        <Card className="border-border/60 shadow-xs">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle>Members</CardTitle>
-                <CardDescription>
-                  Share and revoke access with wrapped vault keys only. Public-key envelopes stay in browser memory for active sessions.
-                </CardDescription>
-              </div>
-              {selectedVault ? <Badge variant="outline">Vault role: {selectedVault.role}</Badge> : null}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {rotationPrompt ? (
-              <Alert>
-                <RotateCcw className="size-4" />
-                <AlertTitle>Key rotation recommended</AlertTitle>
-                <AlertDescription>{rotationPrompt}</AlertDescription>
-              </Alert>
-            ) : null}
-            {membersPending ? <p className="text-sm text-muted-foreground">Loading wrapped member records…</p> : null}
-            {!membersPending && selectedVault && members.length === 0 ? (
-              <p className="text-sm text-muted-foreground">This vault has no active members.</p>
-            ) : null}
-            <div className="space-y-3">
-              {members.map((member) => (
-                <div key={member.user_id} className="rounded-2xl border border-border/60 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="rounded-xl border border-border/60 p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-foreground">{member.user_id}</p>
-                      <p className="text-sm text-muted-foreground">Wrapped key epoch {member.key_epoch}</p>
+                      <p className="font-medium">{editingEntryId ? 'Edit entry' : 'Create entry'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {editingEntryId ? 'Updating re-encrypts the entire payload.' : 'The payload is encrypted locally before upload.'}
+                      </p>
+                    </div>
+                    {selectedEntry ? (
+                      <Button variant="ghost" size="sm" onClick={() => onSelectEntry(null)}>
+                        Clear selection
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="password-manager-entry-title">Title</Label>
+                      <Input
+                        id="password-manager-entry-title"
+                        value={entryTitle}
+                        onChange={(event) => onEntryTitleChange(event.target.value)}
+                        disabled={!selectedVault}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password-manager-entry-username">Username</Label>
+                      <Input
+                        id="password-manager-entry-username"
+                        value={entryUsername}
+                        onChange={(event) => onEntryUsernameChange(event.target.value)}
+                        disabled={!selectedVault}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password-manager-entry-password">Password</Label>
+                      <Input
+                        id="password-manager-entry-password"
+                        type="password"
+                        value={entryPassword}
+                        onChange={(event) => onEntryPasswordChange(event.target.value)}
+                        disabled={!selectedVault}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password-manager-entry-url">URL</Label>
+                      <Input
+                        id="password-manager-entry-url"
+                        value={entryUrl}
+                        onChange={(event) => onEntryUrlChange(event.target.value)}
+                        disabled={!selectedVault}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password-manager-entry-notes">Notes</Label>
+                      <Textarea
+                        id="password-manager-entry-notes"
+                        value={entryNotes}
+                        onChange={(event) => onEntryNotesChange(event.target.value)}
+                        disabled={!selectedVault}
+                      />
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Select
-                        value={memberRoleEdits[member.user_id] ?? member.role}
-                        onValueChange={(value) => onMemberRoleEditChange(member.user_id, value)}
+                      <Button onClick={() => void onEntrySave()} disabled={!selectedVault || workspacePending}>
+                        {workspacePending ? 'Saving...' : editingEntryId ? 'Save encrypted entry' : 'Create encrypted entry'}
+                      </Button>
+                      {selectedEntry ? (
+                        <Button variant="destructive" onClick={() => void onDeleteEntry()} disabled={workspacePending}>
+                          <Trash2 className="mr-2 size-4" />
+                          Delete entry
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          {selectedVault ? (
+            <Card className="border-border/60 shadow-xs">
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>{selectedVault.metadata.name}</CardTitle>
+                    <CardDescription>Rename or remove this vault. Only encrypted metadata leaves the browser.</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="secondary">Key epoch {selectedVault.currentKeyEpoch}</Badge>
+                    <Badge variant="outline">{selectedVault.role}</Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-vault-rename-name">Vault name</Label>
+                  <Input
+                    id="password-manager-vault-rename-name"
+                    value={renameVaultName}
+                    onChange={(event) => onRenameVaultNameChange(event.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-vault-rename-description">Description</Label>
+                  <Textarea
+                    id="password-manager-vault-rename-description"
+                    value={renameVaultDescription}
+                    onChange={(event) => onRenameVaultDescriptionChange(event.target.value)}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => void onRenameVault()} disabled={workspacePending}>
+                  <Pencil className="mr-2 size-4" />
+                  Rename vault
+                </Button>
+                <Button variant="destructive" onClick={() => void onDeleteVault()} disabled={workspacePending}>
+                  <Trash2 className="mr-2 size-4" />
+                  Delete vault
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : (
+            <Card className="border-dashed border-border/60 shadow-xs">
+              <CardHeader>
+                <CardTitle>Select or create a vault</CardTitle>
+                <CardDescription>Vault settings are available after a vault is selected.</CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Members</CardTitle>
+                  <CardDescription>
+                    Share and revoke access with wrapped vault keys only. Public-key envelopes stay in browser memory for active sessions.
+                  </CardDescription>
+                </div>
+                {selectedVault ? <Badge variant="outline">Vault role: {selectedVault.role}</Badge> : null}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {rotationPrompt ? (
+                <Alert>
+                  <RotateCcw className="size-4" />
+                  <AlertTitle>Key rotation recommended</AlertTitle>
+                  <AlertDescription>{rotationPrompt}</AlertDescription>
+                </Alert>
+              ) : null}
+              {membersPending ? <p className="text-sm text-muted-foreground">Loading wrapped member records...</p> : null}
+              {!membersPending && selectedVault && members.length === 0 ? (
+                <p className="text-sm text-muted-foreground">This vault has no active members.</p>
+              ) : null}
+              <div className="space-y-3">
+                {members.map((member) => (
+                  <div
+                    key={member.user_id}
+                    className="rounded-xl border border-border/60 p-4"
+                    data-testid={`password-manager-member-${member.user_id}`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">{member.user_id}</p>
+                        <p className="text-sm text-muted-foreground">Wrapped key epoch {member.key_epoch}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Select
+                          value={memberRoleEdits[member.user_id] ?? member.role}
+                          onValueChange={(value) => onMemberRoleEditChange(member.user_id, value)}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue placeholder="Role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PASSWORD_MANAGER_MEMBER_ROLES.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button variant="outline" size="sm" onClick={() => void onUpdateMemberRole(member)} disabled={!selectedVault || workspacePending}>
+                          <Pencil className="mr-2 size-4" />
+                          Save role
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => void onMemberRemove(member)} disabled={!selectedVault || workspacePending}>
+                          <Trash2 className="mr-2 size-4" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                    {member.user_id !== '' && member.user_id !== ' ' ? (
+                      <div className="mt-3 grid gap-2">
+                        <Label htmlFor={`password-manager-member-envelope-${member.user_id}`}>
+                          Public-key envelope for future rotations
+                        </Label>
+                        <Textarea
+                          id={`password-manager-member-envelope-${member.user_id}`}
+                          value={memberPublicKeyEnvelopeInputs[member.user_id] ?? ''}
+                          onChange={(event) => onMemberPublicKeyEnvelopeInputChange(member.user_id, event.target.value)}
+                          placeholder={
+                            member.user_id === currentPasswordManagerUserId
+                              ? 'Current session key is already available locally.'
+                              : '{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
+                          }
+                          disabled={member.user_id === currentPasswordManagerUserId}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              {selectedVault ? (
+                <>
+                  <Separator />
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label>Organisation user</Label>
+                      <Popover
+                        open={memberSelectorOpen}
+                        onOpenChange={(open) => {
+                          setMemberSelectorOpen(open)
+                          if (open) {
+                            onMemberRecipientLookupRequest()
+                          }
+                        }}
                       >
-                        <SelectTrigger className="w-36">
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 justify-between"
+                            disabled={workspacePending || memberRecipientsPending || !canManageVaultRole(selectedVault.role)}
+                            data-testid="password-manager-member-user-selector"
+                          >
+                            <span className="truncate">{memberRecipientsPending ? 'Loading users...' : selectedMemberLabel}</span>
+                            <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[360px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search organisation users..." />
+                            <CommandList>
+                              <CommandEmpty>No organisation users found.</CommandEmpty>
+                              <CommandGroup>
+                                {organisationUsers.map((user) => {
+                                  const recipient = memberRecipients[user.id]
+                                  const alreadyMember = recipient ? memberIds.has(recipient.user_id) : false
+                                  const ready = Boolean(recipient?.setup_configured && recipient.public_key_envelope && !alreadyMember)
+                                  const status = alreadyMember
+                                    ? 'Already a member'
+                                    : recipient?.setup_configured
+                                      ? 'Ready'
+                                      : 'Password Manager not set up'
+                                  return (
+                                    <CommandItem
+                                      key={user.id}
+                                      value={`${user.name ?? ''} ${user.email}`}
+                                      disabled={!ready}
+                                      onSelect={() => {
+                                        onMemberUserIdChange(user.id)
+                                        setMemberSelectorOpen(false)
+                                      }}
+                                      data-testid={`password-manager-member-user-option-${user.id}`}
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="truncate font-medium">{user.name || user.email}</div>
+                                        <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                                      </div>
+                                      <Badge variant={ready ? 'secondary' : 'outline'} className="ml-auto shrink-0">
+                                        {status}
+                                      </Badge>
+                                      {memberUserId === user.id ? <Check className="size-4" /> : null}
+                                    </CommandItem>
+                                  )
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {selectedRecipient && !selectedRecipient.setup_configured ? (
+                        <p className="text-xs text-muted-foreground">This user must launch and set up Password Manager before receiving a vault key.</p>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Role</Label>
+                      <Select value={memberRole} onValueChange={(value) => onMemberRoleChange(value as (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number])}>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Role" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2300,311 +2586,33 @@ function PasswordManagerWorkspace({
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button variant="outline" size="sm" onClick={() => void onUpdateMemberRole(member)} disabled={!selectedVault || workspacePending}>
-                        <Pencil className="mr-2 size-4" />
-                        Save role
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => void onMemberRemove(member)} disabled={!selectedVault || workspacePending}>
-                        <Trash2 className="mr-2 size-4" />
-                        Remove
-                      </Button>
                     </div>
-                  </div>
-                  {member.user_id !== '' && member.user_id !== ' ' ? (
-                    <div className="mt-3 grid gap-2">
-                      <Label htmlFor={`password-manager-member-envelope-${member.user_id}`}>
-                        Public-key envelope for future rotations
-                      </Label>
-                      <Textarea
-                        id={`password-manager-member-envelope-${member.user_id}`}
-                        value={memberPublicKeyEnvelopeInputs[member.user_id] ?? ''}
-                        onChange={(event) => onMemberPublicKeyEnvelopeInputChange(member.user_id, event.target.value)}
-                        placeholder={
-                          member.user_id === currentPasswordManagerUserId
-                            ? 'Current session key is already available locally.'
-                            : '{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
-                        }
-                        disabled={member.user_id === currentPasswordManagerUserId}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-
-            {selectedVault ? (
-              <>
-                <Separator />
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label>Organisation user</Label>
-                    <Popover
-                      open={memberSelectorOpen}
-                      onOpenChange={(open) => {
-                        setMemberSelectorOpen(open)
-                        if (open) {
-                          onMemberRecipientLookupRequest()
-                        }
-                      }}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 justify-between"
-                          disabled={workspacePending || memberRecipientsPending || !canManageVaultRole(selectedVault.role)}
-                          data-testid="password-manager-member-user-selector"
-                        >
-                          <span className="truncate">{memberRecipientsPending ? 'Loading users...' : selectedMemberLabel}</span>
-                          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[360px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search organisation users..." />
-                          <CommandList>
-                            <CommandEmpty>No organisation users found.</CommandEmpty>
-                            <CommandGroup>
-                              {organisationUsers.map((user) => {
-                                const recipient = memberRecipients[user.id]
-                                const alreadyMember = recipient ? memberIds.has(recipient.user_id) : false
-                                const ready = Boolean(recipient?.setup_configured && recipient.public_key_envelope && !alreadyMember)
-                                const status = alreadyMember
-                                  ? 'Already a member'
-                                  : recipient?.setup_configured
-                                    ? 'Ready'
-                                    : 'Password Manager not set up'
-                                return (
-                                  <CommandItem
-                                    key={user.id}
-                                    value={`${user.name ?? ''} ${user.email}`}
-                                    disabled={!ready}
-                                    onSelect={() => {
-                                      onMemberUserIdChange(user.id)
-                                      setMemberSelectorOpen(false)
-                                    }}
-                                    data-testid={`password-manager-member-user-option-${user.id}`}
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="truncate font-medium">{user.name || user.email}</div>
-                                      <div className="truncate text-xs text-muted-foreground">{user.email}</div>
-                                    </div>
-                                    <Badge variant={ready ? 'secondary' : 'outline'} className="ml-auto shrink-0">
-                                      {status}
-                                    </Badge>
-                                    {memberUserId === user.id ? <Check className="size-4" /> : null}
-                                  </CommandItem>
-                                )
-                              })}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    {selectedRecipient && !selectedRecipient.setup_configured ? (
-                      <p className="text-xs text-muted-foreground">This user must launch and set up Password Manager before receiving a vault key.</p>
-                    ) : null}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Role</Label>
-                    <Select value={memberRole} onValueChange={(value) => onMemberRoleChange(value as (typeof PASSWORD_MANAGER_MEMBER_ROLES)[number])}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PASSWORD_MANAGER_MEMBER_ROLES.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => void onMemberSave()}
-                    disabled={
-                      workspacePending ||
-                      memberRecipientsPending ||
-                      !selectedVault ||
-                      !selectedRecipient?.setup_configured ||
-                      !selectedRecipient.public_key_envelope
-                    }
-                  >
-                    <Plus className="mr-2 size-4" />
-                    Add member
-                  </Button>
-                  <Button variant="outline" onClick={() => void onRetryRotation()} disabled={workspacePending || !selectedVault}>
-                    <RotateCcw className="mr-2 size-4" />
-                    Rotate vault key
-                  </Button>
-                </div>
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60 shadow-xs">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle>Entries</CardTitle>
-                <CardDescription>Reveal, copy, export, and edit entry payloads without sending plaintext back to the API.</CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => void onExportVault()} disabled={!selectedVault || workspacePending}>
-                  <Download className="mr-2 size-4" />
-                  Export vault
-                </Button>
-                <Button variant="outline" onClick={onStartCreateEntry} disabled={!selectedVault || workspacePending}>
-                  <Plus className="mr-2 size-4" />
-                  New entry
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                value={entryFilter}
-                onChange={(event) => onEntryFilterChange(event.target.value)}
-                placeholder="Filter entries locally"
-                disabled={!selectedVault}
-                data-testid="password-manager-entry-filter"
-              />
-            </div>
-            {entriesPending ? <p className="text-sm text-muted-foreground">Loading encrypted entries…</p> : null}
-            {!entriesPending && selectedVault && entries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No entries match <span className="font-medium">{deferredEntryFilter || 'the current view'}</span>.
-              </p>
-            ) : null}
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-              <div className="space-y-2">
-                {entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className={`rounded-2xl border px-4 py-3 ${
-                      selectedEntry?.id === entry.id ? 'border-primary bg-primary/5' : 'border-border/60'
-                    }`}
-                    data-testid={`password-manager-entry-${entry.id}`}
-                  >
-                    <button type="button" className="w-full text-left" onClick={() => onSelectEntry(entry.id)}>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium">{entry.payload.title}</p>
-                        <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{entry.payload.username}</p>
-                      {entry.payload.url ? <p className="text-xs text-muted-foreground">{entry.payload.url}</p> : null}
-                    </button>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void onToggleReveal(entry)}
-                      >
-                        {entryRevealId === entry.id ? <EyeOff className="mr-2 size-4" /> : <Eye className="mr-2 size-4" />}
-                        {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => void onCopyPassword(entry)}>
-                        <Copy className="mr-2 size-4" />
-                        Copy password
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => onStartEditEntry(entry)}>
-                        <Pencil className="mr-2 size-4" />
-                        Edit
-                      </Button>
-                    </div>
-                    {entryRevealId === entry.id ? (
-                      <p className="mt-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 font-mono text-sm">
-                        {entry.payload.password}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-2xl border border-border/60 p-4">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{editingEntryId ? 'Edit entry' : 'Create entry'}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {editingEntryId ? 'Updating re-encrypts the entire payload.' : 'The payload is encrypted locally before upload.'}
-                    </p>
-                  </div>
-                  {selectedEntry ? (
-                    <Button variant="ghost" size="sm" onClick={() => onSelectEntry(null)}>
-                      Clear selection
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="grid gap-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="password-manager-entry-title">Title</Label>
-                    <Input
-                      id="password-manager-entry-title"
-                      value={entryTitle}
-                      onChange={(event) => onEntryTitleChange(event.target.value)}
-                      disabled={!selectedVault}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="password-manager-entry-username">Username</Label>
-                    <Input
-                      id="password-manager-entry-username"
-                      value={entryUsername}
-                      onChange={(event) => onEntryUsernameChange(event.target.value)}
-                      disabled={!selectedVault}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="password-manager-entry-password">Password</Label>
-                    <Input
-                      id="password-manager-entry-password"
-                      type="password"
-                      value={entryPassword}
-                      onChange={(event) => onEntryPasswordChange(event.target.value)}
-                      disabled={!selectedVault}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="password-manager-entry-url">URL</Label>
-                    <Input
-                      id="password-manager-entry-url"
-                      value={entryUrl}
-                      onChange={(event) => onEntryUrlChange(event.target.value)}
-                      disabled={!selectedVault}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="password-manager-entry-notes">Notes</Label>
-                    <Textarea
-                      id="password-manager-entry-notes"
-                      value={entryNotes}
-                      onChange={(event) => onEntryNotesChange(event.target.value)}
-                      disabled={!selectedVault}
-                    />
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void onEntrySave()} disabled={!selectedVault || workspacePending}>
-                      {workspacePending ? 'Saving…' : editingEntryId ? 'Save encrypted entry' : 'Create encrypted entry'}
+                    <Button
+                      onClick={() => void onMemberSave()}
+                      disabled={
+                        workspacePending ||
+                        memberRecipientsPending ||
+                        !selectedVault ||
+                        !selectedRecipient?.setup_configured ||
+                        !selectedRecipient.public_key_envelope
+                      }
+                    >
+                      <Plus className="mr-2 size-4" />
+                      Add member
                     </Button>
-                    {selectedEntry ? (
-                      <Button variant="destructive" onClick={() => void onDeleteEntry()} disabled={workspacePending}>
-                        <Trash2 className="mr-2 size-4" />
-                        Delete entry
-                      </Button>
-                    ) : null}
+                    <Button variant="outline" onClick={() => void onRetryRotation()} disabled={workspacePending || !selectedVault}>
+                      <RotateCcw className="mr-2 size-4" />
+                      Rotate vault key
+                    </Button>
                   </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

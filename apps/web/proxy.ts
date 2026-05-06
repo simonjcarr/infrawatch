@@ -60,6 +60,7 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-request-id', requestId)
   requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('x-pathname', pathname)
   requestHeaders.set('Content-Security-Policy', csp)
 
   const ip = getClientIpFromHeaders(request.headers)

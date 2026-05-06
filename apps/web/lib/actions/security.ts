@@ -6,17 +6,20 @@ import { createPublicKey, X509Certificate } from 'node:crypto'
 import { z } from 'zod'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { certificateAuthorities } from '@/lib/db/schema/certificate-authorities'
+import { certificateAuthorities, organisations } from '@/lib/db/schema'
 import { encrypt } from '@/lib/crypto/encrypt'
 import { getRequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
 import { requireRole } from '@/lib/auth/guards'
 import { assertAgentCAManagementAccess } from './security-auth'
 import type { SecurityOverview } from './security-types'
+import { isTwoFactorRequired } from '@/lib/auth/two-factor-policy'
+import { parseOrgMetadata, type OrgSecuritySettings } from '@/lib/db/schema/organisations'
 
-async function requireAdmin(): Promise<void> {
+async function requireAdmin() {
   const session = await getRequiredSession()
   requireRole(session.user, ADMIN_ROLES)
+  return session
 }
 
 async function requireAgentCAManager(): Promise<void> {
@@ -28,7 +31,19 @@ const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/
 
 export async function getSecurityOverview(): Promise<SecurityOverview | { error: string }> {
   try {
-    await requireAdmin()
+    const session = await requireAdmin()
+    const organisationId = session.user.organisationId
+
+    let accountAuth: SecurityOverview['accountAuth'] = { requireTwoFactor: false }
+    if (organisationId) {
+      const org = await db.query.organisations.findFirst({
+        where: eq(organisations.id, organisationId),
+        columns: { metadata: true },
+      })
+      accountAuth = {
+        requireTwoFactor: isTwoFactorRequired(parseOrgMetadata(org?.metadata)),
+      }
+    }
 
     let serverTls: SecurityOverview['serverTls'] = null
     try {
@@ -69,9 +84,52 @@ export async function getSecurityOverview(): Promise<SecurityOverview | { error:
       }
     }
 
-    return { serverTls, agentCa }
+    return { accountAuth, serverTls, agentCa }
   } catch (err) {
     logError('getSecurityOverview failed:', err)
+    return { error: err instanceof Error ? err.message : 'An unexpected error occurred' }
+  }
+}
+
+const updateAccountAuthSchema = z.object({
+  requireTwoFactor: z.boolean(),
+})
+
+export async function updateAccountAuthenticationSettings(
+  input: z.infer<typeof updateAccountAuthSchema>,
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const session = await requireAdmin()
+    const organisationId = session.user.organisationId
+    if (!organisationId) return { error: 'Organisation not found' }
+
+    const parsed = updateAccountAuthSchema.parse(input)
+    const org = await db.query.organisations.findFirst({
+      where: eq(organisations.id, organisationId),
+      columns: { metadata: true },
+    })
+    if (!org) return { error: 'Organisation not found' }
+
+    const metadata = parseOrgMetadata(org.metadata)
+    const securitySettings: OrgSecuritySettings = {
+      ...metadata.securitySettings,
+      requireTwoFactor: parsed.requireTwoFactor,
+    }
+
+    await db
+      .update(organisations)
+      .set({
+        metadata: {
+          ...metadata,
+          securitySettings,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(organisations.id, organisationId))
+
+    return { success: true }
+  } catch (err) {
+    logError('updateAccountAuthenticationSettings failed:', err)
     return { error: err instanceof Error ? err.message : 'An unexpected error occurred' }
   }
 }

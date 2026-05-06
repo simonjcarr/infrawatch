@@ -52,6 +52,7 @@ export const auth = betterAuth({
       session: schema.sessions,
       account: schema.accounts,
       verification: schema.verifications,
+      totpCredentials: schema.totpCredentials,
     },
   }),
   emailAndPassword: {
@@ -91,6 +92,16 @@ export const auth = betterAuth({
   plugins: [
     twoFactor({
       issuer: 'CT-Ops',
+      twoFactorTable: 'totpCredentials',
+      schema: {
+        twoFactor: {
+          modelName: 'totpCredentials',
+          fields: {
+            backupCodes: 'backupCodes',
+            userId: 'userId',
+          },
+        },
+      },
       totpOptions: {
         period: 30,
         digits: 6,

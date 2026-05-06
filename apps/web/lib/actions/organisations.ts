@@ -6,6 +6,8 @@ import { db } from '@/lib/db'
 import { organisations, users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { Organisation } from '@/lib/db/schema'
+import { getPendingInviteForEmail } from '@/lib/actions/auth'
+import { getRequiredSession } from '@/lib/auth/session'
 
 const createOrganisationSchema = z.object({
   name: z.string().min(2).max(100),
@@ -24,6 +26,20 @@ export async function createOrganisation(
   }
 
   try {
+    const session = await getRequiredSession()
+    if (session.user.id !== userId) {
+      return { error: 'You can only create an organisation for your own account' }
+    }
+    const user = session.user
+    if (user.organisationId) {
+      return { error: 'This account already belongs to an organisation' }
+    }
+
+    const pendingInvite = await getPendingInviteForEmail(user.email)
+    if (pendingInvite) {
+      return { error: 'Accept your pending organisation invitation before creating a new organisation' }
+    }
+
     const existing = await db.query.organisations.findFirst({
       where: eq(organisations.slug, parsed.data.slug),
     })

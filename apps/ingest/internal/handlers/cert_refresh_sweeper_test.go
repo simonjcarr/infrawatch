@@ -27,7 +27,8 @@ func TestFetchLeafAndChainVerifiesTrustedRootsByDefault(t *testing.T) {
 	}
 
 	leaf, chain, err := fetchLeafAndChainWithOptions(context.Background(), serverCert.url, fetchLeafAndChainOptions{
-		rootCAs: roots,
+		rootCAs:          roots,
+		allowPrivateHost: true,
 	})
 	if err != nil {
 		t.Fatalf("fetchLeafAndChainWithOptions() error = %v", err)
@@ -51,9 +52,23 @@ func TestFetchLeafAndChainRejectsUntrustedRootsUnlessOptedOut(t *testing.T) {
 	}
 
 	if _, _, err := fetchLeafAndChainWithOptions(context.Background(), serverCert.url, fetchLeafAndChainOptions{
-		skipVerify: true,
+		skipVerify:       true,
+		allowPrivateHost: true,
 	}); err != nil {
 		t.Fatalf("fetchLeafAndChainWithOptions(skipVerify=true) error = %v", err)
+	}
+}
+
+func TestFetchLeafAndChainRejectsPrivateTrackedHostBeforeDial(t *testing.T) {
+	t.Parallel()
+
+	_, serverCert, closeServer := startTestTLSServer(t)
+	defer closeServer()
+
+	if _, _, err := fetchLeafAndChainWithOptions(context.Background(), serverCert.url, fetchLeafAndChainOptions{
+		skipVerify: true,
+	}); err == nil {
+		t.Fatal("expected private tracked host to be blocked before TLS dial")
 	}
 }
 
@@ -98,13 +113,13 @@ func startTestTLSServer(t *testing.T) ([]byte, testTLSServer, func()) {
 		Subject: pkix.Name{
 			CommonName: "localhost",
 		},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:     []string{"localhost"},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
-		IsCA:         false,
+		NotBefore:   time.Now().Add(-time.Hour),
+		NotAfter:    time.Now().Add(time.Hour),
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:    []string{"localhost"},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		IsCA:        false,
 	}
 	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, rootCert, &leafKey.PublicKey, rootKey)
 	if err != nil {

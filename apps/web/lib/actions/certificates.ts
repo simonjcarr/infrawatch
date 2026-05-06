@@ -14,10 +14,8 @@ import { computeExpiryStatus } from '@/lib/certificates/expiry'
 import {
   fetchCertificateFromUrl,
   parseCertificateBuffer,
-  resolveUrlTarget,
   type ParsedCertificate,
 } from '@/lib/certificates/fetch'
-import { assertPublicHost } from '@/lib/net/ssrf-guard'
 import { createRateLimiter } from '@/lib/rate-limit'
 
 const trackFromUrlLimiter = createRateLimiter({
@@ -275,9 +273,7 @@ export async function trackCertificateFromUrl(
 
   let result
   try {
-    const { host } = resolveUrlTarget(url)
-    await assertPublicHost(host)
-    result = await fetchCertificateFromUrl(url)
+    result = await fetchCertificateFromUrl(url, undefined, undefined, { enforcePublicHost: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch certificate'
     return { error: message }

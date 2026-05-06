@@ -18,16 +18,16 @@ func TestAssertPublicHTTPURLAllowsPublicTargets(t *testing.T) {
 }
 
 func TestAssertPublicHostRejectsPrivateTargets(t *testing.T) {
-	if err := assertPublicHost("127.0.0.1"); err == nil {
+	if _, err := assertPublicHost("127.0.0.1"); err == nil {
 		t.Fatal("expected private smtp host to be rejected")
 	}
-	if err := assertPublicHost("::1"); err == nil {
+	if _, err := assertPublicHost("::1"); err == nil {
 		t.Fatal("expected private IPv6 smtp host to be rejected")
 	}
 }
 
 func TestAssertPublicHostAllowsPublicTargets(t *testing.T) {
-	if err := assertPublicHost("8.8.8.8"); err != nil {
+	if _, err := assertPublicHost("8.8.8.8"); err != nil {
 		t.Fatalf("expected public smtp host to be allowed: %v", err)
 	}
 }

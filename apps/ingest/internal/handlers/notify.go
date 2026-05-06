@@ -43,28 +43,28 @@ func isPrivateOrReservedIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified()
 }
 
-func assertPublicHost(host string) error {
+func assertPublicHost(host string) (string, error) {
 	normalizedHost := strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
 	if ip := net.ParseIP(normalizedHost); ip != nil {
 		if isPrivateOrReservedIP(ip) {
-			return fmt.Errorf("blocked private or reserved address: %s", ip.String())
+			return "", fmt.Errorf("blocked private or reserved address: %s", ip.String())
 		}
-		return nil
+		return ip.String(), nil
 	}
 
 	ips, err := net.LookupIP(normalizedHost)
 	if err != nil {
-		return fmt.Errorf("resolve host %q: %w", normalizedHost, err)
+		return "", fmt.Errorf("resolve host %q: %w", normalizedHost, err)
 	}
 	if len(ips) == 0 {
-		return fmt.Errorf("resolve host %q: no addresses returned", normalizedHost)
+		return "", fmt.Errorf("resolve host %q: no addresses returned", normalizedHost)
 	}
 	for _, ip := range ips {
 		if isPrivateOrReservedIP(ip) {
-			return fmt.Errorf("blocked private or reserved address: %s", ip.String())
+			return "", fmt.Errorf("blocked private or reserved address: %s", ip.String())
 		}
 	}
-	return nil
+	return ips[0].String(), nil
 }
 
 func assertPublicHTTPURL(rawURL string) error {
@@ -78,7 +78,8 @@ func assertPublicHTTPURL(rawURL string) error {
 	if parsed.Hostname() == "" {
 		return fmt.Errorf("missing outbound host")
 	}
-	return assertPublicHost(parsed.Hostname())
+	_, err = assertPublicHost(parsed.Hostname())
+	return err
 }
 
 // AlertEvent is the payload sent to webhook notification channels.
@@ -313,7 +314,7 @@ func dispatchSmtp(smtpChannels []queries.SmtpChannelRow, event AlertEvent) {
 			slog.Warn("dispatchSmtp: incomplete smtp configuration", "channel_id", ch.ID)
 			continue
 		}
-		if err := assertPublicHost(cfg.Host); err != nil {
+		if _, err := assertPublicHost(cfg.Host); err != nil {
 			slog.Warn("dispatchSmtp: blocked outbound target", "channel_id", ch.ID, "host", cfg.Host, "err", err)
 			continue
 		}

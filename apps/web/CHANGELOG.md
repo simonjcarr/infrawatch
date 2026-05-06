@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.3...web/v0.110.4) (2026-05-06)
+
+
+### Bug Fixes
+
+* **auth:** respect invite signup verification policy ([d4601b2](https://github.com/carrtech-dev/ct-ops/commit/d4601b2bec745e3f50336b2f6101d89b679e4545))
+
 ## [0.110.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.110.2...web/v0.110.3) (2026-05-06)
 
 

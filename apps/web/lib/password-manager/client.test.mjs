@@ -86,7 +86,7 @@ test('launch fetches a fresh assertion and exchanges it with Password Manager us
   await client.launch()
 
   assert.equal(calls.length, 2)
-  assert.equal(calls[0].url, 'http://localhost/api/password-manager/launch-assertion')
+  assert.equal(calls[0].url, '/api/password-manager/launch-assertion')
   assert.equal(calls[0].init.method, 'POST')
   assert.equal(calls[0].init.credentials, 'include')
 
@@ -132,6 +132,50 @@ test('createVault and rotateVaultKeys preserve the supplied Idempotency-Key head
 
   assert.equal(calls[0].init.headers['Idempotency-Key'], 'vault-create-key')
   assert.equal(calls[1].init.headers['Idempotency-Key'], 'rotate-key')
+})
+
+test('createVault generates an Idempotency-Key through the runtime crypto API when one is not supplied', async () => {
+  const calls = []
+  const originalCrypto = globalThis.crypto
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: {
+      randomUUID: () => 'generated-idempotency-key',
+    },
+  })
+
+  try {
+    const client = createPasswordManagerClient({
+      apiBaseUrl: 'https://ops.example.test/password-manager-api',
+      fetch: async (input, init = {}) => {
+        calls.push({
+          url: input instanceof Request ? input.url : String(input),
+          init,
+        })
+        return createJsonResponse(201, {
+          id: 'vault-1',
+          encrypted_metadata: { ciphertext_b64: 'meta' },
+          wrapped_vault_key_envelope: { wrapped_key_b64: 'wrapped' },
+          role: 'owner',
+          current_key_epoch: 1,
+          created_at: '2026-05-05T18:00:00Z',
+          updated_at: '2026-05-05T18:00:00Z',
+        })
+      },
+    })
+
+    await client.createVault({
+      encryptedMetadata: { version: 1, algorithm: 'aes-256-gcm', iv_b64: 'aQ==', ciphertext_b64: 'Yg==' },
+      wrappedVaultKeyEnvelope: { version: 1, algorithm: 'rsa-oaep-256', wrapped_key_b64: 'Yw==' },
+    })
+  } finally {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: originalCrypto,
+    })
+  }
+
+  assert.equal(calls[0].init.headers['Idempotency-Key'], 'generated-idempotency-key')
 })
 
 test('audit routes send empty bodies only', async () => {

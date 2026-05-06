@@ -1,6 +1,6 @@
 # Docker Compose Deployment
 
-The recommended way to run CT-Ops in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database) on a single host using digest-pinned images from GHCR.
+The recommended way to run CT-Ops in production is via `docker-compose.single.yml`. This deploys the full stack (web, ingest, database, and the bundled Password Manager services) on a single host using digest-pinned images from GHCR.
 
 ---
 
@@ -114,6 +114,9 @@ The one-shot `migrate` container applies database migrations before web and inge
 |---|---|---|---|
 | `nginx` | `nginx@sha256:...` | **443**, **80** | TLS terminator for browser traffic |
 | `db` | `timescale/timescaledb@sha256:...` | 127.0.0.1:5432 | PostgreSQL + TimescaleDB |
+| `password-manager-db` | `postgres@sha256:...` | none | Bundled CT Password Manager PostgreSQL database on the internal compose network |
+| `password-manager-migrate` | `ghcr.io/carrtech-dev/ct-password-manager/api@sha256:...` | none | One-shot Password Manager migration job that must finish before the API starts |
+| `password-manager-api` | `ghcr.io/carrtech-dev/ct-password-manager/api@sha256:...` | none | Bundled CT Password Manager API, reverse proxied by CT-Ops at `/password-manager-api/` |
 | `web` | `ghcr.io/carrtech-dev/ct-ops/web@sha256:...` | 127.0.0.1:3000 | Next.js web app (reached via nginx) |
 | `ingest` | `ghcr.io/carrtech-dev/ct-ops/ingest@sha256:...` | **9443**, 127.0.0.1:8080 | Agent gRPC (:9443 direct, bypasses nginx) + JWKS on loopback |
 
@@ -149,6 +152,10 @@ checksum that the current CT-Ops line is expected to integrate with. Bump it in
 the same CT-Ops pull request that validates compatibility against the selected
 Password Manager release; do not treat it as an operator override.
 
+Release bundles also stamp `PASSWORD_MANAGER_API_IMAGE` to that digest-pinned
+reference by default, so the bundled `password-manager-migrate` and
+`password-manager-api` services stay aligned with the reviewed descriptor.
+
 ---
 
 ## Backups
@@ -164,6 +171,18 @@ docker compose -f docker-compose.single.yml exec db \
 docker compose -f docker-compose.single.yml cp \
   ingest:/var/lib/ct-ops/jwt_key.pem ./jwt_key.pem.bak
 ```
+
+If you use the bundled Password Manager, also keep these restore inputs
+together:
+
+- the `password_manager_db_data` Docker volume
+- the deployment `.env` file, which stores the generated Password Manager
+  bootstrap secrets and launch-signing keys
+- `deploy/password-manager-release.json`, which records the reviewed Password
+  Manager image digest and API contract metadata
+
+On host-level restore, restore those three artifacts alongside the main CT-Ops
+database backup before restarting the stack.
 
 ---
 

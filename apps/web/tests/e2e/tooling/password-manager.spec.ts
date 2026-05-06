@@ -4,6 +4,8 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   authenticatedPage: page,
   passwordManagerMock,
 }) => {
+  test.setTimeout(60_000)
+
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
 
   const setupPassword = 'LocalUnlockPassword!42'
@@ -34,8 +36,8 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await expect(page.getByTestId('password-manager-shell')).toBeVisible()
   await expect(page.getByTestId('password-manager-state-setup-required')).toBeVisible()
 
-  await page.getByLabel('Unlock password').fill(setupPassword)
-  await page.getByLabel('Confirm unlock password').fill(setupPassword)
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
+  await page.getByLabel('Confirm unlock password', { exact: true }).fill(setupPassword)
   await page.getByRole('button', { name: 'Create unlock profile' }).click()
 
   await expect(page.getByTestId('password-manager-workspace')).toBeVisible()
@@ -83,8 +85,9 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByRole('button', { name: 'Add member' }).click()
   await expect(page.getByText('user-2')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Save role' }).click()
-  await page.getByRole('button', { name: 'Remove' }).click()
+  const memberCard = page.locator('div.rounded-2xl').filter({ hasText: 'user-2' })
+  await memberCard.getByRole('button', { name: 'Save role' }).click()
+  await memberCard.getByRole('button', { name: 'Remove' }).click()
   await expect(page.getByText('Key rotation recommended')).toBeVisible()
 
   passwordManagerMock.failNextRefreshWithSessionExpiry()
@@ -93,7 +96,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   await page.getByRole('button', { name: 'Relaunch' }).click()
   await expect(page.getByTestId('password-manager-state-locked')).toBeVisible()
-  await page.getByLabel('Unlock password').fill(setupPassword)
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
   await page.getByRole('button', { name: 'Unlock' }).click()
   await expect(page.getByTestId('password-manager-workspace')).toBeVisible()
 

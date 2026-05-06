@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 type JsonObject = { [key: string]: JsonValue }
@@ -167,6 +165,22 @@ function requireNonEmptyString(value: string, field: string): string {
   return trimmed
 }
 
+function createIdempotencyKey(): string {
+  const randomUUID = globalThis.crypto?.randomUUID
+  if (typeof randomUUID !== 'function') {
+    throw new Error('crypto.randomUUID() is required for Password Manager idempotency keys')
+  }
+  return randomUUID.call(globalThis.crypto)
+}
+
+function resolveLaunchPathUrl(launchPath: string): string {
+  const trimmed = requireNonEmptyString(launchPath, 'launchPath')
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed
+  }
+  return trimmed
+}
+
 async function parseResponse(response: Response): Promise<unknown> {
   if (response.status === 204) {
     return undefined
@@ -214,7 +228,7 @@ async function extractAssertion(
     throw new Error('Either launchPath or launchAssertionSupplier must be configured')
   }
 
-  const response = await fetchImpl(new URL(launchPath, 'http://localhost').toString(), {
+  const response = await fetchImpl(resolveLaunchPathUrl(launchPath), {
     method: 'POST',
     credentials: 'include',
   })
@@ -424,7 +438,7 @@ export function createPasswordManagerClient(options: PasswordManagerClientOption
     }): Promise<VaultRecord> {
       return requestJson<VaultRecord>(fetchImpl, apiBaseUrl, PASSWORD_MANAGER_CLIENT_ROUTE_SPECS.createVault, {
         headers: {
-          'Idempotency-Key': input.idempotencyKey ?? randomUUID(),
+          'Idempotency-Key': input.idempotencyKey ?? createIdempotencyKey(),
         },
         body: createVaultPayload(input),
       })
@@ -567,7 +581,7 @@ export function createPasswordManagerClient(options: PasswordManagerClientOption
       return requestJson<KeyEpochRecord>(fetchImpl, apiBaseUrl, PASSWORD_MANAGER_CLIENT_ROUTE_SPECS.rotateVaultKeys, {
         pathParams: { vaultID: requireNonEmptyString(input.vaultId, 'vaultId') },
         headers: {
-          'Idempotency-Key': input.idempotencyKey ?? randomUUID(),
+          'Idempotency-Key': input.idempotencyKey ?? createIdempotencyKey(),
         },
         body: createRotateVaultKeysPayload(input),
       })

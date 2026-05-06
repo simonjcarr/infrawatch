@@ -28,6 +28,9 @@ const { privateKey: e2eLicencePrivateKey, publicKey: e2eLicencePublicKey } = gen
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   publicKeyEncoding: { type: 'spki', format: 'pem' },
 })
+const { privateKey: e2ePasswordManagerLaunchPrivateKey } = generateKeyPairSync('ed25519', {
+  privateKeyEncoding: { type: 'pkcs8', format: 'der' },
+})
 
 async function main() {
   console.log('[e2e] starting TimescaleDB container (tmpfs)')
@@ -52,11 +55,14 @@ async function main() {
     process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ?? 'e2e-test-secret-do-not-use-in-prod'
     process.env.BETTER_AUTH_URL = appUrl
     process.env.BETTER_AUTH_TRUSTED_ORIGINS = appUrl
+    process.env.CT_OPS_INSTANCE_ID = process.env.CT_OPS_INSTANCE_ID ?? 'ct-ops-e2e-instance'
     process.env.E2E_PORT = String(port)
     process.env.AUTH_EMAIL_CAPTURE_FILE = authEmailCaptureFile
     process.env.E2E = '1'
     process.env.E2E_DISABLE_AGENT_CACHE_PREWARM = '1'
     process.env.POSTGRES_POOL_MAX = process.env.POSTGRES_POOL_MAX ?? '2'
+    process.env.PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY =
+      process.env.PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY ?? e2ePasswordManagerLaunchPrivateKey.toString('base64')
     process.env.LICENCE_PUBLIC_KEY = e2eLicencePublicKey
     process.env.E2E_LICENCE_PRIVATE_KEY = e2eLicencePrivateKey
 

@@ -6,6 +6,11 @@ test('legal notice page covers operational software risk and customer responsibi
   const page = readFileSync(new URL('../app/(dashboard)/legal-notice/page.tsx', import.meta.url), 'utf8')
 
   assert.match(page, /use CT-Ops at your own risk/i)
+  assert.match(page, /Community/i)
+  assert.match(page, /Open Source/i)
+  assert.match(page, /Enterprise/i)
+  assert.match(page, /3 seats/i)
+  assert.match(page, /additional seats/i)
   assert.match(page, /loss of profit/i)
   assert.match(page, /loss of data/i)
   assert.match(page, /security incident/i)

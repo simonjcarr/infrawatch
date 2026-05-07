@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 64" role="img" aria-labelledby="title desc">
+  <title id="title">CarrTech CT-Ops logo</title>
+  <desc id="desc">The CarrTech mark and wordmark paired with the CT-Ops product name.</desc>
+  <path fill="none" stroke="#0F2533" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.8" d="M49 18 33 9 12 21v22l21 12 16-9M43 22l-10-6-14 8v16l14 8 10-6"/>
+  <path fill="none" stroke="#0A8FA3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M16 34h24M26 34v15M26 34l10-9"/>
+  <circle cx="16" cy="34" r="2.8" fill="#F8FAFC" stroke="#0A8FA3" stroke-width="2.2"/>
+  <circle cx="26" cy="34" r="2.8" fill="#F8FAFC" stroke="#0A8FA3" stroke-width="2.2"/>
+  <circle cx="40" cy="34" r="2.8" fill="#F8FAFC" stroke="#0A8FA3" stroke-width="2.2"/>
+  <circle cx="26" cy="49" r="2.8" fill="#F8FAFC" stroke="#0A8FA3" stroke-width="2.2"/>
+  <circle cx="36" cy="25" r="2.5" fill="#F8FAFC" stroke="#0A8FA3" stroke-width="2.2"/>
+  <text x="76" y="42" fill="#0F2533" font-family="Inter, Geist, Arial, sans-serif" font-size="31" font-weight="800" letter-spacing="0">CarrTech</text>
+  <text x="220" y="42" fill="#94A3B8" font-family="Inter, Geist, Arial, sans-serif" font-size="29" font-weight="500" letter-spacing="0">/</text>
+  <text x="244" y="42" fill="#0A8FA3" font-family="Inter, Geist, Arial, sans-serif" font-size="29" font-weight="800" letter-spacing="0">CT-Ops</text>
+</svg>

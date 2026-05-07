@@ -22,6 +22,10 @@ export const metadata: Metadata = {
     template: '%s | CT-Ops',
   },
   description: 'Open-source infrastructure monitoring and tooling platform',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.svg',
+  },
 }
 
 // Inline script applied before React hydrates to prevent flash of wrong theme.

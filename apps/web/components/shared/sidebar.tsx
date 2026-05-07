@@ -40,6 +40,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
+import { CarrTechLogo } from '@/components/shared/carrtech-logo'
 import { cn } from '@/lib/utils'
 import { TerminalPanelTrigger } from '@/components/terminal'
 import type { LicenceTier } from '@/lib/features'
@@ -257,12 +258,7 @@ export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: Lic
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
-            IW
-          </div>
-          <span className="font-semibold text-sm text-sidebar-foreground">CT-Ops</span>
-        </div>
+        <CarrTechLogo className="flex items-center gap-2 text-sm" markClassName="size-7 shrink-0" />
       </SidebarHeader>
       <SidebarContent>
         <NavGroup label="Monitoring" items={primaryNav} />

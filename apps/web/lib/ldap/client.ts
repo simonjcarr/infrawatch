@@ -2,6 +2,7 @@ import { Client } from 'ldapts'
 import { decrypt } from '@/lib/crypto/encrypt'
 import type { LdapConfiguration } from '@/lib/db/schema'
 import { getTlsOptions } from './tls-options'
+import { buildAuthenticateUserSearchFilter } from './auth-filter'
 
 export interface LdapUser {
   dn: string
@@ -16,15 +17,7 @@ export interface LdapUser {
   passwordLastChangedAt?: Date | null
 }
 
-// RFC 4515 §3: escape special characters before interpolating user input into LDAP filters.
-export function escapeLdapFilterValue(value: string): string {
-  return value
-    .replace(/\\/g, '\\5c')
-    .replace(/\*/g, '\\2a')
-    .replace(/\(/g, '\\28')
-    .replace(/\)/g, '\\29')
-    .replace(/\0/g, '\\00')
-}
+export { escapeLdapFilterValue } from './auth-filter'
 
 function safeDecrypt(value: string): string {
   try { return decrypt(value) } catch { return value }
@@ -316,7 +309,7 @@ export async function authenticateUser(
 
     const searchBase = resolveSearchBase(config.userSearchBase, config.baseDn)
 
-    const searchFilter = config.userSearchFilter.replace('{{username}}', escapeLdapFilterValue(username))
+    const searchFilter = buildAuthenticateUserSearchFilter(config.userSearchFilter, username)
 
     const { searchEntries } = await client.search(searchBase, {
       filter: searchFilter,

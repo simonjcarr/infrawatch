@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.1...ingest/v0.9.2) (2026-05-07)
+
+
+### Bug Fixes
+
+* **terminal:** throttle ssh authentication attempts ([23512dd](https://github.com/carrtech-dev/ct-ops/commit/23512ddeeeaff71fe09c37eeda09242505c8984d))
+
 ## [0.9.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.0...ingest/v0.9.1) (2026-05-07)
 
 

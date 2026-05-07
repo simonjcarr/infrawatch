@@ -58,7 +58,10 @@ import {
 } from '@/components/ui/table'
 import type { ParsedCertificate, CertCheckerResponse } from '@/app/api/tools/certificate-checker/route'
 import { trackCertificateFromUrl, trackCertificateFromUpload } from '@/lib/actions/certificates'
-import { getAllowedCertificateCheckerPorts } from '@/lib/net/certificate-checker-policy'
+import {
+  assertAllowedCertificateCheckerPort,
+  getAllowedCertificateCheckerPorts,
+} from '@/lib/net/certificate-checker-policy'
 
 // ─── Utility helpers ─────────────────────────────────────────────────────────
 
@@ -803,8 +806,22 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
 
   async function submit() {
     if (!url.trim()) return
-    setLoading(true)
     setError(null)
+
+    const requestedPort = port ? Number(port) : 443
+    if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
+      setError('Port must be between 1 and 65535.')
+      return
+    }
+
+    try {
+      assertAllowedCertificateCheckerPort(requestedPort)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Port is not allowed.')
+      return
+    }
+
+    setLoading(true)
     try {
       const resolvedKey = keyText.trim() || (keyFile ? await readFileAsText(keyFile) : undefined)
       const res = await fetch('/api/tools/certificate-checker', {
@@ -813,7 +830,7 @@ function UrlTab({ onResult }: { onResult: (cert: ParsedCertificate, source: Trac
         body: JSON.stringify({
           action: 'fetch-url',
           url: url.trim(),
-          port: port ? parseInt(port, 10) : 443,
+          port: requestedPort,
           servername: servername.trim() || undefined,
           keyPem: resolvedKey || undefined,
         }),

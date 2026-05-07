@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.118.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.117.0...web/v0.118.0) (2026-05-07)
+
+
+### Features
+
+* **password-manager:** add SSH key pair view and copy actions ([a8fed28](https://github.com/carrtech-dev/ct-ops/commit/a8fed281f83d13d8b3c6f3e0177cde5738287915))
+
 ## [0.117.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.9...web/v0.117.0) (2026-05-07)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.114.0...web/v0.115.0) (2026-05-07)
+
+
+### Features
+
+* **profile:** add 2fa qr setup code ([c233b83](https://github.com/carrtech-dev/ct-ops/commit/c233b83ebc6b6727ef3a205995c552d43457a32a))
+
 ## [0.114.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.113.1...web/v0.114.0) (2026-05-06)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.2...web/v0.116.3) (2026-05-07)
+
+
+### Bug Fixes
+
+* **password-manager:** rename vault settings action ([9ddcbc2](https://github.com/carrtech-dev/ct-ops/commit/9ddcbc28dd38e4c76c72767747127c5b5f372c87))
+
 ## [0.116.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.1...web/v0.116.2) (2026-05-07)
 
 

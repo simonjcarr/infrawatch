@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.0...web/v0.116.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **auth:** complete local two-factor login ([#1123](https://github.com/carrtech-dev/ct-ops/issues/1123)) ([75581f5](https://github.com/carrtech-dev/ct-ops/commit/75581f5ebe6c23af770fe07cea9d3eb85fffe35f))
+
 ## [0.116.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.115.0...web/v0.116.0) (2026-05-07)
 
 

@@ -74,6 +74,8 @@ const authenticatedApiRoutes = [
   '/api/system/health',
 ]
 
+const routeWarmupTimeoutMs = 60_000
+
 setup.setTimeout(420_000)
 
 setup('seed test organisation and warm Next routes', async ({ browser, baseURL }) => {
@@ -85,7 +87,7 @@ setup('seed test organisation and warm Next routes', async ({ browser, baseURL }
   const publicPage = await publicContext.newPage()
   try {
     for (const route of publicRoutes) {
-      const response = await publicPage.goto(route, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+      const response = await publicPage.goto(route, { waitUntil: 'domcontentloaded', timeout: routeWarmupTimeoutMs })
       if (response && response.status() >= 500) {
         throw new Error(`Warmup navigation for ${route} failed with ${response.status()}`)
       }
@@ -100,7 +102,7 @@ setup('seed test organisation and warm Next routes', async ({ browser, baseURL }
 
   try {
     for (const route of authenticatedRoutes) {
-      const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: routeWarmupTimeoutMs })
       if (response && response.status() >= 500) {
         throw new Error(`Warmup navigation for ${route} failed with ${response.status()}`)
       }

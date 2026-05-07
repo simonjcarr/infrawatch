@@ -53,6 +53,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   const vaultButton = page.getByTestId('password-manager-vault-vault-1')
   await expect(vaultButton).toContainText('Shared production')
+  await expect(page.getByTestId('password-manager-entry-table')).toBeVisible()
 
   await expect(page.getByLabel('Title')).toHaveCount(0)
   await page.getByTestId('password-manager-entry-template-menu').click()
@@ -86,11 +87,31 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   await entryCard.getByRole('button', { name: 'Reveal password' }).click()
   await expect(entryCard.getByText(entryPassword)).toBeVisible()
+  await expect(entryCard.getByTestId('password-manager-reveal-progress-entry-2')).toBeVisible()
+  await expect(entryCard.getByText('10s reveal')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Settings' }).click()
+  await page.getByLabel('Reveal password duration').fill('2')
+  await page.getByLabel('Clipboard clear duration').fill('3')
+  await page.getByRole('button', { name: 'Rename vault' }).click()
+  await expect(page.getByText('Vault metadata updated in encrypted form.')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Passwords' }).click()
+  await expect(entryCard.getByText(entryPassword)).toHaveCount(0)
+  await entryCard.getByRole('button', { name: 'Reveal password' }).click()
+  await expect(entryCard.getByText(entryPassword)).toBeVisible()
+  await expect(entryCard.getByText('2s reveal')).toBeVisible()
+  await expect(entryCard.getByText(entryPassword)).toHaveCount(0, { timeout: 4_000 })
 
   await entryCard.getByRole('button', { name: 'Copy password' }).click()
+  await expect(entryCard.getByTestId('password-manager-clipboard-progress-entry-2')).toBeVisible()
+  await expect(entryCard.getByText('3s clipboard')).toBeVisible()
   await expect
     .poll(async () => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(entryPassword)
+  await expect
+    .poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 5_000 })
+    .toBe('')
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export vault' }).click()
@@ -106,7 +127,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await expect(page.getByRole('dialog', { name: 'Edit login' })).toBeVisible()
   await page.getByLabel('Password', { exact: true }).fill(updatedEntryPassword)
   await page.getByRole('button', { name: 'Save encrypted entry' }).click()
-  await expect(entryCard.getByRole('button', { name: 'Hide password' })).toBeVisible()
+  await expect(entryCard.getByRole('button', { name: 'Reveal password' })).toBeVisible()
 
   await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByTestId('password-manager-member-user-selector').click()
@@ -146,6 +167,12 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Delete vault' }).click()
+  await expect(page.getByRole('alertdialog', { name: 'Delete vault' })).toBeVisible()
+  await expect(page.getByText('This is irreversible')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete vault permanently' })).toBeDisabled()
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
+  await page.getByLabel('Type the vault name').fill('Shared production')
+  await page.getByRole('button', { name: 'Delete vault permanently' }).click()
   await expect(page.getByTestId('password-manager-vault-vault-1')).toHaveCount(0)
 
   await passwordManagerMock.switchAuthenticatedOrganisation()
@@ -158,6 +185,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   const auditPaths = passwordManagerMock.auditRequests().map((request) => request.path)
   expect(auditPaths).toEqual([
+    '/vaults/vault-1/entries/entry-2/reveal-audit',
     '/vaults/vault-1/entries/entry-2/reveal-audit',
     '/vaults/vault-1/entries/entry-2/copy-audit',
     '/vaults/vault-1/export-audit',

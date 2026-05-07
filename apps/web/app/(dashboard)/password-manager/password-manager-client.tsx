@@ -18,6 +18,7 @@ import {
   Copy,
   CreditCard,
   Download,
+  Ellipsis,
   Eye,
   EyeOff,
   IdCard,
@@ -35,6 +36,15 @@ import {
   Trash2,
   Vault,
 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,6 +61,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -62,6 +73,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { logWarn } from '@/lib/logging'
 import {
@@ -122,9 +134,18 @@ const GENERIC_SETUP_FAILURE = 'Password Manager setup could not be completed saf
 const PASSWORD_MANAGER_MEMBER_ROLES = ['viewer', 'member', 'manager', 'owner'] as const
 const PASSWORD_MANAGER_CRYPTO_BATCH_SIZE = 8
 const PASSWORD_MANAGER_EXPORT_ACKNOWLEDGEMENT = 'I understand the risks'
+const DEFAULT_PASSWORD_REVEAL_TIMEOUT_SECONDS = 10
+const DEFAULT_PASSWORD_CLIPBOARD_TIMEOUT_SECONDS = 20
+const MIN_PASSWORD_TIMEOUT_SECONDS = 1
+const MAX_PASSWORD_TIMEOUT_SECONDS = 300
 
 type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
 type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note'
+type PasswordManagerTimedSecret = {
+  durationSeconds: number
+  expiresAt: number
+  startedAt: number
+}
 
 type PasswordManagerEntryTemplateField = {
   id: string
@@ -293,6 +314,40 @@ function getPasswordManagerEntryIcon(templateId: string | undefined): ReactNode 
   }
 }
 
+function clampPasswordManagerTimeoutSeconds(value: unknown, fallback: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(numeric)) {
+    return fallback
+  }
+  return Math.min(
+    MAX_PASSWORD_TIMEOUT_SECONDS,
+    Math.max(MIN_PASSWORD_TIMEOUT_SECONDS, Math.round(numeric)),
+  )
+}
+
+function getVaultRevealTimeoutSeconds(vault: PasswordManagerVaultSummary | null): number {
+  return clampPasswordManagerTimeoutSeconds(
+    vault?.metadata.revealTimeoutSeconds,
+    DEFAULT_PASSWORD_REVEAL_TIMEOUT_SECONDS,
+  )
+}
+
+function getVaultClipboardTimeoutSeconds(vault: PasswordManagerVaultSummary | null): number {
+  return clampPasswordManagerTimeoutSeconds(
+    vault?.metadata.clipboardTimeoutSeconds,
+    DEFAULT_PASSWORD_CLIPBOARD_TIMEOUT_SECONDS,
+  )
+}
+
+function getTimedSecretProgressPercent(timer: PasswordManagerTimedSecret | undefined, now: number): number {
+  if (!timer) {
+    return 0
+  }
+  const total = Math.max(1, timer.expiresAt - timer.startedAt)
+  const remaining = Math.max(0, timer.expiresAt - now)
+  return Math.min(100, Math.max(0, Math.round((remaining / total) * 100)))
+}
+
 export function PasswordManagerClientShell({
   currentUserId,
   orgId,
@@ -344,6 +399,8 @@ export function PasswordManagerClientShell({
   const [createVaultDescription, setCreateVaultDescription] = useState('')
   const [renameVaultName, setRenameVaultName] = useState('')
   const [renameVaultDescription, setRenameVaultDescription] = useState('')
+  const [renameRevealTimeoutSeconds, setRenameRevealTimeoutSeconds] = useState(String(DEFAULT_PASSWORD_REVEAL_TIMEOUT_SECONDS))
+  const [renameClipboardTimeoutSeconds, setRenameClipboardTimeoutSeconds] = useState(String(DEFAULT_PASSWORD_CLIPBOARD_TIMEOUT_SECONDS))
   const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState<(typeof PASSWORD_MANAGER_MEMBER_ROLES)[number]>('viewer')
   const [memberRecipients, setMemberRecipients] = useState<Record<string, MemberRecipientRecord>>({})
@@ -366,6 +423,9 @@ export function PasswordManagerClientShell({
   const [entryNotes, setEntryNotes] = useState('')
   const [entryFields, setEntryFields] = useState<Record<string, string>>({})
   const [entryRevealId, setEntryRevealId] = useState<string | null>(null)
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, PasswordManagerTimedSecret>>({})
+  const [clipboardPasswords, setClipboardPasswords] = useState<Record<string, PasswordManagerTimedSecret>>({})
+  const [timedSecretNow, setTimedSecretNow] = useState(() => Date.now())
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState<PasswordManagerExportFormat>('encrypted')
@@ -376,6 +436,8 @@ export function PasswordManagerClientShell({
   const [exportError, setExportError] = useState<string | null>(null)
   const vaultKeyCacheRef = useRef(new Map<string, Map<number, CryptoKey>>())
   const memberPublicKeyEnvelopeCacheRef = useRef<Record<string, PasswordManagerPublicKeyEnvelope>>({})
+  const revealTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const clipboardTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingVaultCreateRef = useRef<{
     encryptedMetadata: PasswordManagerEncryptedPayloadEnvelope
     metadata: PasswordManagerVaultMetadata
@@ -891,12 +953,56 @@ export function PasswordManagerClientShell({
     if (!selectedVault) {
       setRenameVaultName('')
       setRenameVaultDescription('')
+      setRenameRevealTimeoutSeconds(String(DEFAULT_PASSWORD_REVEAL_TIMEOUT_SECONDS))
+      setRenameClipboardTimeoutSeconds(String(DEFAULT_PASSWORD_CLIPBOARD_TIMEOUT_SECONDS))
       return
     }
 
     setRenameVaultName(selectedVault.metadata.name)
     setRenameVaultDescription(selectedVault.metadata.description ?? '')
+    setRenameRevealTimeoutSeconds(String(getVaultRevealTimeoutSeconds(selectedVault)))
+    setRenameClipboardTimeoutSeconds(String(getVaultClipboardTimeoutSeconds(selectedVault)))
   }, [selectedVault])
+
+  useEffect(() => {
+    if (entryRevealId && !revealedPasswords[entryRevealId]) {
+      setEntryRevealId(null)
+    }
+  }, [entryRevealId, revealedPasswords])
+
+  useEffect(() => {
+    const hasTimers = Object.keys(revealedPasswords).length > 0 || Object.keys(clipboardPasswords).length > 0
+    if (!hasTimers) {
+      return
+    }
+    const interval = setInterval(() => setTimedSecretNow(Date.now()), 250)
+    return () => clearInterval(interval)
+  }, [clipboardPasswords, revealedPasswords])
+
+  useEffect(() => {
+    setEntryRevealId(null)
+    setRevealedPasswords({})
+    setClipboardPasswords({})
+    for (const timeout of Object.values(revealTimeoutsRef.current)) {
+      clearTimeout(timeout)
+    }
+    for (const timeout of Object.values(clipboardTimeoutsRef.current)) {
+      clearTimeout(timeout)
+    }
+    revealTimeoutsRef.current = {}
+    clipboardTimeoutsRef.current = {}
+  }, [workspaceState.selectedVaultId])
+
+  useEffect(() => {
+    return () => {
+      for (const timeout of Object.values(revealTimeoutsRef.current)) {
+        clearTimeout(timeout)
+      }
+      for (const timeout of Object.values(clipboardTimeoutsRef.current)) {
+        clearTimeout(timeout)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!selectedEntry) {
@@ -1141,6 +1247,8 @@ export function PasswordManagerClientShell({
       const metadata: PasswordManagerVaultMetadata = {
         name,
         description: createVaultDescription.trim() || undefined,
+        revealTimeoutSeconds: DEFAULT_PASSWORD_REVEAL_TIMEOUT_SECONDS,
+        clipboardTimeoutSeconds: DEFAULT_PASSWORD_CLIPBOARD_TIMEOUT_SECONDS,
       }
       const vaultKey = await generateVaultKey()
       const encryptedMetadata = await createEncryptedVaultMetadata(metadata, vaultKey)
@@ -1202,6 +1310,14 @@ export function PasswordManagerClientShell({
       const metadata: PasswordManagerVaultMetadata = {
         name,
         description: renameVaultDescription.trim() || undefined,
+        revealTimeoutSeconds: clampPasswordManagerTimeoutSeconds(
+          renameRevealTimeoutSeconds,
+          getVaultRevealTimeoutSeconds(selectedVault),
+        ),
+        clipboardTimeoutSeconds: clampPasswordManagerTimeoutSeconds(
+          renameClipboardTimeoutSeconds,
+          getVaultClipboardTimeoutSeconds(selectedVault),
+        ),
       }
       const encryptedMetadata = await createEncryptedVaultMetadata(metadata, vaultKey)
       const updated = await client.updateVault({
@@ -1211,6 +1327,17 @@ export function PasswordManagerClientShell({
       setVaults((current) =>
         current.map((vault) => (vault.id === updated.id ? createVaultSummary(updated, metadata) : vault)),
       )
+      setEntryRevealId(null)
+      setRevealedPasswords({})
+      setClipboardPasswords({})
+      for (const timeout of Object.values(revealTimeoutsRef.current)) {
+        clearTimeout(timeout)
+      }
+      for (const timeout of Object.values(clipboardTimeoutsRef.current)) {
+        clearTimeout(timeout)
+      }
+      revealTimeoutsRef.current = {}
+      clipboardTimeoutsRef.current = {}
       setStatusNotice('Vault metadata updated in encrypted form.')
     } catch (error) {
       handleWorkspaceActionError(error, 'The vault could not be renamed safely.')
@@ -1219,14 +1346,27 @@ export function PasswordManagerClientShell({
     }
   }
 
-  async function handleVaultDelete() {
+  async function handleVaultDelete(deleteUnlockPassword: string): Promise<boolean> {
     if (!selectedVault) {
-      return
+      return false
+    }
+    if (!state.encryptedPrivateKeyEnvelope || !state.unlockMetadata) {
+      setWorkspaceError('Relaunch and unlock Password Manager before deleting this vault.')
+      return false
+    }
+    if (!deleteUnlockPassword) {
+      setWorkspaceError('Enter your unlock password to re-authenticate before deleting this vault.')
+      return false
     }
 
     setWorkspacePending(true)
     setWorkspaceError(null)
     try {
+      await decryptUserPrivateKeyEnvelope({
+        unlockPassword: deleteUnlockPassword,
+        encryptedPrivateKeyEnvelope: state.encryptedPrivateKeyEnvelope,
+        kdfMetadata: state.unlockMetadata,
+      })
       await client.deleteVault(selectedVault.id)
       vaultKeyCacheRef.current.delete(selectedVault.id)
       setVaults((current) => current.filter((vault) => vault.id !== selectedVault.id))
@@ -1234,8 +1374,10 @@ export function PasswordManagerClientShell({
       setMembers([])
       workspaceDispatch({ type: 'vault-removed', vaultId: selectedVault.id })
       setStatusNotice('Vault removed and decrypted browser state cleared for that vault.')
+      return true
     } catch (error) {
       handleWorkspaceActionError(error, 'The vault could not be deleted safely.')
+      return false
     } finally {
       setWorkspacePending(false)
     }
@@ -1590,8 +1732,44 @@ export function PasswordManagerClientShell({
     }
 
     try {
+      const durationSeconds = getVaultClipboardTimeoutSeconds(selectedVault)
+      const startedAt = Date.now()
+      const expiresAt = startedAt + durationSeconds * 1000
       await navigator.clipboard.writeText(entry.payload.password)
-      setStatusNotice(`Password copied for ${entry.payload.title}.`)
+      if (clipboardTimeoutsRef.current[entry.id]) {
+        clearTimeout(clipboardTimeoutsRef.current[entry.id])
+      }
+      setClipboardPasswords((current) => ({
+        ...current,
+        [entry.id]: { durationSeconds, expiresAt, startedAt },
+      }))
+      setTimedSecretNow(startedAt)
+      clipboardTimeoutsRef.current[entry.id] = setTimeout(() => {
+        void navigator.clipboard
+          .readText()
+          .then((clipboardText) => {
+            if (clipboardText === entry.payload.password) {
+              return navigator.clipboard.writeText('')
+            }
+            return undefined
+          })
+          .catch((error) => {
+            logPasswordManagerWarning('[password-manager] clipboard clear failed', error, {
+              organisationId: state.organisationId,
+              selectedVaultId: entry.vaultId,
+              selectedEntryId: entry.id,
+            })
+          })
+          .finally(() => {
+            delete clipboardTimeoutsRef.current[entry.id]
+            setClipboardPasswords((current) => {
+              const next = { ...current }
+              delete next[entry.id]
+              return next
+            })
+          })
+      }, durationSeconds * 1000)
+      setStatusNotice(`Password copied for ${entry.payload.title}. Clipboard will be cleared in ${durationSeconds} seconds.`)
       await client.auditCopy({
         vaultId: entry.vaultId,
         entryId: entry.id,
@@ -1614,11 +1792,43 @@ export function PasswordManagerClientShell({
   async function handleEntryRevealToggle(entry: PasswordManagerEntrySummary) {
     if (entryRevealId === entry.id) {
       setEntryRevealId(null)
+      if (revealTimeoutsRef.current[entry.id]) {
+        clearTimeout(revealTimeoutsRef.current[entry.id])
+        delete revealTimeoutsRef.current[entry.id]
+      }
+      setRevealedPasswords((current) => {
+        const next = { ...current }
+        delete next[entry.id]
+        return next
+      })
       return
     }
 
+    const durationSeconds = getVaultRevealTimeoutSeconds(selectedVault)
+    const startedAt = Date.now()
+    const expiresAt = startedAt + durationSeconds * 1000
+    if (entryRevealId && revealTimeoutsRef.current[entryRevealId]) {
+      clearTimeout(revealTimeoutsRef.current[entryRevealId])
+      delete revealTimeoutsRef.current[entryRevealId]
+    }
+    if (revealTimeoutsRef.current[entry.id]) {
+      clearTimeout(revealTimeoutsRef.current[entry.id])
+    }
     setEntryRevealId(entry.id)
-    setStatusNotice(`Password revealed locally for ${entry.payload.title}.`)
+    setRevealedPasswords({
+      [entry.id]: { durationSeconds, expiresAt, startedAt },
+    })
+    setTimedSecretNow(startedAt)
+    revealTimeoutsRef.current[entry.id] = setTimeout(() => {
+      delete revealTimeoutsRef.current[entry.id]
+      setEntryRevealId((current) => (current === entry.id ? null : current))
+      setRevealedPasswords((current) => {
+        const next = { ...current }
+        delete next[entry.id]
+        return next
+      })
+    }, durationSeconds * 1000)
+    setStatusNotice(`Password revealed locally for ${entry.payload.title} for ${durationSeconds} seconds.`)
 
     try {
       await client.auditReveal({
@@ -1804,6 +2014,9 @@ export function PasswordManagerClientShell({
           entryNotes={entryNotes}
           entryPassword={entryPassword}
           entryRevealId={entryRevealId}
+          revealedPasswords={revealedPasswords}
+          clipboardPasswords={clipboardPasswords}
+          timedSecretNow={timedSecretNow}
           entryTemplateId={entryTemplateId}
           entryTitle={entryTitle}
           entryUrl={entryUrl}
@@ -1874,6 +2087,10 @@ export function PasswordManagerClientShell({
           onUpdateMemberRole={handleMemberRoleUpdate}
           renameVaultDescription={renameVaultDescription}
           renameVaultName={renameVaultName}
+          renameRevealTimeoutSeconds={renameRevealTimeoutSeconds}
+          renameClipboardTimeoutSeconds={renameClipboardTimeoutSeconds}
+          onRenameRevealTimeoutSecondsChange={setRenameRevealTimeoutSeconds}
+          onRenameClipboardTimeoutSecondsChange={setRenameClipboardTimeoutSeconds}
           rotationPrompt={rotationPrompt}
           selectedEntry={selectedEntry}
           selectedEntryTemplateId={selectedEntryTemplateId}
@@ -2311,6 +2528,34 @@ function ShellCard({
   )
 }
 
+function TimedSecretProgress({
+  durationLabel,
+  progressPercent,
+  testId,
+}: {
+  durationLabel: string
+  progressPercent: number
+  testId: string
+}) {
+  return (
+    <div className="grid gap-1" data-testid={testId}>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{durationLabel}</span>
+        <span>{Math.max(0, progressPercent)}%</span>
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className="h-full bg-primary transition-[width] duration-200" style={{ width: `${progressPercent}%` }} />
+      </div>
+    </div>
+  )
+}
+
 function PasswordManagerWorkspace({
   createVaultDescription,
   createVaultName,
@@ -2324,6 +2569,9 @@ function PasswordManagerWorkspace({
   entryNotes,
   entryPassword,
   entryRevealId,
+  revealedPasswords,
+  clipboardPasswords,
+  timedSecretNow,
   entryTemplateId,
   entryTitle,
   entryUrl,
@@ -2363,6 +2611,8 @@ function PasswordManagerWorkspace({
   onRenameVault,
   onRenameVaultDescriptionChange,
   onRenameVaultNameChange,
+  onRenameRevealTimeoutSecondsChange,
+  onRenameClipboardTimeoutSecondsChange,
   onRetryCreateVault,
   onRetryRotation,
   onSelectEntry,
@@ -2373,6 +2623,8 @@ function PasswordManagerWorkspace({
   onUpdateMemberRole,
   renameVaultDescription,
   renameVaultName,
+  renameRevealTimeoutSeconds,
+  renameClipboardTimeoutSeconds,
   rotationPrompt,
   selectedEntry,
   selectedEntryTemplateId,
@@ -2395,6 +2647,9 @@ function PasswordManagerWorkspace({
   entryNotes: string
   entryPassword: string
   entryRevealId: string | null
+  revealedPasswords: Record<string, PasswordManagerTimedSecret>
+  clipboardPasswords: Record<string, PasswordManagerTimedSecret>
+  timedSecretNow: number
   entryTemplateId: PasswordManagerEntryTemplateId
   entryTitle: string
   entryUrl: string
@@ -2413,7 +2668,7 @@ function PasswordManagerWorkspace({
   onCreateVaultDescriptionChange: (value: string) => void
   onCreateVaultNameChange: (value: string) => void
   onDeleteEntry: () => Promise<void>
-  onDeleteVault: () => Promise<void>
+  onDeleteVault: (unlockPassword: string) => Promise<boolean>
   onEntryFilterChange: (value: string) => void
   onEntryFieldChange: (fieldId: string, value: string) => void
   onEntryNotesChange: (value: string) => void
@@ -2434,6 +2689,8 @@ function PasswordManagerWorkspace({
   onRenameVault: () => Promise<void>
   onRenameVaultDescriptionChange: (value: string) => void
   onRenameVaultNameChange: (value: string) => void
+  onRenameRevealTimeoutSecondsChange: (value: string) => void
+  onRenameClipboardTimeoutSecondsChange: (value: string) => void
   onRetryCreateVault: () => Promise<void>
   onRetryRotation: () => Promise<void>
   onSelectEntry: (entryId: string | null) => void
@@ -2444,6 +2701,8 @@ function PasswordManagerWorkspace({
   onUpdateMemberRole: (member: MemberRecord) => Promise<void>
   renameVaultDescription: string
   renameVaultName: string
+  renameRevealTimeoutSeconds: string
+  renameClipboardTimeoutSeconds: string
   rotationPrompt: string | null
   selectedEntry: PasswordManagerEntrySummary | null
   selectedEntryTemplateId: PasswordManagerEntryTemplateId
@@ -2457,6 +2716,10 @@ function PasswordManagerWorkspace({
   const [memberSelectorOpen, setMemberSelectorOpen] = useState(false)
   const [createVaultDialogOpen, setCreateVaultDialogOpen] = useState(false)
   const [entryDialogOpen, setEntryDialogOpen] = useState(false)
+  const [deleteVaultDialogOpen, setDeleteVaultDialogOpen] = useState(false)
+  const [deleteVaultUnlockPassword, setDeleteVaultUnlockPassword] = useState('')
+  const [deleteVaultNameConfirmation, setDeleteVaultNameConfirmation] = useState('')
+  const [deleteVaultError, setDeleteVaultError] = useState<string | null>(null)
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
@@ -2494,6 +2757,42 @@ function PasswordManagerWorkspace({
     await onDeleteEntry()
     setEntryDialogOpen(false)
   }
+
+  async function handleConfirmVaultDelete() {
+    if (!selectedVault) {
+      return
+    }
+    if (deleteVaultNameConfirmation !== selectedVault.metadata.name) {
+      setDeleteVaultError('Type the vault name exactly before deleting it.')
+      return
+    }
+    if (!deleteVaultUnlockPassword) {
+      setDeleteVaultError('Enter your unlock password to re-authenticate before deleting it.')
+      return
+    }
+    setDeleteVaultError(null)
+    const deleted = await onDeleteVault(deleteVaultUnlockPassword)
+    if (deleted) {
+      setDeleteVaultDialogOpen(false)
+      setDeleteVaultUnlockPassword('')
+      setDeleteVaultNameConfirmation('')
+    }
+  }
+
+  function handleDeleteVaultDialogOpenChange(open: boolean) {
+    setDeleteVaultDialogOpen(open)
+    if (!open) {
+      setDeleteVaultUnlockPassword('')
+      setDeleteVaultNameConfirmation('')
+      setDeleteVaultError(null)
+    }
+  }
+
+  const deleteVaultEnabled =
+    !!selectedVault &&
+    deleteVaultUnlockPassword.length > 0 &&
+    deleteVaultNameConfirmation === selectedVault.metadata.name &&
+    !workspacePending
 
   return (
     <div className="space-y-4" data-testid="password-manager-workspace">
@@ -2668,29 +2967,66 @@ function PasswordManagerWorkspace({
                   No entries match <span className="font-medium">{deferredEntryFilter || 'the current view'}</span>.
                 </p>
               ) : null}
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-lg border border-border/60" data-testid="password-manager-entry-table">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Entry</TableHead>
+                      <TableHead className="hidden md:table-cell">Username</TableHead>
+                      <TableHead className="hidden lg:table-cell">URL</TableHead>
+                      <TableHead className="hidden sm:table-cell">Key</TableHead>
+                      <TableHead className="w-12 sm:w-[260px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                 {entries.map((entry) => (
-                  <div
+                  <TableRow
                     key={entry.id}
-                    className={`rounded-xl border px-4 py-3 ${
-                      selectedEntry?.id === entry.id ? 'border-primary bg-primary/5' : 'border-border/60'
-                    }`}
+                    data-state={selectedEntry?.id === entry.id ? 'selected' : undefined}
                     data-testid={`password-manager-entry-${entry.id}`}
                   >
-                    <button type="button" className="w-full text-left" onClick={() => onSelectEntry(entry.id)}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-2">
+                    <TableCell className="min-w-[220px]">
+                      <button type="button" className="flex min-w-0 items-start gap-2 text-left" onClick={() => onSelectEntry(entry.id)}>
                           {getPasswordManagerEntryIcon(entry.payload.type)}
                           <div className="min-w-0">
                             <p className="truncate font-medium">{entry.payload.title}</p>
                             <p className="truncate text-sm text-muted-foreground">{getPasswordManagerEntrySummaryText(entry)}</p>
+                            {entry.payload.url ? <p className="truncate text-xs text-muted-foreground lg:hidden">{entry.payload.url}</p> : null}
                           </div>
+                      </button>
+                      {entryRevealId === entry.id && entry.payload.password ? (
+                        <div className="mt-2 space-y-2">
+                          <p className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 font-mono text-sm break-all">
+                            {entry.payload.password}
+                          </p>
+                          <TimedSecretProgress
+                            durationLabel={`${revealedPasswords[entry.id]?.durationSeconds ?? getVaultRevealTimeoutSeconds(selectedVault)}s reveal`}
+                            progressPercent={getTimedSecretProgressPercent(revealedPasswords[entry.id], timedSecretNow)}
+                            testId={`password-manager-reveal-progress-${entry.id}`}
+                          />
                         </div>
-                        <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
-                      </div>
-                      {entry.payload.url ? <p className="mt-2 truncate text-xs text-muted-foreground">{entry.payload.url}</p> : null}
-                    </button>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                      ) : null}
+                      {clipboardPasswords[entry.id] ? (
+                        <div className="mt-2">
+                          <TimedSecretProgress
+                            durationLabel={`${clipboardPasswords[entry.id]?.durationSeconds ?? getVaultClipboardTimeoutSeconds(selectedVault)}s clipboard`}
+                            progressPercent={getTimedSecretProgressPercent(clipboardPasswords[entry.id], timedSecretNow)}
+                            testId={`password-manager-clipboard-progress-${entry.id}`}
+                          />
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="hidden max-w-[180px] truncate md:table-cell">
+                      {entry.payload.username ?? 'Not set'}
+                    </TableCell>
+                    <TableCell className="hidden max-w-[220px] truncate lg:table-cell">
+                      {entry.payload.url ?? 'Not set'}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="hidden flex-wrap justify-end gap-2 sm:flex">
                       {entry.payload.password ? (
                         <>
                           <Button variant="outline" size="sm" onClick={() => void onToggleReveal(entry)}>
@@ -2707,14 +3043,37 @@ function PasswordManagerWorkspace({
                         <Pencil className="mr-2 size-4" />
                         Edit
                       </Button>
-                    </div>
-                    {entryRevealId === entry.id && entry.payload.password ? (
-                      <p className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-sm">
-                        {entry.payload.password}
-                      </p>
-                    ) : null}
-                  </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="icon" className="sm:hidden" aria-label={`Open actions for ${entry.payload.title}`}>
+                            <Ellipsis className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {entry.payload.password ? (
+                            <>
+                              <DropdownMenuItem onSelect={() => void onToggleReveal(entry)}>
+                                {entryRevealId === entry.id ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => void onCopyPassword(entry)}>
+                                <Copy className="size-4" />
+                                Copy password
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                          <DropdownMenuItem onSelect={() => handleStartEditEntryDialog(entry)}>
+                            <Pencil className="size-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
                 ))}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
@@ -2844,13 +3203,37 @@ function PasswordManagerWorkspace({
                     onChange={(event) => onRenameVaultDescriptionChange(event.target.value)}
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-vault-reveal-timeout">Reveal password duration</Label>
+                  <Input
+                    id="password-manager-vault-reveal-timeout"
+                    type="number"
+                    min={MIN_PASSWORD_TIMEOUT_SECONDS}
+                    max={MAX_PASSWORD_TIMEOUT_SECONDS}
+                    value={renameRevealTimeoutSeconds}
+                    onChange={(event) => onRenameRevealTimeoutSecondsChange(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Seconds before revealed passwords are hidden again.</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-vault-clipboard-timeout">Clipboard clear duration</Label>
+                  <Input
+                    id="password-manager-vault-clipboard-timeout"
+                    type="number"
+                    min={MIN_PASSWORD_TIMEOUT_SECONDS}
+                    max={MAX_PASSWORD_TIMEOUT_SECONDS}
+                    value={renameClipboardTimeoutSeconds}
+                    onChange={(event) => onRenameClipboardTimeoutSecondsChange(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Seconds before Password Manager clears its copied value.</p>
+                </div>
               </CardContent>
               <CardFooter className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => void onRenameVault()} disabled={workspacePending}>
                   <Pencil className="mr-2 size-4" />
                   Rename vault
                 </Button>
-                <Button variant="destructive" onClick={() => void onDeleteVault()} disabled={workspacePending}>
+                <Button variant="destructive" onClick={() => setDeleteVaultDialogOpen(true)} disabled={workspacePending}>
                   <Trash2 className="mr-2 size-4" />
                   Delete vault
                 </Button>
@@ -2864,6 +3247,54 @@ function PasswordManagerWorkspace({
               </CardHeader>
             </Card>
           )}
+
+          <AlertDialog open={deleteVaultDialogOpen} onOpenChange={handleDeleteVaultDialogOpenChange}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete vault</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This is irreversible. Deleting this vault permanently removes its encrypted metadata, wrapped keys,
+                  entries, and membership records.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="grid gap-4">
+                {deleteVaultError ? (
+                  <Alert variant="destructive">
+                    <ShieldAlert className="size-4" />
+                    <AlertTitle>Delete blocked</AlertTitle>
+                    <AlertDescription>{deleteVaultError}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-delete-unlock-password">Unlock password</Label>
+                  <Input
+                    id="password-manager-delete-unlock-password"
+                    type="password"
+                    value={deleteVaultUnlockPassword}
+                    autoComplete="current-password"
+                    onChange={(event) => setDeleteVaultUnlockPassword(event.target.value)}
+                    disabled={workspacePending}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-delete-vault-name">Type the vault name</Label>
+                  <Input
+                    id="password-manager-delete-vault-name"
+                    value={deleteVaultNameConfirmation}
+                    onChange={(event) => setDeleteVaultNameConfirmation(event.target.value)}
+                    placeholder={selectedVault?.metadata.name}
+                    disabled={workspacePending}
+                  />
+                </div>
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={workspacePending}>Cancel</AlertDialogCancel>
+                <Button variant="destructive" onClick={() => void handleConfirmVaultDelete()} disabled={!deleteVaultEnabled}>
+                  Delete vault permanently
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Card className="border-border/60 shadow-xs">
             <CardHeader>

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.117.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.9...web/v0.117.0) (2026-05-07)
+
+
+### Features
+
+* **password-manager:** add SSH key pair entries ([217f25d](https://github.com/carrtech-dev/ct-ops/commit/217f25d2f74cd2454621b149e7d9ada8e500fc63))
+
 ## [0.116.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.8...web/v0.116.9) (2026-05-07)
 
 

@@ -134,6 +134,9 @@ test('authenticated user can enable and disable authenticator app 2FA from profi
 
   const secretInput = page.getByTestId('profile-two-factor-secret')
   await expect(secretInput).toBeVisible()
+  const qrCode = page.getByTestId('profile-two-factor-qr')
+  await expect(qrCode).toBeVisible()
+  await expect(qrCode.locator('svg')).toBeVisible()
   const secret = decodeBase32Secret(await secretInput.inputValue())
   const code = generateTotpCode({ secret })
 

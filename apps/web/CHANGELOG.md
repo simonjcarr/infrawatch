@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.7...web/v0.116.8) (2026-05-07)
+
+
+### Bug Fixes
+
+* **ldap:** constrain detail lookup DNs ([#1144](https://github.com/carrtech-dev/ct-ops/issues/1144)) ([4536c93](https://github.com/carrtech-dev/ct-ops/commit/4536c93b2ea14dbe6a3466774a898c399ace1ca5))
+
 ## [0.116.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.6...web/v0.116.7) (2026-05-07)
 
 

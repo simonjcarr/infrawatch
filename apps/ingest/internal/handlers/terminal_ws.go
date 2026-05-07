@@ -99,6 +99,20 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	source := terminalRemoteAddr(r.RemoteAddr)
+	throttleStatus, err := queries.CheckTerminalAuthThrottle(ctx, h.pool, *info, source)
+	if err != nil {
+		slog.Warn("terminal ws: auth throttle check failed", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "Unable to verify SSH authentication rate limits"})
+		return
+	}
+	if !throttleStatus.Allowed {
+		_ = queries.SetTerminalSessionError(context.Background(), h.pool, sessionID, "ssh authentication throttled")
+		slog.Warn("terminal ws: SSH authentication throttled", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "retry_after", throttleStatus.RetryAfter.String())
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "Too many SSH authentication attempts. Try again later."})
+		return
+	}
+
 	slog.Info("terminal ws: opening SSH session", "session_id", sessionID, "host_id", info.HostID, "username", info.Username)
 	sshClient, sshSession, stdin, stdout, err := h.openSSHSession(ctx, info.HostID, info.Host, info.Username, authMsg.Password)
 	authMsg.Password = ""
@@ -109,10 +123,19 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, queries.ErrSSHHostKeyNotTrusted) || errors.Is(err, queries.ErrSSHHostKeyMismatch) {
 			reason = "ssh host key verification failed"
 			message = "SSH host key verification failed"
+		} else if isSSHAuthenticationFailure(err) {
+			if status, recordErr := queries.RecordTerminalAuthFailure(context.Background(), h.pool, *info, source); recordErr != nil {
+				slog.Warn("terminal ws: failed to record SSH authentication failure", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", recordErr)
+			} else if !status.Allowed {
+				slog.Warn("terminal ws: SSH authentication locked out", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "retry_after", status.RetryAfter.String())
+			}
 		}
 		_ = queries.SetTerminalSessionError(context.Background(), h.pool, sessionID, reason)
 		writeWS(ctx, conn, wsMessage{Type: "error", Msg: message})
 		return
+	}
+	if err := queries.ResetTerminalAuthThrottle(context.Background(), h.pool, *info, source); err != nil {
+		slog.Warn("terminal ws: failed to reset SSH auth throttle", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
 	}
 	defer sshClient.Close()
 	defer sshSession.Close()
@@ -315,6 +338,23 @@ func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, us
 	}
 
 	return client, session, stdin, stdout, nil
+}
+
+func terminalRemoteAddr(remoteAddr string) string {
+	remoteAddr = strings.TrimSpace(remoteAddr)
+	if remoteAddr == "" {
+		return "unknown"
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return remoteAddr
+}
+
+func isSSHAuthenticationFailure(err error) bool {
+	var authErr *ssh.ServerAuthError
+	return errors.As(err, &authErr)
 }
 
 func writeWS(ctx context.Context, conn *websocket.Conn, msg wsMessage) error {

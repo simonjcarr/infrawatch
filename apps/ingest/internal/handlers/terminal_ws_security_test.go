@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func TestTerminalWSAcceptOptionsDefaultToSameOrigin(t *testing.T) {
@@ -40,6 +43,24 @@ func TestTerminalWSAcceptOptionsAllowConfiguredOrigins(t *testing.T) {
 func TestTerminalWSAcceptOptionsRejectInvalidOrigins(t *testing.T) {
 	if _, err := terminalWSAcceptOptions([]string{"not-a-url"}); err == nil {
 		t.Fatal("expected invalid origin to be rejected")
+	}
+}
+
+func TestTerminalRemoteAddrNormalisesHostPort(t *testing.T) {
+	if got := terminalRemoteAddr("203.0.113.10:49152"); got != "203.0.113.10" {
+		t.Fatalf("terminalRemoteAddr() = %q, want source IP", got)
+	}
+	if got := terminalRemoteAddr("[2001:db8::1]:49152"); got != "2001:db8::1" {
+		t.Fatalf("terminalRemoteAddr() = %q, want IPv6 source", got)
+	}
+}
+
+func TestIsSSHAuthenticationFailure(t *testing.T) {
+	if !isSSHAuthenticationFailure(&ssh.ServerAuthError{}) {
+		t.Fatal("expected ssh.ServerAuthError to count as an authentication failure")
+	}
+	if isSSHAuthenticationFailure(errors.New("network unreachable")) {
+		t.Fatal("expected generic network errors not to count as authentication failures")
 	}
 }
 

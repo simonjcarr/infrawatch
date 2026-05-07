@@ -38,6 +38,7 @@
     "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.10.2",
     "archiver": "^7.0.1",
+    "bcrypt-pbkdf": "^1.0.2",
     "better-auth": "^1.6.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

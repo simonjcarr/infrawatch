@@ -21,6 +21,7 @@ import {
   Ellipsis,
   Eye,
   EyeOff,
+  FileKey,
   IdCard,
   RotateCcw,
   KeyRound,
@@ -33,6 +34,7 @@ import {
   Settings,
   ShieldAlert,
   StickyNote,
+  Terminal,
   Trash2,
   Vault,
 } from 'lucide-react'
@@ -115,6 +117,10 @@ import {
   type PasswordManagerShellState,
 } from '@/lib/password-manager/shell'
 import {
+  generatePasswordManagerSshKeyPair,
+  type PasswordManagerSshKeyAlgorithm,
+} from '@/lib/password-manager/ssh-keys'
+import {
   createInitialPasswordManagerWorkspaceState,
   filterPasswordManagerEntries,
   filterPasswordManagerVaults,
@@ -141,7 +147,7 @@ const MIN_PASSWORD_TIMEOUT_SECONDS = 1
 const MAX_PASSWORD_TIMEOUT_SECONDS = 300
 
 type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
-type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note'
+type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note' | 'ssh-key-pair'
 type PasswordManagerTimedSecret = {
   durationSeconds: number
   expiresAt: number
@@ -205,6 +211,16 @@ const PASSWORD_MANAGER_ENTRY_TEMPLATES: Array<{
     dialogLabel: 'secure note',
     description: 'Free-form encrypted notes without a password field.',
     fields: [{ id: 'note', label: 'Secure note', multiline: true, required: true }],
+  },
+  {
+    id: 'ssh-key-pair',
+    label: 'SSH Key Pair',
+    dialogLabel: 'SSH key pair',
+    description: 'SSH public key or certificate, private key, and notes.',
+    fields: [
+      { id: 'publicMaterial', label: 'Public key or certificate', multiline: true, required: true },
+      { id: 'privateKey', label: 'Private key', multiline: true, required: true },
+    ],
   },
 ]
 const DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID: PasswordManagerEntryTemplateId = 'login'
@@ -295,6 +311,8 @@ function getPasswordManagerEntrySummaryText(entry: PasswordManagerEntrySummary):
       return payload.fields?.fullName || payload.fields?.email || 'Identity'
     case 'secure-note':
       return 'Secure note'
+    case 'ssh-key-pair':
+      return 'SSH key pair'
     case 'login':
     default:
       return payload.username || 'Login'
@@ -309,6 +327,8 @@ function getPasswordManagerEntryIcon(templateId: string | undefined): ReactNode 
       return <IdCard className="size-4 text-muted-foreground" />
     case 'secure-note':
       return <StickyNote className="size-4 text-muted-foreground" />
+    case 'ssh-key-pair':
+      return <Terminal className="size-4 text-muted-foreground" />
     case 'login':
     default:
       return <KeyRound className="size-4 text-muted-foreground" />
@@ -1661,7 +1681,12 @@ export function PasswordManagerClientShell({
     const payload: PasswordManagerEntryPayload = {
       title,
       type: template.id,
-      username: template.id === 'login' ? username : fields.cardholderName || fields.fullName || fields.email,
+      username:
+        template.id === 'login'
+          ? username
+          : template.id === 'ssh-key-pair'
+            ? 'SSH key pair'
+            : fields.cardholderName || fields.fullName || fields.email,
       password: template.id === 'login' ? password : undefined,
       url: template.id === 'login' ? entryUrl.trim() || undefined : undefined,
       notes: entryNotes.trim() || undefined,
@@ -2721,6 +2746,12 @@ function PasswordManagerWorkspace({
   const [deleteVaultUnlockPassword, setDeleteVaultUnlockPassword] = useState('')
   const [deleteVaultNameConfirmation, setDeleteVaultNameConfirmation] = useState('')
   const [deleteVaultError, setDeleteVaultError] = useState<string | null>(null)
+  const [sshKeyAlgorithm, setSshKeyAlgorithm] = useState<PasswordManagerSshKeyAlgorithm>('ed25519')
+  const [sshKeyPassphraseEnabled, setSshKeyPassphraseEnabled] = useState(false)
+  const [sshKeyPassphrase, setSshKeyPassphrase] = useState('')
+  const [sshKeyPassphraseConfirm, setSshKeyPassphraseConfirm] = useState('')
+  const [sshKeyGenerationPending, setSshKeyGenerationPending] = useState(false)
+  const [sshKeyGenerationError, setSshKeyGenerationError] = useState<string | null>(null)
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
@@ -2738,13 +2769,65 @@ function PasswordManagerWorkspace({
 
   function handleStartCreateEntryDialog() {
     onStartCreateEntry()
+    resetSshKeyGenerationControls()
     setEntryDialogOpen(true)
   }
 
   function handleStartEditEntryDialog(entry: PasswordManagerEntrySummary) {
     onSelectEntry(entry.id)
     onStartEditEntry(entry)
+    resetSshKeyGenerationControls()
     setEntryDialogOpen(true)
+  }
+
+  function resetSshKeyGenerationControls() {
+    setSshKeyAlgorithm('ed25519')
+    setSshKeyPassphraseEnabled(false)
+    setSshKeyPassphrase('')
+    setSshKeyPassphraseConfirm('')
+    setSshKeyGenerationError(null)
+  }
+
+  async function handleSshKeyFileUpload(fieldId: string, file: File | undefined) {
+    if (!file) {
+      return
+    }
+    try {
+      const text = await file.text()
+      onEntryFieldChange(fieldId, text.trim())
+      setSshKeyGenerationError(null)
+    } catch {
+      setSshKeyGenerationError('The selected SSH key file could not be read.')
+    }
+  }
+
+  async function handleGenerateSshKeyPair() {
+    if (sshKeyPassphraseEnabled) {
+      if (!sshKeyPassphrase) {
+        setSshKeyGenerationError('Enter a passphrase before generating a protected SSH key.')
+        return
+      }
+      if (sshKeyPassphrase !== sshKeyPassphraseConfirm) {
+        setSshKeyGenerationError('The SSH key passphrases do not match.')
+        return
+      }
+    }
+
+    setSshKeyGenerationPending(true)
+    setSshKeyGenerationError(null)
+    try {
+      const generated = await generatePasswordManagerSshKeyPair({
+        algorithm: sshKeyAlgorithm,
+        comment: entryTitle.trim() || selectedVault?.metadata.name || undefined,
+        passphrase: sshKeyPassphraseEnabled ? sshKeyPassphrase : undefined,
+      })
+      onEntryFieldChange('publicMaterial', generated.publicMaterial)
+      onEntryFieldChange('privateKey', generated.privateKey)
+    } catch {
+      setSshKeyGenerationError('The SSH key pair could not be generated in this browser.')
+    } finally {
+      setSshKeyGenerationPending(false)
+    }
   }
 
   async function handleEntrySaveFromDialog() {
@@ -3133,6 +3216,79 @@ function PasswordManagerWorkspace({
                     disabled={!selectedVault}
                   />
                 </div>
+                {activeEntryTemplate.id === 'ssh-key-pair' ? (
+                  <div className="grid gap-4 rounded-md border border-border/60 p-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="password-manager-ssh-key-algorithm">Algorithm</Label>
+                        <Select
+                          value={sshKeyAlgorithm}
+                          onValueChange={(value) => setSshKeyAlgorithm(value as PasswordManagerSshKeyAlgorithm)}
+                          disabled={!selectedVault || sshKeyGenerationPending}
+                        >
+                          <SelectTrigger id="password-manager-ssh-key-algorithm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ed25519">Ed25519 (id_ed25519)</SelectItem>
+                            <SelectItem value="rsa">RSA 4096</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleGenerateSshKeyPair()}
+                          disabled={!selectedVault || sshKeyGenerationPending}
+                        >
+                          <FileKey className="mr-2 size-4" />
+                          {sshKeyGenerationPending ? 'Generating...' : 'Generate key pair'}
+                        </Button>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="size-4"
+                        checked={sshKeyPassphraseEnabled}
+                        onChange={(event) => {
+                          setSshKeyPassphraseEnabled(event.target.checked)
+                          setSshKeyGenerationError(null)
+                        }}
+                        disabled={!selectedVault || sshKeyGenerationPending}
+                      />
+                      Password protect generated private key
+                    </label>
+                    {sshKeyPassphraseEnabled ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor="password-manager-ssh-key-passphrase">Key passphrase</Label>
+                          <Input
+                            id="password-manager-ssh-key-passphrase"
+                            type="password"
+                            value={sshKeyPassphrase}
+                            onChange={(event) => setSshKeyPassphrase(event.target.value)}
+                            disabled={!selectedVault || sshKeyGenerationPending}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="password-manager-ssh-key-passphrase-confirm">Confirm key passphrase</Label>
+                          <Input
+                            id="password-manager-ssh-key-passphrase-confirm"
+                            type="password"
+                            value={sshKeyPassphraseConfirm}
+                            onChange={(event) => setSshKeyPassphraseConfirm(event.target.value)}
+                            disabled={!selectedVault || sshKeyGenerationPending}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                    {sshKeyGenerationError ? (
+                      <p className="text-sm text-destructive">{sshKeyGenerationError}</p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {activeEntryTemplate.fields.map((field) => {
                     const fieldId = `password-manager-entry-${field.id}`
@@ -3158,13 +3314,24 @@ function PasswordManagerWorkspace({
 
                     return (
                       <div key={field.id} className={field.multiline ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'}>
-                        <Label htmlFor={fieldId}>{field.label}</Label>
+                        <div className="flex items-center justify-between gap-2">
+                          <Label htmlFor={fieldId}>{field.label}</Label>
+                          {activeEntryTemplate.id === 'ssh-key-pair' ? (
+                            <Label
+                              htmlFor={`${fieldId}-file`}
+                              className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
+                            >
+                              Upload file
+                            </Label>
+                          ) : null}
+                        </div>
                         {field.multiline ? (
                           <Textarea
                             id={fieldId}
                             value={value}
                             onChange={(event) => handleChange(event.target.value)}
                             disabled={!selectedVault}
+                            className={activeEntryTemplate.id === 'ssh-key-pair' ? 'min-h-36 font-mono text-xs' : undefined}
                           />
                         ) : (
                           <Input
@@ -3175,6 +3342,18 @@ function PasswordManagerWorkspace({
                             disabled={!selectedVault}
                           />
                         )}
+                        {activeEntryTemplate.id === 'ssh-key-pair' ? (
+                          <Input
+                            id={`${fieldId}-file`}
+                            type="file"
+                            className="sr-only"
+                            onChange={(event) => {
+                              void handleSshKeyFileUpload(field.id, event.target.files?.[0])
+                              event.target.value = ''
+                            }}
+                            disabled={!selectedVault}
+                          />
+                        ) : null}
                       </div>
                     )
                   })}

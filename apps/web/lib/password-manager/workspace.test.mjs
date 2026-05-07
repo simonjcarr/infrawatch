@@ -56,6 +56,30 @@ test('entry filtering stays local and matches decrypted fields only in memory', 
   assert.deepEqual(filtered.map((entry) => entry.id), ['entry-2'])
 })
 
+test('entry filtering matches SSH key pair public material in decrypted fields', () => {
+  const entries = [
+    {
+      id: 'entry-1',
+      vaultId: 'vault-1',
+      payload: {
+        title: 'Deploy key',
+        type: 'ssh-key-pair',
+        username: 'SSH key pair',
+        fields: {
+          publicMaterial: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeployPublicKey deploy@example',
+          privateKey: 'fixture SSH private key material',
+        },
+      },
+      keyEpoch: 2,
+      updatedAt: '2026-05-05T13:00:00Z',
+    },
+  ]
+
+  const filtered = filterPasswordManagerEntries(entries, 'DeployPublicKey')
+
+  assert.deepEqual(filtered.map((entry) => entry.id), ['entry-1'])
+})
+
 test('workspace reducer clears selection on unavailable objects', () => {
   const loaded = reducePasswordManagerWorkspaceState(createInitialPasswordManagerWorkspaceState(), {
     type: 'workspace-loaded',

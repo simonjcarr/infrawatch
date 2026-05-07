@@ -1,11 +1,13 @@
+import { writeFileSync } from 'node:fs'
+
 import { test, expect } from '../fixtures/test'
 import { TEST_PASSWORD_MANAGER_MEMBER } from '../fixtures/seed'
 
 test('hosted password manager flow keeps plaintext and key material inside the browser', async ({
   authenticatedPage: page,
   passwordManagerMock,
-}) => {
-  test.setTimeout(60_000)
+}, testInfo) => {
+  test.setTimeout(120_000)
 
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
 
@@ -15,6 +17,19 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   const updatedEntryPassword = 'RotatedPassword!100'
   const entryNotes = 'Recovery codes and production notes'
   const cardNumber = '4111111111111111'
+  const pastedSshPublicMaterial = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPastedDeployPublicKey deploy@example.test'
+  const pastedSshPrivateKey = 'pasted SSH private key fixture material'
+  const uploadedSshPublicMaterial = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQUploadedDeployPublicKey uploaded@example.test'
+  const uploadedSshPrivateKey = 'uploaded SSH private key fixture material'
+  const generatedSshPassphrase = 'GeneratedSshPassphrase!42'
+  let generatedEd25519PublicMaterial = ''
+  let generatedEd25519PrivateKey = ''
+  let generatedRsaPublicMaterial = ''
+  let generatedRsaPrivateKey = ''
+  const uploadedSshPublicPath = testInfo.outputPath('uploaded-ssh-key.pub')
+  const uploadedSshPrivatePath = testInfo.outputPath('uploaded-ssh-key')
+  writeFileSync(uploadedSshPublicPath, uploadedSshPublicMaterial)
+  writeFileSync(uploadedSshPrivatePath, uploadedSshPrivateKey)
 
   const consoleMessages: string[] = []
   const pageErrors: string[] = []
@@ -84,6 +99,58 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   const entryCard = page.getByTestId('password-manager-entry-entry-2')
   await expect(entryCard).toContainText('Grafana admin')
   await expect(entryCard).toContainText('ops-admin')
+
+  await page.getByTestId('password-manager-entry-template-menu').click()
+  await page.getByRole('menuitemradio', { name: /SSH Key Pair/ }).click()
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New SSH key pair' })).toBeVisible()
+  await page.getByLabel('Title').fill('Pasted deploy key')
+  await page.getByLabel('Public key or certificate').fill(pastedSshPublicMaterial)
+  await page.getByLabel('Private key').fill(pastedSshPrivateKey)
+  await page.getByRole('button', { name: 'Create encrypted entry' }).click()
+  const pastedSshEntry = page.getByTestId('password-manager-entry-entry-3')
+  await expect(pastedSshEntry).toContainText('Pasted deploy key')
+  await expect(pastedSshEntry).toContainText('SSH key pair')
+  await expect(pastedSshEntry.getByRole('button', { name: 'Reveal password' })).toHaveCount(0)
+  await expect(pastedSshEntry.getByRole('button', { name: 'Copy password' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New SSH key pair' })).toBeVisible()
+  await page.getByLabel('Title').fill('Uploaded deploy key')
+  await page.locator('#password-manager-entry-publicMaterial-file').setInputFiles(uploadedSshPublicPath)
+  await page.locator('#password-manager-entry-privateKey-file').setInputFiles(uploadedSshPrivatePath)
+  await expect(page.getByLabel('Public key or certificate')).toHaveValue(uploadedSshPublicMaterial)
+  await expect(page.getByLabel('Private key')).toHaveValue(uploadedSshPrivateKey)
+  await page.getByRole('button', { name: 'Create encrypted entry' }).click()
+  await expect(page.getByTestId('password-manager-entry-entry-4')).toContainText('Uploaded deploy key')
+
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New SSH key pair' })).toBeVisible()
+  await page.getByLabel('Title').fill('Generated Ed25519 deploy key')
+  await page.getByLabel('Password protect generated private key').check()
+  await page.getByLabel('Key passphrase').fill(generatedSshPassphrase)
+  await page.getByLabel('Confirm key passphrase').fill(generatedSshPassphrase)
+  await page.getByRole('button', { name: 'Generate key pair' }).click()
+  await expect(page.getByLabel('Public key or certificate')).toHaveValue(/^ssh-ed25519 /)
+  await expect(page.getByLabel('Private key')).toHaveValue(/BEGIN OPENSSH PRIVATE KEY/)
+  generatedEd25519PublicMaterial = await page.getByLabel('Public key or certificate').inputValue()
+  generatedEd25519PrivateKey = await page.getByLabel('Private key').inputValue()
+  expect(generatedEd25519PrivateKey).not.toContain(generatedSshPassphrase)
+  await page.getByRole('button', { name: 'Create encrypted entry' }).click()
+  await expect(page.getByTestId('password-manager-entry-entry-5')).toContainText('Generated Ed25519 deploy key')
+
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New SSH key pair' })).toBeVisible()
+  await page.getByLabel('Title').fill('Generated RSA deploy key')
+  await page.getByLabel('Algorithm').click()
+  await page.getByRole('option', { name: 'RSA 4096' }).click()
+  await page.getByRole('button', { name: 'Generate key pair' }).click()
+  await expect(page.getByLabel('Public key or certificate')).toHaveValue(/^ssh-rsa /)
+  await expect(page.getByLabel('Private key')).toHaveValue(/BEGIN OPENSSH PRIVATE KEY/)
+  generatedRsaPublicMaterial = await page.getByLabel('Public key or certificate').inputValue()
+  generatedRsaPrivateKey = await page.getByLabel('Private key').inputValue()
+  await page.getByRole('button', { name: 'Create encrypted entry' }).click()
+  await expect(page.getByTestId('password-manager-entry-entry-6')).toContainText('Generated RSA deploy key')
 
   await entryCard.getByRole('button', { name: 'Reveal password' }).click()
   await expect(entryCard.getByText(entryPassword)).toBeVisible()
@@ -209,6 +276,15 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(request.rawBody).not.toContain(entryPassword)
     expect(request.rawBody).not.toContain(updatedEntryPassword)
     expect(request.rawBody).not.toContain(entryNotes)
+    expect(request.rawBody).not.toContain(pastedSshPublicMaterial)
+    expect(request.rawBody).not.toContain(pastedSshPrivateKey)
+    expect(request.rawBody).not.toContain(uploadedSshPublicMaterial)
+    expect(request.rawBody).not.toContain(uploadedSshPrivateKey)
+    expect(request.rawBody).not.toContain(generatedSshPassphrase)
+    expect(request.rawBody).not.toContain(generatedEd25519PublicMaterial)
+    expect(request.rawBody).not.toContain(generatedEd25519PrivateKey)
+    expect(request.rawBody).not.toContain(generatedRsaPublicMaterial)
+    expect(request.rawBody).not.toContain(generatedRsaPrivateKey)
   }
 
   expect(passwordManagerMock.detectPlaintextLeak()).toBeNull()
@@ -220,6 +296,15 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(message).not.toContain(entryPassword)
     expect(message).not.toContain(updatedEntryPassword)
     expect(message).not.toContain(entryNotes)
+    expect(message).not.toContain(pastedSshPublicMaterial)
+    expect(message).not.toContain(pastedSshPrivateKey)
+    expect(message).not.toContain(uploadedSshPublicMaterial)
+    expect(message).not.toContain(uploadedSshPrivateKey)
+    expect(message).not.toContain(generatedSshPassphrase)
+    expect(message).not.toContain(generatedEd25519PublicMaterial)
+    expect(message).not.toContain(generatedEd25519PrivateKey)
+    expect(message).not.toContain(generatedRsaPublicMaterial)
+    expect(message).not.toContain(generatedRsaPrivateKey)
   }
 
   expect(pageErrors).toEqual([])
@@ -231,5 +316,14 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(request.body).not.toContain(entryPassword)
     expect(request.body).not.toContain(updatedEntryPassword)
     expect(request.body).not.toContain(entryNotes)
+    expect(request.body).not.toContain(pastedSshPublicMaterial)
+    expect(request.body).not.toContain(pastedSshPrivateKey)
+    expect(request.body).not.toContain(uploadedSshPublicMaterial)
+    expect(request.body).not.toContain(uploadedSshPrivateKey)
+    expect(request.body).not.toContain(generatedSshPassphrase)
+    expect(request.body).not.toContain(generatedEd25519PublicMaterial)
+    expect(request.body).not.toContain(generatedEd25519PrivateKey)
+    expect(request.body).not.toContain(generatedRsaPublicMaterial)
+    expect(request.body).not.toContain(generatedRsaPrivateKey)
   }
 })

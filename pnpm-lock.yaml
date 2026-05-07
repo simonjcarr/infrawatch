@@ -91,6 +91,9 @@ importers:
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
+      bcrypt-pbkdf:
+        specifier: ^1.0.2
+        version: 1.0.2
       better-auth:
         specifier: ^1.6.9
         version: 1.6.9(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.28.16)(postgres@3.4.9))(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(sass@1.99.0))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vue@3.5.33(typescript@5.9.3))

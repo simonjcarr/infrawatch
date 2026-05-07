@@ -11,7 +11,7 @@ export interface PasswordManagerVaultMetadata {
 
 export interface PasswordManagerEntryPayload {
   title: string
-  type?: 'login' | 'card' | 'identity' | 'secure-note'
+  type?: 'login' | 'card' | 'identity' | 'secure-note' | 'ssh-key-pair'
   username?: string
   password?: string
   notes?: string

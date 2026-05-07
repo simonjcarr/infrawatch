@@ -35,6 +35,28 @@ const vaultExportInput = {
   exportedAt: '2026-05-06T09:15:00Z',
 }
 
+const sshVaultExportInput = {
+  ...vaultExportInput,
+  entries: [
+    {
+      id: 'entry-ssh',
+      vaultId: 'vault-1',
+      payload: {
+        title: 'Production deploy SSH key',
+        type: 'ssh-key-pair',
+        username: 'SSH key pair',
+        notes: 'Used by CI deploys',
+        fields: {
+          publicMaterial: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeployPublicKey deploy@example',
+          privateKey: 'fixture SSH private key material',
+        },
+      },
+      keyEpoch: 3,
+      updatedAt: '2026-05-06T09:12:00Z',
+    },
+  ],
+}
+
 test('createPasswordManagerEncryptedVaultExportBundle packages encrypted vault data in a zip by default', async () => {
   const bundle = await createPasswordManagerEncryptedVaultExportBundle({
     ...vaultExportInput,
@@ -108,4 +130,29 @@ test('createPasswordManagerVaultExportBundle packages decrypted vault data for e
       },
     ],
   })
+})
+
+test('createPasswordManagerVaultExportBundle includes SSH key pair fields in explicit plaintext export', async () => {
+  const bundle = createPasswordManagerVaultExportBundle({
+    ...sshVaultExportInput,
+  })
+
+  const payload = JSON.parse(await bundle.blob.text())
+  assert.deepEqual(payload.entries, [
+    {
+      id: 'entry-ssh',
+      type: 'ssh-key-pair',
+      title: 'Production deploy SSH key',
+      username: 'SSH key pair',
+      password: null,
+      url: null,
+      notes: 'Used by CI deploys',
+      fields: {
+        publicMaterial: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeployPublicKey deploy@example',
+        privateKey: 'fixture SSH private key material',
+      },
+      key_epoch: 3,
+      updated_at: '2026-05-06T09:12:00Z',
+    },
+  ])
 })

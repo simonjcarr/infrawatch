@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
+import QRCode from 'react-qr-code'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -420,6 +421,26 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
 
           {!twoFactorEnabled && twoFactorUri && (
             <div className="space-y-4">
+              <div className="flex flex-col gap-4 rounded-md border bg-background p-4 sm:flex-row sm:items-center">
+                <div
+                  className="flex size-44 shrink-0 items-center justify-center rounded-md bg-white p-3"
+                  data-testid="profile-two-factor-qr"
+                  aria-label="Authenticator app QR code"
+                >
+                  <QRCode
+                    value={twoFactorUri}
+                    size={152}
+                    level="M"
+                    className="h-full w-full"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Scan with your authenticator app</p>
+                  <p className="text-xs text-muted-foreground">
+                    Use the QR code first. If scanning is unavailable, enter the setup key manually.
+                  </p>
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="profile-two-factor-secret">Authenticator setup key</Label>
                 <div className="flex gap-2">

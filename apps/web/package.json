@@ -60,6 +60,7 @@
     "react-dom": "19.2.5",
     "react-hook-form": "^7.75.0",
     "react-markdown": "^10.1.0",
+    "react-qr-code": "^2.0.21",
     "recharts": "^3.8.1",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",

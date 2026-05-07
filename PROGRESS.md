@@ -15,6 +15,22 @@
 
 ## What Has Been Built
 
+### Session 120 — Profile 2FA QR setup
+
+**Authenticator setup QR code** (`apps/web/app/(dashboard)/profile/profile-client.tsx`, `apps/web/tests/e2e/profile/profile.spec.ts`)
+- Added a scan-ready QR code to the profile two-factor setup flow, generated
+  from the Better Auth `totpURI` returned when setup starts.
+- Kept the setup key and full authenticator URI visible as manual fallback
+  options for users who cannot scan the QR code.
+- Extended the profile 2FA E2E flow to assert the QR code renders before using
+  the setup key to generate and verify the TOTP code.
+
+**Validation**
+- `pnpm --filter web add react-qr-code`
+- `pnpm --dir apps/web test:e2e tests/e2e/profile/profile.spec.ts --grep "enable and disable authenticator"`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint` (passes with existing unrelated warnings)
+
 ### Session 119 — Password Manager entry templates
 
 **Template-driven entry modal** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/workspace.ts`, `apps/web/lib/password-manager/export.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

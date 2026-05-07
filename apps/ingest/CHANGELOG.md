@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.0...ingest/v0.9.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **ingest:** throttle unauthenticated registrations ([511056b](https://github.com/carrtech-dev/ct-ops/commit/511056bbde36a5fc16a8c8169d75838ee4c38cea))
+
 ## [0.9.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.9...ingest/v0.9.0) (2026-05-06)
 
 

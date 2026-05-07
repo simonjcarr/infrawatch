@@ -3264,7 +3264,7 @@ function PasswordManagerWorkspace({
               <CardFooter className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => void onRenameVault()} disabled={workspacePending}>
                   <Pencil className="mr-2 size-4" />
-                  Rename vault
+                  Save Settings
                 </Button>
                 <Button variant="destructive" onClick={() => setDeleteVaultDialogOpen(true)} disabled={workspacePending}>
                   <Trash2 className="mr-2 size-4" />

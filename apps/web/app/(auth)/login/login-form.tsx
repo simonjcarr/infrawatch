@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { signIn } from '@/lib/auth/client'
+import { authClient, signIn } from '@/lib/auth/client'
 import {
   getInviteAcceptPath,
   getInviteRegisterPath,
@@ -32,6 +32,12 @@ const domainLoginSchema = z.object({
 type LocalLoginValues = z.infer<typeof localLoginSchema>
 type DomainLoginValues = z.infer<typeof domainLoginSchema>
 type DomainTwoFactorMethod = 'totp' | 'backup_code'
+type LocalTwoFactorMethod = 'totp' | 'backup_code'
+
+type TwoFactorRedirectData = {
+  twoFactorRedirect: true
+  twoFactorMethods?: string[]
+}
 
 interface LoginFormProps {
   ldapLoginEnabled?: boolean
@@ -43,6 +49,15 @@ function isEmailNotVerifiedError(message: string, code?: string): boolean {
   return code === 'EMAIL_NOT_VERIFIED' || message.toLowerCase().includes('email not verified')
 }
 
+function isTwoFactorRedirectData(data: unknown): data is TwoFactorRedirectData {
+  if (!data || typeof data !== 'object') return false
+  return (data as { twoFactorRedirect?: unknown }).twoFactorRedirect === true
+}
+
+function cleanTwoFactorCode(code: string, method: LocalTwoFactorMethod): string {
+  return method === 'totp' ? code.replace(/\s+/g, '') : code.trim()
+}
+
 export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice = null }: LoginFormProps) {
   const router = useRouter()
   const inviteAcceptPath = getInviteAcceptPath(inviteToken)
@@ -50,6 +65,11 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
   const [canResendVerification, setCanResendVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
   const [loginMode, setLoginMode] = useState<'local' | 'domain'>('local')
+  const [localTwoFactorRequired, setLocalTwoFactorRequired] = useState(false)
+  const [localTwoFactorMethods, setLocalTwoFactorMethods] = useState<LocalTwoFactorMethod[]>(['totp'])
+  const [localTwoFactorMethod, setLocalTwoFactorMethod] = useState<LocalTwoFactorMethod>('totp')
+  const [localTwoFactorCode, setLocalTwoFactorCode] = useState('')
+  const [localTwoFactorSubmitting, setLocalTwoFactorSubmitting] = useState(false)
   const [ldapTwoFactorRequired, setLdapTwoFactorRequired] = useState(false)
   const [ldapTwoFactorCode, setLdapTwoFactorCode] = useState('')
   const [ldapTwoFactorMethod, setLdapTwoFactorMethod] = useState<DomainTwoFactorMethod>('totp')
@@ -66,6 +86,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
     setServerError(null)
     setCanResendVerification(false)
     setVerificationEmail(null)
+    setLocalTwoFactorCode('')
     const result = await signIn.email({
       email: values.email,
       password: values.password,
@@ -80,7 +101,43 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
       return
     }
 
+    if (isTwoFactorRedirectData(result.data)) {
+      const methods = result.data.twoFactorMethods?.filter(
+        (method): method is LocalTwoFactorMethod => method === 'totp' || method === 'backup_code',
+      )
+      const availableMethods: LocalTwoFactorMethod[] = methods && methods.length > 0 ? methods : ['totp']
+      setLocalTwoFactorMethods(availableMethods)
+      setLocalTwoFactorMethod(availableMethods[0] ?? 'totp')
+      setLocalTwoFactorRequired(true)
+      return
+    }
+
     router.push(inviteAcceptPath ?? '/dashboard')
+  }
+
+  async function onLocalTwoFactorSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const code = cleanTwoFactorCode(localTwoFactorCode, localTwoFactorMethod)
+    if (!code) return
+
+    setServerError(null)
+    setLocalTwoFactorSubmitting(true)
+    try {
+      const result = localTwoFactorMethod === 'backup_code'
+        ? await authClient.twoFactor.verifyBackupCode({ code })
+        : await authClient.twoFactor.verifyTotp({ code })
+
+      if (result.error) {
+        setServerError(result.error.message ?? 'Invalid two-factor code.')
+        return
+      }
+
+      router.push(inviteAcceptPath ?? '/dashboard')
+    } catch {
+      setServerError('An unexpected error occurred.')
+    } finally {
+      setLocalTwoFactorSubmitting(false)
+    }
   }
 
   async function onDomainSubmit(values: DomainLoginValues) {
@@ -156,6 +213,13 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
     setLdapTwoFactorMethod('totp')
   }
 
+  function resetLocalTwoFactor() {
+    setLocalTwoFactorRequired(false)
+    setLocalTwoFactorCode('')
+    setLocalTwoFactorMethod('totp')
+    setLocalTwoFactorMethods(['totp'])
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -200,6 +264,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
                 setServerError(null)
                 setCanResendVerification(false)
                 setVerificationEmail(null)
+                resetLocalTwoFactor()
                 resetDomainTwoFactor()
               }}
             >
@@ -209,7 +274,91 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
         </div>
       )}
 
-      {loginMode === 'local' ? (
+      {loginMode === 'local' && localTwoFactorRequired ? (
+        <form onSubmit={onLocalTwoFactorSubmit}>
+          <CardContent className="space-y-4">
+            {serverError && (
+              <p className="text-sm text-destructive" data-testid="login-error">{serverError}</p>
+            )}
+            <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm" data-testid="login-2fa-panel">
+              <p className="font-medium text-foreground">Second factor required</p>
+              <p className="text-muted-foreground">
+                Enter the code from your authenticator app or use one of your backup codes to finish signing in.
+              </p>
+            </div>
+            {localTwoFactorMethods.length > 1 && (
+              <div className="space-y-1.5">
+                <Label>Verification method</Label>
+                <div className="flex rounded-md border p-1 gap-1">
+                  {localTwoFactorMethods.includes('totp') && (
+                    <button
+                      type="button"
+                      className={`flex-1 px-3 py-1.5 text-sm rounded transition-colors ${
+                        localTwoFactorMethod === 'totp'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      onClick={() => setLocalTwoFactorMethod('totp')}
+                      data-testid="login-2fa-method-totp"
+                    >
+                      Authenticator
+                    </button>
+                  )}
+                  {localTwoFactorMethods.includes('backup_code') && (
+                    <button
+                      type="button"
+                      className={`flex-1 px-3 py-1.5 text-sm rounded transition-colors ${
+                        localTwoFactorMethod === 'backup_code'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      onClick={() => setLocalTwoFactorMethod('backup_code')}
+                      data-testid="login-2fa-method-backup"
+                    >
+                      Backup Code
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="login-two-factor-code">
+                {localTwoFactorMethod === 'totp' ? 'Authenticator code' : 'Backup code'}
+              </Label>
+              <Input
+                id="login-two-factor-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={localTwoFactorCode}
+                onChange={(event) => setLocalTwoFactorCode(event.target.value)}
+                data-testid="login-2fa-code"
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={localTwoFactorSubmitting || !cleanTwoFactorCode(localTwoFactorCode, localTwoFactorMethod)}
+              data-testid="login-2fa-submit"
+            >
+              {localTwoFactorSubmitting ? 'Verifying...' : 'Verify code'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setServerError(null)
+                resetLocalTwoFactor()
+              }}
+            >
+              Start over
+            </Button>
+          </CardFooter>
+        </form>
+      ) : loginMode === 'local' ? (
         <form onSubmit={localForm.handleSubmit(onLocalSubmit)}>
           <CardContent className="space-y-4">
             {notice && (

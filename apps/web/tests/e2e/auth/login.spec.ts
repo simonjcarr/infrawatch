@@ -3,6 +3,25 @@ import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
 import { waitForPasswordResetUrl } from '../fixtures/email'
 import { TEST_USER } from '../fixtures/seed'
+import { generateTotpCode } from '../../../lib/auth/ldap-two-factor'
+
+function decodeBase32Secret(secret: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = ''
+  let output = ''
+
+  for (const char of secret.replace(/=+$/, '').toUpperCase()) {
+    const value = alphabet.indexOf(char)
+    if (value === -1) continue
+    bits += value.toString(2).padStart(5, '0')
+  }
+
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    output += String.fromCharCode(parseInt(bits.slice(i, i + 8), 2))
+  }
+
+  return output
+}
 
 test('user can sign in with email and password and reach the dashboard', async ({ page }) => {
   await page.goto('/login')
@@ -53,6 +72,42 @@ test('user can request a password reset from the login screen and sign in with t
   await page.getByTestId('login-email').fill(TEST_USER.email)
   await page.getByTestId('login-password').fill(newPassword)
   await page.getByTestId('login-submit').click()
+
+  await page.waitForURL('**/dashboard')
+  await expect(page.getByTestId('dashboard-heading')).toBeVisible()
+})
+
+test('user with authenticator 2FA can complete local sign in', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByTestId('login-email').fill(TEST_USER.email)
+  await page.getByTestId('login-password').fill(TEST_USER.password)
+  await page.getByTestId('login-submit').click()
+  await page.waitForURL('**/dashboard')
+
+  await page.goto('/profile')
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
+  await expect(page.getByText('2FA is not enabled')).toBeVisible()
+  await page.getByTestId('profile-two-factor-password').fill(TEST_USER.password)
+  await page.getByTestId('profile-two-factor-start').click()
+
+  const secretInput = page.getByTestId('profile-two-factor-secret')
+  await expect(secretInput).toBeVisible()
+  const secret = decodeBase32Secret(await secretInput.inputValue())
+  const setupCode = generateTotpCode({ secret })
+
+  await page.getByTestId('profile-two-factor-code').fill(setupCode)
+  await page.getByTestId('profile-two-factor-verify').click()
+  await expect(page.getByTestId('profile-two-factor-success')).toContainText('enabled')
+
+  await page.context().clearCookies()
+  await page.goto('/login')
+  await page.getByTestId('login-email').fill(TEST_USER.email)
+  await page.getByTestId('login-password').fill(TEST_USER.password)
+  await page.getByTestId('login-submit').click()
+
+  await expect(page.getByTestId('login-2fa-panel')).toBeVisible()
+  await page.getByTestId('login-2fa-code').fill(generateTotpCode({ secret }))
+  await page.getByTestId('login-2fa-submit').click()
 
   await page.waitForURL('**/dashboard')
   await expect(page.getByTestId('dashboard-heading')).toBeVisible()

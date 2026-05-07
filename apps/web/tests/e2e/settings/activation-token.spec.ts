@@ -4,9 +4,9 @@ import { TEST_ORG } from '../fixtures/seed'
 
 test('admin can generate an activation token from settings', async ({ authenticatedPage: page }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-  await page.goto('/settings')
+  await page.goto('/settings/licence')
 
-  await expect(page.getByTestId('settings-heading')).toBeVisible()
+  await expect(page.getByTestId('settings-heading')).toContainText('Organisation')
   await page.getByTestId('activation-token-generate').click()
 
   const activationToken = page.getByTestId('activation-token')

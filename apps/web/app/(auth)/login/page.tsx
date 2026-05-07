@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { LoginForm } from './login-form'
-import { hasLdapLoginEnabled } from '@/lib/actions/ldap'
+import { getLdapLoginOptions } from '@/lib/actions/ldap'
 import { getInviteAcceptPath } from '@/lib/auth/invite-redirects'
 import {
   getAuthenticatedRedirectPath,
@@ -41,12 +41,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     if (redirectPath) redirect(redirectPath)
   }
 
-  const ldapEnabled = await hasLdapLoginEnabled()
+  const ldapLoginOptions = await getLdapLoginOptions()
   const resetComplete = readParam(params.reset) === '1'
 
   return (
     <LoginForm
-      ldapLoginEnabled={ldapEnabled}
+      ldapLoginOptions={ldapLoginOptions}
       inviteToken={inviteToken}
       notice={resetComplete ? 'Your password has been reset. Sign in with your new password.' : null}
     />

@@ -5,13 +5,17 @@ import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/ac
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { ldapConfigurations } from '@/lib/db/schema'
+import { ldapConfigurations, organisations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { encrypt, decrypt } from '@/lib/crypto/encrypt'
 import {
   sanitiseLdapConfigurationForClient,
   type LdapConfigurationSafe,
 } from '@/lib/ldap/config-client'
+import {
+  buildLdapLoginOptions,
+  type LdapLoginOption,
+} from '@/lib/auth/ldap-login-options'
 import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
 import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
@@ -352,4 +356,25 @@ export async function hasLdapLoginEnabled(): Promise<boolean> {
     columns: { id: true },
   })
   return config != null
+}
+
+export async function getLdapLoginOptions(): Promise<LdapLoginOption[]> {
+  const rows = await db
+    .select({
+      ldapConfigurationId: ldapConfigurations.id,
+      ldapConfigurationName: ldapConfigurations.name,
+      organisationName: organisations.name,
+      organisationSlug: organisations.slug,
+    })
+    .from(ldapConfigurations)
+    .innerJoin(organisations, eq(ldapConfigurations.organisationId, organisations.id))
+    .where(and(
+      eq(ldapConfigurations.enabled, true),
+      eq(ldapConfigurations.allowLogin, true),
+      isNull(ldapConfigurations.deletedAt),
+      isNull(organisations.deletedAt),
+    ))
+    .orderBy(organisations.name, ldapConfigurations.name)
+
+  return buildLdapLoginOptions(rows)
 }

@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { authClient, signIn } from '@/lib/auth/client'
 import {
   getInviteAcceptPath,
   getInviteRegisterPath,
 } from '@/lib/auth/invite-redirects'
+import type { LdapLoginOption } from '@/lib/auth/ldap-login-options'
 
 const localLoginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -40,7 +42,7 @@ type TwoFactorRedirectData = {
 }
 
 interface LoginFormProps {
-  ldapLoginEnabled?: boolean
+  ldapLoginOptions?: LdapLoginOption[]
   inviteToken?: string | null
   notice?: string | null
 }
@@ -58,9 +60,11 @@ function cleanTwoFactorCode(code: string, method: LocalTwoFactorMethod): string 
   return method === 'totp' ? code.replace(/\s+/g, '') : code.trim()
 }
 
-export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice = null }: LoginFormProps) {
+export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = null }: LoginFormProps) {
   const router = useRouter()
   const inviteAcceptPath = getInviteAcceptPath(inviteToken)
+  const ldapLoginEnabled = ldapLoginOptions.length > 0
+  const defaultLdapLoginOption = ldapLoginOptions[0] ?? null
   const [serverError, setServerError] = useState<string | null>(null)
   const [canResendVerification, setCanResendVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
@@ -73,6 +77,7 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
   const [ldapTwoFactorRequired, setLdapTwoFactorRequired] = useState(false)
   const [ldapTwoFactorCode, setLdapTwoFactorCode] = useState('')
   const [ldapTwoFactorMethod, setLdapTwoFactorMethod] = useState<DomainTwoFactorMethod>('totp')
+  const [selectedLdapIntegrationId, setSelectedLdapIntegrationId] = useState(defaultLdapLoginOption?.id ?? '')
 
   const localForm = useForm<LocalLoginValues>({
     resolver: zodResolver(localLoginSchema),
@@ -80,6 +85,9 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
 
   const domainForm = useForm<DomainLoginValues>({
     resolver: zodResolver(domainLoginSchema),
+    defaultValues: {
+      organisationSlug: defaultLdapLoginOption?.organisationSlug ?? '',
+    },
   })
 
   async function onLocalSubmit(values: LocalLoginValues) {
@@ -507,15 +515,31 @@ export function LoginForm({ ldapLoginEnabled = false, inviteToken = null, notice
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="domain-organisation">Organisation slug</Label>
-                  <Input
-                    id="domain-organisation"
-                    type="text"
-                    autoComplete="organization"
-                    placeholder="acme"
-                    {...domainForm.register('organisationSlug')}
-                    data-testid="domain-login-organisation"
-                  />
+                  <Label htmlFor="domain-organisation">Domain integration</Label>
+                  <Select
+                    value={selectedLdapIntegrationId}
+                    onValueChange={(value) => {
+                      const option = ldapLoginOptions.find((candidate) => candidate.id === value)
+                      if (!option) return
+                      setSelectedLdapIntegrationId(option.id)
+                      domainForm.setValue('organisationSlug', option.organisationSlug, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                        shouldValidate: true,
+                      })
+                    }}
+                  >
+                    <SelectTrigger id="domain-organisation" data-testid="domain-login-organisation">
+                      <SelectValue placeholder="Select an integration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ldapLoginOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {domainForm.formState.errors.organisationSlug && (
                     <p className="text-xs text-destructive">{domainForm.formState.errors.organisationSlug.message}</p>
                   )}

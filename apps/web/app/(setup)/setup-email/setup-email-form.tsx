@@ -22,11 +22,10 @@ const emailSchema = z.object({
 type EmailValues = z.infer<typeof emailSchema>
 
 interface SetupEmailFormProps {
-  userId: string
   username: string
 }
 
-export function SetupEmailForm({ userId, username }: SetupEmailFormProps) {
+export function SetupEmailForm({ username }: SetupEmailFormProps) {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -39,7 +38,7 @@ export function SetupEmailForm({ userId, username }: SetupEmailFormProps) {
   })
 
   const { mutate, isPending } = useMutation({
-    mutationFn: (values: EmailValues) => updateEmail(userId, values.email),
+    mutationFn: (values: EmailValues) => updateEmail(values.email),
     onSuccess: (result) => {
       if ('error' in result) {
         setServerError(result.error)

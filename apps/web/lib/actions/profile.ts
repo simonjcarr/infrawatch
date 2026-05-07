@@ -8,25 +8,25 @@ import { eq } from 'drizzle-orm'
 import { headers, cookies } from 'next/headers'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { getRequiredSession } from '@/lib/auth/session'
 
 const updateNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
 })
 
-export async function updateName(
-  userId: string,
-  name: string,
-): Promise<{ success: true } | { error: string }> {
+export async function updateName(name: string): Promise<{ success: true } | { error: string }> {
   const parsed = updateNameSchema.safeParse({ name })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid name' }
   }
 
+  const session = await getRequiredSession()
+
   try {
     await db
       .update(users)
       .set({ name: parsed.data.name, updatedAt: new Date() })
-      .where(eq(users.id, userId))
+      .where(eq(users.id, session.user.id))
 
     return { success: true }
   } catch (err) {
@@ -42,27 +42,26 @@ const updateEmailSchema = z.object({
     .refine((e) => !e.endsWith('@ldap.local'), 'Please enter a real email address'),
 })
 
-export async function updateEmail(
-  userId: string,
-  email: string,
-): Promise<{ success: true } | { error: string }> {
+export async function updateEmail(email: string): Promise<{ success: true } | { error: string }> {
   const parsed = updateEmailSchema.safeParse({ email })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid email' }
   }
 
+  const session = await getRequiredSession()
+
   try {
     const existing = await db.query.users.findFirst({
       where: eq(users.email, parsed.data.email),
     })
-    if (existing && existing.id !== userId) {
+    if (existing && existing.id !== session.user.id) {
       return { error: 'This email address is already in use' }
     }
 
     await db
       .update(users)
       .set({ email: parsed.data.email, updatedAt: new Date() })
-      .where(eq(users.id, userId))
+      .where(eq(users.id, session.user.id))
 
     return { success: true }
   } catch (err) {
@@ -73,20 +72,19 @@ export async function updateEmail(
 
 const themeSchema = z.enum(['light', 'dark', 'system'])
 
-export async function updateTheme(
-  userId: string,
-  theme: string,
-): Promise<{ success: true } | { error: string }> {
+export async function updateTheme(theme: string): Promise<{ success: true } | { error: string }> {
   const parsed = themeSchema.safeParse(theme)
   if (!parsed.success) {
     return { error: 'Invalid theme value' }
   }
 
+  const session = await getRequiredSession()
+
   try {
     await db
       .update(users)
       .set({ theme: parsed.data, updatedAt: new Date() })
-      .where(eq(users.id, userId))
+      .where(eq(users.id, session.user.id))
 
     const cookieStore = await cookies()
     cookieStore.set('theme', parsed.data, {
@@ -103,11 +101,13 @@ export async function updateTheme(
   }
 }
 
-export async function updateNotificationPreference(
-  userId: string,
-  orgId: string,
-  enabled: boolean,
-): Promise<{ success: true } | { error: string }> {
+export async function updateNotificationPreference(enabled: boolean): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  const orgId = session.user.organisationId
+  if (!orgId) {
+    return { error: 'Organisation context is required' }
+  }
+
   // Check whether the org allows users to opt out
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
@@ -124,7 +124,7 @@ export async function updateNotificationPreference(
     await db
       .update(users)
       .set({ notificationsEnabled: enabled, updatedAt: new Date() })
-      .where(eq(users.id, userId))
+      .where(eq(users.id, session.user.id))
     return { success: true }
   } catch {
     return { error: 'Failed to update notification preference' }

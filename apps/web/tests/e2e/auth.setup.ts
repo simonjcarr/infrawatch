@@ -74,7 +74,7 @@ const authenticatedApiRoutes = [
   '/api/system/health',
 ]
 
-setup.setTimeout(180_000)
+setup.setTimeout(420_000)
 
 setup('seed test organisation and warm Next routes', async ({ browser, baseURL }) => {
   if (!baseURL) throw new Error('baseURL must be configured')

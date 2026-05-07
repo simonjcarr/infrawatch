@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.115.0...web/v0.116.0) (2026-05-07)
+
+
+### Features
+
+* **password-manager:** harden vault secret handling ([722a50c](https://github.com/carrtech-dev/ct-ops/commit/722a50c408355b70af86f4db3711d74652548367))
+
 ## [0.115.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.114.0...web/v0.115.0) (2026-05-07)
 
 

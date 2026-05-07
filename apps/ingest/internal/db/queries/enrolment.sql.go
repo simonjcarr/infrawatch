@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,6 +31,10 @@ type EnrolmentToken struct {
 	UsageCount     int
 	ExpiresAt      *time.Time
 	Metadata       EnrolmentTokenMetadata
+}
+
+type enrolmentQueryer interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 // GetEnrolmentToken looks up a valid (non-deleted, non-expired, not exhausted)
@@ -66,9 +71,41 @@ func GetEnrolmentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*
 	return &t, nil
 }
 
-// IncrementUsageCount atomically bumps the usage counter for an enrolment token.
-func IncrementUsageCount(ctx context.Context, pool *pgxpool.Pool, tokenID string) error {
-	const q = `UPDATE agent_enrolment_tokens SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = $1`
-	_, err := pool.Exec(ctx, q, tokenID)
-	return err
+// ConsumeEnrolmentToken atomically validates and consumes one use of an
+// enrolment token. When max_uses has already been reached, pgx.ErrNoRows is
+// returned and no usage is consumed.
+func ConsumeEnrolmentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*EnrolmentToken, error) {
+	return consumeEnrolmentToken(ctx, pool, token)
+}
+
+func consumeEnrolmentToken(ctx context.Context, queryer enrolmentQueryer, token string) (*EnrolmentToken, error) {
+	const q = `
+		WITH candidate AS (
+			SELECT id
+			FROM agent_enrolment_tokens
+			WHERE (token_hash = encode(sha256($1::bytea), 'hex') OR (token_hash IS NULL AND token = $1::text))
+			  AND deleted_at IS NULL
+			  AND (expires_at IS NULL OR expires_at > NOW())
+			  AND (max_uses IS NULL OR usage_count < max_uses)
+			FOR UPDATE
+		)
+		UPDATE agent_enrolment_tokens
+		SET usage_count = usage_count + 1, updated_at = NOW()
+		WHERE id = (SELECT id FROM candidate)
+		RETURNING id, organisation_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
+	`
+	row := queryer.QueryRow(ctx, q, token)
+
+	var t EnrolmentToken
+	var rawMeta []byte
+	if err := row.Scan(
+		&t.ID, &t.OrganisationID, &t.Label, &t.Token,
+		&t.AutoApprove, &t.MaxUses, &t.UsageCount, &t.ExpiresAt, &rawMeta,
+	); err != nil {
+		return nil, err
+	}
+	if len(rawMeta) > 0 {
+		_ = json.Unmarshal(rawMeta, &t.Metadata)
+	}
+	return &t, nil
 }

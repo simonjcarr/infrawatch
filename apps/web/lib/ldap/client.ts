@@ -3,6 +3,7 @@ import { decrypt } from '@/lib/crypto/encrypt'
 import type { LdapConfiguration } from '@/lib/db/schema'
 import { getTlsOptions } from './tls-options'
 import { buildAuthenticateUserSearchFilter } from './auth-filter'
+import { isDnWithinSearchBase, resolveSearchBase } from './dn-scope'
 
 export interface LdapUser {
   dn: string
@@ -47,14 +48,6 @@ async function connectAndBind(config: LdapConfiguration, dn: string, password: s
   }
   await client.bind(dn, password)
   return client
-}
-
-/** Resolve a search base: if it already ends with baseDn, use as-is; otherwise append baseDn. */
-function resolveSearchBase(subBase: string | null | undefined, baseDn: string): string {
-  if (!subBase) return baseDn
-  // If the sub-base already contains the base DN (case-insensitive), use it directly
-  if (subBase.toLowerCase().endsWith(baseDn.toLowerCase())) return subBase
-  return `${subBase},${baseDn}`
 }
 
 function getBindPassword(config: LdapConfiguration): string {
@@ -249,6 +242,10 @@ export async function lookupUserByDn(
   config: LdapConfiguration,
   dn: string,
 ): Promise<LdapUserDetail | null> {
+  if (!isDnWithinSearchBase(dn, config)) {
+    throw new Error('DN is outside the configured user search base')
+  }
+
   let client: Client | undefined
   try {
     client = await connectAndBind(config, getBindDn(config), getBindPassword(config))

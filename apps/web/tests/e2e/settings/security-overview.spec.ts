@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
+import { TEST_USER } from '../fixtures/seed'
 
 function createAgentCaFixture() {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'ct-ops-security-ca-'))
@@ -48,8 +49,16 @@ function createAgentCaFixture() {
 const E2E_AGENT_CA = createAgentCaFixture()
 const E2E_UPLOADED_AGENT_CA = createAgentCaFixture()
 
-test('admin can review the current agent CA and upload a replacement CA from security settings', async ({ authenticatedPage: page }) => {
+test('super admin can review the current agent CA and upload a replacement CA from security settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
+
+  await sql`
+    UPDATE "user"
+    SET role = 'super_admin',
+        roles = '["super_admin"]'::jsonb,
+        updated_at = NOW()
+    WHERE email = ${TEST_USER.email}
+  `
 
   await sql`
     INSERT INTO certificate_authorities (

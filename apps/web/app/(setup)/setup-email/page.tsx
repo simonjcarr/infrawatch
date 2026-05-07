@@ -21,5 +21,5 @@ export default async function SetupEmailPage() {
 
   if (!user || !user.email.endsWith('@ldap.local')) redirect('/dashboard')
 
-  return <SetupEmailForm userId={user.id} username={user.name} />
+  return <SetupEmailForm username={user.name} />
 }

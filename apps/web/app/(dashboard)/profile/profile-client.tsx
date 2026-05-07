@@ -101,7 +101,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
   })
 
   const notifMutation = useMutation({
-    mutationFn: (enabled: boolean) => updateNotificationPreference(user.id, orgId, enabled),
+    mutationFn: (enabled: boolean) => updateNotificationPreference(enabled),
     onSuccess: (result) => {
       if ('error' in result) {
         setNotifError(result.error)
@@ -124,7 +124,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
   })
 
   const nameMutation = useMutation({
-    mutationFn: (values: NameValues) => updateName(user.id, values.name),
+    mutationFn: (values: NameValues) => updateName(values.name),
     onSuccess: (result) => {
       if ('error' in result) {
         nameForm.setError('name', { message: result.error })
@@ -549,7 +549,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
                     setCurrentTheme(option.value)
                     applyTheme(option.value)
                     setThemeSaving(true)
-                    await updateTheme(user.id, option.value)
+                    await updateTheme(option.value)
                     setThemeSaving(false)
                   }}
                   className={`flex flex-col items-center gap-2 rounded-lg border px-5 py-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.8...web/v0.116.9) (2026-05-07)
+
+
+### Bug Fixes
+
+* **web:** reject blocked certificate checker ports ([2dc255f](https://github.com/carrtech-dev/ct-ops/commit/2dc255fe795204871fe902bf043c4ed105ad0447))
+
 ## [0.116.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.7...web/v0.116.8) (2026-05-07)
 
 

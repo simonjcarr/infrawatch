@@ -18,14 +18,15 @@ import (
 
 // RegisterHandler implements the Register RPC.
 type RegisterHandler struct {
-	pool   *pgxpool.Pool
-	issuer *auth.JWTIssuer
-	ca     *pki.AgentCA
+	pool                *pgxpool.Pool
+	issuer              *auth.JWTIssuer
+	ca                  *pki.AgentCA
+	registrationLimiter *RegistrationLimiter
 }
 
 // NewRegisterHandler creates a RegisterHandler.
 func NewRegisterHandler(pool *pgxpool.Pool, issuer *auth.JWTIssuer, ca *pki.AgentCA) *RegisterHandler {
-	return &RegisterHandler{pool: pool, issuer: issuer, ca: ca}
+	return &RegisterHandler{pool: pool, issuer: issuer, ca: ca, registrationLimiter: NewDefaultRegistrationLimiter()}
 }
 
 type hostCollisionDecision int
@@ -67,6 +68,10 @@ func existingAgentBelongsToTokenOrg(existing *queries.AgentRow, tokenOrgID strin
 func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterRequest) (*agentv1.RegisterResponse, error) {
 	if req.OrgToken == "" || req.PublicKey == "" {
 		return nil, status.Error(codes.InvalidArgument, "org_token and public_key are required")
+	}
+	if err := h.registrationLimiter.Allow(ctx, req.OrgToken); err != nil {
+		slog.Warn("throttling agent registration attempt", "err", err)
+		return nil, err
 	}
 
 	hostname := "unknown"

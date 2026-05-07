@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.3...web/v0.116.4) (2026-05-07)
+
+
+### Bug Fixes
+
+* **auth:** select LDAP login integration ([d5f3ee7](https://github.com/carrtech-dev/ct-ops/commit/d5f3ee7030b3d9ed93512d104c3d3642e0bc90bf))
+
 ## [0.116.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.2...web/v0.116.3) (2026-05-07)
 
 

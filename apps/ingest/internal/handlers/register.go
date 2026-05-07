@@ -203,7 +203,20 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		}
 	}
 
-	// Step 4: Insert new agent
+	// Step 4: Atomically consume one token use before creating the new agent.
+	// Repeat registration with an existing public key returns above without
+	// consuming another use.
+	token, err = queries.ConsumeEnrolmentToken(ctx, h.pool, req.OrgToken)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Error(codes.Unauthenticated, "invalid or expired enrolment token")
+		}
+		slog.Error("consuming enrolment token", "err", err)
+		return nil, status.Error(codes.Internal, "internal error")
+	}
+	orgID = token.OrganisationID
+
+	// Step 5: Insert new agent
 	agentStatus := "pending"
 	agentID, err := queries.InsertAgent(ctx, h.pool, orgID, hostname, req.PublicKey, agentStatus, token.ID, agentOS, agentArch)
 	if err != nil {
@@ -217,10 +230,6 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		if err := queries.UpsertPendingCSR(ctx, h.pool, agentID, req.CsrDer); err != nil {
 			slog.Warn("queueing CSR", "agent_id", agentID, "err", err)
 		}
-	}
-
-	if err := queries.IncrementUsageCount(ctx, h.pool, token.ID); err != nil {
-		slog.Warn("incrementing enrolment token usage", "err", err)
 	}
 
 	// Insert host row. When the token is NOT auto-approve, stash the merged
@@ -246,7 +255,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 
 	slog.Info("agent registered", "agent_id", agentID, "hostname", hostname, "auto_approve", token.AutoApprove)
 
-	// Step 5: Auto-approve if configured
+	// Step 6: Auto-approve if configured
 	if token.AutoApprove && collisionRequiringManualApproval == nil {
 		if err := queries.ApproveAgent(ctx, h.pool, agentID); err != nil {
 			slog.Error("auto-approving agent", "err", err)
@@ -298,7 +307,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		return resp, nil
 	}
 
-	// Step 6: Pending — waiting for admin approval
+	// Step 7: Pending — waiting for admin approval
 	message := "agent registered and awaiting admin approval"
 	if collisionRequiringManualApproval != nil {
 		message = "agent registered as separate pending host because hostname or IP matches an existing host; admin review required"

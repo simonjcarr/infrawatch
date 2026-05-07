@@ -2,17 +2,25 @@ package queries
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // TerminalSessionInfo is returned after validating and activating a terminal session.
 type TerminalSessionInfo struct {
 	OrganisationID string
+	UserID         string
 	HostID         string
 	Host           string
 	Username       string
@@ -42,7 +50,8 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 		  AND h.id                = ts.host_id
 		  AND h.organisation_id   = ts.organisation_id
 		  AND h.deleted_at        IS NULL
-		RETURNING ts.organisation_id, ts.host_id,
+			RETURNING ts.organisation_id, ts.host_id,
+		          ts.user_id,
 		          COALESCE(NULLIF(h.hostname, ''), h.ip_addresses->>0) AS host,
 		          COALESCE(ts.username, '') AS username,
 		          COALESCE((o.metadata->>'terminalLoggingEnabled')::boolean, false) AS logging_enabled
@@ -51,6 +60,7 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 	err := pool.QueryRow(ctx, q, sessionID, tokenHash).Scan(
 		&info.OrganisationID,
 		&info.HostID,
+		&info.UserID,
 		&info.Host,
 		&info.Username,
 		&info.LoggingEnabled,
@@ -59,6 +69,284 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 		return nil, fmt.Errorf("terminal session not found or expired: %w", err)
 	}
 	return &info, nil
+}
+
+const (
+	terminalAuthWindow      = 15 * time.Minute
+	terminalAuthMaxFailures = 5
+	terminalAuthBaseLockout = 5 * time.Minute
+	terminalAuthMaxLockout  = time.Hour
+)
+
+type TerminalAuthThrottleStatus struct {
+	Allowed    bool
+	RetryAfter time.Duration
+
+	state terminalAuthThrottleState
+}
+
+type terminalAuthThrottleKey struct {
+	scope string
+	key   string
+}
+
+type terminalAuthThrottleState struct {
+	hits         []time.Time
+	lockoutLevel int
+	lockedUntil  time.Time
+}
+
+// CheckTerminalAuthThrottle verifies that another SSH password attempt is
+// currently allowed for both user/host/username and source/host/username
+// scopes. It also persists pruning of expired failure windows.
+func CheckTerminalAuthThrottle(ctx context.Context, pool *pgxpool.Pool, info TerminalSessionInfo, source string) (TerminalAuthThrottleStatus, error) {
+	return mutateTerminalAuthThrottle(ctx, pool, info, source, applyTerminalAuthCheck)
+}
+
+// RecordTerminalAuthFailure records a failed SSH password attempt in durable
+// throttle state and returns whether subsequent attempts remain allowed.
+func RecordTerminalAuthFailure(ctx context.Context, pool *pgxpool.Pool, info TerminalSessionInfo, source string) (TerminalAuthThrottleStatus, error) {
+	return mutateTerminalAuthThrottle(ctx, pool, info, source, applyTerminalAuthFailure)
+}
+
+// ResetTerminalAuthThrottle clears failure counters after a successful SSH
+// authentication so a past typo does not keep penalising legitimate use.
+func ResetTerminalAuthThrottle(ctx context.Context, pool *pgxpool.Pool, info TerminalSessionInfo, source string) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, key := range terminalAuthThrottleKeys(info, source) {
+		if _, err := tx.Exec(ctx, `DELETE FROM security_throttles WHERE scope = $1 AND key = $2`, key.scope, key.key); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func mutateTerminalAuthThrottle(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	info TerminalSessionInfo,
+	source string,
+	apply func(terminalAuthThrottleState, time.Time) TerminalAuthThrottleStatus,
+) (TerminalAuthThrottleStatus, error) {
+	keys := terminalAuthThrottleKeys(info, source)
+	if len(keys) == 0 {
+		return TerminalAuthThrottleStatus{Allowed: true}, nil
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return TerminalAuthThrottleStatus{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	now := time.Now().UTC()
+	result := TerminalAuthThrottleStatus{Allowed: true}
+	for _, key := range keys {
+		state, err := loadTerminalAuthThrottleState(ctx, tx, key)
+		if err != nil {
+			return TerminalAuthThrottleStatus{}, err
+		}
+
+		status := apply(state, now)
+		if err := storeTerminalAuthThrottleState(ctx, tx, key, status.state); err != nil {
+			return TerminalAuthThrottleStatus{}, err
+		}
+		if !status.Allowed && (result.Allowed || status.RetryAfter > result.RetryAfter) {
+			result = TerminalAuthThrottleStatus{Allowed: false, RetryAfter: status.RetryAfter}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return TerminalAuthThrottleStatus{}, err
+	}
+	return result, nil
+}
+
+type terminalThrottleTx interface {
+	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
+	QueryRow(context.Context, string, ...interface{}) pgx.Row
+}
+
+func loadTerminalAuthThrottleState(ctx context.Context, tx terminalThrottleTx, key terminalAuthThrottleKey) (terminalAuthThrottleState, error) {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO security_throttles (scope, key, hits, lockout_level)
+		VALUES ($1, $2, '[]'::jsonb, 0)
+		ON CONFLICT (scope, key) DO NOTHING
+	`, key.scope, key.key); err != nil {
+		return terminalAuthThrottleState{}, err
+	}
+
+	var hitsText string
+	var lockoutLevel int
+	var lockedUntil *time.Time
+	if err := tx.QueryRow(ctx, `
+		SELECT hits::text, lockout_level, locked_until
+		FROM security_throttles
+		WHERE scope = $1 AND key = $2
+		FOR UPDATE
+	`, key.scope, key.key).Scan(&hitsText, &lockoutLevel, &lockedUntil); err != nil {
+		return terminalAuthThrottleState{}, err
+	}
+
+	var rawHits []int64
+	if err := json.Unmarshal([]byte(hitsText), &rawHits); err != nil {
+		rawHits = nil
+	}
+	hits := make([]time.Time, 0, len(rawHits))
+	for _, hit := range rawHits {
+		if hit > 0 {
+			hits = append(hits, time.UnixMilli(hit).UTC())
+		}
+	}
+
+	state := terminalAuthThrottleState{
+		hits:         hits,
+		lockoutLevel: lockoutLevel,
+	}
+	if lockedUntil != nil {
+		state.lockedUntil = lockedUntil.UTC()
+	}
+	return state, nil
+}
+
+func storeTerminalAuthThrottleState(ctx context.Context, tx terminalThrottleTx, key terminalAuthThrottleKey, state terminalAuthThrottleState) error {
+	rawHits := make([]int64, 0, len(state.hits))
+	for _, hit := range state.hits {
+		rawHits = append(rawHits, hit.UTC().UnixMilli())
+	}
+	hitsJSON, err := json.Marshal(rawHits)
+	if err != nil {
+		return err
+	}
+
+	var lockedUntil any
+	if !state.lockedUntil.IsZero() {
+		lockedUntil = state.lockedUntil.UTC()
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE security_throttles
+		SET hits = $3::jsonb,
+		    lockout_level = $4,
+		    locked_until = $5,
+		    updated_at = NOW()
+		WHERE scope = $1 AND key = $2
+	`, key.scope, key.key, string(hitsJSON), state.lockoutLevel, lockedUntil)
+	return err
+}
+
+func applyTerminalAuthCheck(state terminalAuthThrottleState, now time.Time) TerminalAuthThrottleStatus {
+	state.hits = pruneTerminalAuthHits(state.hits, now)
+	if !state.lockedUntil.IsZero() && state.lockedUntil.After(now) {
+		return TerminalAuthThrottleStatus{
+			Allowed:    false,
+			RetryAfter: state.lockedUntil.Sub(now),
+			state:      state,
+		}
+	}
+	state.lockedUntil = time.Time{}
+	return TerminalAuthThrottleStatus{Allowed: true, state: state}
+}
+
+func applyTerminalAuthFailure(state terminalAuthThrottleState, now time.Time) TerminalAuthThrottleStatus {
+	state = applyTerminalAuthCheck(state, now).state
+	if !state.lockedUntil.IsZero() && state.lockedUntil.After(now) {
+		return TerminalAuthThrottleStatus{
+			Allowed:    false,
+			RetryAfter: state.lockedUntil.Sub(now),
+			state:      state,
+		}
+	}
+
+	state.hits = append(state.hits, now)
+	if len(state.hits) < terminalAuthMaxFailures {
+		return TerminalAuthThrottleStatus{Allowed: true, state: state}
+	}
+
+	state.hits = nil
+	state.lockoutLevel++
+	lockout := terminalAuthLockoutDuration(state.lockoutLevel)
+	state.lockedUntil = now.Add(lockout)
+	return TerminalAuthThrottleStatus{
+		Allowed:    false,
+		RetryAfter: lockout,
+		state:      state,
+	}
+}
+
+func terminalAuthLockoutDuration(lockoutLevel int) time.Duration {
+	if lockoutLevel <= 1 {
+		return terminalAuthBaseLockout
+	}
+	lockout := terminalAuthBaseLockout
+	for i := 1; i < lockoutLevel; i++ {
+		if lockout >= terminalAuthMaxLockout/2 {
+			return terminalAuthMaxLockout
+		}
+		lockout *= 2
+	}
+	if lockout > terminalAuthMaxLockout {
+		return terminalAuthMaxLockout
+	}
+	return lockout
+}
+
+func pruneTerminalAuthHits(hits []time.Time, now time.Time) []time.Time {
+	cutoff := now.Add(-terminalAuthWindow)
+	pruned := hits[:0]
+	for _, hit := range hits {
+		if hit.After(cutoff) {
+			pruned = append(pruned, hit)
+		}
+	}
+	return pruned
+}
+
+func terminalAuthThrottleKeys(info TerminalSessionInfo, source string) []terminalAuthThrottleKey {
+	username := strings.ToLower(strings.TrimSpace(info.Username))
+	if info.OrganisationID == "" || info.HostID == "" || username == "" {
+		return nil
+	}
+
+	keys := []terminalAuthThrottleKey{}
+	if info.UserID != "" {
+		keys = append(keys, terminalAuthThrottleKey{
+			scope: "terminal:ssh:user-host-username",
+			key:   terminalAuthThrottleKeyHash(info.OrganisationID, info.UserID, info.HostID, username),
+		})
+	}
+	keys = append(keys, terminalAuthThrottleKey{
+		scope: "terminal:ssh:source-host-username",
+		key:   terminalAuthThrottleKeyHash(info.OrganisationID, terminalAuthSource(source), info.HostID, username),
+	})
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].scope == keys[j].scope {
+			return keys[i].key < keys[j].key
+		}
+		return keys[i].scope < keys[j].scope
+	})
+	return keys
+}
+
+func terminalAuthSource(source string) string {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return "unknown"
+	}
+	if host, _, err := net.SplitHostPort(source); err == nil && host != "" {
+		return host
+	}
+	return source
+}
+
+func terminalAuthThrottleKeyHash(parts ...string) string {
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(sum[:])
 }
 
 func VerifySSHHostKey(ctx context.Context, pool *pgxpool.Pool, hostID string, fingerprint string) error {

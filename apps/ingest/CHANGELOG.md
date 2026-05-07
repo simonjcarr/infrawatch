@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.2...ingest/v0.9.3) (2026-05-07)
+
+
+### Bug Fixes
+
+* **ingest:** consume enrolment tokens atomically ([#1146](https://github.com/carrtech-dev/ct-ops/issues/1146)) ([f631974](https://github.com/carrtech-dev/ct-ops/commit/f631974346fd2fafc2d09ae53952e27e72ecd893))
+
 ## [0.9.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.1...ingest/v0.9.2) (2026-05-07)
 
 

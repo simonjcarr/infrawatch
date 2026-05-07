@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.6...web/v0.116.7) (2026-05-07)
+
+
+### Bug Fixes
+
+* **profile:** derive updates from session ([7327b43](https://github.com/carrtech-dev/ct-ops/commit/7327b431e5df380c26081d600c9559757e2ef248)), closes [#1112](https://github.com/carrtech-dev/ct-ops/issues/1112)
+
 ## [0.116.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.5...web/v0.116.6) (2026-05-07)
 
 

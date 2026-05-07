@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.4...web/v0.116.5) (2026-05-07)
+
+
+### Bug Fixes
+
+* **ldap:** support UPN login search ([12f1c4b](https://github.com/carrtech-dev/ct-ops/commit/12f1c4b072c747d68395fea4d1cd2f061db79ee2))
+
 ## [0.116.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.3...web/v0.116.4) (2026-05-07)
 
 

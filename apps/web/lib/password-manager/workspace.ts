@@ -5,6 +5,8 @@ import type {
 export interface PasswordManagerVaultMetadata {
   name: string
   description?: string
+  revealTimeoutSeconds?: number
+  clipboardTimeoutSeconds?: number
 }
 
 export interface PasswordManagerEntryPayload {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.1...web/v0.116.2) (2026-05-07)
+
+
+### Bug Fixes
+
+* **password-manager:** use icon entry actions ([f61da1a](https://github.com/carrtech-dev/ct-ops/commit/f61da1a44a6bf3073981a269d21a8fb5a3c12570))
+
 ## [0.116.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.0...web/v0.116.1) (2026-05-07)
 
 

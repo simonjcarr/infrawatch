@@ -5,9 +5,13 @@ import { sessions, totpCredentials, users, verifications } from '@/lib/db/schema
 import { eq } from 'drizzle-orm'
 import { randomBytes } from 'crypto'
 import { createRateLimiter } from '@/lib/rate-limit'
-import { getBetterAuthSecret } from '@/lib/auth/env'
+import { getBetterAuthSecret, getBetterAuthUrl } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
-import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
+import {
+  getBetterAuthSessionCookieName,
+  makeSessionCookieValue,
+  shouldUseSecureSessionCookie,
+} from '@/lib/auth/session-cookie'
 import { assertUserCanAccessSeat, SeatAdmissionError } from '@/lib/seat-admission'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
 import {
@@ -54,6 +58,7 @@ export async function POST(request: NextRequest) {
     const twoFactorMethod = body.twoFactorMethod
 
     const authSecret = getBetterAuthSecret()
+    const authUrl = getBetterAuthUrl()
     const signedChallengeCookie = request.cookies.get(LDAP_TWO_FACTOR_COOKIE_NAME)?.value
     const challengeId = await readSignedLdapTwoFactorCookieValue(signedChallengeCookie, authSecret)
 
@@ -158,6 +163,8 @@ export async function POST(request: NextRequest) {
     })
 
     const cookieValue = await makeSessionCookieValue(sessionToken, authSecret)
+    const cookieName = getBetterAuthSessionCookieName(authUrl)
+    const secureCookie = shouldUseSecureSessionCookie(authUrl)
     await db.delete(verifications).where(eq(verifications.identifier, challengeId))
     await passwordLoginAttemptGuard.reset(challenge.username)
 
@@ -172,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     response.headers.append(
       'Set-Cookie',
-      `better-auth.session_token=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
+      `${cookieName}=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${secureCookie ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
     )
     response.cookies.set(LDAP_TWO_FACTOR_COOKIE_NAME, '', {
       path: '/',

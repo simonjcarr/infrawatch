@@ -7,9 +7,13 @@ import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
 import { randomBytes } from 'crypto'
 import { createRateLimiter } from '@/lib/rate-limit'
-import { getBetterAuthSecret } from '@/lib/auth/env'
+import { getBetterAuthSecret, getBetterAuthUrl } from '@/lib/auth/env'
 import { passwordLoginAttemptGuard } from '@/lib/auth/login-attempts'
-import { makeSessionCookieValue } from '@/lib/auth/session-cookie'
+import {
+  getBetterAuthSessionCookieName,
+  makeSessionCookieValue,
+  shouldUseSecureSessionCookie,
+} from '@/lib/auth/session-cookie'
 import { normalizeLdapTenantSlug } from '@/lib/auth/ldap-tenant'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
@@ -60,6 +64,7 @@ export async function POST(request: NextRequest) {
     const tenantSlug = normalizeLdapTenantSlug(organisationSlug)
 
     const authSecret = getBetterAuthSecret()
+    const authUrl = getBetterAuthUrl()
 
     if (!username || !password) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
@@ -240,6 +245,8 @@ export async function POST(request: NextRequest) {
       })
 
       const cookieValue = await makeSessionCookieValue(sessionToken, authSecret)
+      const cookieName = getBetterAuthSessionCookieName(authUrl)
+      const secureCookie = shouldUseSecureSessionCookie(authUrl)
 
       const response = NextResponse.json({
         success: true,
@@ -253,7 +260,7 @@ export async function POST(request: NextRequest) {
       // Set the cookie with an already-encoded value (Next.js would double-encode otherwise).
       response.headers.append(
         'Set-Cookie',
-        `better-auth.session_token=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
+        `${cookieName}=${cookieValue}; Path=/; HttpOnly; SameSite=Lax${secureCookie ? '; Secure' : ''}; Expires=${expiresAt.toUTCString()}`,
       )
 
       await passwordLoginAttemptGuard.reset(accountKey)

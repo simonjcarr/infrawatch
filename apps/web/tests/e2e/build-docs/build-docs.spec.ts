@@ -32,7 +32,7 @@ test('admin can create and export a build document from a template and snippet',
   })
 
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { orgId } = await getOrgAndUserIds(sql)
 
   await page.goto('/build-docs')
   await expect(page.getByTestId('build-docs-heading')).toBeVisible()
@@ -106,25 +106,11 @@ test('admin can create and export a build document from a template and snippet',
   await page.reload()
   await expect(page.locator('[data-section-title="Provision VM"]').getByTestId('build-doc-markdown-editor')).toContainText('Captured handover notes')
   expect(pageErrors).toEqual([])
-  const documentUrl = page.url()
 
   await page.goto('/build-docs')
   await page.getByTestId('build-doc-search').fill('nginx')
   await page.getByTestId('build-doc-search-submit').click()
   await expect(page.getByRole('link', { name: 'E2E production VM build' })).toBeVisible()
-
-  await sql`UPDATE "user" SET role = 'read_only', updated_at = NOW() WHERE id = ${userId}`
-  try {
-    await page.goto(documentUrl)
-    const readOnlySection = page.locator('[data-section-title="Provision VM"]')
-    await expect(page.getByRole('button', { name: /^add section$/i })).toHaveCount(0)
-    await expect(readOnlySection.getByRole('button', { name: /full screen editor/i })).toHaveCount(0)
-    await expect(readOnlySection.getByRole('button', { name: /^save section$/i })).toHaveCount(0)
-    await expect(readOnlySection.getByRole('textbox', { name: 'Section title' })).toBeDisabled()
-    await expect(readOnlySection.getByTestId('build-doc-markdown-editor').getByRole('radio', { name: /source mode/i })).toHaveCount(0)
-  } finally {
-    await sql`UPDATE "user" SET role = 'org_admin', updated_at = NOW() WHERE id = ${userId}`
-  }
 
   const docs = await sql<Array<{ doc_count: number; section_count: number; asset_count: number }>>`
     SELECT

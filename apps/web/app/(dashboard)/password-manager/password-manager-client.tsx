@@ -75,6 +75,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { logWarn } from '@/lib/logging'
 import {
   createEncryptedEntryPayload,
@@ -2975,7 +2976,7 @@ function PasswordManagerWorkspace({
                       <TableHead className="hidden md:table-cell">Username</TableHead>
                       <TableHead className="hidden lg:table-cell">URL</TableHead>
                       <TableHead className="hidden sm:table-cell">Key</TableHead>
-                      <TableHead className="w-12 sm:w-[260px]">Actions</TableHead>
+                      <TableHead className="w-12 sm:w-[116px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -3026,23 +3027,55 @@ function PasswordManagerWorkspace({
                       <Badge variant="outline">Epoch {entry.keyEpoch}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+                      <div className="hidden justify-end gap-1.5 sm:flex">
                       {entry.payload.password ? (
                         <>
-                          <Button variant="outline" size="sm" onClick={() => void onToggleReveal(entry)}>
-                            {entryRevealId === entry.id ? <EyeOff className="mr-2 size-4" /> : <Eye className="mr-2 size-4" />}
-                            {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => void onCopyPassword(entry)}>
-                            <Copy className="mr-2 size-4" />
-                            Copy password
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon-sm"
+                                onClick={() => void onToggleReveal(entry)}
+                                aria-label={entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
+                                title={entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
+                              >
+                                {entryRevealId === entry.id ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {entryRevealId === entry.id ? 'Hide password' : 'Reveal password'}
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon-sm"
+                                onClick={() => void onCopyPassword(entry)}
+                                aria-label="Copy password"
+                                title="Copy password"
+                              >
+                                <Copy className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy password</TooltipContent>
+                          </Tooltip>
                         </>
                       ) : null}
-                      <Button variant="outline" size="sm" onClick={() => handleStartEditEntryDialog(entry)}>
-                        <Pencil className="mr-2 size-4" />
-                        Edit
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            onClick={() => handleStartEditEntryDialog(entry)}
+                            aria-label="Edit entry"
+                            title="Edit entry"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit entry</TooltipContent>
+                      </Tooltip>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

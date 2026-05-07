@@ -113,6 +113,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await expect(pastedSshEntry).toContainText('SSH key pair')
   await expect(pastedSshEntry.getByRole('button', { name: 'Reveal password' })).toHaveCount(0)
   await expect(pastedSshEntry.getByRole('button', { name: 'Copy password' })).toHaveCount(0)
+  await expect(pastedSshEntry.getByRole('button', { name: 'View entry' })).toBeVisible()
 
   await page.getByRole('button', { name: 'New entry' }).click()
   await expect(page.getByRole('dialog', { name: 'New SSH key pair' })).toBeVisible()
@@ -127,6 +128,10 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByRole('button', { name: 'New entry' }).click()
   await expect(page.getByRole('dialog', { name: 'New SSH key pair' })).toBeVisible()
   await page.getByLabel('Title').fill('Generated Ed25519 deploy key')
+  await page.getByLabel('Algorithm').click()
+  await expect(page.getByRole('option', { name: 'ED25519', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: /id_ed25519/ })).toHaveCount(0)
+  await page.getByRole('option', { name: 'ED25519', exact: true }).click()
   await page.getByLabel('Password protect generated private key').check()
   await page.getByLabel('Key passphrase').fill(generatedSshPassphrase)
   await page.getByLabel('Confirm key passphrase').fill(generatedSshPassphrase)
@@ -179,6 +184,19 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await expect
     .poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 5_000 })
     .toBe('')
+
+  await pastedSshEntry.getByRole('button', { name: 'View entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'View SSH key pair' })).toBeVisible()
+  await expect(page.getByLabel('Title')).toBeDisabled()
+  await expect(page.getByLabel('Public key or certificate')).toBeDisabled()
+  await expect(page.getByLabel('Private key')).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save encrypted entry' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Delete entry' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Copy public key or certificate' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe(pastedSshPublicMaterial)
+  await page.getByRole('button', { name: 'Copy private key' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe(pastedSshPrivateKey)
+  await page.getByRole('button', { name: 'Close' }).click()
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export vault' }).click()
@@ -255,6 +273,8 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     '/vaults/vault-1/entries/entry-2/reveal-audit',
     '/vaults/vault-1/entries/entry-2/reveal-audit',
     '/vaults/vault-1/entries/entry-2/copy-audit',
+    '/vaults/vault-1/entries/entry-3/copy-audit',
+    '/vaults/vault-1/entries/entry-3/copy-audit',
     '/vaults/vault-1/export-audit',
   ])
 

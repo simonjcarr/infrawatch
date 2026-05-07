@@ -148,6 +148,7 @@ const MAX_PASSWORD_TIMEOUT_SECONDS = 300
 
 type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
 type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note' | 'ssh-key-pair'
+type PasswordManagerEntryDialogMode = 'create' | 'edit' | 'view'
 type PasswordManagerTimedSecret = {
   durationSeconds: number
   expiresAt: number
@@ -1815,6 +1816,35 @@ export function PasswordManagerClientShell({
     }
   }
 
+  async function handleCopyEntryField(entry: PasswordManagerEntrySummary, fieldId: string, fieldLabel: string) {
+    const value = entry.payload.fields?.[fieldId]
+    if (!value) {
+      setWorkspaceError(`${fieldLabel} is empty and cannot be copied.`)
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(value)
+      setStatusNotice(`${fieldLabel} copied for ${entry.payload.title}.`)
+      await client.auditCopy({
+        vaultId: entry.vaultId,
+        entryId: entry.id,
+      })
+    } catch (error) {
+      if (!(error instanceof PasswordManagerApiError)) {
+        handleWorkspaceActionError(error, `${fieldLabel} could not be copied safely in this browser.`)
+        return
+      }
+
+      logPasswordManagerWarning('[password-manager] field copy audit failed', error, {
+        organisationId: state.organisationId,
+        selectedVaultId: entry.vaultId,
+        selectedEntryId: entry.id,
+      })
+      recordAuditHookFailure(`${fieldLabel.toLowerCase()} copy`, error)
+    }
+  }
+
   async function handleEntryRevealToggle(entry: PasswordManagerEntrySummary) {
     if (entryRevealId === entry.id) {
       setEntryRevealId(null)
@@ -2056,6 +2086,7 @@ export function PasswordManagerClientShell({
           members={members}
           membersPending={membersPending}
           organisationUsers={organisationUsers}
+          onCopyEntryField={handleCopyEntryField}
           onCopyPassword={handleCopyPassword}
           onCreateVault={runVaultCreate}
           onCreateVaultDescriptionChange={setCreateVaultDescription}
@@ -2611,6 +2642,7 @@ function PasswordManagerWorkspace({
   members,
   membersPending,
   organisationUsers,
+  onCopyEntryField,
   onCopyPassword,
   onCreateVault,
   onCreateVaultDescriptionChange,
@@ -2689,6 +2721,7 @@ function PasswordManagerWorkspace({
   members: MemberRecord[]
   membersPending: boolean
   organisationUsers: PasswordManagerOrganisationUser[]
+  onCopyEntryField: (entry: PasswordManagerEntrySummary, fieldId: string, fieldLabel: string) => Promise<void>
   onCopyPassword: (entry: PasswordManagerEntrySummary) => Promise<void>
   onCreateVault: () => Promise<void>
   onCreateVaultDescriptionChange: (value: string) => void
@@ -2742,6 +2775,7 @@ function PasswordManagerWorkspace({
   const [memberSelectorOpen, setMemberSelectorOpen] = useState(false)
   const [createVaultDialogOpen, setCreateVaultDialogOpen] = useState(false)
   const [entryDialogOpen, setEntryDialogOpen] = useState(false)
+  const [entryDialogMode, setEntryDialogMode] = useState<PasswordManagerEntryDialogMode>('create')
   const [deleteVaultDialogOpen, setDeleteVaultDialogOpen] = useState(false)
   const [deleteVaultUnlockPassword, setDeleteVaultUnlockPassword] = useState('')
   const [deleteVaultNameConfirmation, setDeleteVaultNameConfirmation] = useState('')
@@ -2756,6 +2790,7 @@ function PasswordManagerWorkspace({
   const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
   const activeEntryTemplate = getPasswordManagerEntryTemplate(entryTemplateId)
+  const isViewingEntry = entryDialogMode === 'view'
   const selectedMemberLabel = selectedOrganisationUser
     ? `${selectedOrganisationUser.name || selectedOrganisationUser.email} (${selectedOrganisationUser.email})`
     : 'Select user'
@@ -2769,6 +2804,7 @@ function PasswordManagerWorkspace({
 
   function handleStartCreateEntryDialog() {
     onStartCreateEntry()
+    setEntryDialogMode('create')
     resetSshKeyGenerationControls()
     setEntryDialogOpen(true)
   }
@@ -2776,6 +2812,15 @@ function PasswordManagerWorkspace({
   function handleStartEditEntryDialog(entry: PasswordManagerEntrySummary) {
     onSelectEntry(entry.id)
     onStartEditEntry(entry)
+    setEntryDialogMode('edit')
+    resetSshKeyGenerationControls()
+    setEntryDialogOpen(true)
+  }
+
+  function handleStartViewEntryDialog(entry: PasswordManagerEntrySummary) {
+    onSelectEntry(entry.id)
+    onStartEditEntry(entry)
+    setEntryDialogMode('view')
     resetSshKeyGenerationControls()
     setEntryDialogOpen(true)
   }
@@ -3145,6 +3190,22 @@ function PasswordManagerWorkspace({
                           </Tooltip>
                         </>
                       ) : null}
+                      {entry.payload.type === 'ssh-key-pair' ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              onClick={() => handleStartViewEntryDialog(entry)}
+                              aria-label="View entry"
+                              title="View entry"
+                            >
+                              <Eye className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View entry</TooltipContent>
+                        </Tooltip>
+                      ) : null}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -3179,6 +3240,12 @@ function PasswordManagerWorkspace({
                               </DropdownMenuItem>
                             </>
                           ) : null}
+                          {entry.payload.type === 'ssh-key-pair' ? (
+                            <DropdownMenuItem onSelect={() => handleStartViewEntryDialog(entry)}>
+                              <Eye className="size-4" />
+                              View
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem onSelect={() => handleStartEditEntryDialog(entry)}>
                             <Pencil className="size-4" />
                             Edit
@@ -3198,10 +3265,12 @@ function PasswordManagerWorkspace({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
-                  {editingEntryId ? 'Edit' : 'New'} {activeEntryTemplate.dialogLabel}
+                  {isViewingEntry ? 'View' : editingEntryId ? 'Edit' : 'New'} {activeEntryTemplate.dialogLabel}
                 </DialogTitle>
                 <DialogDescription>
-                  {editingEntryId
+                  {isViewingEntry
+                    ? 'This encrypted payload is open read-only in browser memory.'
+                    : editingEntryId
                     ? 'Updating re-encrypts the entire payload in browser memory before upload.'
                     : 'The template payload is encrypted locally before it leaves the browser.'}
                 </DialogDescription>
@@ -3213,10 +3282,10 @@ function PasswordManagerWorkspace({
                     id="password-manager-entry-title"
                     value={entryTitle}
                     onChange={(event) => onEntryTitleChange(event.target.value)}
-                    disabled={!selectedVault}
+                    disabled={!selectedVault || isViewingEntry}
                   />
                 </div>
-                {activeEntryTemplate.id === 'ssh-key-pair' ? (
+                {activeEntryTemplate.id === 'ssh-key-pair' && !isViewingEntry ? (
                   <div className="grid gap-4 rounded-md border border-border/60 p-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="grid gap-2">
@@ -3230,7 +3299,7 @@ function PasswordManagerWorkspace({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="ed25519">Ed25519 (id_ed25519)</SelectItem>
+                            <SelectItem value="ed25519">ED25519</SelectItem>
                             <SelectItem value="rsa">RSA 4096</SelectItem>
                           </SelectContent>
                         </Select>
@@ -3311,12 +3380,36 @@ function PasswordManagerWorkspace({
                         onEntryFieldChange(field.id, nextValue)
                       }
                     }
+                    const sshCopyLabel =
+                      field.id === 'publicMaterial'
+                        ? 'Copy public key or certificate'
+                        : field.id === 'privateKey'
+                          ? 'Copy private key'
+                          : `Copy ${field.label.toLowerCase()}`
+                    const canCopySshField =
+                      isViewingEntry && activeEntryTemplate.id === 'ssh-key-pair' && !!editingEntryId && !!selectedEntry && !!value
 
                     return (
                       <div key={field.id} className={field.multiline ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'}>
                         <div className="flex items-center justify-between gap-2">
                           <Label htmlFor={fieldId}>{field.label}</Label>
-                          {activeEntryTemplate.id === 'ssh-key-pair' ? (
+                          {canCopySshField ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => void onCopyEntryField(selectedEntry!, field.id, field.label)}
+                                  aria-label={sshCopyLabel}
+                                  title={sshCopyLabel}
+                                >
+                                  <Copy className="size-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{sshCopyLabel}</TooltipContent>
+                            </Tooltip>
+                          ) : activeEntryTemplate.id === 'ssh-key-pair' && !isViewingEntry ? (
                             <Label
                               htmlFor={`${fieldId}-file`}
                               className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -3330,7 +3423,7 @@ function PasswordManagerWorkspace({
                             id={fieldId}
                             value={value}
                             onChange={(event) => handleChange(event.target.value)}
-                            disabled={!selectedVault}
+                            disabled={!selectedVault || isViewingEntry}
                             className={activeEntryTemplate.id === 'ssh-key-pair' ? 'min-h-36 font-mono text-xs' : undefined}
                           />
                         ) : (
@@ -3339,10 +3432,10 @@ function PasswordManagerWorkspace({
                             type={field.type}
                             value={value}
                             onChange={(event) => handleChange(event.target.value)}
-                            disabled={!selectedVault}
+                            disabled={!selectedVault || isViewingEntry}
                           />
                         )}
-                        {activeEntryTemplate.id === 'ssh-key-pair' ? (
+                        {activeEntryTemplate.id === 'ssh-key-pair' && !isViewingEntry ? (
                           <Input
                             id={`${fieldId}-file`}
                             type="file"
@@ -3364,20 +3457,27 @@ function PasswordManagerWorkspace({
                     id="password-manager-entry-notes"
                     value={entryNotes}
                     onChange={(event) => onEntryNotesChange(event.target.value)}
-                    disabled={!selectedVault}
+                    disabled={!selectedVault || isViewingEntry}
                   />
                 </div>
               </div>
               <DialogFooter>
-                {editingEntryId && selectedEntry ? (
+                {isViewingEntry ? (
+                  <Button variant="outline" onClick={() => setEntryDialogOpen(false)}>
+                    Close
+                  </Button>
+                ) : null}
+                {!isViewingEntry && editingEntryId && selectedEntry ? (
                   <Button variant="destructive" onClick={() => void handleEntryDeleteFromDialog()} disabled={workspacePending}>
                     <Trash2 className="mr-2 size-4" />
                     Delete entry
                   </Button>
                 ) : null}
-                <Button onClick={() => void handleEntrySaveFromDialog()} disabled={!selectedVault || workspacePending}>
-                  {workspacePending ? 'Saving...' : editingEntryId ? 'Save encrypted entry' : 'Create encrypted entry'}
-                </Button>
+                {!isViewingEntry ? (
+                  <Button onClick={() => void handleEntrySaveFromDialog()} disabled={!selectedVault || workspacePending}>
+                    {workspacePending ? 'Saving...' : editingEntryId ? 'Save encrypted entry' : 'Create encrypted entry'}
+                  </Button>
+                ) : null}
               </DialogFooter>
             </DialogContent>
           </Dialog>

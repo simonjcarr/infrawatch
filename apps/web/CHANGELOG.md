@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.5...web/v0.116.6) (2026-05-07)
+
+
+### Bug Fixes
+
+* **auth:** align LDAP session cookie with secure auth URL ([2626387](https://github.com/carrtech-dev/ct-ops/commit/262638767ba62ededba789e35a0b9b158f0aecc4))
+
 ## [0.116.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.116.4...web/v0.116.5) (2026-05-07)
 
 

@@ -14,3 +14,12 @@ export async function makeSessionCookieValue(token: string, secret: string): Pro
   const base64Sig = btoa(String.fromCharCode(...new Uint8Array(sig)))
   return encodeURIComponent(`${token}.${base64Sig}`)
 }
+
+export function shouldUseSecureSessionCookie(authUrl: string, nodeEnv = process.env.NODE_ENV): boolean {
+  return authUrl.startsWith('https://') || nodeEnv === 'production'
+}
+
+export function getBetterAuthSessionCookieName(authUrl: string, nodeEnv = process.env.NODE_ENV): string {
+  const securePrefix = shouldUseSecureSessionCookie(authUrl, nodeEnv) ? '__Secure-' : ''
+  return `${securePrefix}better-auth.session_token`
+}

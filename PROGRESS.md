@@ -15,6 +15,27 @@
 
 ## What Has Been Built
 
+### Session 122 — Patch Status history chart semantics
+
+**Patch Status check history chart** (`apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`, `apps/web/lib/checks/history-chart.ts`)
+- Changed Patch Status history bars so their height is based on
+  `updates_count` instead of check response duration.
+- Changed Patch Status history bar colour to reflect patch age against the
+  configured policy threshold: green before five-sixths of the threshold, amber
+  from five-sixths through the threshold, and red after the threshold.
+- Kept non-Patch Status checks on the existing response-duration chart
+  semantics, and added tooltip copy for available updates, patch age, and the
+  policy threshold.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `node --experimental-strip-types --test apps/web/lib/checks/history-chart.test.mjs`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint` (passes with existing unrelated warnings)
+- `pnpm --dir apps/web test:unit` (new tests pass; full suite still has
+  unrelated failures from missing local container runtime plus existing issue
+  https://github.com/carrtech-dev/ct-ops/issues/1109)
+
 ### Session 121 — Shared Password Generator tool
 
 **Reusable password generator** (`apps/web/lib/password-generator.ts`, `apps/web/components/password-generator/password-generator-tool.tsx`, `apps/web/app/(dashboard)/password-generator/page.tsx`)

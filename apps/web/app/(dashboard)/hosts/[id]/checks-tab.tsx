@@ -63,6 +63,12 @@ import {
   deleteCheck,
   deleteCheckHistory,
 } from '@/lib/actions/checks'
+import {
+  CHECK_STATUS_COLOURS,
+  getPatchStatusChartColour,
+  getPatchStatusChartValue,
+  parsePatchStatusOutput,
+} from '@/lib/checks/history-chart'
 import type { CheckWithHistory } from '@/lib/actions/checks'
 import type {
   CheckResultRow,
@@ -89,11 +95,7 @@ interface Props {
   hostId: string
 }
 
-const STATUS_COLOUR: Record<string, string> = {
-  pass: '#22c55e',
-  fail: '#ef4444',
-  error: '#f59e0b',
-}
+const STATUS_COLOUR: Record<string, string> = CHECK_STATUS_COLOURS
 
 function formatCheckOutput(checkType: string, output: string): string {
   if (checkType === 'service_account') {
@@ -252,16 +254,35 @@ function StatusWeather({ results }: { results: CheckResultRow[] }) {
   return <span title={label}><CloudLightning className="size-4 text-red-500" aria-label="Mostly failing" /></span>
 }
 
-function CheckHistoryChart({ results, checkType }: { results: CheckResultRow[]; checkType: string }) {
+function CheckHistoryChart({
+  results,
+  checkType,
+  patchConfig,
+}: {
+  results: CheckResultRow[]
+  checkType: string
+  patchConfig?: PatchStatusCheckConfig
+}) {
+  const maxPatchAgeDays = patchConfig?.max_age_days
   const data = [...results]
     .reverse()
-    .map((r) => ({
-      id: r.id,
-      time: new Date(r.ranAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      duration: Math.max(1, r.durationMs ?? 1),
-      status: r.status,
-      output: r.output ? formatCheckOutput(checkType, r.output) : r.output,
-    }))
+    .map((r) => {
+      const patchPayload = checkType === 'patch_status' ? parsePatchStatusOutput(r.output) : null
+      const patchMaxAgeDays = typeof patchPayload?.max_age_days === 'number' ? patchPayload.max_age_days : maxPatchAgeDays
+      return {
+        id: r.id,
+        time: new Date(r.ranAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        duration: Math.max(1, r.durationMs ?? 1),
+        status: r.status,
+        output: r.output ? formatCheckOutput(checkType, r.output) : r.output,
+        value: checkType === 'patch_status' ? getPatchStatusChartValue(r.output) : Math.max(1, r.durationMs ?? 1),
+        fill: checkType === 'patch_status'
+          ? getPatchStatusChartColour(r.output, maxPatchAgeDays)
+          : STATUS_COLOUR[r.status] ?? STATUS_COLOUR.unknown,
+        patchAgeDays: typeof patchPayload?.patch_age_days === 'number' ? patchPayload.patch_age_days : null,
+        patchMaxAgeDays,
+      }
+    })
 
   return (
     <ResponsiveContainer width="100%" height={72}>
@@ -288,19 +309,38 @@ function CheckHistoryChart({ results, checkType }: { results: CheckResultRow[]; 
                 </p>
                 {d.output && <p className="text-muted-foreground truncate max-w-48">{d.output}</p>}
                 <p className="text-muted-foreground">{d.time}</p>
-                <p className="text-muted-foreground">
-                  Response time:{' '}
-                  <span className="text-foreground font-medium">{d.duration}ms</span>
-                </p>
+                {checkType === 'patch_status' ? (
+                  <>
+                    <p className="text-muted-foreground">
+                      Available updates:{' '}
+                      <span className="text-foreground font-medium">{d.value}</span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      Patch age:{' '}
+                      <span className="text-foreground font-medium">
+                        {d.patchAgeDays ?? 'unknown'}
+                        {d.patchAgeDays == null ? '' : 'd'}
+                      </span>
+                      {typeof d.patchMaxAgeDays === 'number' && (
+                        <> / {d.patchMaxAgeDays}d policy</>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Response time:{' '}
+                    <span className="text-foreground font-medium">{d.duration}ms</span>
+                  </p>
+                )}
               </div>
             )
           }}
         />
-        <Bar dataKey="duration" minPointSize={6} radius={[2, 2, 0, 0]}>
+        <Bar dataKey="value" minPointSize={checkType === 'patch_status' ? 3 : 6} radius={[2, 2, 0, 0]}>
           {data.map((entry) => (
             <Cell
               key={entry.id}
-              fill={STATUS_COLOUR[entry.status] ?? '#9ca3af'}
+              fill={entry.fill}
               fillOpacity={0.85}
             />
           ))}
@@ -1309,7 +1349,11 @@ function CheckRow({
                   <> · <span className="text-foreground">{formatCheckOutput(check.checkType, check.latestResult.output)}</span></>
                 )}
               </p>
-              <CheckHistoryChart results={check.results} checkType={check.checkType} />
+              <CheckHistoryChart
+                results={check.results}
+                checkType={check.checkType}
+                patchConfig={check.checkType === 'patch_status' ? check.config as PatchStatusCheckConfig : undefined}
+              />
             </>
           ) : (
             <p className="text-sm text-muted-foreground py-2">No results yet.</p>

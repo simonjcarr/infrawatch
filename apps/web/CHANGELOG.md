@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.0...web/v0.122.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **notifications:** await bell mark-read before navigation ([#1179](https://github.com/carrtech-dev/ct-ops/issues/1179)) ([2d43715](https://github.com/carrtech-dev/ct-ops/commit/2d4371519088017f2bda158b855382e247ed6c03))
+
 ## [0.122.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.121.1...web/v0.122.0) (2026-05-08)
 
 

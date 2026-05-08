@@ -15,6 +15,25 @@
 
 ## What Has Been Built
 
+### Session 124 — Password Manager entry password visibility
+
+**Entry form password reveal controls** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Added eye-icon visibility toggles to password-style fields in Password Manager
+  entry dialogs, including login passwords, card security codes, and generated
+  SSH key passphrases.
+- Reset reveal state when the entry dialog is opened or closed so newly opened
+  forms start with masked values.
+- Extended Password Manager E2E coverage to assert password fields are masked by
+  default, can be shown before creating an encrypted entry, and can be hidden
+  again.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 123 — Password Manager generator integration layout
 
 **Password Generator embedded layout** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/password-generator/password-generator.spec.ts`)

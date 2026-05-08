@@ -2788,6 +2788,7 @@ function PasswordManagerWorkspace({
   const [sshKeyPassphraseConfirm, setSshKeyPassphraseConfirm] = useState('')
   const [sshKeyGenerationPending, setSshKeyGenerationPending] = useState(false)
   const [sshKeyGenerationError, setSshKeyGenerationError] = useState<string | null>(null)
+  const [visibleEntryPasswordFields, setVisibleEntryPasswordFields] = useState<Record<string, boolean>>({})
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
@@ -2807,6 +2808,7 @@ function PasswordManagerWorkspace({
   function handleStartCreateEntryDialog() {
     onStartCreateEntry()
     setEntryDialogMode('create')
+    setVisibleEntryPasswordFields({})
     resetSshKeyGenerationControls()
     setPasswordGeneratorDialogOpen(false)
     setEntryDialogOpen(true)
@@ -2816,6 +2818,7 @@ function PasswordManagerWorkspace({
     onSelectEntry(entry.id)
     onStartEditEntry(entry)
     setEntryDialogMode('edit')
+    setVisibleEntryPasswordFields({})
     resetSshKeyGenerationControls()
     setPasswordGeneratorDialogOpen(false)
     setEntryDialogOpen(true)
@@ -2825,9 +2828,24 @@ function PasswordManagerWorkspace({
     onSelectEntry(entry.id)
     onStartEditEntry(entry)
     setEntryDialogMode('view')
+    setVisibleEntryPasswordFields({})
     resetSshKeyGenerationControls()
     setPasswordGeneratorDialogOpen(false)
     setEntryDialogOpen(true)
+  }
+
+  function handleEntryDialogOpenChange(open: boolean) {
+    setEntryDialogOpen(open)
+    if (!open) {
+      setVisibleEntryPasswordFields({})
+    }
+  }
+
+  function toggleEntryPasswordFieldVisibility(fieldId: string) {
+    setVisibleEntryPasswordFields((current) => ({
+      ...current,
+      [fieldId]: !current[fieldId],
+    }))
   }
 
   function resetSshKeyGenerationControls() {
@@ -3266,7 +3284,7 @@ function PasswordManagerWorkspace({
             </CardContent>
           </Card>
 
-          <Dialog open={entryDialogOpen} onOpenChange={setEntryDialogOpen}>
+          <Dialog open={entryDialogOpen} onOpenChange={handleEntryDialogOpenChange}>
             <DialogContent
               className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-xl"
               data-testid="password-manager-entry-dialog"
@@ -3339,25 +3357,83 @@ function PasswordManagerWorkspace({
                     </label>
                     {sshKeyPassphraseEnabled ? (
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="grid gap-2">
+                        <div className="relative grid gap-2">
                           <Label htmlFor="password-manager-ssh-key-passphrase">Key passphrase</Label>
                           <Input
                             id="password-manager-ssh-key-passphrase"
-                            type="password"
+                            type={visibleEntryPasswordFields.sshKeyPassphrase ? 'text' : 'password'}
                             value={sshKeyPassphrase}
                             onChange={(event) => setSshKeyPassphrase(event.target.value)}
                             disabled={!selectedVault || sshKeyGenerationPending}
+                            className="pr-10"
                           />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="absolute right-1 bottom-1"
+                                onClick={() => toggleEntryPasswordFieldVisibility('sshKeyPassphrase')}
+                                disabled={!selectedVault || sshKeyGenerationPending}
+                                aria-label={visibleEntryPasswordFields.sshKeyPassphrase ? 'Hide key passphrase' : 'Show key passphrase'}
+                                title={visibleEntryPasswordFields.sshKeyPassphrase ? 'Hide key passphrase' : 'Show key passphrase'}
+                              >
+                                {visibleEntryPasswordFields.sshKeyPassphrase ? (
+                                  <EyeOff className="size-4" />
+                                ) : (
+                                  <Eye className="size-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {visibleEntryPasswordFields.sshKeyPassphrase ? 'Hide key passphrase' : 'Show key passphrase'}
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
-                        <div className="grid gap-2">
+                        <div className="relative grid gap-2">
                           <Label htmlFor="password-manager-ssh-key-passphrase-confirm">Confirm key passphrase</Label>
                           <Input
                             id="password-manager-ssh-key-passphrase-confirm"
-                            type="password"
+                            type={visibleEntryPasswordFields.sshKeyPassphraseConfirm ? 'text' : 'password'}
                             value={sshKeyPassphraseConfirm}
                             onChange={(event) => setSshKeyPassphraseConfirm(event.target.value)}
                             disabled={!selectedVault || sshKeyGenerationPending}
+                            className="pr-10"
                           />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="absolute right-1 bottom-1"
+                                onClick={() => toggleEntryPasswordFieldVisibility('sshKeyPassphraseConfirm')}
+                                disabled={!selectedVault || sshKeyGenerationPending}
+                                aria-label={
+                                  visibleEntryPasswordFields.sshKeyPassphraseConfirm
+                                    ? 'Hide confirm key passphrase'
+                                    : 'Show confirm key passphrase'
+                                }
+                                title={
+                                  visibleEntryPasswordFields.sshKeyPassphraseConfirm
+                                    ? 'Hide confirm key passphrase'
+                                    : 'Show confirm key passphrase'
+                                }
+                              >
+                                {visibleEntryPasswordFields.sshKeyPassphraseConfirm ? (
+                                  <EyeOff className="size-4" />
+                                ) : (
+                                  <Eye className="size-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {visibleEntryPasswordFields.sshKeyPassphraseConfirm
+                                ? 'Hide confirm key passphrase'
+                                : 'Show confirm key passphrase'}
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     ) : null}
@@ -3397,8 +3473,14 @@ function PasswordManagerWorkspace({
                     const canCopySshField =
                       isViewingEntry && activeEntryTemplate.id === 'ssh-key-pair' && !!editingEntryId && !!selectedEntry && !!value
                     const canGeneratePassword = field.id === 'password' && !isViewingEntry
+                    const canTogglePasswordVisibility = field.type === 'password' && !isViewingEntry
+                    const passwordVisibilityLabel = field.label.toLowerCase()
                     const fieldContainerClassName =
-                      field.multiline || canGeneratePassword ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'
+                      field.multiline || canGeneratePassword
+                        ? 'relative grid gap-2 sm:col-span-2'
+                        : canTogglePasswordVisibility
+                          ? 'relative grid gap-2'
+                          : 'grid gap-2'
 
                     return (
                       <div
@@ -3453,13 +3535,51 @@ function PasswordManagerWorkspace({
                             className={activeEntryTemplate.id === 'ssh-key-pair' ? 'min-h-36 font-mono text-xs' : undefined}
                           />
                         ) : (
-                          <Input
-                            id={fieldId}
-                            type={field.type}
-                            value={value}
-                            onChange={(event) => handleChange(event.target.value)}
-                            disabled={!selectedVault || isViewingEntry}
-                          />
+                          <>
+                            <Input
+                              id={fieldId}
+                              type={canTogglePasswordVisibility && visibleEntryPasswordFields[field.id] ? 'text' : field.type}
+                              value={value}
+                              onChange={(event) => handleChange(event.target.value)}
+                              disabled={!selectedVault || isViewingEntry}
+                              className={canTogglePasswordVisibility ? 'pr-10' : undefined}
+                            />
+                            {canTogglePasswordVisibility ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="absolute right-1 bottom-1"
+                                    onClick={() => toggleEntryPasswordFieldVisibility(field.id)}
+                                    disabled={!selectedVault}
+                                    aria-label={
+                                      visibleEntryPasswordFields[field.id]
+                                        ? `Hide ${passwordVisibilityLabel}`
+                                        : `Show ${passwordVisibilityLabel}`
+                                    }
+                                    title={
+                                      visibleEntryPasswordFields[field.id]
+                                        ? `Hide ${passwordVisibilityLabel}`
+                                        : `Show ${passwordVisibilityLabel}`
+                                    }
+                                  >
+                                    {visibleEntryPasswordFields[field.id] ? (
+                                      <EyeOff className="size-4" />
+                                    ) : (
+                                      <Eye className="size-4" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {visibleEntryPasswordFields[field.id]
+                                    ? `Hide ${passwordVisibilityLabel}`
+                                    : `Show ${passwordVisibilityLabel}`}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : null}
+                          </>
                         )}
                         {activeEntryTemplate.id === 'ssh-key-pair' && !isViewingEntry ? (
                           <Input

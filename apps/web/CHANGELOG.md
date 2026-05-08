@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.119.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.118.0...web/v0.119.0) (2026-05-08)
+
+
+### Features
+
+* **web:** add shared password generator tool ([#1160](https://github.com/carrtech-dev/ct-ops/issues/1160)) ([1106b84](https://github.com/carrtech-dev/ct-ops/commit/1106b8462068414d04a51061445b782c8b260682))
+
 ## [0.118.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.117.0...web/v0.118.0) (2026-05-07)
 
 

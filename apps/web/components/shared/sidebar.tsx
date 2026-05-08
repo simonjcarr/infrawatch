@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { TerminalPanelTrigger } from '@/components/terminal'
+import { CarrTechLogo } from '@/components/shared/carrtech-logo'
 import type { LicenceTier } from '@/lib/features'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import { PASSWORD_MANAGER_NAV_ITEM } from '@/lib/password-manager/navigation'
@@ -259,12 +260,9 @@ export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: Lic
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
-            IW
-          </div>
-          <span className="font-semibold text-sm text-sidebar-foreground">CT-Ops</span>
-        </div>
+        <Link href="/dashboard" className="block w-fit" aria-label="CT-Ops dashboard">
+          <CarrTechLogo className="w-32 shadow-xs ring-1 ring-sidebar-border" priority />
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <NavGroup label="Monitoring" items={primaryNav} />

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.0...agent/v0.34.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **agent:** round patch age partial days up ([43cb491](https://github.com/carrtech-dev/ct-ops/commit/43cb49188ea3c8b64ef6a2c64ffbbec9fd8e5e0a))
+
 ## [0.34.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.33.0...agent/v0.34.0) (2026-05-06)
 
 

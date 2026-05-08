@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.4...web/v0.123.0) (2026-05-08)
+
+
+### Features
+
+* **calendar:** add operations planning calendar ([80d6217](https://github.com/carrtech-dev/ct-ops/commit/80d6217bcca605ee5c961ddecb119b7b7477af9d))
+
 ## [0.122.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.3...web/v0.122.4) (2026-05-08)
 
 

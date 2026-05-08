@@ -14,6 +14,14 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 }
 
 test('authenticated user sees the LDAP setup empty state when no directory is configured', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const orgId = await getOrgId(sql)
+
+  await sql`
+    DELETE FROM ldap_configurations
+    WHERE organisation_id = ${orgId}
+  `
+
   await page.goto('/directory-lookup')
 
   await expect(page.getByTestId('directory-lookup-heading')).toContainText('Directory User Lookup')

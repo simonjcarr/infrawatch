@@ -160,9 +160,12 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
         cidr: data.cidr,
         description: data.description || undefined,
       }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+      ])
       setCreateOpen(false)
     },
   })
@@ -174,17 +177,24 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
         cidr: data.cidr,
         description: data.description || undefined,
       }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+      ])
       setEditNetwork(null)
     },
   })
 
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
     mutationFn: (networkId: string) => deleteNetwork(orgId, networkId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+    onSuccess: async (result) => {
+      if ('error' in result) return
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+      ])
       setDeleteTarget(null)
     },
   })

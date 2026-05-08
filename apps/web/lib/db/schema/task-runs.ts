@@ -93,6 +93,7 @@ export const taskRunHosts = pgTable('task_run_hosts', {
   skipReason: text('skip_reason'),
   exitCode: integer('exit_code'),
   rawOutput: text('raw_output').notNull().default(''), // appended incrementally as chunks arrive
+  errorMessage: text('error_message'),                  // final agent/task error, stored separately from progress output
   result: jsonb('result').$type<TaskResult>(),          // structured on completion
   startedAt: timestamp('started_at', { withTimezone: true }),
   completedAt: timestamp('completed_at', { withTimezone: true }),

@@ -52,6 +52,30 @@ test('admin can view ingest status, agent errors, and upgrade counts', async ({ 
       ${createId()}, ${orgId}, ${hostId}, 'list_services', 'error', 'service inventory timed out', NOW() - INTERVAL '1 minute', NOW(), NOW() + INTERVAL '1 hour'
     )
   `
+  const taskRunId = createId()
+  const taskRunHostId = createId()
+  await sql`
+    INSERT INTO task_runs (
+      id, organisation_id, triggered_by, target_type, target_id,
+      task_type, config, max_parallel, status, created_at, updated_at
+    )
+    VALUES (
+      ${taskRunId}, ${orgId}, NULL, 'host', ${hostId},
+      'software_inventory', '{}', 1, 'failed', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '2 minutes'
+    )
+  `
+  await sql`
+    INSERT INTO task_run_hosts (
+      id, organisation_id, task_run_id, host_id, status, exit_code,
+      raw_output, error_message, started_at, completed_at, created_at, updated_at
+    )
+    VALUES (
+      ${taskRunHostId}, ${orgId}, ${taskRunId}, ${hostId}, 'failed', -1,
+      'collecting installed packages... collected 690 packages (source: dpkg), streaming to server... chunk 0 sent (500 packages) chunk 1 sent (190 packages)',
+      'streaming packages: closing stream: rpc error: code = Unauthenticated desc = invalid token',
+      NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '2 minutes'
+    )
+  `
 
   await page.goto('/settings/system')
 
@@ -64,5 +88,10 @@ test('admin can view ingest status, agent errors, and upgrade counts', async ({ 
   await expect(page.getByText('Agent Errors')).toBeVisible()
   await expect(page.getByText('ops-agent-01')).toBeVisible()
   await expect(page.getByText('service inventory timed out')).toBeVisible()
+  await expect(page.getByText('streaming packages: closing stream')).toBeVisible()
+  await page.getByRole('button', { name: 'View more' }).first().click()
+  await expect(page.getByRole('dialog', { name: 'Agent error detail' })).toBeVisible()
+  await expect(page.getByText('collecting installed packages...')).not.toBeVisible()
+  await expect(page.getByText('rpc error: code = Unauthenticated desc = invalid token')).toBeVisible()
   await expect(page.getByText('Not upgraded')).toBeVisible()
 })

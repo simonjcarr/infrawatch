@@ -13,6 +13,12 @@ import { ApiAuthError, getApiOrgAdminSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
+function summariseAgentError(message: string) {
+  const summary = message.trim()
+  if (summary.length <= 72) return summary
+  return `${summary.slice(0, 69).trimEnd()}...`
+}
+
 export async function GET() {
   let session
   try {
@@ -101,6 +107,7 @@ export async function GET() {
       hostname: string
       source: string
       message: string
+      detail: string
       occurred_at: Date
     }>(sql`
       SELECT * FROM (
@@ -109,6 +116,7 @@ export async function GET() {
           COALESCE(h.hostname, a.hostname, 'Unknown host') AS hostname,
           'Certificate signing' AS source,
           pcs.last_error AS message,
+          pcs.last_error AS detail,
           COALESCE(pcs.last_attempt_at, pcs.requested_at) AS occurred_at
         FROM pending_cert_signings pcs
         INNER JOIN agents a ON a.id = pcs.agent_id
@@ -124,6 +132,7 @@ export async function GET() {
           h.hostname AS hostname,
           'Agent query' AS source,
           aq.error AS message,
+          aq.error AS detail,
           COALESCE(aq.completed_at, aq.updated_at, aq.requested_at) AS occurred_at
         FROM agent_queries aq
         INNER JOIN hosts h ON h.id = aq.host_id
@@ -141,6 +150,7 @@ export async function GET() {
           h.hostname AS hostname,
           'Software inventory' AS source,
           ss.error_message AS message,
+          ss.error_message AS detail,
           COALESCE(ss.completed_at, ss.created_at) AS occurred_at
         FROM software_scans ss
         INNER JOIN hosts h ON h.id = ss.host_id
@@ -156,7 +166,8 @@ export async function GET() {
           a.id AS agent_id,
           h.hostname AS hostname,
           'Task run' AS source,
-          COALESCE(NULLIF(left(trh.raw_output, 500), ''), trh.skip_reason, 'Task failed') AS message,
+          COALESCE(NULLIF(trh.error_message, ''), NULLIF(left(trh.raw_output, 500), ''), trh.skip_reason, 'Task failed') AS message,
+          COALESCE(NULLIF(trh.error_message, ''), NULLIF(trh.raw_output, ''), trh.skip_reason, 'Task failed') AS detail,
           COALESCE(trh.completed_at, trh.updated_at, trh.created_at) AS occurred_at
         FROM task_run_hosts trh
         INNER JOIN hosts h ON h.id = trh.host_id
@@ -210,7 +221,8 @@ export async function GET() {
         agentId: row.agent_id,
         hostname: row.hostname,
         source: row.source,
-        message: row.message,
+        message: summariseAgentError(row.message),
+        detail: row.detail,
         occurredAt: new Date(row.occurred_at).toISOString(),
       })),
     },

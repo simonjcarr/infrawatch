@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.3...ingest/v0.9.4) (2026-05-08)
+
+
+### Bug Fixes
+
+* **system:** show full agent task errors ([#1178](https://github.com/carrtech-dev/ct-ops/issues/1178)) ([51de705](https://github.com/carrtech-dev/ct-ops/commit/51de70574347a6f20a5bc0979be7c5eef71d3dea))
+
 ## [0.9.3](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.2...ingest/v0.9.3) (2026-05-07)
 
 

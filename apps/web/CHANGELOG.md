@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.1...web/v0.122.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* **system:** show full agent task errors ([#1178](https://github.com/carrtech-dev/ct-ops/issues/1178)) ([51de705](https://github.com/carrtech-dev/ct-ops/commit/51de70574347a6f20a5bc0979be7c5eef71d3dea))
+
 ## [0.122.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.0...web/v0.122.1) (2026-05-08)
 
 

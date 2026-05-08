@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.121.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.121.0...web/v0.121.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **web:** await network mutation refreshes ([62778fe](https://github.com/carrtech-dev/ct-ops/commit/62778fe3b5555420c4bfa2ea8cc865089749d840)), closes [#996](https://github.com/carrtech-dev/ct-ops/issues/996)
+
 ## [0.121.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.120.1...web/v0.121.0) (2026-05-08)
 
 

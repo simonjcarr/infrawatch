@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.121.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.120.1...web/v0.121.0) (2026-05-08)
+
+
+### Features
+
+* **password-manager:** add entry password visibility toggles ([47ab2b4](https://github.com/carrtech-dev/ct-ops/commit/47ab2b4082208eba3bf62c2afd5c6ab54e79a5b0))
+
+
+### Bug Fixes
+
+* **web:** replace CT-Ops logo asset ([dc2138a](https://github.com/carrtech-dev/ct-ops/commit/dc2138a2061e0c7ab59a77d940a63e43bd898f3e))
+
 ## [0.120.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.120.0...web/v0.120.1) (2026-05-08)
 
 

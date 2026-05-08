@@ -50,6 +50,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PasswordGeneratorTool } from '@/components/password-generator/password-generator-tool'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import {
@@ -2776,6 +2777,7 @@ function PasswordManagerWorkspace({
   const [createVaultDialogOpen, setCreateVaultDialogOpen] = useState(false)
   const [entryDialogOpen, setEntryDialogOpen] = useState(false)
   const [entryDialogMode, setEntryDialogMode] = useState<PasswordManagerEntryDialogMode>('create')
+  const [passwordGeneratorDialogOpen, setPasswordGeneratorDialogOpen] = useState(false)
   const [deleteVaultDialogOpen, setDeleteVaultDialogOpen] = useState(false)
   const [deleteVaultUnlockPassword, setDeleteVaultUnlockPassword] = useState('')
   const [deleteVaultNameConfirmation, setDeleteVaultNameConfirmation] = useState('')
@@ -2806,6 +2808,7 @@ function PasswordManagerWorkspace({
     onStartCreateEntry()
     setEntryDialogMode('create')
     resetSshKeyGenerationControls()
+    setPasswordGeneratorDialogOpen(false)
     setEntryDialogOpen(true)
   }
 
@@ -2814,6 +2817,7 @@ function PasswordManagerWorkspace({
     onStartEditEntry(entry)
     setEntryDialogMode('edit')
     resetSshKeyGenerationControls()
+    setPasswordGeneratorDialogOpen(false)
     setEntryDialogOpen(true)
   }
 
@@ -2822,6 +2826,7 @@ function PasswordManagerWorkspace({
     onStartEditEntry(entry)
     setEntryDialogMode('view')
     resetSshKeyGenerationControls()
+    setPasswordGeneratorDialogOpen(false)
     setEntryDialogOpen(true)
   }
 
@@ -3388,12 +3393,24 @@ function PasswordManagerWorkspace({
                           : `Copy ${field.label.toLowerCase()}`
                     const canCopySshField =
                       isViewingEntry && activeEntryTemplate.id === 'ssh-key-pair' && !!editingEntryId && !!selectedEntry && !!value
+                    const canGeneratePassword = field.id === 'password' && !isViewingEntry
 
                     return (
                       <div key={field.id} className={field.multiline ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'}>
                         <div className="flex items-center justify-between gap-2">
                           <Label htmlFor={fieldId}>{field.label}</Label>
-                          {canCopySshField ? (
+                          {canGeneratePassword ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPasswordGeneratorDialogOpen(true)}
+                              disabled={!selectedVault}
+                            >
+                              <KeyRound className="size-4" />
+                              Generate password
+                            </Button>
+                          ) : canCopySshField ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -3479,6 +3496,23 @@ function PasswordManagerWorkspace({
                   </Button>
                 ) : null}
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={passwordGeneratorDialogOpen} onOpenChange={setPasswordGeneratorDialogOpen}>
+            <DialogContent className="max-h-[calc(100vh-2rem)] max-w-4xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Password Generator</DialogTitle>
+                <DialogDescription>
+                  Generate a password locally, then insert it into this entry.
+                </DialogDescription>
+              </DialogHeader>
+              <PasswordGeneratorTool
+                showHeading={false}
+                onUsePassword={(generatedPassword) => {
+                  onEntryPasswordChange(generatedPassword)
+                  setPasswordGeneratorDialogOpen(false)
+                }}
+              />
             </DialogContent>
           </Dialog>
         </TabsContent>

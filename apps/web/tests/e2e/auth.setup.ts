@@ -33,6 +33,7 @@ const authenticatedRoutes = [
   '/hosts/networks',
   '/legal-notice',
   '/notifications',
+  '/password-generator',
   '/password-manager',
   '/reports/patch-status',
   '/reports/software',

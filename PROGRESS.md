@@ -15,6 +15,28 @@
 
 ## What Has Been Built
 
+### Session 121 — Shared Password Generator tool
+
+**Reusable password generator** (`apps/web/lib/password-generator.ts`, `apps/web/components/password-generator/password-generator-tool.tsx`, `apps/web/app/(dashboard)/password-generator/page.tsx`)
+- Added a tooling-protected Password Generator page with browser-local password
+  and passphrase generation, presets, length and character-class controls,
+  ambiguous-character exclusion, custom symbols, copy support, and strength
+  feedback.
+- Added Password Generator entries to the sidebar and command palette using
+  shared navigation metadata.
+- Reused the same generator component inside the Password Manager login entry
+  modal, so template password fields can open the generator and populate the
+  selected encrypted-entry password field without creating a second generator.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `node --experimental-strip-types --test lib/password-generator.test.mjs lib/password-generator/navigation.test.mjs`
+- `pnpm --filter web type-check`
+- `pnpm --filter web lint` (passes with existing unrelated warnings)
+- `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=local-build-secret DATABASE_URL=postgres://test:test@localhost:5432/ctops_test pnpm --filter web build` (passes; local placeholder secret emits expected Better Auth warnings)
+- `pnpm --filter web test:e2e tests/e2e/password-generator/password-generator.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+- `pnpm --filter web test:unit` (new generator tests pass; full suite still has unrelated failures from missing container runtime plus existing issue https://github.com/carrtech-dev/ct-ops/issues/1109)
+
 ### Session 120 — Profile 2FA QR setup
 
 **Authenticator setup QR code** (`apps/web/app/(dashboard)/profile/profile-client.tsx`, `apps/web/tests/e2e/profile/profile.spec.ts`)

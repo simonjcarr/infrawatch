@@ -23,9 +23,10 @@ test('read-only users cannot access tooling pages or certificate checker API', a
     await page.goto('/dashboard')
     await expect(page.getByText('Tooling')).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Password Manager' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Password Generator' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'SSL Certificate Checker' })).toHaveCount(0)
 
-    for (const path of ['/password-manager', '/certificate-checker', '/directory-lookup', '/tasks', '/build-docs']) {
+    for (const path of ['/password-manager', '/password-generator', '/certificate-checker', '/directory-lookup', '/tasks', '/build-docs']) {
       await page.goto(path)
       await expect(page).toHaveURL(/\/dashboard$/)
     }

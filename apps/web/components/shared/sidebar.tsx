@@ -45,6 +45,7 @@ import { TerminalPanelTrigger } from '@/components/terminal'
 import type { LicenceTier } from '@/lib/features'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import { PASSWORD_MANAGER_NAV_ITEM } from '@/lib/password-manager/navigation'
+import { PASSWORD_GENERATOR_NAV_ITEM } from '@/lib/password-generator/navigation'
 import pkg from '../../package.json'
 
 const WEB_VERSION = `v${pkg.version}`
@@ -100,6 +101,7 @@ const reportingNav: NavItem[] = [
 
 const toolingNav: NavItem[] = [
   PASSWORD_MANAGER_NAV_ITEM,
+  PASSWORD_GENERATOR_NAV_ITEM,
   { title: 'SSL Certificate Checker', href: '/certificate-checker', icon: ScanSearch },
   { title: 'Directory User Lookup', href: '/directory-lookup', icon: FolderSearch },
   { title: 'Air-gap Bundlers', href: '/bundlers', icon: Package },

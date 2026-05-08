@@ -26,6 +26,7 @@ import {
 import { listHosts } from '@/lib/actions/agents'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import { PASSWORD_MANAGER_COMMAND_ITEM } from '@/lib/password-manager/navigation'
+import { PASSWORD_GENERATOR_COMMAND_ITEM } from '@/lib/password-generator/navigation'
 import type { CommandPaletteItem } from './types'
 
 const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
@@ -42,6 +43,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-reports-patch-status', label: 'Patch Status Report', icon: ShieldCheck, href: '/reports/patch-status' },
   { id: 'nav-reports-vulnerabilities', label: 'Vulnerability Report', icon: ShieldAlert, href: '/reports/vulnerabilities' },
   PASSWORD_MANAGER_COMMAND_ITEM,
+  PASSWORD_GENERATOR_COMMAND_ITEM,
   { id: 'nav-cert-checker', label: 'SSL Certificate Checker', icon: ScanSearch, href: '/certificate-checker' },
   { id: 'nav-dir-lookup', label: 'Directory User Lookup', icon: FolderSearch, href: '/directory-lookup' },
   { id: 'nav-bundlers', label: 'Air-gap Bundlers', icon: Package, href: '/bundlers' },
@@ -58,6 +60,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
 
 const TOOLING_ITEM_IDS = new Set([
   'nav-password-manager',
+  'nav-password-generator',
   'nav-cert-checker',
   'nav-dir-lookup',
   'nav-bundlers',

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.120.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.120.0...web/v0.120.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **web:** improve password manager generator layout ([#1165](https://github.com/carrtech-dev/ct-ops/issues/1165)) ([513402c](https://github.com/carrtech-dev/ct-ops/commit/513402cd6fd19dc911d7df94c89d7d7ca850250a))
+
 ## [0.120.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.119.0...web/v0.120.0) (2026-05-08)
 
 

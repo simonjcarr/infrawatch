@@ -1,8 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Server,
@@ -12,6 +21,15 @@ import {
   XCircle,
   Loader2,
 } from 'lucide-react'
+
+interface AgentError {
+  agentId: string | null
+  hostname: string
+  source: string
+  message: string
+  detail: string
+  occurredAt: string
+}
 
 interface HealthData {
   version: string
@@ -23,13 +41,7 @@ interface HealthData {
     offline: number
     total: number
     upgrades: { requiredVersion: string; notUpgraded: number; unknownVersion: number }
-    errors: Array<{
-      agentId: string | null
-      hostname: string
-      source: string
-      message: string
-      occurredAt: string
-    }>
+    errors: AgentError[]
   }
   ingest: {
     totalServers: number
@@ -98,6 +110,7 @@ function formatDateTime(value: string) {
 }
 
 export function SystemHealthClient() {
+  const [selectedError, setSelectedError] = useState<AgentError | null>(null)
   const { data, isLoading, error } = useQuery<HealthData>({
     queryKey: ['system-health'],
     queryFn: () => fetch('/api/system/health').then((r) => r.json()),
@@ -124,6 +137,7 @@ export function SystemHealthClient() {
   }
 
   return (
+    <>
     <div className="space-y-6 max-w-6xl">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">System Health</h1>
@@ -295,19 +309,36 @@ export function SystemHealthClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.agents.errors.map((error) => (
-                    <TableRow key={`${error.source}-${error.agentId ?? error.hostname}-${error.occurredAt}`}>
-                      <TableCell>
-                        <div className="font-medium">{error.hostname}</div>
-                        {error.agentId ? (
-                          <div className="text-xs text-muted-foreground font-mono">{error.agentId}</div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{error.source}</TableCell>
-                      <TableCell className="max-w-xl whitespace-normal text-sm">{error.message}</TableCell>
-                      <TableCell>{formatDateTime(error.occurredAt)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {data.agents.errors.map((error) => {
+                    const hasDetail = error.detail.trim() !== error.message.trim()
+                    return (
+                      <TableRow key={`${error.source}-${error.agentId ?? error.hostname}-${error.occurredAt}`}>
+                        <TableCell>
+                          <div className="font-medium">{error.hostname}</div>
+                          {error.agentId ? (
+                            <div className="text-xs text-muted-foreground font-mono">{error.agentId}</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{error.source}</TableCell>
+                        <TableCell className="max-w-xl whitespace-normal text-sm">
+                          <div className="space-y-2">
+                            <p>{error.message}</p>
+                            {hasDetail ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                onClick={() => setSelectedError(error)}
+                              >
+                                View more
+                              </Button>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDateTime(error.occurredAt)}</TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -315,5 +346,23 @@ export function SystemHealthClient() {
         </CardContent>
       </Card>
     </div>
+    <Dialog open={selectedError !== null} onOpenChange={(open) => { if (!open) setSelectedError(null) }}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Agent error detail</DialogTitle>
+          {selectedError ? (
+            <DialogDescription>
+              {selectedError.hostname} · {selectedError.source} · {formatDateTime(selectedError.occurredAt)}
+            </DialogDescription>
+          ) : null}
+        </DialogHeader>
+        {selectedError ? (
+          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-mono text-xs text-foreground">
+            {selectedError.detail}
+          </pre>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

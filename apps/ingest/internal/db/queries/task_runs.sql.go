@@ -161,11 +161,12 @@ func CompleteTaskRunHost(
 		SET status       = CASE WHEN status = 'cancelling' THEN 'cancelled' ELSE $2 END,
 		    exit_code    = $3,
 		    result       = $4::jsonb,
+		    error_message = NULLIF($5, ''),
 		    completed_at = NOW(),
 		    updated_at   = NOW()
 		WHERE id = $1
 	`
-	_, err := pool.Exec(ctx, q, taskRunHostID, hostStatus, exitCode, resultArg)
+	_, err := pool.Exec(ctx, q, taskRunHostID, hostStatus, exitCode, resultArg, errMsg)
 	return err
 }
 

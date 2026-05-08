@@ -130,6 +130,7 @@ export async function getServiceAccounts(
 export async function getServiceAccount(
   orgId: string,
   accountId: string,
+  hostId?: string,
 ): Promise<{
   account: ServiceAccount
   keys: SshKey[]
@@ -142,6 +143,7 @@ export async function getServiceAccount(
       eq(serviceAccounts.id, accountId),
       eq(serviceAccounts.organisationId, orgId),
       isNull(serviceAccounts.deletedAt),
+      ...(hostId != null && hostId !== '' ? [eq(serviceAccounts.hostId, hostId)] : []),
     ),
   })
   if (!account) return null

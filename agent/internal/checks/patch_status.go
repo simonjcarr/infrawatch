@@ -146,14 +146,20 @@ func buildPatchStatusReport(input patchStatusInput) patchStatusReport {
 	}
 	report.UpdatesCount = len(input.Updates)
 	report.LastPatchedAt = input.LastPatchedAt.UTC().Format(time.RFC3339)
-	report.PatchAgeDays = int(input.Now.UTC().Sub(input.LastPatchedAt.UTC()).Hours() / 24)
-	if report.PatchAgeDays < 0 {
-		report.PatchAgeDays = 0
-	}
+	report.PatchAgeDays = patchAgeDays(input.Now, input.LastPatchedAt)
 	if report.PatchAgeDays > maxAge {
 		report.Status = "fail"
 	}
 	return report
+}
+
+func patchAgeDays(now, lastPatchedAt time.Time) int {
+	elapsed := now.UTC().Sub(lastPatchedAt.UTC())
+	if elapsed <= 0 {
+		return 0
+	}
+	const day = 24 * time.Hour
+	return int((elapsed + day - time.Nanosecond) / day)
 }
 
 func detectPatchPackageManager() (string, error) {

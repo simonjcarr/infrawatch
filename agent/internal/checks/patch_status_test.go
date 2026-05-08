@@ -75,3 +75,19 @@ func TestEvaluatePatchStatusUsesPatchAgeOnly(t *testing.T) {
 		t.Fatalf("UpdatesCount = %d, want 1", report.UpdatesCount)
 	}
 }
+
+func TestPatchStatusRoundsPartialDayAgeUp(t *testing.T) {
+	t.Parallel()
+
+	report := buildPatchStatusReport(patchStatusInput{
+		Now:              time.Date(2026, 5, 8, 9, 30, 0, 0, time.UTC),
+		MaxAgeDays:       30,
+		LastPatchedAt:    time.Date(2026, 5, 8, 6, 28, 24, 0, time.UTC),
+		PackageManager:   "apt",
+		UpdatesSupported: true,
+	})
+
+	if report.PatchAgeDays != 1 {
+		t.Fatalf("PatchAgeDays = %d, want 1", report.PatchAgeDays)
+	}
+}

@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createRateLimiter } from '@/lib/rate-limit'
 import {
-  getConfiguredCtCveServiceTokens,
   verifyCtCveServiceRequest,
   type CtCveServiceAuthError,
 } from '@/lib/integrations/ct-cve/service-token'
+import { getCtCveServiceTokensForOrg } from '@/lib/integrations/ct-cve/connector-settings'
 import { recordCtCveConnectionHealth } from '@/lib/integrations/ct-cve/connection-status'
 
 export const dynamic = 'force-dynamic'
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const tokens = getConfiguredCtCveServiceTokens()
+  const tokens = await getCtCveServiceTokensForOrg(orgId)
   if (tokens.length === 0) {
     return NextResponse.json(
       {

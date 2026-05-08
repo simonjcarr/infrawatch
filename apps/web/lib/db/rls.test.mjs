@@ -50,13 +50,29 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
         INSERT INTO organisations (id, name, slug)
         VALUES
           ('org-a', 'Org A', 'org-a'),
-          ('org-b', 'Org B', 'org-b')
+          ('org-b', 'Org B', 'org-b'),
+          ('org-c', 'Org C', 'org-c')
       `)
       await migrationClient.unsafe(`
         INSERT INTO tags (id, organisation_id, key, value, usage_count)
         VALUES
           ('tag-a', 'org-a', 'env', 'prod', 1),
           ('tag-b', 'org-b', 'env', 'dev', 1)
+      `)
+      await migrationClient.unsafe(`
+        INSERT INTO ct_cve_connector_settings (
+          organisation_id,
+          enabled,
+          name,
+          base_url,
+          inventory_token_id,
+          inventory_token_secret_encrypted,
+          ct_cve_token_id,
+          ct_cve_token_secret_encrypted
+        )
+        VALUES
+          ('org-a', true, 'CT-CVE A', 'https://ct-cve-a.example.test', 'inventory-a', 'encrypted-inventory-a', 'ctcve-a', 'encrypted-ctcve-a'),
+          ('org-b', true, 'CT-CVE B', 'https://ct-cve-b.example.test', 'inventory-b', 'encrypted-inventory-b', 'ctcve-b', 'encrypted-ctcve-b')
       `)
       await migrationClient.unsafe(`
         INSERT INTO "user" (id, name, email, email_verified, organisation_id, role, is_active)
@@ -108,6 +124,11 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
       orderBy: [asc(schema.sessions.id)],
     })
     assert.deepEqual(unscopedSessions.map((row) => row.id), [])
+
+    const unscopedCtCveConnectorSettings = await db.query.ctCveConnectorSettings.findMany({
+      orderBy: [asc(schema.ctCveConnectorSettings.organisationId)],
+    })
+    assert.deepEqual(unscopedCtCveConnectorSettings.map((row) => row.organisationId), [])
 
     const authBootstrapClient = postgres(`${appDatabaseUrl}?options=-c%20app.auth_bootstrap%3Don`, {
       prepare: false,
@@ -164,6 +185,13 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
     )
     assert.deepEqual(orgRows.map((row) => row.id), ['tag-a'])
 
+    const orgCtCveConnectorSettings = await withOrgDatabaseScope('org-a', async (scopedDb) =>
+      scopedDb.query.ctCveConnectorSettings.findMany({
+        orderBy: [asc(schema.ctCveConnectorSettings.organisationId)],
+      }),
+    )
+    assert.deepEqual(orgCtCveConnectorSettings.map((row) => row.organisationId), ['org-a'])
+
     const orgSessions = await withOrgDatabaseScope('org-a', async (scopedDb) =>
       scopedDb.query.sessions.findMany({ orderBy: [asc(schema.sessions.id)] }),
     )
@@ -188,7 +216,7 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
       withOrgDatabaseScope('org-a', async (scopedDb) => {
         await scopedDb.insert(schema.tags).values({
           id: 'tag-cross-org',
-          organisationId: 'org-b',
+          organisationId: 'org-c',
           key: 'team',
           value: 'security',
           usageCount: 0,
@@ -196,6 +224,25 @@ test('org-scoped database context enforces RLS for organisation_id tables', asyn
       }),
       (error) => {
         assert.match(error.message, /Failed query: insert into "tags"/)
+        return true
+      },
+    )
+
+    await assert.rejects(
+      withOrgDatabaseScope('org-a', async (scopedDb) => {
+        await scopedDb.insert(schema.ctCveConnectorSettings).values({
+          organisationId: 'org-c',
+          enabled: true,
+          name: 'Cross-org CT-CVE',
+          baseUrl: 'https://ct-cve-cross.example.test',
+          inventoryTokenId: 'inventory-cross',
+          inventoryTokenSecretEncrypted: 'encrypted-inventory-cross',
+          ctCveTokenId: 'ctcve-cross',
+          ctCveTokenSecretEncrypted: 'encrypted-ctcve-cross',
+        })
+      }),
+      (error) => {
+        assert.match(error.message, /Failed query: insert into "ct_cve_connector_settings"/)
         return true
       },
     )

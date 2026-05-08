@@ -110,6 +110,55 @@ test('pushes every paged inventory snapshot for configured targets', async () =>
   })
 })
 
+test('loads CT-CVE inventory push targets from app settings when no explicit targets are passed', async () => {
+  const pushes = []
+  const result = await runCtCveInventoryPushes({
+    env: { CT_CVE_INVENTORY_PUSH_TARGETS: '[]' },
+    loadTargets: async (env) => {
+      assert.equal(env.CT_CVE_INVENTORY_PUSH_TARGETS, '[]')
+      return [{
+        name: 'app settings target',
+        enabled: true,
+        baseUrl: 'https://ct-cve.example.invalid',
+        token,
+      }]
+    },
+    buildSnapshot: async ({ orgId }) => ({
+      contractVersion: '2026-04-30',
+      orgId,
+      orgSlug: 'acme',
+      snapshotId: 'snapshot',
+      snapshotType: 'full',
+      generatedAt: '2026-04-30T10:00:00.000Z',
+      cursor: null,
+      hosts: [],
+      packages: [],
+    }),
+    pushSnapshot: async ({ baseUrl, token: pushToken }) => {
+      pushes.push({ baseUrl, token: pushToken })
+      return {
+        accepted: true,
+        snapshotId: 'snapshot',
+        hostsAccepted: 0,
+        packagesAccepted: 0,
+        rowsRejected: 0,
+        nextAction: 'none',
+      }
+    },
+    statusRepository: {
+      async get() {
+        return null
+      },
+      async save() {},
+    },
+  })
+
+  assert.equal(pushes.length, 1)
+  assert.equal(pushes[0].baseUrl, 'https://ct-cve.example.invalid')
+  assert.equal(result.targetsConfigured, 1)
+  assert.equal(result.targetsPushed, 1)
+})
+
 test('reports target failures without stopping later targets', async () => {
   const result = await runCtCveInventoryPushes({
     targets: [

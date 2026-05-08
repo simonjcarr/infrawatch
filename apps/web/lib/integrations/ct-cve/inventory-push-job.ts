@@ -5,6 +5,7 @@ import {
   type CtCveInventorySnapshot,
 } from './inventory-export.ts'
 import type { CtCveConnectionStatusRepository } from './connection-status.ts'
+import { listCtCveInventoryPushTargetsFromSettings } from './connector-settings.ts'
 
 export interface CtCveInventoryPushTarget {
   name: string
@@ -38,6 +39,7 @@ interface BuildSnapshotOptions {
 }
 
 type BuildSnapshot = (options: BuildSnapshotOptions) => Promise<CtCveInventorySnapshot>
+type LoadTargets = (env?: NodeJS.ProcessEnv) => Promise<CtCveInventoryPushTarget[]>
 type PushSnapshot = (options: {
   baseUrl: string
   token: CtCveInventoryPushTarget['token']
@@ -148,15 +150,27 @@ export function getConfiguredCtCveInventoryPushTargets(
   return parseCtCveInventoryPushTargets(env.CT_CVE_INVENTORY_PUSH_TARGETS)
 }
 
+async function getCtCveInventoryPushTargetsForJob(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<CtCveInventoryPushTarget[]> {
+  const stored = await listCtCveInventoryPushTargetsFromSettings()
+  if (stored.settingsCount > 0) {
+    return stored.targets
+  }
+  return getConfiguredCtCveInventoryPushTargets(env)
+}
+
 export async function runCtCveInventoryPushes(options: {
   targets?: CtCveInventoryPushTarget[]
   env?: NodeJS.ProcessEnv
+  loadTargets?: LoadTargets
   buildSnapshot?: BuildSnapshot
   pushSnapshot?: PushSnapshot
   statusRepository?: CtCveConnectionStatusRepository
   maxPagesPerTarget?: number
 } = {}): Promise<CtCveInventoryPushJobResult> {
-  const targets = options.targets ?? getConfiguredCtCveInventoryPushTargets(options.env)
+  const loadTargets = options.loadTargets ?? getCtCveInventoryPushTargetsForJob
+  const targets = options.targets ?? await loadTargets(options.env)
   const buildSnapshot = options.buildSnapshot ?? ((snapshotOptions) => buildCtCveInventorySnapshot(snapshotOptions))
   const pushSnapshot = options.pushSnapshot ?? pushCtCveInventorySnapshot
   const maxPagesPerTarget = Math.max(1, options.maxPagesPerTarget ?? DEFAULT_MAX_PAGES_PER_TARGET)

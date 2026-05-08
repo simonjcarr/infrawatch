@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createRateLimiter } from '@/lib/rate-limit'
 import {
-  getConfiguredCtCveServiceTokens,
   verifyCtCveServiceRequest,
   type CtCveServiceAuthError,
 } from '@/lib/integrations/ct-cve/service-token'
+import { getCtCveServiceTokensForOrg } from '@/lib/integrations/ct-cve/connector-settings'
 import {
   CtCveFindingBatchValidationError,
   ingestCtCveFindingBatch,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }, 400)
   }
 
-  const tokens = getConfiguredCtCveServiceTokens()
+  const tokens = await getCtCveServiceTokensForOrg(orgId)
   if (tokens.length === 0) {
     return errorResponse({
       code: 'ct_cve_not_configured',

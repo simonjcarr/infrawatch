@@ -435,6 +435,13 @@
       "when": 1778108400000,
       "tag": "0061_totp_verified",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1778228100000,
+      "tag": "0062_ct_cve_connector_settings",
+      "breakpoints": true
     }
   ]
 }

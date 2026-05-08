@@ -40,8 +40,12 @@ test('password manager uses the shared generator to populate a login password fi
 
   await page.getByRole('button', { name: 'New entry' }).click()
   await expect(page.getByRole('dialog', { name: 'New login' })).toBeVisible()
+  await expect(page.getByTestId('password-manager-entry-dialog')).toHaveClass(/sm:max-w-xl/)
+  await expect(page.getByTestId('password-manager-entry-field-password')).toHaveClass(/sm:col-span-2/)
+
   await page.getByRole('button', { name: 'Generate password' }).click()
   await expect(page.getByRole('dialog', { name: 'Password Generator' })).toBeVisible()
+  await expect(page.getByTestId('password-manager-generator-dialog')).toHaveClass(/sm:max-w-5xl/)
 
   await page.getByLabel('Password length', { exact: true }).fill('28')
   await page.getByRole('button', { name: 'Use password' }).click()

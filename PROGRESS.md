@@ -15,6 +15,25 @@
 
 ## What Has Been Built
 
+### Session 123 — Password Manager generator integration layout
+
+**Password Generator embedded layout** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/password-generator/password-generator.spec.ts`)
+- Widened the Password Manager entry dialog so template forms have room for
+  inline password-generation controls.
+- Made template password fields span the full form width when generation is
+  available, preventing the label action from compressing the password input.
+- Widened the embedded shared Password Generator dialog used from Password
+  Manager entries while leaving the standalone generator features unchanged.
+- Added E2E layout assertions covering the Password Manager entry dialog,
+  generated-password field wrapper, and embedded generator dialog sizing.
+
+**Validation**
+- `pnpm install --frozen-lockfile`
+- `pnpm --filter web type-check`
+- `pnpm --filter web lint -- 'app/(dashboard)/password-manager/password-manager-client.tsx' tests/e2e/password-generator/password-generator.spec.ts`
+- `pnpm --filter web exec playwright test --list tests/e2e/password-generator/password-generator.spec.ts`
+- `git diff --check`
+
 ### Session 122 — Patch Status history chart semantics
 
 **Patch Status check history chart** (`apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`, `apps/web/lib/checks/history-chart.ts`)

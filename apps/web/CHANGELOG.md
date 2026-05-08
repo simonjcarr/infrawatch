@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.120.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.119.0...web/v0.120.0) (2026-05-08)
+
+
+### Features
+
+* **web:** add CarrTech logo and favicon ([b46f58d](https://github.com/carrtech-dev/ct-ops/commit/b46f58dc86c8889483251b120711a16238826bcb))
+
+
+### Bug Fixes
+
+* **web:** update patch status chart semantics ([c49c095](https://github.com/carrtech-dev/ct-ops/commit/c49c095d8d8baddf8373ab838de24fba5e57b285))
+
 ## [0.119.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.118.0...web/v0.119.0) (2026-05-08)
 
 

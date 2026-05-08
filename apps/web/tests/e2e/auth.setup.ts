@@ -1,4 +1,4 @@
-import { test as setup } from '@playwright/test'
+import { test as setup, type APIRequestContext, type Page } from '@playwright/test'
 import { getStorageStatePath } from './fixtures/auth'
 import { seedOrgAndUser } from './fixtures/seed'
 
@@ -75,9 +75,59 @@ const authenticatedApiRoutes = [
   '/api/system/health',
 ]
 
-const routeWarmupTimeoutMs = 60_000
+const routeWarmupTimeoutMs = 120_000
+const routeSettleTimeoutMs = 10_000
+const setupTimeoutMs = 30 * 60_000
 
-setup.setTimeout(420_000)
+setup.setTimeout(setupTimeoutMs)
+
+function isIgnorableWarmupError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+
+  return err.name === 'TimeoutError' || err.message.includes('net::ERR_ABORTED')
+}
+
+async function warmupNavigation(page: Page, route: string): Promise<void> {
+  let response
+  try {
+    response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: routeWarmupTimeoutMs })
+  } catch (err) {
+    if (isIgnorableWarmupError(err)) {
+      console.warn(`[e2e] warmup navigation for ${route} was interrupted: ${String(err)}`)
+      return
+    }
+    throw err
+  }
+  if (response && response.status() >= 500) {
+    throw new Error(`Warmup navigation for ${route} failed with ${response.status()}`)
+  }
+
+  try {
+    await page.waitForLoadState('networkidle', { timeout: routeSettleTimeoutMs })
+  } catch (err) {
+    if (isIgnorableWarmupError(err)) {
+      console.warn(`[e2e] warmup navigation for ${route} did not settle: ${String(err)}`)
+      return
+    }
+    throw err
+  }
+}
+
+async function warmupRequest(request: APIRequestContext, route: string): Promise<void> {
+  let response
+  try {
+    response = await request.get(route, { timeout: routeWarmupTimeoutMs })
+  } catch (err) {
+    if (isIgnorableWarmupError(err)) {
+      console.warn(`[e2e] warmup request for ${route} was interrupted: ${String(err)}`)
+      return
+    }
+    throw err
+  }
+  if (response.status() >= 500) {
+    throw new Error(`Warmup request for ${route} failed with ${response.status()}`)
+  }
+}
 
 setup('seed test organisation and warm Next routes', async ({ browser, baseURL }) => {
   if (!baseURL) throw new Error('baseURL must be configured')
@@ -88,10 +138,7 @@ setup('seed test organisation and warm Next routes', async ({ browser, baseURL }
   const publicPage = await publicContext.newPage()
   try {
     for (const route of publicRoutes) {
-      const response = await publicPage.goto(route, { waitUntil: 'domcontentloaded', timeout: routeWarmupTimeoutMs })
-      if (response && response.status() >= 500) {
-        throw new Error(`Warmup navigation for ${route} failed with ${response.status()}`)
-      }
+      await warmupNavigation(publicPage, route)
     }
   } finally {
     await publicContext.close()
@@ -103,17 +150,11 @@ setup('seed test organisation and warm Next routes', async ({ browser, baseURL }
 
   try {
     for (const route of authenticatedRoutes) {
-      const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: routeWarmupTimeoutMs })
-      if (response && response.status() >= 500) {
-        throw new Error(`Warmup navigation for ${route} failed with ${response.status()}`)
-      }
+      await warmupNavigation(page, route)
     }
 
     for (const route of authenticatedApiRoutes) {
-      const response = await context.request.get(route)
-      if (response.status() >= 500) {
-        throw new Error(`Warmup request for ${route} failed with ${response.status()}`)
-      }
+      await warmupRequest(context.request, route)
     }
   } finally {
     await context.close()

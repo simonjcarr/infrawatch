@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.121.1...web/v0.122.0) (2026-05-08)
+
+
+### Features
+
+* **web:** configure CT-CVE connector in app ([415cac3](https://github.com/carrtech-dev/ct-ops/commit/415cac391aff1ade72dbb35c8a8f137838bf5189))
+
 ## [0.121.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.121.0...web/v0.121.1) (2026-05-08)
 
 

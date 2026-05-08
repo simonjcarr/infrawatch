@@ -115,11 +115,14 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
 
   const { mutate: doAdd, isPending: isAdding } = useMutation({
     mutationFn: (hostId: string) => addHostToNetwork(orgId, network.id, hostId),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['network', orgId, network.id] })
-      queryClient.invalidateQueries({ queryKey: ['network-memberships', orgId, network.id] })
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['network', orgId, network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['network-memberships', orgId, network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+      ])
       setAddOpen(false)
       setSearch('')
     },
@@ -127,10 +130,14 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
 
   const { mutate: doRemove, isPending: isRemoving } = useMutation({
     mutationFn: (hostId: string) => removeHostFromNetwork(orgId, network.id, hostId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['network', orgId, network.id] })
-      queryClient.invalidateQueries({ queryKey: ['network-memberships', orgId, network.id] })
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+    onSuccess: async (result) => {
+      if ('error' in result) return
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['network', orgId, network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['network-memberships', orgId, network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+      ])
       setRemoveTarget(null)
     },
   })

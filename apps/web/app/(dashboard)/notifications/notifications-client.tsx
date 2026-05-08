@@ -275,49 +275,61 @@ export function NotificationsClient({
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => markAsRead(orgId, id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['notifications', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] }),
+      ])
     },
   })
 
   const markAllMutation = useMutation({
     mutationFn: () => markAllAsRead(orgId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['notifications', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] }),
+      ])
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteNotification(orgId, id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['notifications', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-stats', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-time-series', orgId] }),
+      ])
     },
   })
 
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: string[]) => deleteNotifications(orgId, ids),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['notifications', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-stats', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-time-series', orgId] }),
+      ])
       setSelectedIds(new Set())
-      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-stats', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-time-series', orgId] })
     },
   })
 
   const bulkMarkReadMutation = useMutation({
     mutationFn: ({ ids, read }: { ids: string[]; read: boolean }) =>
       markBatchReadStatus(orgId, ids, read),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['notifications', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] }),
+        qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] }),
+      ])
       setSelectedIds(new Set())
-      qc.invalidateQueries({ queryKey: ['notifications', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
     },
   })
 

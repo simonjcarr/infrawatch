@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.123.0...web/v0.123.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **calendar:** improve operations calendar layouts ([1f8f474](https://github.com/carrtech-dev/ct-ops/commit/1f8f474e35a36f09c5e7a530a5b51ce648d455a1))
+
 ## [0.123.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.4...web/v0.123.0) (2026-05-08)
 
 

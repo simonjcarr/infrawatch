@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.2...web/v0.122.3) (2026-05-08)
+
+
+### Bug Fixes
+
+* **notifications:** await inbox mutation refreshes ([c922465](https://github.com/carrtech-dev/ct-ops/commit/c92246520baa5e9059da2902157b494e7e0dd38a)), closes [#998](https://github.com/carrtech-dev/ct-ops/issues/998)
+
 ## [0.122.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.1...web/v0.122.2) (2026-05-08)
 
 

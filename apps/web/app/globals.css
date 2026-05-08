@@ -193,7 +193,8 @@
   --fc-today-bg-color: color-mix(in oklch, var(--primary) 8%, transparent);
   --fc-now-indicator-color: oklch(0.62 0.19 27);
   --fc-small-font-size: 0.75rem;
-  min-height: 680px;
+  height: calc(100svh - 12rem);
+  min-height: 560px;
   position: relative;
 }
 
@@ -232,7 +233,7 @@
 }
 
 .ct-ops-calendar .fc-timegrid-slot {
-  height: 2.25rem;
+  height: 2rem;
 }
 
 .ct-ops-calendar .fc-timegrid-slot-minor {
@@ -242,6 +243,23 @@
 .ct-ops-calendar .fc-daygrid-day-number {
   padding: 0.35rem;
   font-size: 0.75rem;
+}
+
+.ct-ops-calendar .fc-daygrid-body,
+.ct-ops-calendar .fc-daygrid-body table {
+  width: 100% !important;
+}
+
+.ct-ops-calendar .fc-daygrid-day-frame {
+  min-height: 7.5rem;
+}
+
+.ct-ops-calendar .fc-dayGridMonth-view .fc-scrollgrid-sync-table {
+  height: 100% !important;
+}
+
+.ct-ops-calendar .fc-dayGridMonth-view .fc-daygrid-day-frame {
+  min-height: 6.5rem;
 }
 
 .ct-ops-calendar .fc-multimonth {
@@ -259,6 +277,10 @@
   padding: 0.45rem;
   font-size: 0.8rem;
   font-weight: 650;
+}
+
+.ct-ops-calendar .fc-multimonth .fc-daygrid-day-frame {
+  min-height: 3rem;
 }
 
 .ct-ops-calendar-event {

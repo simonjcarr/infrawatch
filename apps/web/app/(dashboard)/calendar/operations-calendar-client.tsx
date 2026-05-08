@@ -11,6 +11,7 @@ import type {
   CalendarApi,
   DateSelectArg,
   DatesSetArg,
+  DayCellContentArg,
   EventClickArg,
   EventContentArg,
   EventDropArg,
@@ -152,11 +153,30 @@ const WEEKDAY_LABELS: Record<CalendarWeekday, string> = {
   su: 'Sun',
 }
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
+
 function getInitialRange(): CalendarRange {
   const now = new Date()
   const startsAt = new Date(now.getFullYear(), now.getMonth(), 1)
   const endsAt = new Date(now.getFullYear(), now.getMonth() + 1, 1)
   return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() }
+}
+
+function formatMonthYear(date: Date): string {
+  return `${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`
+}
+
+function formatDayMonthYear(date: Date): string {
+  return `${date.getDate()} ${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`
+}
+
+function startOfWeekMonday(date: Date): Date {
+  const start = new Date(date)
+  const day = start.getDay()
+  const offset = day === 0 ? -6 : 1 - day
+  start.setDate(start.getDate() + offset)
+  start.setHours(0, 0, 0, 0)
+  return start
 }
 
 function toDateTimeLocal(value: string | Date): string {
@@ -269,6 +289,10 @@ function renderEventContent(arg: EventContentArg) {
   )
 }
 
+function renderDayCellContent(arg: DayCellContentArg) {
+  return `${arg.date.getDate()} ${MONTH_LABELS[arg.date.getMonth()]}`
+}
+
 function getCalendarApi(ref: React.RefObject<FullCalendar | null>): CalendarApi | null {
   return ref.current?.getApi() ?? null
 }
@@ -287,6 +311,7 @@ export function OperationsCalendarClient({
   const calendarRef = useRef<FullCalendar | null>(null)
   const queryClient = useQueryClient()
   const [range, setRange] = useState<CalendarRange>(getInitialRange)
+  const [periodDate, setPeriodDate] = useState(() => new Date())
   const [currentView, setCurrentView] = useState<CalendarViewId>('full-week')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [draft, setDraft] = useState<EventDraft>(() => createDraft())
@@ -419,6 +444,7 @@ export function OperationsCalendarClient({
   function handleDatesSet(arg: DatesSetArg) {
     const view = VIEW_OPTIONS.find((item) => item.viewName === arg.view.type)
     if (view) setCurrentView(view.id)
+    setPeriodDate(arg.view.currentStart)
     setRange({ startsAt: arg.start.toISOString(), endsAt: arg.end.toISOString() })
   }
 
@@ -512,6 +538,11 @@ export function OperationsCalendarClient({
   const hostOptions = 'hosts' in hostsQuery.data ? hostsQuery.data.hosts : initialHosts
   const userOptions = 'users' in usersQuery.data ? usersQuery.data.users : initialUsers
   const calendarError = calendarQuery.data && 'error' in calendarQuery.data ? calendarQuery.data.error : null
+  const currentPeriodTitle = useMemo(() => {
+    if (currentView === 'month' || currentView === 'year') return formatMonthYear(periodDate)
+    if (currentView === 'work-week' || currentView === 'full-week') return `W/B ${formatDayMonthYear(startOfWeekMonday(periodDate))}`
+    return formatDayMonthYear(periodDate)
+  }, [currentView, periodDate])
 
   return (
     <div className="flex min-h-[calc(100svh-3rem)] flex-col gap-4">
@@ -544,6 +575,12 @@ export function OperationsCalendarClient({
             <ChevronRight className="size-4" />
           </Button>
         </div>
+        <div
+          className="order-3 min-w-full text-center text-sm font-semibold text-foreground sm:order-none sm:min-w-0"
+          data-testid="calendar-period-title"
+        >
+          {currentPeriodTitle}
+        </div>
         <div className="flex flex-wrap items-center gap-1">
           {VIEW_OPTIONS.map((option) => (
             <Button
@@ -566,7 +603,7 @@ export function OperationsCalendarClient({
         </div>
       ) : null}
 
-      <div className="ct-ops-calendar flex-1 overflow-hidden rounded-lg border bg-card">
+      <div className="ct-ops-calendar flex-1 overflow-auto rounded-lg border bg-card">
         {calendarQuery.isFetching ? (
           <div className="absolute right-8 top-32 z-10 inline-flex items-center rounded-md border bg-popover px-2 py-1 text-xs text-muted-foreground shadow-sm">
             <Loader2 className="mr-1 size-3 animate-spin" />
@@ -579,10 +616,23 @@ export function OperationsCalendarClient({
           initialView="timeGridWeek"
           headerToolbar={false}
           views={{
+            timeGridDay: {
+              dayHeaderFormat: { weekday: 'long' },
+            },
+            timeGridWeek: {
+              dayHeaderFormat: { weekday: 'short', day: 'numeric', month: 'short' },
+            },
             timeGridWorkWeek: {
               type: 'timeGridWeek',
               weekends: false,
               buttonText: 'Work Week',
+              dayHeaderFormat: { weekday: 'short', day: 'numeric', month: 'short' },
+            },
+            dayGridMonth: {
+              dayHeaderFormat: { weekday: 'short' },
+            },
+            multiMonthYear: {
+              dayHeaderFormat: { weekday: 'short' },
             },
           }}
           firstDay={1}
@@ -593,11 +643,19 @@ export function OperationsCalendarClient({
           eventDurationEditable={canEdit}
           selectMirror
           height="100%"
-          slotMinTime="06:00:00"
-          slotMaxTime="22:00:00"
-          expandRows
+          slotMinTime="00:00:00"
+          slotMaxTime="24:00:00"
+          slotDuration="00:30:00"
+          slotLabelInterval="00:30:00"
+          slotLabelFormat={{ hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' }}
+          scrollTime="09:00:00"
+          expandRows={false}
+          dayCellContent={renderDayCellContent}
           dayMaxEvents={4}
+          fixedWeekCount
+          showNonCurrentDates
           multiMonthMaxColumns={3}
+          multiMonthTitleFormat={{ month: 'short' }}
           events={events}
           datesSet={handleDatesSet}
           select={handleSelect}

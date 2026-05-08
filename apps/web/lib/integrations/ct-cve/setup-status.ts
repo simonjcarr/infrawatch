@@ -3,20 +3,24 @@ import {
   type CtCveConnectionStatus,
   type CtCveConnectionStatusRepository,
 } from './connection-status.ts'
-import { parseCtCveInventoryPushTargets } from './inventory-push-job.ts'
 import {
-  parseCtCveServiceTokens,
   type CtCveServiceTokenScope,
 } from './service-token.ts'
+import {
+  getCtCveConnectorSettingsSummary,
+  type CtCveConnectorSettingsRepository,
+  type CtCveConnectorSettingsSummary,
+} from './connector-settings.ts'
 
 interface BuildOverviewOptions {
   orgId: string
-  env?: NodeJS.ProcessEnv
+  settingsRepository?: CtCveConnectorSettingsRepository
   statusRepository?: CtCveConnectionStatusRepository
 }
 
 export interface CtCveConnectorSetupOverview {
   configured: boolean
+  enabled: boolean
   inbound: {
     configured: boolean
     tokenCount: number
@@ -36,81 +40,61 @@ export interface CtCveConnectorSetupOverview {
   status: CtCveConnectionStatus
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 function sortedScopes(scopes: Iterable<CtCveServiceTokenScope>): CtCveServiceTokenScope[] {
   return Array.from(new Set(scopes)).sort()
 }
 
-function summariseInboundTokens(orgId: string, env: NodeJS.ProcessEnv): CtCveConnectorSetupOverview['inbound'] {
-  try {
-    const tokens = parseCtCveServiceTokens(env.CT_CVE_SERVICE_TOKENS)
-      .filter((token) => token.orgId === orgId)
-    const activeTokens = tokens.filter((token) => !token.revoked)
-
-    return {
-      configured: activeTokens.length > 0,
-      tokenCount: activeTokens.length,
-      revokedTokenCount: tokens.length - activeTokens.length,
-      scopes: sortedScopes(activeTokens.flatMap((token) => token.scopes)),
-      error: null,
-    }
-  } catch (error) {
-    return {
-      configured: false,
-      tokenCount: 0,
-      revokedTokenCount: 0,
-      scopes: [],
-      error: `CT_CVE_SERVICE_TOKENS: ${errorMessage(error)}`,
-    }
+function summariseInboundTokens(
+  settings: CtCveConnectorSettingsSummary | null,
+): CtCveConnectorSetupOverview['inbound'] {
+  const configured = Boolean(settings?.enabled && settings.hasCtCveTokenSecret)
+  return {
+    configured,
+    tokenCount: configured ? 1 : 0,
+    revokedTokenCount: 0,
+    scopes: configured ? sortedScopes(['connection:read', 'findings:write']) : [],
+    error: null,
   }
 }
 
 function summariseInventoryPushTargets(
-  orgId: string,
-  env: NodeJS.ProcessEnv,
+  settings: CtCveConnectorSettingsSummary | null,
 ): CtCveConnectorSetupOverview['inventoryPush'] {
-  try {
-    const targets = parseCtCveInventoryPushTargets(env.CT_CVE_INVENTORY_PUSH_TARGETS)
-      .filter((target) => target.token.orgId === orgId)
-      .map((target) => ({
-        name: target.name,
-        baseUrl: target.baseUrl,
-      }))
-
-    return {
-      configured: targets.length > 0,
-      targetCount: targets.length,
-      targets,
-      error: null,
-    }
-  } catch (error) {
-    return {
-      configured: false,
-      targetCount: 0,
-      targets: [],
-      error: `CT_CVE_INVENTORY_PUSH_TARGETS: ${errorMessage(error)}`,
-    }
+  const configured = Boolean(settings?.enabled && settings.hasInventoryTokenSecret)
+  return {
+    configured,
+    targetCount: configured ? 1 : 0,
+    targets: configured ? [{ name: settings!.name, baseUrl: settings!.baseUrl }] : [],
+    error: null,
   }
 }
 
 export async function buildCtCveConnectorSetupOverview({
   orgId,
-  env = process.env,
+  settingsRepository,
   statusRepository,
 }: BuildOverviewOptions): Promise<CtCveConnectorSetupOverview> {
-  const inbound = summariseInboundTokens(orgId, env)
-  const inventoryPush = summariseInventoryPushTargets(orgId, env)
-  const configured = inbound.configured || inventoryPush.configured
-  const status = await getCtCveConnectionStatus(orgId, {
+  const repository = settingsRepository ?? {
+    getSummary: getCtCveConnectorSettingsSummary,
+  }
+  const settings = await repository.getSummary(orgId)
+  const inbound = summariseInboundTokens(settings)
+  const inventoryPush = summariseInventoryPushTargets(settings)
+  const configured = Boolean(settings)
+  const enabled = Boolean(settings?.enabled)
+  const storedStatus = await getCtCveConnectionStatus(orgId, {
     configured,
     repository: statusRepository,
   })
+  const status = {
+    ...storedStatus,
+    configured,
+    enabled,
+  }
 
   return {
     configured,
+    enabled,
     inbound,
     inventoryPush,
     status,

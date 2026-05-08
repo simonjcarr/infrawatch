@@ -3,38 +3,23 @@ import assert from 'node:assert/strict'
 
 import { buildCtCveConnectorSetupOverview } from './setup-status.ts'
 
-const secret = Buffer.from('ct-cve connector setup unit test secret').toString('base64url')
-
-test('summarises CT-CVE connector setup without exposing service-token secrets', async () => {
+test('summarises DB-backed CT-CVE connector settings without exposing token identifiers or secrets', async () => {
   const overview = await buildCtCveConnectorSetupOverview({
     orgId: 'org_1',
-    env: {
-      CT_CVE_SERVICE_TOKENS: JSON.stringify([
-        {
-          id: 'ct-cve-inbound',
-          secret,
-          orgId: 'org_1',
-          scopes: ['findings:write', 'connection:read'],
-        },
-        {
-          id: 'other-org',
-          secret,
-          orgId: 'org_2',
-          scopes: ['findings:write'],
-        },
-      ]),
-      CT_CVE_INVENTORY_PUSH_TARGETS: JSON.stringify([
-        {
+    settingsRepository: {
+      async getSummary(orgId) {
+        assert.equal(orgId, 'org_1')
+        return {
+          organisationId: 'org_1',
+          enabled: true,
           name: 'Primary CT-CVE',
-          baseUrl: 'https://ct-cve.example.invalid/',
-          token: {
-            id: 'ct-ops-inventory',
-            secret,
-            orgId: 'org_1',
-            scopes: ['inventory:write'],
-          },
-        },
-      ]),
+          baseUrl: 'https://ct-cve.example.invalid',
+          inventoryTokenId: 'ctops_inventory_org_1',
+          ctCveTokenId: 'ctcve_findings_org_1',
+          hasInventoryTokenSecret: true,
+          hasCtCveTokenSecret: true,
+        }
+      },
     },
     statusRepository: {
       async get(orgId) {
@@ -58,6 +43,7 @@ test('summarises CT-CVE connector setup without exposing service-token secrets',
   })
 
   assert.equal(overview.configured, true)
+  assert.equal(overview.enabled, true)
   assert.equal(overview.status.lastInventoryPushAt, '2026-05-01T09:00:00.000Z')
   assert.deepEqual(overview.inbound, {
     configured: true,
@@ -72,23 +58,18 @@ test('summarises CT-CVE connector setup without exposing service-token secrets',
     targets: [{ name: 'Primary CT-CVE', baseUrl: 'https://ct-cve.example.invalid' }],
     error: null,
   })
-  assert.equal(JSON.stringify(overview).includes(secret), false)
-  assert.equal(JSON.stringify(overview).includes('ct-cve-inbound'), false)
-  assert.equal(JSON.stringify(overview).includes('ct-ops-inventory'), false)
+  assert.equal(JSON.stringify(overview).includes('ctcve_findings_org_1'), false)
+  assert.equal(JSON.stringify(overview).includes('ctops_inventory_org_1'), false)
 })
 
-test('reports malformed connector environment without throwing', async () => {
+test('reports missing CT-CVE app settings as unconfigured', async () => {
   const overview = await buildCtCveConnectorSetupOverview({
     orgId: 'org_1',
-    env: {
-      CT_CVE_SERVICE_TOKENS: '{not json',
-      CT_CVE_INVENTORY_PUSH_TARGETS: JSON.stringify([
-        {
-          name: 'broken',
-          baseUrl: 'https://ct-cve.example.invalid',
-          token: { id: 'id', secret: 'short', orgId: 'org_1', scopes: ['inventory:write'] },
-        },
-      ]),
+    settingsRepository: {
+      async getSummary(orgId) {
+        assert.equal(orgId, 'org_1')
+        return null
+      },
     },
     statusRepository: {
       async get() {
@@ -101,9 +82,8 @@ test('reports malformed connector environment without throwing', async () => {
   })
 
   assert.equal(overview.configured, false)
+  assert.equal(overview.enabled, false)
   assert.equal(overview.inbound.configured, false)
-  assert.match(overview.inbound.error ?? '', /CT_CVE_SERVICE_TOKENS/)
   assert.equal(overview.inventoryPush.configured, false)
-  assert.match(overview.inventoryPush.error ?? '', /token\.secret/)
   assert.equal(overview.status.configured, false)
 })

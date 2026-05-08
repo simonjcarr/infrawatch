@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { CarrTechLogo } from '@/components/shared/carrtech-logo'
 
 const resetPasswordSchema = z
   .object({
@@ -79,8 +80,9 @@ export function ResetPasswordForm({ token, callbackURL }: ResetPasswordFormProps
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">CT-Ops</h1>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <CarrTechLogo className="w-48 shadow-xs ring-1 ring-border" priority />
+          <h1 className="sr-only">CT-Ops</h1>
           <p className="text-sm text-muted-foreground mt-1">Choose a new password for your account</p>
         </div>
         <Card>

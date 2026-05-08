@@ -15,6 +15,25 @@
 
 ## What Has Been Built
 
+### Session 125 — System agent error details
+
+**Agent task error storage and display** (`apps/ingest/internal/db/queries/task_runs.sql.go`, `apps/web/app/api/system/health/route.ts`, `apps/web/app/(dashboard)/settings/system/system-client.tsx`)
+- Added `task_run_hosts.error_message` so failed agent task results keep the
+  final error separately from incremental progress output.
+- Updated the System Health API to return a short agent-error summary plus full
+  detail text.
+- Updated the Administration → System Agent Errors table to show the summary
+  inline and expose a View more dialog for the full error.
+- Extended System page E2E coverage to seed a failed software inventory task and
+  assert summary/detail behavior.
+
+**Validation**
+- `pnpm --filter web db:validate`
+- `pnpm --filter web type-check`
+- `pnpm --filter web lint -- 'app/(dashboard)/settings/system/system-client.tsx' app/api/system/health/route.ts tests/e2e/settings/system-health.spec.ts`
+- `go test ./apps/ingest/internal/db/queries ./apps/ingest/internal/handlers`
+- `pnpm --filter web test:e2e tests/e2e/settings/system-health.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 124 — Password Manager entry password visibility
 
 **Entry form password reveal controls** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

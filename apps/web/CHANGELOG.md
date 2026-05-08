@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.3...web/v0.122.4) (2026-05-08)
+
+
+### Bug Fixes
+
+* **web:** update favicon asset ([#1185](https://github.com/carrtech-dev/ct-ops/issues/1185)) ([bb520b6](https://github.com/carrtech-dev/ct-ops/commit/bb520b629d775a048f0eda5b69cc59cd276d2d12))
+
 ## [0.122.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.122.2...web/v0.122.3) (2026-05-08)
 
 

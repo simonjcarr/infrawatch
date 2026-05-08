@@ -185,6 +185,127 @@
   cursor: default !important;
 }
 
+/* ── Operations Calendar ──────────────────────────────────────────────────── */
+.ct-ops-calendar {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-today-bg-color: color-mix(in oklch, var(--primary) 8%, transparent);
+  --fc-now-indicator-color: oklch(0.62 0.19 27);
+  --fc-small-font-size: 0.75rem;
+  min-height: 680px;
+  position: relative;
+}
+
+.ct-ops-calendar .fc {
+  height: 100%;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.ct-ops-calendar .fc-scrollgrid,
+.ct-ops-calendar .fc-theme-standard td,
+.ct-ops-calendar .fc-theme-standard th {
+  border-color: var(--border);
+}
+
+.ct-ops-calendar .fc-col-header-cell,
+.ct-ops-calendar .fc-timegrid-axis,
+.ct-ops-calendar .fc-daygrid-day-frame,
+.ct-ops-calendar .fc-multimonth,
+.ct-ops-calendar .fc-multimonth-month {
+  background: var(--card);
+}
+
+.ct-ops-calendar .fc-col-header-cell-cushion,
+.ct-ops-calendar .fc-daygrid-day-number,
+.ct-ops-calendar .fc-timegrid-slot-label-cushion,
+.ct-ops-calendar .fc-multimonth-title {
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.ct-ops-calendar .fc-col-header-cell-cushion {
+  padding: 0.45rem 0.25rem;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.ct-ops-calendar .fc-timegrid-slot {
+  height: 2.25rem;
+}
+
+.ct-ops-calendar .fc-timegrid-slot-minor {
+  border-top-style: dashed;
+}
+
+.ct-ops-calendar .fc-daygrid-day-number {
+  padding: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.ct-ops-calendar .fc-multimonth {
+  border: 0;
+  padding: 0.75rem;
+}
+
+.ct-ops-calendar .fc-multimonth-month {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.ct-ops-calendar .fc-multimonth-title {
+  padding: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.ct-ops-calendar-event {
+  border: 0 !important;
+  border-radius: 5px !important;
+  padding: 1px 3px !important;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
+}
+
+.ct-ops-calendar-event--maintenance {
+  background-color: oklch(0.50 0.13 245) !important;
+}
+
+.ct-ops-calendar-event--patching {
+  background-color: oklch(0.54 0.15 145) !important;
+}
+
+.ct-ops-calendar-event--application {
+  background-color: oklch(0.55 0.14 35) !important;
+}
+
+.ct-ops-calendar-event--change {
+  background-color: oklch(0.48 0.14 285) !important;
+}
+
+.ct-ops-calendar-event--meeting {
+  background-color: oklch(0.50 0.10 205) !important;
+}
+
+.ct-ops-calendar-event--other {
+  background-color: oklch(0.48 0.03 260) !important;
+}
+
+.ct-ops-calendar-event--completed {
+  opacity: 0.72;
+}
+
+.ct-ops-calendar-event--cancelled {
+  opacity: 0.48;
+  text-decoration: line-through;
+}
+
+.ct-ops-calendar-event--exception {
+  outline: 2px solid rgb(255 255 255 / 45%);
+  outline-offset: -2px;
+}
+
 /* ── Build Docs rich Markdown editor ───────────────────────────────────────── */
 .build-doc-markdown-editor {
   --basePageBg: var(--background);

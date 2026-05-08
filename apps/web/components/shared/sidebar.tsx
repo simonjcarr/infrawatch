@@ -23,6 +23,7 @@ import {
   FolderSearch,
   ScanSearch,
   Lock,
+  CalendarDays,
 } from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import {
@@ -71,6 +72,7 @@ interface NavItem {
 
 const primaryNav: NavItem[] = [
   { title: 'Overview', href: '/dashboard', icon: BarChart3 },
+  { title: 'Operations Calendar', href: '/calendar', icon: CalendarDays },
   {
     title: 'Hosts',
     href: '/hosts',

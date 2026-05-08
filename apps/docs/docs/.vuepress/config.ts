@@ -70,6 +70,7 @@ export default defineUserConfig({
           '/features/alerts.md',
           '/features/notifications.md',
           '/features/reports.md',
+          '/features/operations-calendar.md',
           '/features/terminal.md',
           '/features/service-accounts.md',
           '/features/directory-lookup.md',

@@ -20,6 +20,7 @@ const authenticatedRoutes = [
   '/build-docs',
   '/build-docs/e2e-warmup',
   '/bundlers',
+  '/calendar',
   '/certificate-checker',
   '/certificates',
   '/certificates/e2e-warmup',

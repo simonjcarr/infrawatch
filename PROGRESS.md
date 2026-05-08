@@ -15,6 +15,37 @@
 
 ## What Has Been Built
 
+### Session 126 — Operations Calendar planning
+
+**Shared planning calendar** (`apps/web/app/(dashboard)/calendar`, `apps/web/lib/actions/calendar.ts`, `apps/web/lib/db/schema/calendar.ts`)
+- Added an Operations Calendar dashboard page for human planning of maintenance,
+  patching, application work, change windows, meetings, and other operational
+  events. Engineers and admins can create/edit/delete; read-only users can view.
+- Added Outlook-style Day, Work Week, Full Week, Month, and Year views using
+  FullCalendar with drag/drop and resize persistence through server actions.
+- Added host links and user participants with roles: owner, requester,
+  implementer, approver, reviewer, and observer.
+- Added daily/weekly/monthly/yearly recurrence storage with bounded server-side
+  expansion and single-occurrence exceptions for moved recurring instances.
+
+**Persistence, security, and audit**
+- Added `calendar_events`, `calendar_event_hosts`, and
+  `calendar_event_participants` with org-scoped RLS, indexes, idempotent create
+  support via `client_request_id`, and occurrence-exception uniqueness.
+- Calendar mutations validate input on the server, enforce org ownership for
+  linked hosts/users, rate-limit writes, and emit audit events.
+- Added sidebar/command-palette entries, docs, E2E fixture cleanup, and route
+  warmup coverage.
+
+**Validation**
+- `node --experimental-strip-types --test apps/web/lib/calendar/recurrence.test.mjs apps/web/lib/actions/calendar-source.test.mjs`
+- `pnpm --dir apps/web db:validate`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint 'app/(dashboard)/calendar/page.tsx' 'app/(dashboard)/calendar/operations-calendar-client.tsx' lib/actions/calendar.ts lib/calendar/recurrence.ts lib/db/schema/calendar.ts components/shared/sidebar.tsx components/shared/command-palette/providers.tsx tests/e2e/calendar/calendar.spec.ts tests/e2e/auth.setup.ts tests/e2e/fixtures/db.ts`
+- `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=local-build-secret DATABASE_URL=postgres://test:test@localhost:5432/ctops_test pnpm --dir apps/web build` (passes with existing Turbopack NFT warnings and expected placeholder-secret Better Auth warnings)
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/calendar/calendar.spec.ts`
+- `pnpm --dir apps/web test:e2e tests/e2e/calendar/calendar.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 125 — System agent error details
 
 **Agent task error storage and display** (`apps/ingest/internal/db/queries/task_runs.sql.go`, `apps/web/app/api/system/health/route.ts`, `apps/web/app/(dashboard)/settings/system/system-client.tsx`)

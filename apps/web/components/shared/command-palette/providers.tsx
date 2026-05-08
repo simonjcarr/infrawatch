@@ -8,6 +8,7 @@ import {
   Bell,
   BellPlus,
   BookOpen,
+  CalendarDays,
   FileBarChart,
   FolderSearch,
   HeartPulse,
@@ -31,6 +32,7 @@ import type { CommandPaletteItem } from './types'
 
 const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-dashboard', label: 'Overview', icon: BarChart3, href: '/dashboard', keywords: ['home', 'start'] },
+  { id: 'nav-calendar', label: 'Operations Calendar', icon: CalendarDays, href: '/calendar', keywords: ['calendar', 'maintenance', 'patching', 'events'] },
   { id: 'nav-hosts', label: 'Hosts', icon: Server, href: '/hosts', keywords: ['servers', 'machines'] },
   { id: 'nav-host-groups', label: 'Host Groups', icon: Layers, href: '/hosts/groups' },
   { id: 'nav-networks', label: 'Networks', icon: Network, href: '/hosts/networks' },

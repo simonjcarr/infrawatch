@@ -73,6 +73,11 @@ export function NotificationBell({ orgId }: NotificationBellProps) {
     window.location.assign(path)
   }
 
+  async function handleNotificationSelect(notification: Notification) {
+    await markReadMutation.mutateAsync(notification.id)
+    navigateTo(getResourceUrl(notification.resourceType, notification.resourceId))
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -121,8 +126,7 @@ export function NotificationBell({ orgId }: NotificationBellProps) {
                 data-testid={`notification-bell-item-${n.id}`}
                 onSelect={(event) => {
                   event.preventDefault()
-                  markReadMutation.mutate(n.id)
-                  navigateTo(getResourceUrl(n.resourceType, n.resourceId))
+                  void handleNotificationSelect(n)
                 }}
               >
                   {severityDot(n.severity)}

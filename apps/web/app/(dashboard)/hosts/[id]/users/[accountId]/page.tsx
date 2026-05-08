@@ -17,7 +17,7 @@ export default async function LocalUserDetailPage({
   const orgId = session.user.organisationId!
   const { id: hostId, accountId } = await params
 
-  const result = await getServiceAccount(orgId, accountId)
+  const result = await getServiceAccount(orgId, accountId, hostId)
   if (!result) notFound()
 
   return (

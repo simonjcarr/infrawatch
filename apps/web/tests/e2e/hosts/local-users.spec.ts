@@ -190,23 +190,23 @@ test('authenticated user can review host local users and open a user detail page
   await expect(page.getByRole('row', { name: /backup-svc/i })).toBeVisible()
   await expect(page.getByRole('row', { name: /legacy-daemon/i })).toBeVisible()
 
-  await page.getByPlaceholder('Search by username...').fill('backup')
-  await expect(page.getByRole('row', { name: /backup-svc/i })).toBeVisible()
-  await expect(page.getByRole('row', { name: /alice-admin/i })).toHaveCount(0)
+  await page.getByTestId('local-users-search').fill('backup')
+  await expect(page.getByTestId('local-user-row-local-user-backup')).toBeVisible()
+  await expect(page.getByTestId('local-user-row-local-user-alice')).toHaveCount(0)
 
-  await page.getByPlaceholder('Search by username...').fill('')
+  await page.getByTestId('local-users-search').fill('')
 
-  await page.getByRole('combobox').nth(0).click()
+  await page.getByTestId('local-users-type-filter').click()
   await page.getByRole('option', { name: 'Human' }).click()
-  await expect(page.getByRole('row', { name: /alice-admin/i })).toBeVisible()
-  await expect(page.getByRole('row', { name: /backup-svc/i })).toHaveCount(0)
+  await expect(page.getByTestId('local-user-row-local-user-alice')).toBeVisible()
+  await expect(page.getByTestId('local-user-row-local-user-backup')).toHaveCount(0)
 
-  await page.getByRole('combobox').nth(1).click()
+  await page.getByTestId('local-users-status-filter').click()
   await page.getByRole('option', { name: 'Active' }).click()
-  await expect(page.getByRole('row', { name: /alice-admin/i })).toBeVisible()
-  await expect(page.getByRole('row', { name: /legacy-daemon/i })).toHaveCount(0)
+  await expect(page.getByTestId('local-user-row-local-user-alice')).toBeVisible()
+  await expect(page.getByTestId('local-user-row-local-user-daemon')).toHaveCount(0)
 
-  await page.getByRole('row', { name: /alice-admin/i }).click()
+  await page.getByTestId('local-user-row-local-user-alice').click()
 
   await expect(page).toHaveURL(/\/hosts\/local-users-host\/users\/local-user-alice$/)
   await expect(page.getByRole('heading', { name: 'alice-admin' })).toBeVisible()

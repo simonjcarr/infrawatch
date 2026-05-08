@@ -63,10 +63,11 @@ export function LocalUsersTab({ orgId, hostId }: LocalUsersTabProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
+            data-testid="local-users-search"
           />
         </div>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as ServiceAccountType | 'all')}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-36" data-testid="local-users-type-filter">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -77,7 +78,7 @@ export function LocalUsersTab({ orgId, hostId }: LocalUsersTabProps) {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ServiceAccountStatus | 'all')}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-36" data-testid="local-users-status-filter">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -126,6 +127,7 @@ export function LocalUsersTab({ orgId, hostId }: LocalUsersTabProps) {
                   <TableRow
                     key={account.id}
                     className="cursor-pointer hover:bg-muted/50"
+                    data-testid={`local-user-row-${account.id}`}
                     onClick={() => router.push(`/hosts/${hostId}/users/${account.id}`)}
                   >
                     <TableCell className="font-medium font-mono text-sm">

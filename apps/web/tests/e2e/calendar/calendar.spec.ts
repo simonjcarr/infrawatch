@@ -166,6 +166,32 @@ test('read-only users can view calendar events but cannot create them', async ({
   await expect(page.getByTestId('calendar-new-event')).toHaveCount(0)
 })
 
+test('calendar views use operational calendar labels and grid structure', async ({ authenticatedPage: page }) => {
+  await page.goto('/calendar')
+  await expect(page.getByTestId('operations-calendar-heading')).toBeVisible()
+
+  await page.getByTestId('calendar-view-work-week').click()
+  await expect(page.getByTestId('calendar-period-title')).toContainText(/^W\/B \d{1,2} [A-Z][a-z]{2} \d{4}$/)
+  await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '9 AM' }).first()).toBeVisible()
+  await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '9:30 AM' }).first()).toBeVisible()
+  await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '5 PM' }).first()).toBeVisible()
+  await expect(page.locator('.fc-col-header-cell').filter({ hasText: 'Sun' })).toHaveCount(0)
+
+  await page.getByTestId('calendar-view-full-week').click()
+  await expect(page.locator('.fc-col-header-cell').filter({ hasText: /Mon \d{1,2} [A-Z][a-z]{2}/ }).first()).toBeVisible()
+  await expect(page.locator('.fc-col-header-cell').filter({ hasText: /Sun \d{1,2} [A-Z][a-z]{2}/ }).first()).toBeVisible()
+
+  await page.getByTestId('calendar-view-month').click()
+  await expect(page.getByTestId('calendar-period-title')).toContainText(/^[A-Z][a-z]{2} \d{4}$/)
+  await expect(page.locator('.fc-daygrid-day')).toHaveCount(42)
+  await expect(page.locator('.fc-daygrid-day-frame').first()).toBeVisible()
+  await expect(page.locator('.fc-daygrid-day-number').filter({ hasText: /[A-Z][a-z]{2}/ }).first()).toBeVisible()
+
+  await page.getByTestId('calendar-view-year').click()
+  await expect(page.locator('.fc-multimonth-title').filter({ hasText: /^[A-Z][a-z]{2}$/ }).first()).toBeVisible()
+  await expect(page.locator('.fc-daygrid-day')).not.toHaveCount(0)
+})
+
 declare global {
   interface Window {
     __ctOpsCalendarTestMoveEvent?: (input: {

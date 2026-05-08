@@ -3267,7 +3267,10 @@ function PasswordManagerWorkspace({
           </Card>
 
           <Dialog open={entryDialogOpen} onOpenChange={setEntryDialogOpen}>
-            <DialogContent>
+            <DialogContent
+              className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-xl"
+              data-testid="password-manager-entry-dialog"
+            >
               <DialogHeader>
                 <DialogTitle>
                   {isViewingEntry ? 'View' : editingEntryId ? 'Edit' : 'New'} {activeEntryTemplate.dialogLabel}
@@ -3394,9 +3397,15 @@ function PasswordManagerWorkspace({
                     const canCopySshField =
                       isViewingEntry && activeEntryTemplate.id === 'ssh-key-pair' && !!editingEntryId && !!selectedEntry && !!value
                     const canGeneratePassword = field.id === 'password' && !isViewingEntry
+                    const fieldContainerClassName =
+                      field.multiline || canGeneratePassword ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'
 
                     return (
-                      <div key={field.id} className={field.multiline ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'}>
+                      <div
+                        key={field.id}
+                        className={fieldContainerClassName}
+                        data-testid={`password-manager-entry-field-${field.id}`}
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <Label htmlFor={fieldId}>{field.label}</Label>
                           {canGeneratePassword ? (
@@ -3499,7 +3508,10 @@ function PasswordManagerWorkspace({
             </DialogContent>
           </Dialog>
           <Dialog open={passwordGeneratorDialogOpen} onOpenChange={setPasswordGeneratorDialogOpen}>
-            <DialogContent className="max-h-[calc(100vh-2rem)] max-w-4xl overflow-y-auto">
+            <DialogContent
+              className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-5xl"
+              data-testid="password-manager-generator-dialog"
+            >
               <DialogHeader>
                 <DialogTitle>Password Generator</DialogTitle>
                 <DialogDescription>

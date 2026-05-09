@@ -9,9 +9,11 @@ import { users, invitations, sessions } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
+import { getRequiredSession } from '@/lib/auth/session'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { ASSIGNED_ROLES, INVITABLE_ROLES, getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
+import { resolveCurrentActionScope } from './action-scope'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -31,17 +33,19 @@ function hasSuperAdminRole(role: string | null | undefined, roles: readonly stri
 }
 
 export async function getOrgUsers(
-  orgId: string,
+  scopeId?: string,
 ): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
-  await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
+  const currentScope = scopeId ?? resolveCurrentActionScope(session)
+  await requireOrgAccess(currentScope)
 
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({
-      where: and(eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      where: and(eq(users.organisationId, currentScope), isNull(users.deletedAt)),
     }),
     db.query.invitations.findMany({
       where: and(
-        eq(invitations.organisationId, orgId),
+        eq(invitations.organisationId, currentScope),
         isNull(invitations.deletedAt),
         isNull(invitations.acceptedAt),
         gt(invitations.expiresAt, new Date()),

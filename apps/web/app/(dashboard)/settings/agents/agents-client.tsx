@@ -463,7 +463,7 @@ export function AgentsSettingsClient({
                   Applied to every host registered with this token. CLI <code>--tag</code> flags on
                   the agent override these on matching keys.
                 </p>
-                <TagEditor orgId={orgId} value={tokenTags} onChange={setTokenTags} />
+                <TagEditor value={tokenTags} onChange={setTokenTags} />
               </div>
 
               {createMutation.data && 'error' in createMutation.data && (
@@ -494,7 +494,6 @@ export function AgentsSettingsClient({
         open={showBundleDialog}
         onOpenChange={setShowBundleDialog}
         activeTokens={(tokens ?? []).filter((t) => tokenStatus(t).label === 'Active')}
-        orgId={orgId}
       />
     </div>
   )
@@ -510,10 +509,9 @@ interface BundleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   activeTokens: EnrolmentTokenSafe[]
-  orgId: string
 }
 
-function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogProps) {
+function BundleDialog({ open, onOpenChange, activeTokens }: BundleDialogProps) {
   const [os, setOs] = useState<BundleOS>('linux')
   const [arch, setArch] = useState<BundleArch>('amd64')
   const [tokenMode, setTokenMode] = useState<TokenMode>('create')
@@ -818,7 +816,7 @@ function BundleDialog({ open, onOpenChange, activeTokens, orgId }: BundleDialogP
               Baked into <code>agent.toml</code> and applied on every registration from this bundle.
               Overridden by <code>--tag</code> flags on the agent CLI when keys match.
             </p>
-            <TagEditor orgId={orgId} value={bundleTags} onChange={setBundleTags} />
+            <TagEditor value={bundleTags} onChange={setBundleTags} />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

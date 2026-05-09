@@ -9,9 +9,11 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const sources = {
   'alerts.ts': readFileSync(path.join(here, 'alerts.ts'), 'utf8'),
   'checks-core.ts': readFileSync(path.join(here, 'checks-core.ts'), 'utf8'),
+  'host-groups-core.ts': readFileSync(path.join(here, 'host-groups-core.ts'), 'utf8'),
   'host-groups.ts': readFileSync(path.join(here, 'host-groups.ts'), 'utf8'),
   'host-settings.ts': readFileSync(path.join(here, 'host-settings.ts'), 'utf8'),
   'tag-rules.ts': readFileSync(path.join(here, 'tag-rules.ts'), 'utf8'),
+  'tags-core.ts': readFileSync(path.join(here, 'tags-core.ts'), 'utf8'),
   'tags.ts': readFileSync(path.join(here, 'tags.ts'), 'utf8'),
 }
 
@@ -34,18 +36,18 @@ const writeGuardedActions = [
   ['checks-core.ts', 'updateCheck'],
   ['checks-core.ts', 'deleteCheckHistory'],
   ['checks-core.ts', 'deleteCheck'],
-  ['host-groups.ts', 'createGroup'],
-  ['host-groups.ts', 'updateGroup'],
-  ['host-groups.ts', 'deleteGroup'],
-  ['host-groups.ts', 'addHostToGroup'],
-  ['host-groups.ts', 'removeHostFromGroup'],
+  ['host-groups-core.ts', 'createGroup'],
+  ['host-groups-core.ts', 'updateGroup'],
+  ['host-groups-core.ts', 'deleteGroup'],
+  ['host-groups-core.ts', 'addHostToGroup'],
+  ['host-groups-core.ts', 'removeHostFromGroup'],
   ['host-settings.ts', 'updateHostCollectionSettings'],
   ['tag-rules.ts', 'bulkAssignTags'],
   ['tag-rules.ts', 'runTagRule'],
   ['tag-rules.ts', 'runMatchingTagRules'],
-  ['tags.ts', 'assignTagsToResource'],
-  ['tags.ts', 'removeTagFromResource'],
-  ['tags.ts', 'replaceResourceTags'],
+  ['tags-core.ts', 'assignTagsToResource'],
+  ['tags-core.ts', 'removeTagFromResource'],
+  ['tags-core.ts', 'replaceResourceTags'],
 ]
 
 const adminGuardedActions = [
@@ -56,7 +58,7 @@ const adminGuardedActions = [
   ['tag-rules.ts', 'createTagRule'],
   ['tag-rules.ts', 'updateTagRule'],
   ['tag-rules.ts', 'deleteTagRule'],
-  ['tags.ts', 'updateOrgDefaultTags'],
+  ['tags-core.ts', 'updateOrgDefaultTags'],
 ]
 
 test('tenant state mutations require write-capable org access', () => {
@@ -65,7 +67,7 @@ test('tenant state mutations require write-capable org access', () => {
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgWriteAccess\(orgId\)/,
+      /(?:const session = )?await requireOrgWriteAccess\((?:orgId|currentScope)\)/,
       `${fileName} ${action} must reject read-only users before mutating tenant state`,
     )
   }
@@ -77,7 +79,7 @@ test('organisation-wide defaults and rules require org admin access', () => {
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgAdminAccess\(orgId\)/,
+      /(?:const session = )?await requireOrgAdminAccess\((?:orgId|currentScope)\)/,
       `${fileName} ${action} must require org admin access before mutating organisation-wide settings`,
     )
   }

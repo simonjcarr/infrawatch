@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { getHost } from '@/lib/actions/agents'
-import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { getChecksWithHistory } from '@/lib/actions/checks'
 import { listNotesForHost } from '@/lib/actions/notes'
 import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
@@ -11,9 +10,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  let session
   try {
-    session = await getApiOrgSession()
+    await getApiOrgSession()
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return new Response(err.message, { status: err.status })
@@ -22,7 +20,6 @@ export async function GET(
   }
 
   const { id: hostId } = await params
-  const scopeId = resolveCurrentActionScope(session)
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -41,7 +38,7 @@ export async function GET(
       }
       send('update', initial)
       send('checks', await getChecksWithHistory(hostId))
-      send('notes', await listNotesForHost(scopeId, hostId))
+      send('notes', await listNotesForHost(hostId))
 
       // Notes change infrequently compared to metrics — poll them every third
       // tick (≈15s) to keep the DB load down. The counter lives in closure so
@@ -60,7 +57,7 @@ export async function GET(
           send('update', host)
           send('checks', await getChecksWithHistory(hostId))
           if (tick % 3 === 0) {
-            send('notes', await listNotesForHost(scopeId, hostId))
+            send('notes', await listNotesForHost(hostId))
           }
         } catch {
           // transient DB error — skip this tick

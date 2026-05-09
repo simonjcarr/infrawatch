@@ -470,7 +470,7 @@ not primarily metadata editing.
 
 ## Task 8 - Web Host Settings, Notes, Tags, Membership Tabs, And Terminal Conversion
 
-Status: Not started
+Status: In progress
 
 Completed by:
 

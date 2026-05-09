@@ -19,7 +19,6 @@ export interface EditorTag {
 }
 
 export interface TagEditorProps {
-  orgId: string
   value: EditorTag[]
   onChange: (next: EditorTag[]) => void
   disabled?: boolean
@@ -42,7 +41,6 @@ function normKey(k: string): string {
 }
 
 export function TagEditor({
-  orgId,
   value,
   onChange,
   disabled,
@@ -62,9 +60,9 @@ export function TagEditor({
   // Distinct keys (via de-dupe on the client) so typing "env" doesn't fan out
   // into one entry per value.
   const keyQuery = useQuery({
-    queryKey: ['tag-search-keys', orgId, debKey],
+    queryKey: ['tag-search-keys', debKey],
     queryFn: async () => {
-      const rows = await searchTags(orgId, debKey, { limit: 25 })
+      const rows = await searchTags(debKey, { limit: 25 })
       const seen = new Set<string>()
       const uniqueKeys: Array<{ key: string; count: number }> = []
       for (const r of rows) {
@@ -84,8 +82,8 @@ export function TagEditor({
   // dedupe UX — once a user commits "env", only pre-existing values under
   // "env" are suggested.
   const valueQuery = useQuery({
-    queryKey: ['tag-search-values', orgId, keyInput, debValue],
-    queryFn: () => searchTags(orgId, debValue, { key: keyInput.trim(), limit: 10 }),
+    queryKey: ['tag-search-values', keyInput, debValue],
+    queryFn: () => searchTags(debValue, { key: keyInput.trim(), limit: 10 }),
     enabled: valueOpen && keyInput.trim().length > 0,
     staleTime: 5_000,
   })

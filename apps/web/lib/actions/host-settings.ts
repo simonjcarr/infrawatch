@@ -2,6 +2,7 @@
 
 import { logError } from '@/lib/logging'
 import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { getRequiredSession } from '@/lib/auth/session'
 
 import { db } from '@/lib/db'
 import { hosts, organisations, checks } from '@/lib/db/schema'
@@ -10,15 +11,18 @@ import type { HostCollectionSettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { resolveCurrentActionScope } from './action-scope'
 import { createCheck, updateCheck } from '@/lib/actions/checks'
 
 export async function getHostCollectionSettings(
-  orgId: string,
-  hostId: string,
+  ...args: [string] | [string, string]
 ): Promise<HostCollectionSettings> {
-  await requireOrgAccess(orgId)
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  await requireOrgAccess(currentScope)
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
     columns: { metadata: true },
   })
 
@@ -28,18 +32,19 @@ export async function getHostCollectionSettings(
   }
 
   // Fall back to org defaults
-  return getOrgDefaultCollectionSettings(orgId)
+  return getOrgDefaultCollectionSettings(currentScope)
 }
 
 export async function updateHostCollectionSettings(
-  orgId: string,
-  hostId: string,
-  settings: HostCollectionSettings,
+  ...args: [string, HostCollectionSettings] | [string, string, HostCollectionSettings]
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  const session = await getRequiredSession()
+  const [currentScope, hostId, settings] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  await requireOrgWriteAccess(currentScope)
   try {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
       columns: { id: true, metadata: true },
     })
     if (!host) return { error: 'Host not found' }
@@ -53,10 +58,10 @@ export async function updateHostCollectionSettings(
     await db
       .update(hosts)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope)))
 
     // Auto-manage service_account and ssh_key_scan checks based on localUsers toggle
-    await syncLocalUserChecks(orgId, hostId, settings.localUsers)
+    await syncLocalUserChecks(currentScope, hostId, settings.localUsers)
 
     return { success: true }
   } catch (err) {

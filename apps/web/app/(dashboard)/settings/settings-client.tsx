@@ -745,7 +745,6 @@ export function SettingsClient({
         </CardHeader>
         <CardContent className="space-y-4">
           <TagEditor
-            orgId={org.id}
             value={currentDefaultTags}
             onChange={(next) => setLocalDefaultTags(next)}
             disabled={!isAdmin}

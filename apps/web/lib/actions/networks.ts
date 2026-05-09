@@ -1,357 +1,112 @@
 'use server'
 
-import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
-
-import { db } from '@/lib/db'
-import { networks, hostNetworkMemberships, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
-import { hasRole } from '@/lib/auth/guards'
 import { getRequiredSession } from '@/lib/auth/session'
-import type { Network, Host } from '@/lib/db/schema'
-import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
+import { resolveCurrentActionScope } from './action-scope'
+import {
+  addHostToNetwork as addHostToNetworkCore,
+  createNetwork as createNetworkCore,
+  deleteNetwork as deleteNetworkCore,
+  getNetwork as getNetworkCore,
+  listHostsInNetwork as listHostsInNetworkCore,
+  listMembershipsForNetwork as listMembershipsForNetworkCore,
+  listNetworks as listNetworksCore,
+  listNetworksForHost as listNetworksForHostCore,
+  listNetworksWithHosts as listNetworksWithHostsCore,
+  removeHostFromNetwork as removeHostFromNetworkCore,
+  updateNetwork as updateNetworkCore,
+  type NetworkMembershipEntry,
+  type NetworkWithCount,
+  type NetworkWithHosts,
+  type NetworkWithMembership,
+} from './networks-core'
 
-export type NetworkWithCount = Network & { hostCount: number }
-export type NetworkWithMembership = Network & { autoAssigned: boolean }
+export type {
+  NetworkMembershipEntry,
+  NetworkWithCount,
+  NetworkWithHosts,
+  NetworkWithMembership,
+} from './networks-core'
 
-const networkSchema = z.object({
-  name: z.string().min(1).max(100),
-  cidr: z
-    .string()
-    .regex(
-      /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/,
-      'Must be a valid CIDR (e.g. 192.168.1.0/24)',
-    ),
-  description: z.string().max(500).optional(),
-})
-
-// ── Network CRUD ──────────────────────────────────────────────────────────────
-
-export async function listNetworks(orgId: string): Promise<NetworkWithCount[]> {
-  await requireOrgAccess(orgId)
-  const rows = await db.query.networks.findMany({
-    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
-    orderBy: (n, { asc }) => [asc(n.name)],
-  })
-
-  const counts = await db
-    .select({
-      networkId: hostNetworkMemberships.networkId,
-      count: sql<number>`cast(count(*) as int)`,
-    })
-    .from(hostNetworkMemberships)
-    .where(and(eq(hostNetworkMemberships.organisationId, orgId), isNull(hostNetworkMemberships.deletedAt)))
-    .groupBy(hostNetworkMemberships.networkId)
-
-  const countMap = new Map(counts.map((c) => [c.networkId, c.count]))
-
-  return rows.map((n) => ({ ...n, hostCount: countMap.get(n.id) ?? 0 }))
+export async function listNetworks(
+  ...args: [] | [string]
+): Promise<NetworkWithCount[]> {
+  const session = await getRequiredSession()
+  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  return listNetworksCore(currentScope)
 }
 
 export async function getNetwork(
-  orgId: string,
+  scopeId: string,
   networkId: string,
-): Promise<(Network & { members: Host[] }) | null> {
-  await requireOrgAccess(orgId)
-  const network = await db.query.networks.findFirst({
-    where: and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
-  })
-  if (!network) return null
-
-  const members = await listHostsInNetwork(orgId, networkId)
-  return { ...network, members }
+): Promise<(import('@/lib/db/schema').Network & { members: import('@/lib/db/schema').Host[] }) | null> {
+  return getNetworkCore(scopeId, networkId)
 }
 
 export async function createNetwork(
-  orgId: string,
+  scopeId: string,
   data: { name: string; cidr: string; description?: string },
-): Promise<{ success: true; network: Network } | { error: string }> {
-  try {
-    await requireOrgAdminAccess(orgId)
-  } catch {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  const parsed = networkSchema.safeParse(data)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
-  }
-
-  try {
-    const rows = await db
-      .insert(networks)
-      .values({
-        organisationId: orgId,
-        name: parsed.data.name,
-        cidr: parsed.data.cidr,
-        description: parsed.data.description ?? null,
-      })
-      .returning()
-    const network = rows[0]
-    if (!network) return { error: 'Failed to create network' }
-    return { success: true, network }
-  } catch (err) {
-    logError('Failed to create network:', err)
-    return { error: 'Failed to create network' }
-  }
+): Promise<{ success: true; network: import('@/lib/db/schema').Network } | { error: string }> {
+  return createNetworkCore(scopeId, data)
 }
 
 export async function updateNetwork(
-  orgId: string,
+  scopeId: string,
   networkId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true } | { error: string }> {
-  try {
-    await requireOrgAdminAccess(orgId)
-  } catch {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  const parsed = networkSchema.safeParse(data)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
-  }
-
-  try {
-    const result = await db
-      .update(networks)
-      .set({
-        name: parsed.data.name,
-        cidr: parsed.data.cidr,
-        description: parsed.data.description ?? null,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)))
-      .returning({ id: networks.id })
-
-    if (result.length === 0) return { error: 'Network not found' }
-    return { success: true }
-  } catch (err) {
-    logError('Failed to update network:', err)
-    return { error: 'Failed to update network' }
-  }
+  return updateNetworkCore(scopeId, networkId, data)
 }
 
 export async function deleteNetwork(
-  orgId: string,
+  scopeId: string,
   networkId: string,
 ): Promise<{ success: true } | { error: string }> {
-  try {
-    await requireOrgAdminAccess(orgId)
-  } catch {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  try {
-    const result = await db
-      .update(networks)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)))
-      .returning({ id: networks.id })
-
-    if (result.length === 0) return { error: 'Network not found' }
-
-    // Soft-delete all memberships for this network
-    await db
-      .update(hostNetworkMemberships)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          eq(hostNetworkMemberships.networkId, networkId),
-          eq(hostNetworkMemberships.organisationId, orgId),
-          isNull(hostNetworkMemberships.deletedAt),
-        ),
-      )
-
-    return { success: true }
-  } catch (err) {
-    logError('Failed to delete network:', err)
-    return { error: 'Failed to delete network' }
-  }
+  return deleteNetworkCore(scopeId, networkId)
 }
 
-// ── Membership ────────────────────────────────────────────────────────────────
-
 export async function addHostToNetwork(
-  orgId: string,
-  networkId: string,
-  hostId: string,
+  ...args: [string, string] | [string, string, string]
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  try {
-    const existing = await db.query.hostNetworkMemberships.findFirst({
-      where: and(
-        eq(hostNetworkMemberships.networkId, networkId),
-        eq(hostNetworkMemberships.hostId, hostId),
-        eq(hostNetworkMemberships.organisationId, orgId),
-      ),
-    })
-
-    if (existing) {
-      if (!existing.deletedAt) return { error: 'Host is already in this network' }
-      // Restore soft-deleted membership
-      await db
-        .update(hostNetworkMemberships)
-        .set({ deletedAt: null, autoAssigned: false, updatedAt: new Date() })
-        .where(eq(hostNetworkMemberships.id, existing.id))
-      return { success: true }
-    }
-
-    await db.insert(hostNetworkMemberships).values({
-      organisationId: orgId,
-      networkId,
-      hostId,
-      autoAssigned: false,
-    })
-    return { success: true }
-  } catch (err) {
-    logError('Failed to add host to network:', err)
-    return { error: 'Failed to add host to network' }
-  }
+  const [currentScope, networkId, hostId] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  return addHostToNetworkCore(currentScope, networkId, hostId)
 }
 
 export async function removeHostFromNetwork(
-  orgId: string,
-  networkId: string,
-  hostId: string,
+  ...args: [string, string] | [string, string, string]
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
   const session = await getRequiredSession()
-  if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  try {
-    const result = await db
-      .update(hostNetworkMemberships)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          eq(hostNetworkMemberships.networkId, networkId),
-          eq(hostNetworkMemberships.hostId, hostId),
-          eq(hostNetworkMemberships.organisationId, orgId),
-          isNull(hostNetworkMemberships.deletedAt),
-        ),
-      )
-      .returning({ id: hostNetworkMemberships.id })
-
-    if (result.length === 0) return { error: 'Membership not found' }
-    return { success: true }
-  } catch (err) {
-    logError('Failed to remove host from network:', err)
-    return { error: 'Failed to remove host from network' }
-  }
+  const [currentScope, networkId, hostId] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  return removeHostFromNetworkCore(currentScope, networkId, hostId)
 }
 
-export async function listHostsInNetwork(orgId: string, networkId: string): Promise<Host[]> {
-  await requireOrgAccess(orgId)
-  const members = await db.query.hostNetworkMemberships.findMany({
-    where: and(
-      eq(hostNetworkMemberships.networkId, networkId),
-      eq(hostNetworkMemberships.organisationId, orgId),
-      isNull(hostNetworkMemberships.deletedAt),
-    ),
-    columns: { hostId: true },
-  })
-
-  if (members.length === 0) return []
-
-  const hostIds = members.map((m) => m.hostId)
-
-  const hostRows = await db.query.hosts.findMany({
-    where: and(eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-  })
-
-  return hostRows.filter((h) => hostIds.includes(h.id))
-}
-
-export type NetworkMembershipEntry = {
-  hostId: string
-  autoAssigned: boolean
+export async function listHostsInNetwork(
+  scopeId: string,
+  networkId: string,
+): Promise<import('@/lib/db/schema').Host[]> {
+  return listHostsInNetworkCore(scopeId, networkId)
 }
 
 export async function listMembershipsForNetwork(
-  orgId: string,
+  scopeId: string,
   networkId: string,
 ): Promise<NetworkMembershipEntry[]> {
-  await requireOrgAccess(orgId)
-  const rows = await db.query.hostNetworkMemberships.findMany({
-    where: and(
-      eq(hostNetworkMemberships.networkId, networkId),
-      eq(hostNetworkMemberships.organisationId, orgId),
-      isNull(hostNetworkMemberships.deletedAt),
-    ),
-    columns: { hostId: true, autoAssigned: true },
-  })
-  return rows
+  return listMembershipsForNetworkCore(scopeId, networkId)
 }
 
-export type NetworkWithHosts = Network & { hosts: Host[] }
-
-export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithHosts[]> {
-  await requireOrgAccess(orgId)
-  const networkRows = await db.query.networks.findMany({
-    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
-    orderBy: (n, { asc }) => [asc(n.name)],
-  })
-
-  if (networkRows.length === 0) return []
-
-  const memberships = await db
-    .select({
-      networkId: hostNetworkMemberships.networkId,
-      host: hosts,
-    })
-    .from(hostNetworkMemberships)
-    .innerJoin(hosts, eq(hostNetworkMemberships.hostId, hosts.id))
-    .where(
-      and(
-        eq(hostNetworkMemberships.organisationId, orgId),
-        isNull(hostNetworkMemberships.deletedAt),
-        isNull(hosts.deletedAt),
-      ),
-    )
-
-  const hostsByNetwork = new Map<string, Host[]>()
-  memberships.forEach(({ networkId, host }) => {
-    const arr = hostsByNetwork.get(networkId) ?? []
-    arr.push(host)
-    hostsByNetwork.set(networkId, arr)
-  })
-
-  return networkRows.map((network) => ({
-    ...network,
-    hosts: hostsByNetwork.get(network.id) ?? [],
-  }))
+export async function listNetworksWithHosts(
+  scopeId: string,
+): Promise<NetworkWithHosts[]> {
+  return listNetworksWithHostsCore(scopeId)
 }
 
-export async function listNetworksForHost(orgId: string, hostId: string): Promise<NetworkWithMembership[]> {
-  await requireOrgAccess(orgId)
-  const members = await db.query.hostNetworkMemberships.findMany({
-    where: and(
-      eq(hostNetworkMemberships.hostId, hostId),
-      eq(hostNetworkMemberships.organisationId, orgId),
-      isNull(hostNetworkMemberships.deletedAt),
-    ),
-    columns: { networkId: true, autoAssigned: true },
-  })
-
-  if (members.length === 0) return []
-
-  const networkIds = members.map((m) => m.networkId)
-  const autoMap = new Map(members.map((m) => [m.networkId, m.autoAssigned]))
-
-  const networkRows = await db.query.networks.findMany({
-    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
-  })
-
-  return networkRows
-    .filter((n) => networkIds.includes(n.id))
-    .map((n) => ({ ...n, autoAssigned: autoMap.get(n.id) ?? false }))
+export async function listNetworksForHost(
+  ...args: [string] | [string, string]
+): Promise<NetworkWithMembership[]> {
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return listNetworksForHostCore(currentScope, hostId)
 }

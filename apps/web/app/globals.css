@@ -311,7 +311,7 @@
 .ct-ops-calendar-time-day-stack > .ct-ops-calendar-event {
   position: absolute;
   left: 0.25rem;
-  right: 0.25rem;
+  width: calc(100% - 0.5rem);
   z-index: 2;
 }
 

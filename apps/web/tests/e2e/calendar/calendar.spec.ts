@@ -165,6 +165,41 @@ test('dragging one recurring occurrence creates an exception without moving the 
   expect(rows[1]!.starts_at).toContain('2026-05-12 11:00:00')
 })
 
+test('overlapping timed calendar events render side by side', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { orgId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO calendar_events (id, organisation_id, created_by, title, starts_at, ends_at, all_day, timezone, status, category)
+    VALUES
+      ('calendar-overlap-1', ${orgId}, ${userId}, 'First overlapping maintenance', '2026-05-08T10:00:00Z', '2026-05-08T11:00:00Z', false, 'UTC', 'planned', 'maintenance'),
+      ('calendar-overlap-2', ${orgId}, ${userId}, 'Second overlapping maintenance', '2026-05-08T10:00:00Z', '2026-05-08T11:00:00Z', false, 'UTC', 'planned', 'patching')
+  `
+
+  await page.clock.setFixedTime(CALENDAR_TEST_NOW)
+  await page.goto('/calendar')
+
+  const firstEvent = page.getByTestId('calendar-rendered-event-calendar-overlap-1')
+  const secondEvent = page.getByTestId('calendar-rendered-event-calendar-overlap-2')
+  await expect(firstEvent).toBeVisible()
+  await expect(secondEvent).toBeVisible()
+
+  const [firstBox, secondBox, dayBox] = await Promise.all([
+    firstEvent.boundingBox(),
+    secondEvent.boundingBox(),
+    page.getByTestId('calendar-time-day-2026-05-08').boundingBox(),
+  ])
+
+  expect(firstBox).not.toBeNull()
+  expect(secondBox).not.toBeNull()
+  expect(dayBox).not.toBeNull()
+  expect(Math.abs(firstBox!.y - secondBox!.y)).toBeLessThanOrEqual(1)
+  expect(Math.abs(firstBox!.width - secondBox!.width)).toBeLessThanOrEqual(1)
+  expect(firstBox!.x + firstBox!.width).toBeLessThanOrEqual(secondBox!.x + 1)
+  expect(firstBox!.width).toBeLessThan(dayBox!.width * 0.6)
+  expect(secondBox!.width).toBeLessThan(dayBox!.width * 0.6)
+})
+
 test('read-only users can view calendar events but cannot create them', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { orgId, userId } = await getOrgAndUserIds(sql)

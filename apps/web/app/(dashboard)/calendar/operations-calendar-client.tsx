@@ -36,6 +36,7 @@ import {
   type CalendarHostOption,
   type CalendarUserOption,
 } from '@/lib/actions/calendar'
+import { getTimedEventLayouts } from '@/lib/calendar/timed-layout'
 import {
   CALENDAR_EVENT_CATEGORIES,
   CALENDAR_EVENT_STATUSES,
@@ -661,6 +662,7 @@ export function OperationsCalendarClient({
             {days.map((day) => {
               const dayKey = localDateKey(day)
               const timedEvents = eventsForDay(calendarEvents, day).filter((event) => !event.allDay)
+              const eventLayouts = getTimedEventLayouts(timedEvents)
               return (
                 <div key={dayKey} className="ct-ops-calendar-time-day-stack" data-testid={`calendar-time-day-${dayKey}`}>
                   {TIME_SLOTS.map((minutes, index) => {
@@ -681,6 +683,10 @@ export function OperationsCalendarClient({
                     )
                   })}
                   {timedEvents.map((event) => {
+                    const layout = eventLayouts[event.id] ?? {
+                      leftPercent: 0,
+                      widthPercent: 100,
+                    }
                     const dayStart = startOfDay(day)
                     const startsAt = new Date(event.startsAt)
                     const endsAt = new Date(event.endsAt)
@@ -694,6 +700,8 @@ export function OperationsCalendarClient({
                         event={event}
                         onOpen={openEdit}
                         style={{
+                          left: `calc(${layout.leftPercent}% + 0.25rem)`,
+                          width: `calc(${layout.widthPercent}% - 0.5rem)`,
                           top: `calc(${topSlots} * var(--ct-ops-calendar-time-slot-height) + 2px)`,
                           height: `max(1.5rem, calc(${heightSlots} * var(--ct-ops-calendar-time-slot-height) - 4px))`,
                         }}

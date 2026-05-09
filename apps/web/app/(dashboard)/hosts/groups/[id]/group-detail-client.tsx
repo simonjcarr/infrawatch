@@ -71,7 +71,7 @@ import {
   deleteTaskRuns,
 } from '@/lib/actions/task-runs'
 import type { HostGroupWithMembers } from '@/lib/actions/host-groups'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 import type {
   Host,
   PatchTaskConfig,

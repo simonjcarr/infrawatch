@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { listHosts, type HostWithAgent } from '@/lib/actions/agents'
+import { listHosts } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 
 export type TransferBundle = {
   fileName: string

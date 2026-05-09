@@ -53,7 +53,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getHost, getHostMetrics, getHeartbeatHistory, deleteHost, uninstallAndDeleteHost } from '@/lib/actions/agents'
-import type { HostWithAgent, MetricsPreset, MetricsQuery, HeartbeatPoint } from '@/lib/actions/agents'
+import type { HeartbeatPoint, HostWithAgent, MetricsPreset, MetricsQuery } from '@/lib/actions/agents-core'
 import { useHostStream } from '@/hooks/use-host-stream'
 import { useChartZoom } from '@/hooks/use-chart-zoom'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'

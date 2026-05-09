@@ -31,7 +31,7 @@ import { getSoftwareInventorySettings, updateSoftwareInventorySettings } from '@
 import { getOrgDefaultTags, updateOrgDefaultTags } from '@/lib/actions/tags'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import type { TagPair } from '@/lib/db/schema'
-import type { OrgTerminalSettings } from '@/lib/actions/terminal'
+import type { OrgTerminalSettings } from '@/lib/actions/terminal-core'
 import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput, SmtpRelayTestLogEntry } from '@/lib/actions/notification-settings'
 import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'

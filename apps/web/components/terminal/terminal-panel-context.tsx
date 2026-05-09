@@ -22,7 +22,6 @@ export interface TerminalSessionBinding {
   hostname: string
   username: string
   password?: string
-  orgId: string
   directAccess: false
 }
 
@@ -60,7 +59,6 @@ interface TerminalPanelActions {
     hostname: string
     username: string
     password: string
-    orgId: string
     directAccess: false
   }) => void
   closeTab: (tabId: string) => void
@@ -194,7 +192,6 @@ function isValidBinding(value: unknown): value is TerminalSessionBinding {
     typeof b.hostId === 'string' &&
     typeof b.hostname === 'string' &&
     typeof b.username === 'string' &&
-    typeof b.orgId === 'string' &&
     b.directAccess === false
   )
 }
@@ -330,7 +327,6 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
       hostname: string
       username: string
       password: string
-      orgId: string
       directAccess: false
     }) => {
       const tabId = createId()

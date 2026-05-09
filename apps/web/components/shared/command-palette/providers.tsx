@@ -52,7 +52,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-build-docs', label: 'Build Docs', icon: BookOpen, href: '/build-docs', keywords: ['runbooks', 'build documents'] },
   { id: 'nav-tasks', label: 'Scheduled Tasks', icon: Activity, href: '/tasks' },
   { id: 'nav-people', label: 'People', icon: Users, href: '/team', keywords: ['team', 'members', 'users'] },
-  { id: 'nav-organisation', label: 'Organisation', icon: Settings, href: '/settings', keywords: ['settings', 'profile'] },
+  { id: 'nav-instance', label: 'Instance', icon: Settings, href: '/settings', keywords: ['settings', 'profile'] },
   { id: 'nav-agents-admin', label: 'Agents', icon: Server, href: '/settings/agents', keywords: ['enrolment', 'defaults'] },
   { id: 'nav-monitoring-admin', label: 'Monitoring Settings', icon: BellPlus, href: '/settings/monitoring', keywords: ['alerts', 'retention'] },
   { id: 'nav-integrations-admin', label: 'Integrations', icon: Key, href: '/settings/integrations', keywords: ['ldap', 'smtp', 'directory'] },
@@ -79,10 +79,10 @@ export function useNavigationItems(userRole: string): CommandPaletteItem[] {
   )
 }
 
-export function useHostItems(orgId: string, enabled: boolean): CommandPaletteItem[] {
+export function useHostItems(enabled: boolean): CommandPaletteItem[] {
   const { data } = useQuery({
-    queryKey: ['command-palette', 'hosts', orgId],
-    queryFn: () => listHosts(orgId),
+    queryKey: ['command-palette', 'hosts'],
+    queryFn: () => listHosts(),
     enabled,
     staleTime: 30_000,
   })

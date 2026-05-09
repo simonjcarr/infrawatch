@@ -167,7 +167,6 @@ export function TerminalSession({
         term.writeln(`\x1b[90mConnecting to ${binding.hostname} as ${binding.username} over SSH...\x1b[0m`)
 
         const result = await createTerminalSession(
-          binding.orgId,
           binding.hostId,
           binding.username,
         )

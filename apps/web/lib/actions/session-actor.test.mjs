@@ -5,11 +5,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const agentsSource = readFileSync(path.join(here, 'agents.ts'), 'utf8')
+const agentsSource = readFileSync(path.join(here, 'agents-core.ts'), 'utf8')
 const alertsSource = readFileSync(path.join(here, 'alerts.ts'), 'utf8')
 
 function getActionSegment(source, action) {
-  const start = source.indexOf(`export async function ${action}`)
+  const start = source.lastIndexOf(`export async function ${action}`)
   assert.notEqual(start, -1, `expected ${action} to exist`)
   const next = source.indexOf('\nexport async function ', start + 1)
   return source.slice(start, next === -1 ? undefined : next)

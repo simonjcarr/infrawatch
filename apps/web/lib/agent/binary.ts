@@ -24,6 +24,9 @@ interface GitHubRelease {
   assets: GitHubAsset[]
 }
 
+const LATEST_RELEASE_CACHE_TTL_MS = 5 * 60 * 1000
+let latestReleaseCache: { release: GitHubRelease | null; expiresAt: number } | null = null
+
 export function binaryBaseName(os: AgentOS, arch: AgentArch): string {
   const suffix = os === 'windows' ? '.exe' : ''
   return `ct-ops-agent-${os}-${arch}${suffix}`
@@ -42,26 +45,26 @@ export async function resolveAgentBinary(
 ): Promise<{ bytes: Buffer; fileName: string } | null> {
   const baseName = binaryBaseName(os, arch)
   const suffix = os === 'windows' ? '.exe' : ''
-  const versionedName = `ct-ops-agent-${os}-${arch}-${REQUIRED_AGENT_VERSION}${suffix}`
-  const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
 
-  const cachedVersioned = await readVerifiedLocalBinary(versionedPath, baseName)
-  if (cachedVersioned) {
-    return { bytes: cachedVersioned, fileName: baseName }
+  const latestRelease = await fetchLatestAgentRelease()
+  const latestVersion = versionFromAgentTag(latestRelease?.tag_name)
+  if (latestRelease && latestVersion) {
+    const latest = await resolveFromRelease(latestRelease, latestVersion, os, arch, baseName, suffix)
+    if (latest) return latest
   }
 
   const tag = `agent/${REQUIRED_AGENT_VERSION}`
-  const release = await fetchRelease(tag)
-  if (release?.tag_name === tag) {
-    const asset = release.assets.find((a) => a.name === baseName)
-    const checksumAsset = release.assets.find((a) => a.name === `${baseName}.sha256`)
-    if (asset && checksumAsset) {
-      const verified = await fetchVerifiedBinaryFromGitHub(asset, checksumAsset, baseName)
-      if (verified) {
-        await cacheLocally(versionedPath, verified.bytes, verified.checksumLine)
-        return { bytes: Buffer.from(verified.bytes), fileName: baseName }
-      }
-    }
+  const requiredRelease = latestRelease?.tag_name === tag ? latestRelease : await fetchRelease(tag)
+  if (requiredRelease?.tag_name === tag) {
+    const required = await resolveFromRelease(
+      requiredRelease,
+      REQUIRED_AGENT_VERSION,
+      os,
+      arch,
+      baseName,
+      suffix,
+    )
+    if (required) return required
   }
 
   const unversionedPath = path.join(AGENT_DIST_DIR, baseName)
@@ -84,9 +87,9 @@ export async function resolveAgentBinary(
 
 export function binaryUnavailableMessage(os: AgentOS, arch: AgentArch): string {
   return (
-    `No binary available for ${os}/${arch} (required version: ${REQUIRED_AGENT_VERSION}). ` +
+    `No binary available for ${os}/${arch} (latest agent release or required version: ${REQUIRED_AGENT_VERSION}). ` +
     `Either place a binary plus matching .sha256 sidecar in AGENT_DIST_DIR (${AGENT_DIST_DIR}) ` +
-    `or ensure a GitHub release exists for tag "agent/${REQUIRED_AGENT_VERSION}" in ` +
+    `or ensure a GitHub agent release exists in ` +
     `${AGENT_REPO_OWNER}/${AGENT_REPO_NAME} with verified binary and checksum assets.`
   )
 }
@@ -97,6 +100,58 @@ const ghHeaders: Record<string, string> = {
   ...(process.env.GITHUB_TOKEN
     ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
     : {}),
+}
+
+async function resolveFromRelease(
+  release: GitHubRelease,
+  version: string,
+  os: AgentOS,
+  arch: AgentArch,
+  baseName: string,
+  suffix: string,
+): Promise<{ bytes: Buffer; fileName: string } | null> {
+  const versionedName = `ct-ops-agent-${os}-${arch}-${version}${suffix}`
+  const versionedPath = path.join(AGENT_DIST_DIR, versionedName)
+
+  const cachedVersioned = await readVerifiedLocalBinary(versionedPath, baseName)
+  if (cachedVersioned) {
+    return { bytes: cachedVersioned, fileName: baseName }
+  }
+
+  const asset = release.assets.find((a) => a.name === baseName)
+  const checksumAsset = release.assets.find((a) => a.name === `${baseName}.sha256`)
+  if (!asset || !checksumAsset) return null
+
+  const verified = await fetchVerifiedBinaryFromGitHub(asset, checksumAsset, baseName)
+  if (!verified) return null
+
+  await cacheLocally(versionedPath, verified.bytes, verified.checksumLine)
+  return { bytes: Buffer.from(verified.bytes), fileName: baseName }
+}
+
+async function fetchLatestAgentRelease(): Promise<GitHubRelease | null> {
+  const now = Date.now()
+  if (latestReleaseCache && latestReleaseCache.expiresAt > now) {
+    return latestReleaseCache.release
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${AGENT_REPO_OWNER}/${AGENT_REPO_NAME}/releases?per_page=20`,
+      { headers: ghHeaders },
+    )
+    if (!res.ok) {
+      latestReleaseCache = { release: null, expiresAt: now + LATEST_RELEASE_CACHE_TTL_MS }
+      return null
+    }
+    const releases = (await res.json()) as GitHubRelease[]
+    const release = releases.find((r) => versionFromAgentTag(r.tag_name)) ?? null
+    latestReleaseCache = { release, expiresAt: now + LATEST_RELEASE_CACHE_TTL_MS }
+    return release
+  } catch {
+    latestReleaseCache = { release: null, expiresAt: now + LATEST_RELEASE_CACHE_TTL_MS }
+    return null
+  }
 }
 
 async function fetchRelease(tag: string): Promise<GitHubRelease | null> {
@@ -110,6 +165,11 @@ async function fetchRelease(tag: string): Promise<GitHubRelease | null> {
   } catch {
     return null
   }
+}
+
+function versionFromAgentTag(tag: string | undefined): string | null {
+  const match = tag?.match(/^agent\/(v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$/)
+  return match?.[1] ?? null
 }
 
 async function fetchVerifiedBinaryFromGitHub(

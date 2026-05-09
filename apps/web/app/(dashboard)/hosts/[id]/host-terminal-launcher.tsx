@@ -16,7 +16,7 @@ interface Props {
   accessDeniedReason: string | null
 }
 
-export function HostTerminalLauncher({ orgId, host, directAccess, accessDeniedReason }: Props) {
+export function HostTerminalLauncher({ orgId: _orgId, host, directAccess, accessDeniedReason }: Props) {
   const { openTerminal } = useTerminalPanel()
   const { data: session } = useSession()
 
@@ -70,7 +70,6 @@ export function HostTerminalLauncher({ orgId, host, directAccess, accessDeniedRe
       hostname: host.displayName ?? host.hostname,
       username: username.trim(),
       password,
-      orgId,
       directAccess: false,
     })
     setPassword('')

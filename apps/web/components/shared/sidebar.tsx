@@ -114,7 +114,7 @@ const toolingNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { title: 'People', href: '/team', icon: Users },
-  { title: 'Organisation', href: '/settings', icon: Settings },
+  { title: 'Instance', href: '/settings', icon: Settings },
   { title: 'Agents', href: '/settings/agents', icon: Server },
   { title: 'Monitoring', href: '/settings/monitoring', icon: BellPlus },
   { title: 'Integrations', href: '/settings/integrations', icon: Key },
@@ -256,7 +256,7 @@ const TIER_LABEL: Record<LicenceTier, string> = {
   enterprise: 'Enterprise Edition',
 }
 
-export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: LicenceTier; userRole: string }) {
+export function AppSidebar({ tier, userRole }: { tier: LicenceTier; userRole: string }) {
   const showTooling = canAccessTooling({ role: userRole })
 
   return (
@@ -276,7 +276,7 @@ export function AppSidebar({ orgId, tier, userRole }: { orgId: string; tier: Lic
               <SidebarMenu>
                 <NavGroupItems items={toolingNav} />
                 <SidebarMenuItem>
-                  <TerminalPanelTrigger orgId={orgId} />
+                  <TerminalPanelTrigger />
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>

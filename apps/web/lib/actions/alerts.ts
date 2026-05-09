@@ -35,6 +35,7 @@ import type {
 } from '@/lib/db/schema'
 import { organisations } from '@/lib/db/schema'
 import type { SmtpEncryption } from '@/lib/notifications/smtp-settings'
+import { getRequiredSession } from '@/lib/auth/session'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -456,10 +457,26 @@ export async function acknowledgeAlert(
 }
 
 export async function getActiveAlertCountsForHosts(
+  hostIds: string[],
+): Promise<Record<string, number>>
+export async function getActiveAlertCountsForHosts(
   orgId: string,
   hostIds: string[],
+): Promise<Record<string, number>>
+export async function getActiveAlertCountsForHosts(
+  orgIdOrHostIds: string | string[],
+  maybeHostIds?: string[],
 ): Promise<Record<string, number>> {
-  await requireOrgAccess(orgId)
+  const currentScope = maybeHostIds
+    ? orgIdOrHostIds as string
+    : await (async () => {
+      const session = await getRequiredSession()
+      const orgId = session.user.organisationId
+      if (!orgId) throw new Error('Instance scope is not configured')
+      return orgId
+    })()
+  const hostIds = maybeHostIds ?? orgIdOrHostIds as string[]
+  await requireOrgAccess(currentScope)
   if (hostIds.length === 0) return {}
 
   const rows = await db
@@ -470,7 +487,7 @@ export async function getActiveAlertCountsForHosts(
     .from(alertInstances)
     .where(
       and(
-        eq(alertInstances.organisationId, orgId),
+        eq(alertInstances.organisationId, currentScope),
         eq(alertInstances.status, 'firing'),
         inArray(alertInstances.hostId, hostIds),
       ),

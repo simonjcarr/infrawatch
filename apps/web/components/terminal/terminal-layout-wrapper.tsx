@@ -15,11 +15,11 @@ export function TerminalProviderWrapper({ children }: { children: React.ReactNod
  * Inner wrapper for the main content column. Renders the TerminalPanel at the
  * bottom and lets the page content shrink to fit.
  */
-export function TerminalContentWrapper({ orgId, children }: { orgId: string; children: React.ReactNode }) {
+export function TerminalContentWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col flex-1 min-w-0 min-h-0">
       {children}
-      <TerminalPanel orgId={orgId} />
+      <TerminalPanel />
     </div>
   )
 }

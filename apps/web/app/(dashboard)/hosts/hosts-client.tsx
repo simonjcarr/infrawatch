@@ -62,7 +62,6 @@ import { getActiveAlertCountsForHosts } from '@/lib/actions/alerts'
 type StatusFilter = 'all' | 'online' | 'offline' | 'unknown'
 
 interface HostsClientProps {
-  orgId: string
   currentUserRole: string
   initialHostPage: HostListResult
   initialStats: HostInventoryStats
@@ -197,7 +196,6 @@ function SortableHeader({
 }
 
 export function HostsClient({
-  orgId,
   currentUserRole,
   initialHostPage,
   initialStats,
@@ -271,62 +269,60 @@ export function HostsClient({
     !search && status === 'all' && os === 'all' && sortBy === 'hostname' && sortDir === 'asc' && page === 0
 
   const { data: hostsPage = initialHostPage } = useQuery({
-    queryKey: ['hosts', 'page', orgId, queryParams],
-    queryFn: () => listHostsPaginated(orgId, queryParams),
+    queryKey: ['hosts', 'page', queryParams],
+    queryFn: () => listHostsPaginated(queryParams),
     initialData: filtersAreDefault && pageSize === DEFAULT_PAGE_SIZE ? initialHostPage : undefined,
     placeholderData: keepPreviousData,
     refetchInterval: 30_000,
   })
 
   const { data: stats = initialStats } = useQuery({
-    queryKey: ['hosts', 'stats', orgId],
-    queryFn: () => getHostInventoryStats(orgId),
+    queryKey: ['hosts', 'stats'],
+    queryFn: () => getHostInventoryStats(),
     initialData: initialStats,
     refetchInterval: 30_000,
   })
 
   const { data: osOptions = initialOsOptions } = useQuery({
-    queryKey: ['hosts', 'os-options', orgId],
-    queryFn: () => listDistinctHostOses(orgId),
+    queryKey: ['hosts', 'os-options'],
+    queryFn: () => listDistinctHostOses(),
     initialData: initialOsOptions,
     refetchInterval: 60_000,
   })
 
   const hostRows = hostsPage.hosts
   const { data: alertCounts = {} } = useQuery({
-    queryKey: ['alert-counts', orgId, hostRows.map((h) => h.id)],
+    queryKey: ['alert-counts', hostRows.map((h) => h.id)],
     queryFn: async () => {
       const ids = hostRows.map((h) => h.id)
       if (ids.length === 0) return {}
-      return getActiveAlertCountsForHosts(orgId, ids)
+      return getActiveAlertCountsForHosts(ids)
     },
     enabled: hostRows.length > 0,
     refetchInterval: 30_000,
   })
 
   const { data: pendingAgents = initialPendingAgents } = useQuery({
-    queryKey: ['agents', 'pending', orgId],
-    queryFn: () => listPendingAgents(orgId),
+    queryKey: ['agents', 'pending'],
+    queryFn: () => listPendingAgents(),
     initialData: initialPendingAgents,
     refetchInterval: 15_000,
   })
 
   const approveMutation = useMutation({
-    mutationFn: ({ agentId }: { agentId: string }) =>
-      approveAgent(orgId, agentId),
+    mutationFn: ({ agentId }: { agentId: string }) => approveAgent(agentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents', 'pending', orgId] })
-      queryClient.invalidateQueries({ queryKey: ['hosts', 'page', orgId] })
-      queryClient.invalidateQueries({ queryKey: ['hosts', 'stats', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['agents', 'pending'] })
+      queryClient.invalidateQueries({ queryKey: ['hosts', 'page'] })
+      queryClient.invalidateQueries({ queryKey: ['hosts', 'stats'] })
     },
   })
 
   const rejectMutation = useMutation({
-    mutationFn: ({ agentId }: { agentId: string }) =>
-      rejectAgent(orgId, agentId),
+    mutationFn: ({ agentId }: { agentId: string }) => rejectAgent(agentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents', 'pending', orgId] })
-      queryClient.invalidateQueries({ queryKey: ['hosts', 'stats', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['agents', 'pending'] })
+      queryClient.invalidateQueries({ queryKey: ['hosts', 'stats'] })
     },
   })
 

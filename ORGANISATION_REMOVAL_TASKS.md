@@ -285,19 +285,40 @@ Follow-up: Start Task 5 next. Do not restore the previous combined Task 4.
 
 ## Task 5 - Web Host Inventory, Admission, And Fleet Navigation Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
-PR:
+PR: pending
 
-Summary:
+Summary: Removed caller-supplied organisation identity from the hosts
+inventory, pending-agent queue, fleet stats, command palette, sidebar terminal
+launcher, and terminal host picker by switching those surfaces to derive the
+instance scope from the authenticated session. Split `agents.ts` and
+`terminal.ts` into thin instance-scoped wrappers over `*-core.ts` so the Task
+5-owned action entrypoints no longer expose org-scoped signatures, and updated
+source-inspection unit tests to follow the new structure.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/hosts/{page.tsx,hosts-client.tsx,[id]/host-terminal-launcher.tsx,networks/components/host-node-terminal-dialog.tsx}`,
+`apps/web/app/(dashboard)/layout.tsx`,
+`apps/web/components/shared/{sidebar.tsx,command-palette/*}`,
+`apps/web/components/terminal/*`,
+`apps/web/hooks/use-host-stream.ts`,
+`apps/web/lib/actions/{action-scope.ts,agents.ts,agents-core.ts,alerts.ts,terminal.ts,terminal-core.ts}`,
+`apps/web/lib/actions/*test.mjs`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web type-check`
+(passes); `pnpm --dir apps/web lint` (passes with pre-existing warnings only);
+`pnpm --dir apps/web test:unit` (passes except
+`lib/db/rls.test.mjs` and `lib/integrations/ct-cve/db-nonce-store.test.mjs`,
+both failing because no working container runtime is available in this
+environment); `pnpm --dir apps/web exec playwright test --list` (passes);
+`rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/page.tsx' 'apps/web/app/(dashboard)/hosts/hosts-client.tsx' apps/web/components/shared/sidebar.tsx apps/web/components/shared/command-palette/{command-palette,providers}.tsx apps/web/components/terminal/{host-selector-dialog,terminal-session}.tsx apps/web/hooks/use-host-stream.ts apps/web/lib/actions/{agents,terminal}.ts`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 6 next. The remaining `test:unit` failures still need a
+container runtime; no Task 5-specific test failures remain.
 
 ### Required work
 

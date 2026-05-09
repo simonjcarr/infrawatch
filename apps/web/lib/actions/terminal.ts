@@ -1,400 +1,51 @@
 'use server'
 
-import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
-
-import { db } from '@/lib/db'
-import { organisations, hosts, terminalSessions } from '@/lib/db/schema'
-import { eq, and, isNull } from 'drizzle-orm'
-import { createId } from '@paralleldrive/cuid2'
-import { createHash, randomBytes } from 'node:crypto'
 import { getRequiredSession } from '@/lib/auth/session'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
-import { parseHostMetadata, type SshHostKeyMetadata } from '@/lib/db/schema/hosts'
-import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
-import { hasRole } from '@/lib/auth/guards'
-import { writeAuditEvent } from '@/lib/audit/events'
+import { resolveCurrentActionScope } from './action-scope'
+import {
+  checkTerminalAccess as checkTerminalAccessCore,
+  createTerminalSession as createTerminalSessionCore,
+  type HostTerminalSettings,
+  type OrgTerminalSettings,
+  type TerminalAccessDenied,
+  type TerminalAccessResult,
+} from './terminal-core'
 
-export interface TerminalAccessResult {
-  allowed: true
-  directAccess: false
+export * from './terminal-core'
+
+export type {
+  HostTerminalSettings,
+  OrgTerminalSettings,
+  TerminalAccessDenied,
+  TerminalAccessResult,
 }
 
-export interface TerminalAccessDenied {
-  allowed: false
-  reason: string
-}
-
-/**
- * Checks whether the current user has terminal access to the given host.
- * Used to show/hide the terminal tab without creating a session.
- */
 export async function checkTerminalAccess(
-  orgId: string,
-  hostId: string,
+  ...args: [string] | [string, string]
 ): Promise<TerminalAccessResult | TerminalAccessDenied> {
-  const session = await requireOrgAccess(orgId)
-  const { user } = session
-
-  // 1. Role check
-  if (!hasRole(user, MEMBERSHIP_ROLES)) {
-    return { allowed: false, reason: 'Terminal access requires at minimum engineer role' }
-  }
-
-  // 2. Org-level terminal enabled
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
-    columns: { metadata: true },
-  })
-  const orgMeta = parseOrgMetadata(org?.metadata)
-  if (orgMeta.terminalEnabled === false) {
-    return { allowed: false, reason: 'Terminal access is disabled for this organisation' }
-  }
-
-  // 3. Host-level terminal enabled
-  const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-    columns: { metadata: true },
-  })
-  if (!host) {
-    return { allowed: false, reason: 'Host not found' }
-  }
-  const hostMeta = parseHostMetadata(host.metadata)
-  if (hostMeta.terminalEnabled === false) {
-    return { allowed: false, reason: 'Terminal access is disabled for this host' }
-  }
-
-  // 4. User allowlist
-  const allowedUsers = hostMeta.terminalAllowedUsers ?? []
-  if (allowedUsers.length > 0 && !allowedUsers.includes(user.id)) {
-    return { allowed: false, reason: 'You are not authorised to access this host terminal' }
-  }
-
-  // Terminal access is always SSH-backed. CTOps never opens a shell through
-  // the agent or as the agent/root user.
-  return { allowed: true, directAccess: false }
-}
-
-// POSIX-compliant: starts with letter or underscore, contains only [a-zA-Z0-9_-], max 32 chars
-const VALID_USERNAME_RE = /^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$/
-
-/**
- * Creates a terminal session record and returns the session ID + ingest WS URL.
- * Performs full access control checks before creating the session.
- * When not in direct access mode, username is required and validated.
- */
-export async function createTerminalSession(
-  orgId: string,
-  hostId: string,
-  username?: string,
-): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }> {
-  await requireOrgAccess(orgId)
-  const access = await checkTerminalAccess(orgId, hostId)
-  if (!access.allowed) {
-    return { error: access.reason }
-  }
-
-  const trimmedUsername = username?.trim()
-  if (!trimmedUsername) {
-    return { error: 'Username is required for SSH terminal access' }
-  }
-  if (trimmedUsername.length > 256) {
-    return { error: 'Username is too long' }
-  }
-  if (!VALID_USERNAME_RE.test(trimmedUsername)) {
-    return { error: 'Username contains invalid characters' }
-  }
-
   const session = await getRequiredSession()
-
-  try {
-    const sessionId = createId()
-    const websocketToken = randomBytes(32).toString('base64url')
-    const websocketTokenHash = createHash('sha256').update(websocketToken).digest('hex')
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
-
-    await db.insert(terminalSessions).values({
-      organisationId: orgId,
-      hostId,
-      userId: session.user.id,
-      sessionId,
-      username: trimmedUsername,
-      websocketTokenHash,
-      expiresAt,
-      status: 'pending',
-    })
-
-    // When INGEST_WS_URL is an absolute URL, the browser connects directly to
-    // the ingest service. When it is empty or a path, we return a path-only
-    // URL so the browser connects to the same origin it loaded the page from.
-    // Same-origin mode is required for deployments behind a reverse proxy or
-    // Cloudflare tunnel, where only the web app's hostname is publicly
-    // reachable and the proxy routes /ws/terminal/* to the ingest service.
-    const rawBase = (process.env['INGEST_WS_URL'] ?? '').trim().replace(/\/+$/, '')
-    // Accept http(s):// for convenience and rewrite to ws(s):// — new WebSocket()
-    // only accepts the ws schemes.
-    const normalised = rawBase
-      .replace(/^http:\/\//i, 'ws://')
-      .replace(/^https:\/\//i, 'wss://')
-    const isAbsolute = /^wss?:\/\//i.test(normalised)
-    const ingestWsUrl = isAbsolute
-      ? `${normalised}/ws/terminal/${sessionId}`
-      : `/ws/terminal/${sessionId}`
-    return {
-      sessionId,
-      ingestWsUrl,
-      websocketToken,
-    }
-  } catch (err) {
-    logError('Failed to create terminal session:', err)
-    return { error: 'An unexpected error occurred' }
-  }
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return checkTerminalAccessCore(currentScope, hostId)
 }
 
-// --- Org-level terminal settings ---
+export async function createTerminalSession(
+  ...args: [string, string?] | [string, string, string?]
+): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }> {
+  const session = await getRequiredSession()
+  let currentScope: string
+  let hostId: string
+  let username: string | undefined
 
-export interface OrgTerminalSettings {
-  terminalEnabled: boolean
-  terminalLoggingEnabled: boolean
-  terminalDirectAccess: boolean
-}
-
-export async function getOrgTerminalSettings(
-  orgId: string,
-): Promise<OrgTerminalSettings> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
-    columns: { metadata: true },
-  })
-  const meta = parseOrgMetadata(org?.metadata)
-  return {
-    terminalEnabled: meta.terminalEnabled !== false,
-    terminalLoggingEnabled: meta.terminalLoggingEnabled === true,
-    terminalDirectAccess: false,
-  }
-}
-
-export async function updateOrgTerminalSettings(
-  orgId: string,
-  settings: OrgTerminalSettings,
-): Promise<{ success: true } | { error: string }> {
-  let session
-  try {
-    session = await requireOrgAdminAccess(orgId)
-  } catch {
-    return { error: 'You do not have permission to perform this action' }
+  if (args.length >= 3) {
+    currentScope = args[0]
+    hostId = args[1]!
+    username = args[2]
+  } else {
+    currentScope = resolveCurrentActionScope(session)
+    hostId = args[0]
+    username = args[1]
   }
 
-  try {
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
-      columns: { id: true, metadata: true },
-    })
-    if (!org) return { error: 'Organisation not found' }
-
-    const currentMetadata = parseOrgMetadata(org.metadata)
-    const updatedMetadata = {
-      ...currentMetadata,
-      terminalEnabled: settings.terminalEnabled,
-      terminalLoggingEnabled: settings.terminalLoggingEnabled,
-      terminalDirectAccess: false,
-    }
-
-    await db
-      .update(organisations)
-      .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
-
-    await writeAuditEvent(db, {
-      organisationId: orgId,
-      actorUserId: session.user.id,
-      action: 'terminal.org_settings.updated',
-      targetType: 'organisation',
-      targetId: orgId,
-      summary: 'Updated organisation terminal settings',
-      metadata: {
-        previous: {
-          terminalEnabled: currentMetadata.terminalEnabled !== false,
-          terminalLoggingEnabled: currentMetadata.terminalLoggingEnabled === true,
-          terminalDirectAccess: false,
-        },
-        next: updatedMetadata,
-      },
-    })
-
-    return { success: true }
-  } catch (err) {
-    logError('Failed to update org terminal settings:', err)
-    return { error: 'An unexpected error occurred' }
-  }
-}
-
-// --- Host-level terminal settings ---
-
-export interface HostTerminalSettings {
-  terminalEnabled: boolean
-  terminalAllowedUsers: string[]
-  sshHostKeys: SshHostKeyMetadata[]
-  pendingSshHostKeys: SshHostKeyMetadata[]
-  sshHostKeyStatus?: 'changed'
-  sshHostKeyChangedAt?: string
-}
-
-export async function getHostTerminalSettings(
-  orgId: string,
-  hostId: string,
-): Promise<HostTerminalSettings> {
-  await requireOrgAccess(orgId)
-  const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-    columns: { metadata: true },
-  })
-  const meta = parseHostMetadata(host?.metadata)
-  return {
-    terminalEnabled: meta.terminalEnabled !== false,
-    terminalAllowedUsers: meta.terminalAllowedUsers ?? [],
-    sshHostKeys: normaliseHostKeys(meta.sshHostKeys, meta.sshHostKeySha256),
-    pendingSshHostKeys: normaliseHostKeys(meta.pendingSshHostKeys),
-    sshHostKeyStatus: meta.sshHostKeyStatus,
-    sshHostKeyChangedAt: meta.sshHostKeyChangedAt,
-  }
-}
-
-export async function updateHostTerminalSettings(
-  orgId: string,
-  hostId: string,
-  settings: HostTerminalSettings,
-): Promise<{ success: true } | { error: string }> {
-  let session
-  try {
-    session = await requireOrgAdminAccess(orgId)
-  } catch {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  try {
-    const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-      columns: { id: true, metadata: true },
-    })
-    if (!host) return { error: 'Host not found' }
-
-    const currentMetadata = parseHostMetadata(host.metadata)
-    const updatedMetadata = {
-      ...currentMetadata,
-      terminalEnabled: settings.terminalEnabled,
-      terminalAllowedUsers: settings.terminalAllowedUsers,
-    }
-
-    await db
-      .update(hosts)
-      .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
-
-    await writeAuditEvent(db, {
-      organisationId: orgId,
-      actorUserId: session.user.id,
-      action: 'terminal.host_settings.updated',
-      targetType: 'host',
-      targetId: hostId,
-      summary: 'Updated host terminal settings',
-      metadata: {
-        previous: {
-          terminalEnabled: currentMetadata.terminalEnabled !== false,
-          terminalAllowedUsers: currentMetadata.terminalAllowedUsers ?? [],
-        },
-        next: updatedMetadata,
-      },
-    })
-
-    return { success: true }
-  } catch (err) {
-    logError('Failed to update host terminal settings:', err)
-    return { error: 'An unexpected error occurred' }
-  }
-}
-
-export async function trustPendingSshHostKeys(
-  orgId: string,
-  hostId: string,
-): Promise<{ success: true } | { error: string }> {
-  let session
-  try {
-    session = await requireOrgAdminAccess(orgId)
-  } catch {
-    return { error: 'You do not have permission to perform this action' }
-  }
-
-  try {
-    const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-      columns: { id: true, metadata: true },
-    })
-    if (!host) return { error: 'Host not found' }
-
-    const currentMetadata = parseHostMetadata(host.metadata)
-    const pendingKeys = normaliseHostKeys(currentMetadata.pendingSshHostKeys)
-    if (pendingKeys.length === 0) {
-      return { error: 'No pending SSH host key is available to trust' }
-    }
-
-    const updatedMetadata = {
-      ...currentMetadata,
-      sshHostKeys: pendingKeys,
-      sshHostKeySha256: pendingKeys[0]?.fingerprintSha256,
-      pendingSshHostKeys: [],
-      sshHostKeyStatus: undefined,
-      sshHostKeyChangedAt: undefined,
-    }
-
-    await db
-      .update(hosts)
-      .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
-
-    await writeAuditEvent(db, {
-      organisationId: orgId,
-      actorUserId: session.user.id,
-      action: 'terminal.host_ssh_key.trusted',
-      targetType: 'host',
-      targetId: hostId,
-      summary: 'Trusted pending SSH host key for terminal access',
-      metadata: {
-        previous: {
-          sshHostKeys: normaliseHostKeys(currentMetadata.sshHostKeys, currentMetadata.sshHostKeySha256),
-          pendingSshHostKeys: pendingKeys,
-          sshHostKeyStatus: currentMetadata.sshHostKeyStatus,
-          sshHostKeyChangedAt: currentMetadata.sshHostKeyChangedAt,
-        },
-        next: {
-          sshHostKeys: pendingKeys,
-        },
-      },
-    })
-
-    return { success: true }
-  } catch (err) {
-    logError('Failed to trust pending SSH host key:', err)
-    return { error: 'An unexpected error occurred' }
-  }
-}
-
-function normaliseHostKeys(keys?: SshHostKeyMetadata[], legacyFingerprint?: string): SshHostKeyMetadata[] {
-  const result: SshHostKeyMetadata[] = []
-  const seen = new Set<string>()
-  for (const key of keys ?? []) {
-    if (!key.fingerprintSha256) continue
-    const identity = `${key.algorithm ?? ''}\0${key.fingerprintSha256}`
-    if (seen.has(identity)) continue
-    seen.add(identity)
-    result.push({
-      algorithm: key.algorithm,
-      fingerprintSha256: key.fingerprintSha256,
-    })
-  }
-  if (result.length === 0 && legacyFingerprint) {
-    result.push({ fingerprintSha256: legacyFingerprint })
-  }
-  return result
+  return createTerminalSessionCore(currentScope, hostId, username)
 }

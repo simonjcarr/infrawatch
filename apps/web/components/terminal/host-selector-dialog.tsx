@@ -23,10 +23,9 @@ import { useTerminalPanel } from './terminal-panel-context'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  orgId: string
 }
 
-export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
+export function HostSelectorDialog({ open, onOpenChange }: Props) {
   const [search, setSearch] = useState('')
   const [selectedHostId, setSelectedHostId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,8 +36,8 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
   const [password, setPassword] = useState('')
 
   const { data: hosts = [], isLoading } = useQuery({
-    queryKey: ['hosts', orgId],
-    queryFn: () => listHosts(orgId),
+    queryKey: ['hosts'],
+    queryFn: () => listHosts(),
     enabled: open,
   })
 
@@ -69,8 +68,8 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
   const selectedHost = hosts.find((h) => h.id === selectedHostId)
 
   const { data: terminalAccess, isLoading: accessLoading } = useQuery({
-    queryKey: ['terminal-access', orgId, selectedHostId],
-    queryFn: () => checkTerminalAccess(orgId, selectedHostId!),
+    queryKey: ['terminal-access', selectedHostId],
+    queryFn: () => checkTerminalAccess(selectedHostId!),
     enabled: !!selectedHostId,
   })
 
@@ -136,7 +135,6 @@ export function HostSelectorDialog({ open, onOpenChange, orgId }: Props) {
       hostname: selectedHost.displayName ?? selectedHost.hostname,
       username: username.trim(),
       password,
-      orgId,
       directAccess: false,
     })
 

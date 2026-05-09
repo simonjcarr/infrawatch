@@ -52,7 +52,6 @@ function TerminalConnectForm({
       hostname: data.name,
       username: username.trim(),
       password,
-      orgId: data.orgId,
       directAccess: false,
     })
     setPassword('')

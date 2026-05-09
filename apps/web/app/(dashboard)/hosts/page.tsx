@@ -14,18 +14,16 @@ export const metadata: Metadata = {
 
 export default async function HostsPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
 
   const [hostPage, pendingAgents, stats, osOptions] = await Promise.all([
-    listHostsPaginated(orgId, { limit: 50, offset: 0, sortBy: 'hostname', sortDir: 'asc' }),
-    listPendingAgents(orgId),
-    getHostInventoryStats(orgId),
-    listDistinctHostOses(orgId),
+    listHostsPaginated({ limit: 50, offset: 0, sortBy: 'hostname', sortDir: 'asc' }),
+    listPendingAgents(),
+    getHostInventoryStats(),
+    listDistinctHostOses(),
   ])
 
   return (
     <HostsClient
-      orgId={orgId}
       currentUserRole={session.user.role}
       initialHostPage={hostPage}
       initialStats={stats}

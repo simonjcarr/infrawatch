@@ -65,11 +65,7 @@ import { TerminalPaneTree } from './terminal-pane-tree'
 import { HostSelectorDialog } from './host-selector-dialog'
 import type { TerminalSessionStatus } from './terminal-session'
 
-interface Props {
-  orgId: string
-}
-
-export function TerminalPanel({ orgId }: Props) {
+export function TerminalPanel() {
   const {
     isOpen,
     panelHeight,
@@ -157,7 +153,6 @@ export function TerminalPanel({ orgId }: Props) {
       <HostSelectorDialog
         open={hostSelectorOpen}
         onOpenChange={setHostSelectorOpen}
-        orgId={orgId}
       />
     )
   }
@@ -307,11 +302,10 @@ export function TerminalPanel({ orgId }: Props) {
         )}
       </div>
 
-      <HostSelectorDialog
-        open={hostSelectorOpen}
-        onOpenChange={setHostSelectorOpen}
-        orgId={orgId}
-      />
+              <HostSelectorDialog
+                open={hostSelectorOpen}
+                onOpenChange={setHostSelectorOpen}
+              />
     </>
   )
 }
@@ -621,7 +615,7 @@ function TerminalSettingsPopover({
  * Button that can be placed anywhere (e.g. sidebar) to open the terminal host selector.
  * Must be rendered inside a TerminalPanelProvider.
  */
-export function TerminalPanelTrigger({ orgId }: { orgId: string }) {
+export function TerminalPanelTrigger() {
   const { tabs, openPanel } = useTerminalPanel()
   const [selectorOpen, setSelectorOpen] = useState(false)
 
@@ -642,7 +636,7 @@ export function TerminalPanelTrigger({ orgId }: { orgId: string }) {
         <Terminal className="size-4" />
         <span>Terminal</span>
       </button>
-      <HostSelectorDialog open={selectorOpen} onOpenChange={setSelectorOpen} orgId={orgId} />
+      <HostSelectorDialog open={selectorOpen} onOpenChange={setSelectorOpen} />
     </>
   )
 }

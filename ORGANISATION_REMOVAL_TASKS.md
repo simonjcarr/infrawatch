@@ -357,7 +357,48 @@ This slice owns the fleet overview and shared host-picking surfaces.
   command-palette flows where local infrastructure allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/page.tsx' 'apps/web/app/(dashboard)/hosts/hosts-client.tsx' apps/web/components/shared/{command-palette,sidebar}.tsx apps/web/components/terminal/{host-selector-dialog,terminal-session}.tsx apps/web/hooks/use-host-stream.ts apps/web/lib/actions/{agents,terminal}`
 
-## Task 6 - Web Host Detail, Groups, Networks, Notes, Tags, And Terminal Settings Conversion
+## Task 6 - Split Host Detail And Metadata Conversion Into Smaller Vertical Slices
+
+Status: Complete
+
+Completed by: Codex automation
+
+PR:
+
+Summary: Replaced the mixed host-detail metadata slice after auditing the
+remaining org-scoped surface and finding the previous task still spans host
+overview, checks, compare, local users, notes, tags, terminal settings, group
+and network membership, groups/networks inventory pages, and task-run surfaces
+embedded in group detail. The next agent should now take the host-detail core
+slice instead of retrying another oversized cross-workflow PR.
+
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`
+
+Validation: `rg -l "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/[id]' 'apps/web/app/(dashboard)/hosts/groups' 'apps/web/app/(dashboard)/hosts/networks' apps/web/components/{notes,shared/tag-editor}.tsx 'apps/web/app/api/hosts/[id]/stream/route.ts' apps/web/lib/actions/{host-groups,networks,notes,tags,terminal}.ts`
+
+Follow-up: Start Task 7 next. Do not restore the previous combined Task 6.
+
+### Required work
+
+- Replace the previous mixed Task 6 with smaller independently shippable host
+  detail slices.
+- Keep each slice focused on a coherent operator workflow rather than mixing
+  host overview, metadata, memberships, and task-run surfaces in one PR.
+- Narrow each slice's grep validation so it only covers the files that the
+  slice actually owns.
+
+### Acceptance criteria
+
+- The tracker no longer expects one PR to remove organisation identity from the
+  entire host-detail, notes, tags, groups, networks, and terminal surface.
+- The first available implementation task is a narrower host-detail core slice
+  that can land independently.
+
+### Validation
+
+- `rg -n "^## Task " ORGANISATION_REMOVAL_TASKS.md`
+
+## Task 7 - Web Host Detail Core, Stream, Checks, Compare, And Local Users Conversion
 
 Status: Not started
 
@@ -375,21 +416,69 @@ Follow-up:
 
 ### Required work
 
-This slice owns per-host operation and organisation-free host metadata flows.
+This slice owns the host detail page and the live operational tabs that are
+not primarily metadata editing.
 
-- Remove `orgId` / `organisationId` parameters from host detail tabs, host
-  settings, host tag editing, notes, host groups, networks, terminal access,
-  SSH host-key trust, and related loaders, server actions, route handlers, and
-  client components in this slice.
+- Remove `orgId` / `organisationId` parameters from the host detail loader,
+  host stream route, overview/dashboard queries, checks tab, compare view, and
+  local user views in this slice.
 - Delete org prop threading and React Query keys containing `orgId` for these
   workflows.
-- Rewrite unit tests and E2E fixtures touched by these workflows so they seed
+- Rewrite unit tests and E2E fixtures touched by this slice so they seed
   standalone instance data and no longer query or insert `organisations`.
 
 ### Acceptance criteria
 
-- Host detail tabs, notes, tags, groups, networks, and terminal settings work
-  without caller-supplied organisation identity.
+- Host detail overview, stream updates, checks, compare, and local user flows
+  work without caller-supplied organisation identity.
+- The dashboard UI and route handlers touched by these workflows no longer
+  thread `orgId`.
+- Web tests touched by this slice no longer insert into or query
+  `organisations`.
+
+### Validation
+
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for host detail, compare, checks, and local users
+  where local infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/[id]/page.tsx' 'apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx' 'apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx' 'apps/web/app/(dashboard)/hosts/[id]/compare' 'apps/web/app/(dashboard)/hosts/[id]/local-users-tab.tsx' 'apps/web/app/(dashboard)/hosts/[id]/users' 'apps/web/app/api/hosts/[id]/stream/route.ts' apps/web/lib/actions/{checks,service-accounts,software-inventory}.ts`
+
+## Task 8 - Web Host Settings, Notes, Tags, Membership Tabs, And Terminal Conversion
+
+Status: Not started
+
+Completed by:
+
+PR:
+
+Summary:
+
+Files changed:
+
+Validation:
+
+Follow-up:
+
+### Required work
+
+This slice owns per-host metadata editing and access-control flows.
+
+- Remove `orgId` / `organisationId` parameters from host settings, host tag
+  editing, notes, host membership tabs, terminal access, SSH host-key trust,
+  and related loaders, server actions, route handlers, and client components
+  in this slice.
+- Delete org prop threading and React Query keys containing `orgId` for these
+  workflows.
+- Rewrite unit tests and E2E fixtures touched by this slice so they seed
+  standalone instance data and no longer query or insert `organisations`.
+
+### Acceptance criteria
+
+- Host settings, notes, tags, group/network membership tabs, and terminal
+  settings work without caller-supplied organisation identity.
 - The dashboard UI and shared components touched by these workflows no longer
   thread `orgId`.
 - Web tests touched by this slice no longer insert into or query
@@ -401,11 +490,59 @@ This slice owns per-host operation and organisation-free host metadata flows.
 - `pnpm --dir apps/web lint`
 - `pnpm --dir apps/web test:unit`
 - `pnpm --dir apps/web exec playwright test --list`
-- Targeted E2E smoke runs for host detail, notes, groups, networks, and
+- Targeted E2E smoke runs for host settings, notes, tags, membership tabs, and
   terminal settings where local infrastructure allows.
-- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/[id]' 'apps/web/app/(dashboard)/hosts/groups' 'apps/web/app/(dashboard)/hosts/networks' apps/web/components/{notes,shared/tag-editor}.tsx apps/web/app/api/hosts/[id]/stream/route.ts apps/web/lib/actions/{host-groups,networks,notes,tags,terminal}`
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/[id]/settings-tab.tsx' 'apps/web/app/(dashboard)/hosts/[id]/host-terminal-launcher.tsx' apps/web/components/{notes,shared/tag-editor}.tsx apps/web/lib/actions/{host-groups,networks,notes,tags,terminal}.ts`
 
-## Task 7 - Web Task Runs And Schedule Conversion
+## Task 9 - Web Host Groups And Networks Inventory Conversion
+
+Status: Not started
+
+Completed by:
+
+PR:
+
+Summary:
+
+Files changed:
+
+Validation:
+
+Follow-up:
+
+### Required work
+
+This slice owns the standalone groups and networks inventory/detail pages
+outside the task-run-heavy group operations view.
+
+- Remove `orgId` / `organisationId` parameters from the host groups index,
+  networks index, network detail, host membership pickers, and related
+  loaders, server actions, route handlers, and client components in this
+  slice.
+- Delete org prop threading and React Query keys containing `orgId` for these
+  workflows.
+- Rewrite unit tests and E2E fixtures touched by this slice so they seed
+  standalone instance data and no longer query or insert `organisations`.
+
+### Acceptance criteria
+
+- Host groups and networks inventory/detail flows work without caller-supplied
+  organisation identity.
+- The dashboard UI touched by these workflows no longer thread `orgId`.
+- Web tests touched by this slice no longer insert into or query
+  `organisations`.
+
+### Validation
+
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for groups index, networks index, network detail,
+  and host membership pickers where local infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/groups/page.tsx' 'apps/web/app/(dashboard)/hosts/groups/groups-client.tsx' 'apps/web/app/(dashboard)/hosts/networks' apps/web/lib/actions/{host-groups,networks}.ts`
+
+## Task 10 - Web Task Runs And Schedule Conversion
 
 Status: Not started
 
@@ -452,7 +589,7 @@ This slice owns task execution and scheduling workflows.
   schedules where local infrastructure allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/tasks' 'apps/web/app/(dashboard)/hosts/[id]/tasks-tab.tsx' 'apps/web/app/(dashboard)/hosts/groups/[id]/group-detail-client.tsx' apps/web/lib/actions/{task-runs,task-schedules}`
 
-## Task 8 - Web Alerts, Notifications, Team, And Agent Management Conversion
+## Task 11 - Web Alerts, Notifications, Team, And Agent Management Conversion
 
 Status: Not started
 
@@ -503,7 +640,7 @@ This slice owns operational coordination and agent management workflows.
   where local infrastructure allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/alerts' 'apps/web/app/(dashboard)/notifications' 'apps/web/app/(dashboard)/team' 'apps/web/app/(dashboard)/settings/agents' 'apps/web/app/(dashboard)/settings/monitoring' apps/web/components/shared/{notification-bell,topbar}.tsx apps/web/lib/{actions,notifications}`
 
-## Task 9 - Web Reporting, Integrations, Certificates, And Remaining Dashboard Conversion
+## Task 12 - Web Reporting, Integrations, Certificates, And Remaining Dashboard Conversion
 
 Status: Not started
 
@@ -553,7 +690,7 @@ volume operational paths are converted.
   allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/reports' 'apps/web/app/(dashboard)/certificates' 'apps/web/app/(dashboard)/bundlers' 'apps/web/app/(dashboard)/build-docs' 'apps/web/app/(dashboard)/directory-lookup' 'apps/web/app/(dashboard)/service-accounts' 'apps/web/app/(dashboard)/password-manager' 'apps/web/app/(dashboard)/settings/integrations' apps/web/app/api/{reports,certificates,service-accounts,build-docs} apps/web/lib/actions/{build-docs,certificates,ct-cve,domain-accounts,software-inventory,vulnerabilities}`
 
-## Task 10 - Web Reporting, Integrations, And Schema Baseline Cleanup
+## Task 13 - Web Reporting, Integrations, And Schema Baseline Cleanup
 
 Status: Not started
 
@@ -613,7 +750,7 @@ and migration residue after the earlier slices have converted the live paths.
   allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
 
-## Task 11 - Ingest And Agent Single-Instance Conversion
+## Task 14 - Ingest And Agent Single-Instance Conversion
 
 Status: Not started
 
@@ -657,7 +794,7 @@ Follow-up:
 - `pnpm --dir apps/web type-check`
 - `rg -n "organisation|organization|orgID|orgId|org_id|organisation_id|OrgToken|org_token|tenant" apps/ingest agent proto`
 
-## Task 12 - Docs, Deploy, And External Contracts
+## Task 15 - Docs, Deploy, And External Contracts
 
 Status: Not started
 
@@ -701,7 +838,7 @@ Follow-up:
 - `pnpm --dir apps/docs build`
 - `rg -n "organisation|organization|orgId|organisationId|organisation_id|org_id|tenant|organisations" README.md docs apps/docs deploy .env.example apps/web/.env.example`
 
-## Task 13 - Final Residue Sweep And Validation
+## Task 16 - Final Residue Sweep And Validation
 
 Status: Not started
 

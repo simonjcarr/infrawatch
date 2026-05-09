@@ -177,7 +177,7 @@ export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
     return rowsToNotes(rows)
   } catch {
     // tsquery parse errors fall through to a simple ILIKE on title.
-    const like = `%${trimmed.replace(/[%_]/g, '\\$&')}%`
+    const like = `%${trimmed.replace(/[\\%_]/g, '\\$&')}%`
     const rows = await db.execute(sql`
       SELECT n.*
       FROM notes n

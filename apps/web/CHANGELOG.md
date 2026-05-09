@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.124.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.2...web/v0.124.3) (2026-05-09)
+
+
+### Bug Fixes
+
+* **web:** resolve latest agent download release ([1113753](https://github.com/carrtech-dev/ct-ops/commit/111375317b3f13ddab32665935925a8bdb14d293))
+
 ## [0.124.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.1...web/v0.124.2) (2026-05-09)
 
 

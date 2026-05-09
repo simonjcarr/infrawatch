@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.2...agent/v0.34.3) (2026-05-09)
+
+
+### Bug Fixes
+
+* **agent:** cover self-update HTTP client defaults ([08b6b9e](https://github.com/carrtech-dev/ct-ops/commit/08b6b9e2bbeb3435c3f67380ff43d0c0bb3ba6cb))
+
 ## [0.34.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.1...agent/v0.34.2) (2026-05-09)
 
 

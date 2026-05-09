@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.123.1...web/v0.123.2) (2026-05-09)
+
+
+### Bug Fixes
+
+* **calendar:** restore time grid slot layout ([8ae2c58](https://github.com/carrtech-dev/ct-ops/commit/8ae2c58bae9f76cb5148eee8ddee1d791b8de054))
+
 ## [0.123.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.123.0...web/v0.123.1) (2026-05-08)
 
 

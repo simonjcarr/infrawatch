@@ -569,7 +569,7 @@ gen_cert() {
   elif command -v ifconfig >/dev/null 2>&1; then
     local_ips=$(ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/ {print "IP:" $2}' | tr '\n' ',' | sed 's/,$//' || true)
   fi
-  local san="DNS:ingest,DNS:localhost,IP:127.0.0.1"
+  local san="DNS:ingest,DNS:localhost,DNS:ct-ops,IP:127.0.0.1"
   [ -n "$local_ips" ] && san="${san},${local_ips}"
 
   local openssl_err

@@ -122,7 +122,7 @@ dev-tls:
 		-days 365 \
 		-nodes \
 		-subj "/CN=localhost" \
-		-addext "subjectAltName=DNS:localhost,DNS:ingest,IP:127.0.0.1" \
+		-addext "subjectAltName=DNS:localhost,DNS:ingest,DNS:ct-ops,IP:127.0.0.1" \
 		2>/dev/null
 	@echo "Generated deploy/dev-tls/server.crt and deploy/dev-tls/server.key"
 

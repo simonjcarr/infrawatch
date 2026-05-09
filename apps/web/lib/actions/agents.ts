@@ -35,6 +35,7 @@ import {
   hostNetworkMemberships,
   hostPatchStatuses,
   hostPackageUpdates,
+  pendingCertSignings,
 } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, lte, asc, desc, sql, inArray, ilike, or, count } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
@@ -1262,6 +1263,9 @@ export async function deleteHost(
             .onConflictDoNothing()
         }
 
+        await tx
+          .delete(pendingCertSignings)
+          .where(eq(pendingCertSignings.agentId, host.agentId))
         await tx
           .delete(agentStatusHistory)
           .where(eq(agentStatusHistory.agentId, host.agentId))

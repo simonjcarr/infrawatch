@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { MouseEvent } from 'react'
 import type { CategoricalChartFunc } from 'recharts/types/chart/types'
-import type { MetricsBounds } from '@/lib/actions/agents'
+import type { MetricsBounds } from '@/lib/actions/agents-core'
 
 export interface ChartZoomHandlers {
   onMouseDown: CategoricalChartFunc<MouseEvent<SVGGraphicsElement>>

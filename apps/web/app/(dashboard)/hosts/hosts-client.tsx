@@ -54,7 +54,7 @@ import type {
   HostInventoryStats,
   HostSortField,
   HostSortDir,
-} from '@/lib/actions/agents'
+} from '@/lib/actions/agents-core'
 import type { Agent } from '@/lib/db/schema'
 import { HOST_HIGH_USAGE_THRESHOLD, HOST_STALE_MINUTES } from '@/lib/db/schema/hosts'
 import { getActiveAlertCountsForHosts } from '@/lib/actions/alerts'

@@ -61,7 +61,7 @@ import {
 } from '@/lib/actions/networks'
 import { listHosts } from '@/lib/actions/agents'
 import { NetworkGraph } from './network-graph'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 import type { Network as NetworkType, Host } from '@/lib/db/schema'
 
 type NetworkWithMembers = NetworkType & { members: Host[] }

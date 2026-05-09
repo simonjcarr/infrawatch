@@ -3,21 +3,30 @@
 import { getRequiredSession } from '@/lib/auth/session'
 import type { Agent } from '@/lib/db/schema'
 import {
+  createEnrolmentToken as createEnrolmentTokenCore,
+  deleteHost as deleteHostCore,
+  getHeartbeatHistory as getHeartbeatHistoryCore,
+  getHost as getHostCore,
   listPendingAgents as listPendingAgentsCore,
   approveAgent as approveAgentCore,
   rejectAgent as rejectAgentCore,
   listHosts as listHostsCore,
   listHostsPaginated as listHostsPaginatedCore,
   getHostInventoryStats as getHostInventoryStatsCore,
+  getHostMetrics as getHostMetricsCore,
   listDistinctHostOses as listDistinctHostOsesCore,
+  listEnrolmentTokens as listEnrolmentTokensCore,
+  revokeEnrolmentToken as revokeEnrolmentTokenCore,
+  uninstallAndDeleteHost as uninstallAndDeleteHostCore,
+  type EnrolmentTokenSafe,
+  type HeartbeatPoint,
   type HostListParams,
   type HostListResult,
   type HostInventoryStats,
   type HostWithAgent,
+  type MetricsQuery,
 } from './agents-core'
 import { resolveCurrentActionScope } from './action-scope'
-
-export * from './agents-core'
 
 export async function listPendingAgents(...args: [] | [string]): Promise<Agent[]> {
   const session = await getRequiredSession()
@@ -69,4 +78,73 @@ export async function listDistinctHostOses(...args: [] | [string]): Promise<stri
   const session = await getRequiredSession()
   const currentScope = args[0] ?? resolveCurrentActionScope(session)
   return listDistinctHostOsesCore(currentScope)
+}
+
+export async function createEnrolmentToken(
+  scopeId: string,
+  input: {
+    label: string
+    autoApprove: boolean
+    skipVerify?: boolean
+    maxUses?: number
+    expiresInDays?: number
+    tags?: Array<{ key: string; value: string }>
+  },
+): Promise<{ token: string; id: string } | { error: string }> {
+  return createEnrolmentTokenCore(scopeId, input)
+}
+
+export async function listEnrolmentTokens(scopeId: string): Promise<EnrolmentTokenSafe[]> {
+  return listEnrolmentTokensCore(scopeId)
+}
+
+export async function revokeEnrolmentToken(
+  scopeId: string,
+  tokenId: string,
+): Promise<{ success: true } | { error: string }> {
+  return revokeEnrolmentTokenCore(scopeId, tokenId)
+}
+
+export async function getHostMetrics(
+  scopeId: string,
+  hostId: string,
+  query: MetricsQuery,
+) {
+  return getHostMetricsCore(scopeId, hostId, query)
+}
+
+export async function getHeartbeatHistory(
+  scopeId: string,
+  hostId: string,
+  query: MetricsQuery,
+): Promise<HeartbeatPoint[]> {
+  return getHeartbeatHistoryCore(scopeId, hostId, query)
+}
+
+export async function getHost(...args: [string] | [string, string]): Promise<HostWithAgent | null> {
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return getHostCore(currentScope, hostId)
+}
+
+export async function deleteHost(
+  ...args: [string] | [string, string]
+): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return deleteHostCore(currentScope, hostId)
+}
+
+export async function uninstallAndDeleteHost(
+  ...args: [string] | [string, string]
+): Promise<
+  | { success: true }
+  | { error: string; taskRunId?: string; agentOffline?: boolean }
+> {
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return uninstallAndDeleteHostCore(currentScope, hostId)
 }

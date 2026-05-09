@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useTerminalPanel } from '@/components/terminal'
 import { useSession } from '@/lib/auth/client'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 
 interface Props {
   orgId: string

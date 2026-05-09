@@ -5,20 +5,16 @@ import { resolveCurrentActionScope } from './action-scope'
 import {
   checkTerminalAccess as checkTerminalAccessCore,
   createTerminalSession as createTerminalSessionCore,
+  getOrgTerminalSettings as getOrgTerminalSettingsCore,
+  getHostTerminalSettings as getHostTerminalSettingsCore,
   type HostTerminalSettings,
   type OrgTerminalSettings,
   type TerminalAccessDenied,
   type TerminalAccessResult,
+  trustPendingSshHostKeys as trustPendingSshHostKeysCore,
+  updateHostTerminalSettings as updateHostTerminalSettingsCore,
+  updateOrgTerminalSettings as updateOrgTerminalSettingsCore,
 } from './terminal-core'
-
-export * from './terminal-core'
-
-export type {
-  HostTerminalSettings,
-  OrgTerminalSettings,
-  TerminalAccessDenied,
-  TerminalAccessResult,
-}
 
 export async function checkTerminalAccess(
   ...args: [string] | [string, string]
@@ -48,4 +44,39 @@ export async function createTerminalSession(
   }
 
   return createTerminalSessionCore(currentScope, hostId, username)
+}
+
+export async function getOrgTerminalSettings(
+  scopeId: string,
+): Promise<OrgTerminalSettings> {
+  return getOrgTerminalSettingsCore(scopeId)
+}
+
+export async function updateOrgTerminalSettings(
+  scopeId: string,
+  settings: OrgTerminalSettings,
+): Promise<{ success: true } | { error: string }> {
+  return updateOrgTerminalSettingsCore(scopeId, settings)
+}
+
+export async function getHostTerminalSettings(
+  scopeId: string,
+  hostId: string,
+): Promise<HostTerminalSettings> {
+  return getHostTerminalSettingsCore(scopeId, hostId)
+}
+
+export async function updateHostTerminalSettings(
+  scopeId: string,
+  hostId: string,
+  settings: HostTerminalSettings,
+): Promise<{ success: true } | { error: string }> {
+  return updateHostTerminalSettingsCore(scopeId, hostId, settings)
+}
+
+export async function trustPendingSshHostKeys(
+  scopeId: string,
+  hostId: string,
+): Promise<{ success: true } | { error: string }> {
+  return trustPendingSshHostKeysCore(scopeId, hostId)
 }

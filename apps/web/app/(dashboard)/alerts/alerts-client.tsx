@@ -65,7 +65,7 @@ import {
 } from '@/lib/actions/alerts'
 import type { AlertInstanceWithRule, NotificationChannelSafe, AlertSilenceWithHost } from '@/lib/actions/alerts'
 import type { AlertSeverity, AlertInstanceStatus } from '@/lib/db/schema'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 
 type SuccessHandler = () => void | Promise<void>
 

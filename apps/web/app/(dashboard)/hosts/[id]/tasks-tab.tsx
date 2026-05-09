@@ -58,7 +58,7 @@ import type {
   AgentQueryStatus,
   ServiceInfoResult,
 } from '@/lib/db/schema'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 import { useRouter } from 'next/navigation'
 
 interface Props {

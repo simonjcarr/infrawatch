@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { ChartZoomHandlers } from '@/hooks/use-chart-zoom'
-import type { HeartbeatPoint } from '@/lib/actions/agents'
+import type { HeartbeatPoint } from '@/lib/actions/agents-core'
 
 interface HostHeartbeatBarChartProps {
   data: HeartbeatPoint[]

@@ -41,7 +41,7 @@ import {
   revokeEnrolmentToken,
 } from '@/lib/actions/agents'
 import type { AgentEnrolmentToken } from '@/lib/db/schema'
-import type { EnrolmentTokenSafe } from '@/lib/actions/agents'
+import type { EnrolmentTokenSafe } from '@/lib/actions/agents-core'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import {
   DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,

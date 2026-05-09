@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { HostWithAgent } from '@/lib/actions/agents'
+import type { HostWithAgent } from '@/lib/actions/agents-core'
 import type { CheckWithHistory } from '@/lib/actions/checks'
 import type { ResolvedNote } from '@/lib/actions/notes-resolver'
 

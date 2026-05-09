@@ -48,13 +48,12 @@ const CATEGORY_LABELS: Record<NoteCategory, string> = {
 }
 
 interface Props {
-  scopeId: string
   hostId: string
   currentUserId: string
   userRole: string
 }
 
-export function NotesTab({ scopeId, hostId, currentUserId, userRole }: Props) {
+export function NotesTab({ hostId, currentUserId, userRole }: Props) {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [selectedNote, setSelectedNote] = useState<ResolvedNote | null>(null)
@@ -66,17 +65,17 @@ export function NotesTab({ scopeId, hostId, currentUserId, userRole }: Props) {
   const canCreate = userRole !== 'read_only'
 
   const { data: notes = [], isLoading } = useQuery({
-    queryKey: ['notes-for-host', scopeId, hostId],
-    queryFn: () => listNotesForHost(scopeId, hostId),
+    queryKey: ['notes-for-host', hostId],
+    queryFn: () => listNotesForHost(hostId),
   })
 
   const invalidateHostNotes = () => {
-    queryClient.invalidateQueries({ queryKey: ['notes-for-host', scopeId, hostId] })
+    queryClient.invalidateQueries({ queryKey: ['notes-for-host', hostId] })
   }
 
   const deleteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      const result = await deleteNote(scopeId, noteId)
+      const result = await deleteNote(noteId)
       if ('error' in result) throw new Error(result.error)
     },
     onSuccess: () => {
@@ -168,7 +167,7 @@ export function NotesTab({ scopeId, hostId, currentUserId, userRole }: Props) {
           <p className="text-sm font-medium text-foreground">No notes yet</p>
           <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
             Capture a runbook, a known issue, or a contact for this host. Notes are
-            shared with your org unless you mark them private.
+            shared across this CT-Ops instance unless you mark them private.
           </p>
           {canCreate && (
             <Button className="mt-4" size="sm" onClick={() => setCreateOpen(true)}>
@@ -265,7 +264,6 @@ export function NotesTab({ scopeId, hostId, currentUserId, userRole }: Props) {
       {createOpen && (
         <NoteEditorDialog
           mode="create"
-          scopeId={scopeId}
           hostId={hostId}
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -275,7 +273,6 @@ export function NotesTab({ scopeId, hostId, currentUserId, userRole }: Props) {
       {editingNote && (
         <NoteEditorDialog
           mode="edit"
-          scopeId={scopeId}
           hostId={hostId}
           noteId={editingNote.id}
           initial={{

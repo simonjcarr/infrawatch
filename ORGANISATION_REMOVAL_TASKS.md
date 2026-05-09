@@ -470,19 +470,40 @@ not primarily metadata editing.
 
 ## Task 8 - Web Host Settings, Notes, Tags, Membership Tabs, And Terminal Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
-PR:
+PR: [#1228](https://github.com/carrtech-dev/ct-ops/pull/1228)
 
-Summary:
+Summary: Removed caller-supplied organisation identity from host settings,
+notes, tags, group/network membership tabs, and terminal settings by shifting
+the host-facing actions to session-derived instance-scope wrappers and moving
+the remaining org-scoped database logic into new `*-core.ts` modules.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/hosts/[id]/{host-detail-client.tsx,host-terminal-launcher.tsx,settings-tab.tsx}`,
+`apps/web/app/(dashboard)/hosts/bulk-tag/bulk-tag-client.tsx`,
+`apps/web/app/(dashboard)/settings/{settings-client.tsx,agents/agents-client.tsx}`,
+`apps/web/app/api/hosts/[id]/stream/route.ts`,
+`apps/web/components/{notes/*,shared/tag-editor.tsx}`,
+`apps/web/lib/actions/{host-groups.ts,host-groups-core.ts,host-settings.ts,instance-scope-wrappers.test.mjs,mutation-authz.test.mjs,networks.ts,networks-core.ts,notes.ts,notes-core.ts,tags.ts,tags-core.ts,terminal.ts,users.ts}`
 
-Validation:
+Validation: `pnpm --dir apps/web install --frozen-lockfile`; `pnpm --dir apps/web type-check`
+(passes); `pnpm --dir apps/web lint` (passes with pre-existing warnings only);
+`pnpm --dir apps/web test:unit` (passes except `lib/db/rls.test.mjs` and
+`lib/integrations/ct-cve/db-nonce-store.test.mjs`, both failing because no
+working container runtime is available in this environment);
+`pnpm --dir apps/web exec playwright test --list` (passes);
+`BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret pnpm --dir apps/web exec playwright test tests/e2e/hosts/host-detail-memberships.spec.ts --project=chromium --grep "authenticated user can manage group and network memberships from the host detail page"`
+(fails before test execution because Next instrumentation cannot import
+`./lib/agent/cache-prewarm` in this checkout);
+`rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/[id]/settings-tab.tsx' 'apps/web/app/(dashboard)/hosts/[id]/host-terminal-launcher.tsx' apps/web/components/{notes,shared/tag-editor}.tsx apps/web/lib/actions/{host-groups,networks,notes,tags,terminal}.ts`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 9 next. If you need local browser smoke coverage in this
+worktree, fix the missing `apps/web/lib/agent/cache-prewarm` import path or
+use an environment where the instrumentation hook resolves correctly.
 
 ### Required work
 

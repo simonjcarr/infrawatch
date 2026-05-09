@@ -60,23 +60,28 @@ export async function updateOrgTerminalSettings(
 }
 
 export async function getHostTerminalSettings(
-  scopeId: string,
-  hostId: string,
+  ...args: [string] | [string, string]
 ): Promise<HostTerminalSettings> {
-  return getHostTerminalSettingsCore(scopeId, hostId)
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return getHostTerminalSettingsCore(currentScope, hostId)
 }
 
 export async function updateHostTerminalSettings(
-  scopeId: string,
-  hostId: string,
-  settings: HostTerminalSettings,
+  ...args: [string, HostTerminalSettings] | [string, string, HostTerminalSettings]
 ): Promise<{ success: true } | { error: string }> {
-  return updateHostTerminalSettingsCore(scopeId, hostId, settings)
+  const session = await getRequiredSession()
+  const [currentScope, hostId, settings] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  return updateHostTerminalSettingsCore(currentScope, hostId, settings)
 }
 
 export async function trustPendingSshHostKeys(
-  scopeId: string,
-  hostId: string,
+  ...args: [string] | [string, string]
 ): Promise<{ success: true } | { error: string }> {
-  return trustPendingSshHostKeysCore(scopeId, hostId)
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return trustPendingSshHostKeysCore(currentScope, hostId)
 }

@@ -217,7 +217,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <TagEditor orgId={orgId} value={tags} onChange={setTags} />
+          <TagEditor value={tags} onChange={setTags} />
         </CardContent>
       </Card>
 

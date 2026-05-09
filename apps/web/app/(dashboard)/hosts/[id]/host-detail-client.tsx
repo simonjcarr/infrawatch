@@ -371,8 +371,8 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
   })
 
   const { data: collectionSettings } = useQuery({
-    queryKey: ['host-collection-settings', scopeId, initialHost.id],
-    queryFn: () => getHostCollectionSettings(scopeId, initialHost.id),
+    queryKey: ['host-collection-settings', initialHost.id],
+    queryFn: () => getHostCollectionSettings(initialHost.id),
   })
 
   const { data: localUsers = [] } = useQuery({
@@ -383,66 +383,66 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
   const localUserCount = localUsers.length > 0 ? localUsers.length : 0
 
   const { data: hostGroupsList = [] } = useQuery<HostGroup[]>({
-    queryKey: ['host-groups-for-host', scopeId, initialHost.id],
-    queryFn: () => listGroupsForHost(scopeId, initialHost.id),
+    queryKey: ['host-groups-for-host', initialHost.id],
+    queryFn: () => listGroupsForHost(initialHost.id),
     enabled: activeTab === 'groups',
   })
 
   const { data: allGroups = [] } = useQuery<HostGroupWithCount[]>({
-    queryKey: ['host-groups', scopeId],
-    queryFn: () => listGroups(scopeId),
+    queryKey: ['host-groups'],
+    queryFn: () => listGroups(),
     enabled: activeTab === 'groups',
   })
 
   const { data: terminalAccess } = useQuery({
-    queryKey: ['terminal-access', scopeId, initialHost.id],
-    queryFn: () => checkTerminalAccess(scopeId, initialHost.id),
+    queryKey: ['terminal-access', initialHost.id],
+    queryFn: () => checkTerminalAccess(initialHost.id),
     enabled: activeTab === 'terminal',
   })
 
   const { mutate: doAddToGroup, isPending: isAddingToGroup } = useMutation({
-    mutationFn: (groupId: string) => addHostToGroup(scopeId, groupId, initialHost.id),
+    mutationFn: (groupId: string) => addHostToGroup(groupId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', scopeId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['host-groups', scopeId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups'] })
       setAddGroupOpen(false)
     },
   })
 
   const { mutate: doRemoveFromGroup, isPending: isRemovingFromGroup } = useMutation({
-    mutationFn: (groupId: string) => removeHostFromGroup(scopeId, groupId, initialHost.id),
+    mutationFn: (groupId: string) => removeHostFromGroup(groupId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', scopeId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['host-groups', scopeId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups'] })
     },
   })
 
   const { data: hostNetworksList = [] } = useQuery<NetworkWithMembership[]>({
-    queryKey: ['networks-for-host', scopeId, initialHost.id],
-    queryFn: () => listNetworksForHost(scopeId, initialHost.id),
+    queryKey: ['networks-for-host', initialHost.id],
+    queryFn: () => listNetworksForHost(initialHost.id),
     enabled: activeTab === 'host-networks',
   })
 
   const { data: allNetworks = [] } = useQuery<NetworkWithCount[]>({
-    queryKey: ['networks', scopeId],
-    queryFn: () => listNetworks(scopeId),
+    queryKey: ['networks'],
+    queryFn: () => listNetworks(),
     enabled: activeTab === 'host-networks',
   })
 
   const { mutate: doAddToNetwork, isPending: isAddingToNetwork } = useMutation({
-    mutationFn: (networkId: string) => addHostToNetwork(scopeId, networkId, initialHost.id),
+    mutationFn: (networkId: string) => addHostToNetwork(networkId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['networks-for-host', scopeId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['networks', scopeId] })
+      queryClient.invalidateQueries({ queryKey: ['networks-for-host', initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['networks'] })
       setAddNetworkOpen(false)
     },
   })
 
   const { mutate: doRemoveFromNetwork, isPending: isRemovingFromNetwork } = useMutation({
-    mutationFn: (networkId: string) => removeHostFromNetwork(scopeId, networkId, initialHost.id),
+    mutationFn: (networkId: string) => removeHostFromNetwork(networkId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['networks-for-host', scopeId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['networks', scopeId] })
+      queryClient.invalidateQueries({ queryKey: ['networks-for-host', initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['networks'] })
     },
   })
 
@@ -758,7 +758,6 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
           </div>
 
           <PinnedNotesCard
-            scopeId={scopeId}
             hostId={initialHost.id}
             currentUserId={currentUserId}
             userRole={userRole}
@@ -957,7 +956,7 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <SettingsTab scopeId={scopeId} hostId={initialHost.id} isAdmin={userRole === 'org_admin' || userRole === 'super_admin'} />
+        <SettingsTab hostId={initialHost.id} isAdmin={userRole === 'org_admin' || userRole === 'super_admin'} />
       )}
 
       {/* Groups Tab */}
@@ -1283,7 +1282,6 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
       {/* Notes Tab */}
       {activeTab === 'notes' && (
         <NotesTab
-          scopeId={scopeId}
           hostId={initialHost.id}
           currentUserId={currentUserId}
           userRole={userRole}
@@ -1303,7 +1301,6 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
       {/* Terminal Tab */}
       {activeTab === 'terminal' && (
         <HostTerminalLauncher
-          scopeId={scopeId}
           host={host}
           directAccess={terminalAccess?.allowed === true ? terminalAccess.directAccess : false}
           accessDeniedReason={

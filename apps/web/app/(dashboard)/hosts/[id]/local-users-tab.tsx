@@ -28,20 +28,19 @@ import { getServiceAccounts } from '@/lib/actions/service-accounts'
 import type { ServiceAccountStatus, ServiceAccountType } from '@/lib/db/schema'
 
 interface LocalUsersTabProps {
-  orgId: string
   hostId: string
 }
 
-export function LocalUsersTab({ orgId, hostId }: LocalUsersTabProps) {
+export function LocalUsersTab({ hostId }: LocalUsersTabProps) {
   const router = useRouter()
   const [typeFilter, setTypeFilter] = useState<ServiceAccountType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<ServiceAccountStatus | 'all'>('all')
   const [search, setSearch] = useState('')
 
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ['local-users', orgId, hostId, typeFilter, statusFilter, search],
+    queryKey: ['local-users', hostId, typeFilter, statusFilter, search],
     queryFn: () =>
-      getServiceAccounts(orgId, {
+      getServiceAccounts({
         hostId,
         accountType: typeFilter === 'all' ? undefined : typeFilter,
         status: statusFilter === 'all' ? undefined : statusFilter,

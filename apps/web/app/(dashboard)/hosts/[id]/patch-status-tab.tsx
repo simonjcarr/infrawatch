@@ -16,7 +16,7 @@ import {
 import { getHostPatchStatus } from '@/lib/actions/patch-status'
 
 interface Props {
-  orgId: string
+  scopeId: string
   hostId: string
 }
 
@@ -33,10 +33,10 @@ function PatchBadge({ status }: { status: string }) {
   return <Badge variant="outline">Unknown</Badge>
 }
 
-export function PatchStatusTab({ orgId, hostId }: Props) {
+export function PatchStatusTab({ scopeId, hostId }: Props) {
   const { data: patchStatus, isLoading } = useQuery({
-    queryKey: ['host-patch-status', orgId, hostId],
-    queryFn: () => getHostPatchStatus(orgId, hostId),
+    queryKey: ['host-patch-status', scopeId, hostId],
+    queryFn: () => getHostPatchStatus(scopeId, hostId),
   })
 
   if (isLoading) {

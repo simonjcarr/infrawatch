@@ -10,13 +10,13 @@ import { useSession } from '@/lib/auth/client'
 import type { HostWithAgent } from '@/lib/actions/agents-core'
 
 interface Props {
-  orgId: string
+  scopeId: string
   host: HostWithAgent
   directAccess: boolean
   accessDeniedReason: string | null
 }
 
-export function HostTerminalLauncher({ orgId: _orgId, host, directAccess, accessDeniedReason }: Props) {
+export function HostTerminalLauncher({ scopeId: _orgId, host, directAccess, accessDeniedReason }: Props) {
   const { openTerminal } = useTerminalPanel()
   const { data: session } = useSession()
 

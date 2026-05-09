@@ -400,19 +400,41 @@ Follow-up: Start Task 7 next. Do not restore the previous combined Task 6.
 
 ## Task 7 - Web Host Detail Core, Stream, Checks, Compare, And Local Users Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
 PR:
 
-Summary:
+Summary: Removed caller-supplied organisation identity from the host detail
+page, host stream route, checks flows, compare view, and local-user detail/list
+surfaces by introducing session-derived instance wrappers for host checks,
+service accounts, software inventory comparisons, and host metrics. Renamed the
+remaining host-detail child props touched by this slice to neutral `scopeId`
+plumbing where later tasks still own the underlying org-scoped actions.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/hosts/[id]/{page.tsx,host-detail-client.tsx,checks-tab.tsx,local-users-tab.tsx,alerts-tab.tsx,host-notification-charts.tsx,host-terminal-launcher.tsx,inventory-tab.tsx,logs-tab.tsx,patch-status-tab.tsx,settings-tab.tsx,tasks-tab.tsx,vulnerabilities-tab.tsx,compare/*,users/[accountId]/*}`,
+`apps/web/app/api/hosts/[id]/stream/route.ts`,
+`apps/web/components/notes/*`,
+`apps/web/lib/actions/{agents.ts,checks.ts,checks-core.ts,service-accounts.ts,service-accounts-core.ts,software-inventory.ts,software-inventory-core.ts,*test.mjs}`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web type-check`
+(passes); `pnpm --dir apps/web lint` (passes with pre-existing warnings only);
+`pnpm --dir apps/web test:unit` (passes except
+`lib/db/rls.test.mjs` and
+`lib/integrations/ct-cve/db-nonce-store.test.mjs`, both failing because no
+working container runtime is available in this environment);
+`pnpm --dir apps/web exec playwright test --list` (passes);
+`BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret pnpm --dir apps/web exec playwright test tests/e2e/hosts/compare.spec.ts --project=chromium --grep "empty-state"`
+(fails before test execution because Next instrumentation cannot import
+`./lib/agent/cache-prewarm` in this checkout);
+`rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/[id]/page.tsx' 'apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx' 'apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx' 'apps/web/app/(dashboard)/hosts/[id]/compare' 'apps/web/app/(dashboard)/hosts/[id]/local-users-tab.tsx' 'apps/web/app/(dashboard)/hosts/[id]/users' 'apps/web/app/api/hosts/[id]/stream/route.ts' apps/web/lib/actions/{checks,service-accounts,software-inventory}.ts`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 8 next. If you need browser smoke coverage in this
+worktree, fix the missing `apps/web/lib/agent/cache-prewarm` import path or use
+an environment where the instrumentation hook can resolve it.
 
 ### Required work
 

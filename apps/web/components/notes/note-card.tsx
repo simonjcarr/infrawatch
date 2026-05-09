@@ -79,7 +79,7 @@ const SOURCE_LABELS: Record<ResolvedNoteSource, { label: string; icon: typeof Us
 
 interface Props {
   note: ResolvedNote
-  orgId: string
+  scopeId: string
   hostId: string
   currentUserId: string
   userRole: string
@@ -90,7 +90,7 @@ interface Props {
 
 export function NoteCard({
   note,
-  orgId,
+  scopeId,
   hostId,
   currentUserId,
   userRole,
@@ -109,13 +109,13 @@ export function NoteCard({
   const canPin = note.directTargetId != null && canEdit
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['notes-for-host', orgId, hostId] })
+    queryClient.invalidateQueries({ queryKey: ['notes-for-host', scopeId, hostId] })
   }
 
   const pinMutation = useMutation({
     mutationFn: async () => {
       if (!note.directTargetId) throw new Error('Cannot pin — not directly targeted to this host')
-      const result = await toggleNotePin(orgId, note.directTargetId, !note.isPinned)
+      const result = await toggleNotePin(scopeId, note.directTargetId, !note.isPinned)
       if ('error' in result) throw new Error(result.error)
     },
     onSuccess: invalidate,
@@ -124,7 +124,7 @@ export function NoteCard({
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const result = await deleteNote(orgId, note.id)
+      const result = await deleteNote(scopeId, note.id)
       if ('error' in result) throw new Error(result.error)
     },
     onSuccess: () => {
@@ -272,7 +272,7 @@ export function NoteCard({
       {editOpen && (
         <NoteEditorDialog
           mode="edit"
-          orgId={orgId}
+          scopeId={scopeId}
           hostId={hostId}
           noteId={note.id}
           initial={{

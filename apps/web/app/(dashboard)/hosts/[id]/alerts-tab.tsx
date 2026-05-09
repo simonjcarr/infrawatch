@@ -116,13 +116,13 @@ const silenceFormSchema = z.object({
 type SilenceFormValues = z.infer<typeof silenceFormSchema>
 
 function AddSilenceDialog({
-  orgId,
+  scopeId,
   hostId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
+  scopeId: string
   hostId: string
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -145,7 +145,7 @@ function AddSilenceDialog({
   })
 
   async function onSubmit(values: SilenceFormValues) {
-    const result = await createSilence(orgId, {
+    const result = await createSilence(scopeId, {
       hostId,
       reason: values.reason,
       startsAt: new Date(values.startsAt).toISOString(),
@@ -202,13 +202,13 @@ function AddSilenceDialog({
 // ─── Add Rule Dialog ──────────────────────────────────────────────────────────
 
 function AddRuleDialog({
-  orgId,
+  scopeId,
   hostId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
+  scopeId: string
   hostId: string
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -218,13 +218,13 @@ function AddRuleDialog({
   const [certScope, setCertScope] = useState<'all' | 'specific'>('all')
 
   const { data: checks = [] } = useQuery({
-    queryKey: ['checks-history', orgId, hostId],
-    queryFn: () => getChecksWithHistory(orgId, hostId),
+    queryKey: ['checks-history', scopeId, hostId],
+    queryFn: () => getChecksWithHistory(scopeId, hostId),
   })
 
   const { data: orgCerts = [] } = useQuery({
-    queryKey: ['certificates', orgId],
-    queryFn: () => getCertificates(orgId, { limit: 200 }),
+    queryKey: ['certificates', scopeId],
+    queryFn: () => getCertificates(scopeId, { limit: 200 }),
     enabled: conditionType === 'cert_expiry' && certScope === 'specific',
   })
 
@@ -281,7 +281,7 @@ function AddRuleDialog({
       }
     }
 
-    const result = await createAlertRule(orgId, input)
+    const result = await createAlertRule(scopeId, input)
     if ('error' in result) return
     reset()
     onSuccess()
@@ -528,36 +528,36 @@ function AddRuleDialog({
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 interface Props {
-  orgId: string
+  scopeId: string
   hostId: string
 }
 
-export function AlertsTab({ orgId, hostId }: Props) {
+export function AlertsTab({ scopeId, hostId }: Props) {
   const qc = useQueryClient()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [addSilenceOpen, setAddSilenceOpen] = useState(false)
 
   const { data: allRules = [] } = useQuery({
-    queryKey: ['alert-rules', orgId, hostId],
-    queryFn: () => getAlertRules(orgId, hostId),
+    queryKey: ['alert-rules', scopeId, hostId],
+    queryFn: () => getAlertRules(scopeId, hostId),
     refetchInterval: 30_000,
   })
 
   const { data: globalDefaults = [] } = useQuery({
-    queryKey: ['alert-global-defaults', orgId],
-    queryFn: () => getGlobalAlertDefaults(orgId),
+    queryKey: ['alert-global-defaults', scopeId],
+    queryFn: () => getGlobalAlertDefaults(scopeId),
     refetchInterval: 60_000,
   })
 
   const { data: activeAlerts = [] } = useQuery({
-    queryKey: ['alerts', orgId, 'firing', hostId],
-    queryFn: () => getAlertInstances(orgId, { status: 'firing', hostId }),
+    queryKey: ['alerts', scopeId, 'firing', hostId],
+    queryFn: () => getAlertInstances(scopeId, { status: 'firing', hostId }),
     refetchInterval: 30_000,
   })
 
   const { data: activeSilences = [] } = useQuery({
-    queryKey: ['silences-active', orgId, hostId],
-    queryFn: () => getActiveSilencesForHost(orgId, hostId),
+    queryKey: ['silences-active', scopeId, hostId],
+    queryFn: () => getActiveSilencesForHost(scopeId, hostId),
     refetchInterval: 60_000,
   })
 
@@ -565,18 +565,18 @@ export function AlertsTab({ orgId, hostId }: Props) {
 
   const toggleMutation = useMutation({
     mutationFn: ({ ruleId, enabled }: { ruleId: string; enabled: boolean }) =>
-      updateAlertRule(orgId, ruleId, { enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', orgId, hostId] }),
+      updateAlertRule(scopeId, ruleId, { enabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] }),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (ruleId: string) => deleteAlertRule(orgId, ruleId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', orgId, hostId] }),
+    mutationFn: (ruleId: string) => deleteAlertRule(scopeId, ruleId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] }),
   })
 
   const deleteSilenceMutation = useMutation({
-    mutationFn: (silenceId: string) => deleteSilence(orgId, silenceId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['silences-active', orgId, hostId] }),
+    mutationFn: (silenceId: string) => deleteSilence(scopeId, silenceId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['silences-active', scopeId, hostId] }),
   })
 
   const currentSilence = activeSilences[0] ?? null
@@ -750,18 +750,18 @@ export function AlertsTab({ orgId, hostId }: Props) {
       </Card>
 
       <AddRuleDialog
-        orgId={orgId}
+        scopeId={scopeId}
         hostId={hostId}
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['alert-rules', orgId, hostId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] })}
       />
       <AddSilenceDialog
-        orgId={orgId}
+        scopeId={scopeId}
         hostId={hostId}
         open={addSilenceOpen}
         onOpenChange={setAddSilenceOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['silences-active', orgId, hostId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['silences-active', scopeId, hostId] })}
       />
     </div>
   )

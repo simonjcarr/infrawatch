@@ -91,7 +91,6 @@ type AgentQueryPollResponse = {
 }
 
 interface Props {
-  orgId: string
   hostId: string
 }
 
@@ -353,12 +352,10 @@ function CheckHistoryChart({
 function AddCheckDialog({
   open,
   onOpenChange,
-  orgId,
   hostId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  orgId: string
   hostId: string
 }) {
   const queryClient = useQueryClient()
@@ -453,14 +450,14 @@ function AddCheckDialog({
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
-      return createCheck(orgId, { hostId, name, checkType, config, intervalSeconds })
+      return createCheck({ hostId, name, checkType, config, intervalSeconds })
     },
     onSuccess: (result) => {
       if ('error' in result) {
         setError(result.error)
         return
       }
-      queryClient.invalidateQueries({ queryKey: ['checks-history', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['checks-history', hostId] })
       onOpenChange(false)
       resetForm()
     },
@@ -862,13 +859,11 @@ function EditCheckDialog({
   check,
   open,
   onOpenChange,
-  orgId,
   hostId,
 }: {
   check: CheckWithHistory
   open: boolean
   onOpenChange: (open: boolean) => void
-  orgId: string
   hostId: string
 }) {
   const queryClient = useQueryClient()
@@ -941,13 +936,13 @@ function EditCheckDialog({
   }
 
   const { mutate: clearHistory, isPending: isClearingHistory } = useMutation({
-    mutationFn: () => deleteCheckHistory(orgId, check.id),
+    mutationFn: () => deleteCheckHistory(check.id),
     onSuccess: (result) => {
       if ('error' in result) {
         setError(result.error)
         return
       }
-      queryClient.invalidateQueries({ queryKey: ['checks-history', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['checks-history', hostId] })
       setConfirmClearHistory(false)
     },
     onError: (err) => {
@@ -984,14 +979,14 @@ function EditCheckDialog({
       } else {
         config = { url: httpUrl, expected_status: parseInt(httpStatus, 10) || 200 }
       }
-      return updateCheck(orgId, check.id, { name, config, intervalSeconds })
+      return updateCheck(check.id, { name, config, intervalSeconds })
     },
     onSuccess: (result) => {
       if ('error' in result) {
         setError(result.error)
         return
       }
-      queryClient.invalidateQueries({ queryKey: ['checks-history', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['checks-history', hostId] })
       onOpenChange(false)
     },
     onError: (err) => {
@@ -1261,11 +1256,9 @@ function EditCheckDialog({
 
 function CheckRow({
   check,
-  orgId,
   hostId,
 }: {
   check: CheckWithHistory
-  orgId: string
   hostId: string
 }) {
   const queryClient = useQueryClient()
@@ -1274,13 +1267,13 @@ function CheckRow({
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   const { mutate: toggleEnabled } = useMutation({
-    mutationFn: (enabled: boolean) => updateCheck(orgId, check.id, { enabled }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['checks-history', orgId, hostId] }),
+    mutationFn: (enabled: boolean) => updateCheck(check.id, { enabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['checks-history', hostId] }),
   })
 
   const { mutate: remove, isPending: isDeleting } = useMutation({
-    mutationFn: () => deleteCheck(orgId, check.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['checks-history', orgId, hostId] }),
+    mutationFn: () => deleteCheck(check.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['checks-history', hostId] }),
   })
 
   return (
@@ -1366,7 +1359,6 @@ function CheckRow({
       check={check}
       open={editOpen}
       onOpenChange={setEditOpen}
-      orgId={orgId}
       hostId={hostId}
     />
 
@@ -1416,12 +1408,12 @@ function sortedChecks(checks: CheckWithHistory[]): CheckWithHistory[] {
   })
 }
 
-export function ChecksTab({ orgId, hostId }: Props) {
+export function ChecksTab({ hostId }: Props) {
   const [addOpen, setAddOpen] = useState(false)
 
   const { data: rawChecks = [], isLoading } = useQuery({
-    queryKey: ['checks-history', orgId, hostId],
-    queryFn: () => getChecksWithHistory(orgId, hostId),
+    queryKey: ['checks-history', hostId],
+    queryFn: () => getChecksWithHistory(hostId),
     refetchInterval: 30_000,
   })
 
@@ -1505,7 +1497,7 @@ export function ChecksTab({ orgId, hostId }: Props) {
       ) : (
         <div className="space-y-2">
           {checks.map((check) => (
-            <CheckRow key={check.id} check={check} orgId={orgId} hostId={hostId} />
+            <CheckRow key={check.id} check={check} hostId={hostId} />
           ))}
         </div>
       )}
@@ -1513,7 +1505,6 @@ export function ChecksTab({ orgId, hostId }: Props) {
       <AddCheckDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        orgId={orgId}
         hostId={hostId}
       />
     </div>

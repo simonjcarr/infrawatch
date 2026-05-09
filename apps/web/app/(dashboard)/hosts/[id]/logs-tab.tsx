@@ -33,7 +33,7 @@ import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
 import type { SoftwareInventoryTaskResult } from '@/lib/db/schema'
 
 interface Props {
-  orgId: string
+  scopeId: string
   hostId: string
 }
 
@@ -106,13 +106,13 @@ function LogDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: string
   return <span className="text-sm text-muted-foreground">—</span>
 }
 
-export function LogsTab({ orgId, hostId }: Props) {
+export function LogsTab({ scopeId, hostId }: Props) {
   const queryClient = useQueryClient()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: runs = [] } = useQuery({
-    queryKey: ['automated-runs-host', orgId, hostId],
-    queryFn: () => listAutomatedRunsForHost(orgId, hostId),
+    queryKey: ['automated-runs-host', scopeId, hostId],
+    queryFn: () => listAutomatedRunsForHost(scopeId, hostId),
     refetchInterval: (query) => {
       const rows = query.state.data ?? []
       return rows.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
@@ -120,10 +120,10 @@ export function LogsTab({ orgId, hostId }: Props) {
   })
 
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
-    mutationFn: () => deleteTaskRuns(orgId, [...selectedIds]),
+    mutationFn: () => deleteTaskRuns(scopeId, [...selectedIds]),
     onSuccess: () => {
       setSelectedIds(new Set())
-      queryClient.invalidateQueries({ queryKey: ['automated-runs-host', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['automated-runs-host', scopeId, hostId] })
     },
   })
 

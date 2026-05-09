@@ -246,7 +246,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1226](https://github.com/carrtech-dev/ct-ops/pull/1226)
 
 Summary: Replaced the still-too-large hosts/tasks conversion with narrower
 product-path slices after an implementation attempt showed the previous task

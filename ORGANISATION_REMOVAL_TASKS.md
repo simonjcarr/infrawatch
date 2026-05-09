@@ -87,7 +87,44 @@ Before finishing:
 - `Blocked`: cannot continue until the listed blocker is resolved.
 - `Complete`: merged to `main` with validation recorded.
 
-## Task 1 - Core Web Single-Instance Conversion
+## Task 1 - Split Core Web Conversion Into Vertical Slices
+
+Status: Complete
+
+Completed by: Codex automation
+
+PR: [#1217](https://github.com/carrtech-dev/ct-ops/pull/1217)
+
+Summary: Replaced the blocked all-at-once web conversion with smaller
+independently shippable slices so the next agent can take a real product path
+instead of retrying the schema/auth/API deadlock.
+
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`
+
+Validation: `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
+
+Follow-up: Start Task 2 next. Do not restore the previous single-PR Task 1.
+
+### Required work
+
+- Replace the previous blocked Task 1 with smaller vertical slices.
+- Keep each new slice independently shippable.
+- Ensure each slice leaves `pnpm --dir apps/web type-check` passing.
+- Ensure each slice removes organisation concepts from a complete product path,
+  not just one technical layer.
+
+### Acceptance criteria
+
+- The tracker no longer asks an agent to remove all web organisation concepts in
+  one PR.
+- The first available implementation task is a smaller vertical slice that can
+  land without recreating the schema/auth/API dependency cycle.
+
+### Validation
+
+- `rg -n "^## Task " ORGANISATION_REMOVAL_TASKS.md`
+
+## Task 2 - Web Auth, Setup, And Instance Foundation
 
 Status: Not started
 
@@ -105,41 +142,130 @@ Follow-up:
 
 ### Required work
 
-This task supersedes the previously blocked schema-only, auth-only, and
-API-only tasks. It must remove organisation concepts from the web app as one
-coherent vertical change.
+This slice owns the sign-in and bootstrap path so users can access CT-Ops as a
+standalone instance without any organisation prerequisite.
+
+- Remove organisation creation actions and onboarding screens.
+- Remove redirects that send users without an organisation to `/onboarding`.
+- Remove `users.organisationId` from auth/session/user types and all session
+  loading logic touched by this path.
+- Replace org membership guards, same-org checks, and org-admin wrappers used by
+  auth/setup flows with instance-level role checks.
+- Remove LDAP tenant/organisation selection. LDAP configuration and login must
+  be instance-scoped.
+- Remove invitation assumptions that attach a user to an organisation. Invites
+  should invite users into the instance.
+- Replace org-owned settings needed by auth/setup with instance-level storage.
+  Use the existing system config table if it fits; otherwise add a standalone
+  instance settings table.
+- Rewrite setup/auth E2E fixtures and unit tests touched by this slice so they
+  seed standalone instance users and no longer query or insert organisations.
+- Remove tenant-isolation auth/setup tests rather than adapting them into no-op
+  tests.
+
+### Acceptance criteria
+
+- Authenticated users are never blocked because they lack an organisation.
+- There is no `/onboarding` route for creating an organisation.
+- LDAP login and configuration do not require tenant or organisation selection.
+- Invite acceptance joins a user to the instance without caller-supplied org
+  identity.
+- Web tests for auth/setup no longer insert into or query `organisations`.
+
+### Validation
+
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for auth, setup, LDAP, and invites where local
+  infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web/app apps/web/lib/auth apps/web/tests/e2e`
+
+## Task 3 - Web Inventory, Operations, And Core UI Single-Instance Conversion
+
+Status: Not started
+
+Completed by:
+
+PR:
+
+Summary:
+
+Files changed:
+
+Validation:
+
+Follow-up:
+
+### Required work
+
+This slice owns the main dashboard workflows that operators use day to day.
+
+- Remove `orgId` / `organisationId` parameters from hosts, tags, tasks, notes,
+  alerts, notifications, networks, software inventory, agent enrolment, and
+  related dashboard loaders, server actions, route handlers, request bodies,
+  query strings, and client components.
+- Delete organisation settings/name/slug UI, org prop threading, and React
+  Query keys containing `orgId` for the areas in this slice.
+- Update shared navigation, profile/team surfaces, and dashboard copy touched by
+  these workflows so the UI presents CT-Ops as a standalone instance.
+- Rewrite unit tests and E2E fixtures touched by this slice so they seed
+  standalone instance data and no longer query or insert organisations.
+
+### Acceptance criteria
+
+- Hosts, tasks, notes, tags, notifications, networks, software inventory, and
+  agent enrolment flows work without caller-supplied organisation identity.
+- The main dashboard UI presents CT-Ops as a standalone instance for these
+  workflows.
+- Web tests touched by these workflows no longer insert into or query
+  `organisations`.
+
+### Validation
+
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for agents, hosts, tasks, notes, notifications, and
+  inventory where local infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" apps/web/app apps/web/components apps/web/hooks apps/web/lib/{actions,hosts,notes,notifications}`
+
+## Task 4 - Web Reporting, Integrations, And Schema Baseline Cleanup
+
+Status: Not started
+
+Completed by:
+
+PR:
+
+Summary:
+
+Files changed:
+
+Validation:
+
+Follow-up:
+
+### Required work
+
+This slice finishes the remaining web product areas and removes the last schema
+and migration residue after the earlier slices have converted the live paths.
 
 - Remove the `organisations` schema module and all exports of it.
-- Remove every `organisation_id` / `org_id` column from web app schemas.
+- Remove every remaining `organisation_id` / `org_id` column from web app
+  schemas.
 - Remove every web migration, snapshot, foreign key, index, unique constraint,
   and RLS policy whose purpose is organisation scoping.
 - Replace the current web migration chain with a clean standalone baseline
   suitable for reinstalling development environments.
 - Remove `withOrgDatabaseScope`, `runWithOrgDatabaseScope`, and
   `app.organisation_id` database session setting code.
-- Replace org-owned settings with instance-level storage. Use the existing
-  system config table if it fits; otherwise add a standalone instance settings
-  table.
-- Delete organisation creation actions and onboarding screens.
-- Remove `users.organisationId` from auth/session/user types and all session
-  loading logic.
-- Replace org membership guards, same-org checks, and org-admin wrappers with
-  instance-level role checks.
-- Remove redirects that send users without an organisation to `/onboarding`.
-- Remove LDAP tenant/organisation selection. LDAP configuration and login must
-  be instance-scoped.
-- Remove invitation assumptions that attach a user to an organisation. Invites
-  should invite users into the instance.
-- Remove `orgId` / `organisationId` parameters from web server actions,
-  route handlers, request bodies, query strings, dashboard loaders, and client
-  components.
 - Update CT-CVE web routes/settings, licence checks, settings, reports,
-  notifications, tasks, hosts, tags, calendar, certificates, service accounts,
-  build docs, notes, alerts, networks, software inventory, and agent enrolment
-  web code to be instance-scoped.
-- Delete organisation settings/name/slug UI, org prop threading, React Query
-  keys containing `orgId`, and user-facing organisation wording in the web UI.
-- Rewrite web unit tests and E2E fixtures touched by this conversion so they
+  calendar, certificates, service accounts, build docs, and remaining admin or
+  export flows to be instance-scoped.
+- Rewrite remaining unit tests and E2E fixtures touched by this slice so they
   seed standalone instance users and no longer query or insert organisations.
 - Remove tenant-isolation tests rather than adapting them into no-op tests.
 
@@ -148,11 +274,9 @@ coherent vertical change.
 - A fresh web database created from migrations has no `organisations` table.
 - No web app table has `organisation_id` or `org_id`.
 - No RLS policy references `app.organisation_id`.
-- Authenticated users are never blocked because they lack an organisation.
-- There is no `/onboarding` route for creating an organisation.
 - No public or internal web action/API requires caller-supplied organisation
   identity.
-- The web UI presents CT-Ops as a standalone instance.
+- The remaining web UI presents CT-Ops as a standalone instance.
 - Web tests no longer insert into or query `organisations`.
 - Tenant-isolation tests are removed, not softened.
 
@@ -163,11 +287,12 @@ coherent vertical change.
 - `pnpm --dir apps/web lint`
 - `pnpm --dir apps/web test:unit`
 - `pnpm --dir apps/web exec playwright test --list`
-- Targeted E2E smoke runs for auth, setup, settings, agents, hosts, tasks,
-  reports, CT-CVE, and calendar where local infrastructure allows.
+- Targeted E2E smoke runs for settings, reports, CT-CVE, calendar,
+  certificates, service accounts, and build docs where local infrastructure
+  allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
 
-## Task 2 - Ingest And Agent Single-Instance Conversion
+## Task 5 - Ingest And Agent Single-Instance Conversion
 
 Status: Not started
 
@@ -211,7 +336,7 @@ Follow-up:
 - `pnpm --dir apps/web type-check`
 - `rg -n "organisation|organization|orgID|orgId|org_id|organisation_id|OrgToken|org_token|tenant" apps/ingest agent proto`
 
-## Task 3 - Docs, Deploy, And External Contracts
+## Task 6 - Docs, Deploy, And External Contracts
 
 Status: Not started
 
@@ -255,7 +380,7 @@ Follow-up:
 - `pnpm --dir apps/docs build`
 - `rg -n "organisation|organization|orgId|organisationId|organisation_id|org_id|tenant|organisations" README.md docs apps/docs deploy .env.example apps/web/.env.example`
 
-## Task 4 - Final Residue Sweep And Validation
+## Task 7 - Final Residue Sweep And Validation
 
 Status: Not started
 

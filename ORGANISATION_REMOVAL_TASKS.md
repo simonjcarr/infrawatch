@@ -202,7 +202,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1220](https://github.com/carrtech-dev/ct-ops/pull/1220)
 
 Summary: Replaced the oversized dashboard conversion slice with narrower
 product-path tasks after auditing the remaining org-scoped surface and finding

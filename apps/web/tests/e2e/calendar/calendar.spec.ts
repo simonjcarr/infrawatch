@@ -52,6 +52,18 @@ test('engineer can create a host-linked calendar event with participant roles ac
   await page.getByTestId('calendar-event-submit').click()
 
   await expect(page.getByText('Kernel patch planning')).toBeVisible()
+  const timedEvent = page.locator('.fc-timegrid-event').filter({ hasText: 'Kernel patch planning' }).first()
+  await expect(timedEvent).toBeVisible()
+  await expect(page.locator('.fc-daygrid-event').filter({ hasText: 'Kernel patch planning' })).toHaveCount(0)
+  const [timedEventBox, timeGridBox] = await Promise.all([
+    timedEvent.boundingBox(),
+    page.locator('.fc-timegrid-body').first().boundingBox(),
+  ])
+  expect(timedEventBox).not.toBeNull()
+  expect(timeGridBox).not.toBeNull()
+  expect(timedEventBox!.height).toBeGreaterThan(40)
+  expect(timedEventBox!.y).toBeGreaterThanOrEqual(timeGridBox!.y)
+  expect(timedEventBox!.y + timedEventBox!.height).toBeLessThanOrEqual(timeGridBox!.y + timeGridBox!.height + 1)
 
   for (const view of ['day', 'work-week', 'full-week', 'month', 'year']) {
     await page.getByTestId(`calendar-view-${view}`).click()
@@ -176,10 +188,21 @@ test('calendar views use operational calendar labels and grid structure', async 
   await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '9:30 AM' }).first()).toBeVisible()
   await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '5 PM' }).first()).toBeVisible()
   await expect(page.locator('.fc-col-header-cell').filter({ hasText: 'Sun' })).toHaveCount(0)
+  await expect(page.locator('.fc-timegrid .fc-daygrid-day-number')).toHaveCount(0)
+  expect(await page.locator('.fc-timegrid-slots .fc-timegrid-slot').count()).toBeGreaterThanOrEqual(48)
+  const timeSlotHeights = await page.locator('.fc-timegrid-slots tr').evaluateAll((slots) =>
+    slots.map((slot) => slot.getBoundingClientRect().height),
+  )
+  expect(timeSlotHeights.length).toBeGreaterThanOrEqual(48)
+  expect(Math.min(...timeSlotHeights)).toBeGreaterThanOrEqual(28)
+  const visibleSlotHeight = timeSlotHeights[0]!
+  const scrollerHeight = await page.locator('.fc-timegrid-body').first().evaluate((body) => body.getBoundingClientRect().height)
+  expect(visibleSlotHeight * 16).toBeGreaterThanOrEqual(scrollerHeight * 0.85)
 
   await page.getByTestId('calendar-view-full-week').click()
   await expect(page.locator('.fc-col-header-cell').filter({ hasText: /Mon \d{1,2} [A-Z][a-z]{2}/ }).first()).toBeVisible()
   await expect(page.locator('.fc-col-header-cell').filter({ hasText: /Sun \d{1,2} [A-Z][a-z]{2}/ }).first()).toBeVisible()
+  await expect(page.locator('.fc-timegrid .fc-daygrid-day-number')).toHaveCount(0)
 
   await page.getByTestId('calendar-view-month').click()
   await expect(page.getByTestId('calendar-period-title')).toContainText(/^[A-Z][a-z]{2} \d{4}$/)

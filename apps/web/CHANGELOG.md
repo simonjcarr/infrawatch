@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.125.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.5...web/v0.125.0) (2026-05-09)
+
+
+### Features
+
+* **web:** remove organisation onboarding from auth setup ([#1218](https://github.com/carrtech-dev/ct-ops/issues/1218)) ([863f40e](https://github.com/carrtech-dev/ct-ops/commit/863f40ec8bc3552b77a86cf2ba0e33b0ea5198d7))
+
 ## [0.124.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.4...web/v0.124.5) (2026-05-09)
 
 

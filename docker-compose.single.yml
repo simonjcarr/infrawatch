@@ -274,7 +274,7 @@ services:
           -keyout /tls/server.key \
           -out /tls/server.crt \
           -subj "/CN=ct-ops" \
-          -addext "subjectAltName=DNS:localhost,DNS:ingest,IP:127.0.0.1" 2>/dev/null
+          -addext "subjectAltName=DNS:localhost,DNS:ingest,DNS:ct-ops,IP:127.0.0.1" 2>/dev/null
         chmod 600 /tls/server.key
         chmod 644 /tls/server.crt
         echo "tls-init: wrote /tls/server.{crt,key}. Replace with your own cert"

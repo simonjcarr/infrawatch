@@ -15,7 +15,8 @@
 # Behaviour:
 #   - Idempotent: exits 0 if OUT_DIR/server.crt and server.key both exist
 #     unless FORCE=1.
-#   - Always includes DNS:localhost, DNS:ingest, IP:127.0.0.1 in the SAN list.
+#   - Always includes DNS:localhost, DNS:ingest, DNS:ct-ops, IP:127.0.0.1
+#     in the SAN list.
 #   - Appends every non-loopback IPv4 address on the host (so remote agents
 #     can verify by IP against a cert generated on the server).
 #   - Writes the key with mode 600 and the cert with mode 644.
@@ -50,7 +51,7 @@ elif command -v ifconfig >/dev/null 2>&1; then
   LOCAL_IPS=$(ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/ {print "IP:" $2}' | tr '\n' ',' | sed 's/,$//' || true)
 fi
 
-SAN="DNS:localhost,DNS:ingest,IP:127.0.0.1"
+SAN="DNS:localhost,DNS:ingest,DNS:ct-ops,IP:127.0.0.1"
 [ -n "$LOCAL_IPS" ] && SAN="${SAN},${LOCAL_IPS}"
 [ -n "$EXTRA_SANS" ] && SAN="${SAN},${EXTRA_SANS}"
 

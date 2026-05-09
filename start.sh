@@ -452,7 +452,7 @@ if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
   else
     LOCAL_IPS=$(ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/ {print "IP:" $2}' | tr '\n' ',' | sed 's/,$//')
   fi
-  SAN="DNS:ingest,DNS:localhost,IP:127.0.0.1"
+  SAN="DNS:ingest,DNS:localhost,DNS:ct-ops,IP:127.0.0.1"
   if [ -n "$LOCAL_IPS" ]; then
     SAN="${SAN},${LOCAL_IPS}"
   fi

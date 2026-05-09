@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.124.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.3...web/v0.124.4) (2026-05-09)
+
+
+### Bug Fixes
+
+* **calendar:** lay out overlapping timed events ([7aaf6b1](https://github.com/carrtech-dev/ct-ops/commit/7aaf6b1b81906575203fffce315c81eaa91c5111))
+* **web:** cover generated ct-ops TLS certificate SAN ([2f4d62e](https://github.com/carrtech-dev/ct-ops/commit/2f4d62e29f6ab1117710d8c567d64180da4bf2c0))
+
 ## [0.124.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.2...web/v0.124.3) (2026-05-09)
 
 

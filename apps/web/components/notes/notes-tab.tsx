@@ -1,14 +1,41 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { NotebookPen, Plus, Filter } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { formatDistanceToNow } from 'date-fns'
+import { Filter, Loader2, NotebookPen, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { listNotesForHost } from '@/lib/actions/notes'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { MarkdownRenderer } from '@/components/shared/markdown-renderer'
+import { deleteNote, listNotesForHost } from '@/lib/actions/notes'
+import type { ResolvedNote } from '@/lib/actions/notes-resolver'
 import { NOTE_CATEGORIES, type NoteCategory } from '@/lib/db/schema'
-import { NoteCard } from './note-card'
 import { NoteEditorDialog } from './note-editor-dialog'
 
 const CATEGORY_LABELS: Record<NoteCategory, string> = {
@@ -28,14 +55,36 @@ interface Props {
 }
 
 export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
+  const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
+  const [selectedNote, setSelectedNote] = useState<ResolvedNote | null>(null)
+  const [editingNote, setEditingNote] = useState<ResolvedNote | null>(null)
+  const [deletingNote, setDeletingNote] = useState<ResolvedNote | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<NoteCategory | 'all'>('all')
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const canCreate = userRole !== 'read_only'
 
   const { data: notes = [], isLoading } = useQuery({
     queryKey: ['notes-for-host', orgId, hostId],
     queryFn: () => listNotesForHost(orgId, hostId),
+  })
+
+  const invalidateHostNotes = () => {
+    queryClient.invalidateQueries({ queryKey: ['notes-for-host', orgId, hostId] })
+  }
+
+  const deleteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      const result = await deleteNote(orgId, noteId)
+      if ('error' in result) throw new Error(result.error)
+    },
+    onSuccess: () => {
+      setDeletingNote(null)
+      setSelectedNote(null)
+      invalidateHostNotes()
+    },
+    onError: (err: Error) => setActionError(err.message),
   })
 
   // Counts per category drive badge tags so empty categories don't clutter the
@@ -135,17 +184,81 @@ export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {visibleNotes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              orgId={orgId}
-              hostId={hostId}
-              currentUserId={currentUserId}
-              userRole={userRole}
-            />
-          ))}
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Author</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="w-24 text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleNotes.map((note) => {
+                const isAuthor = note.authorId === currentUserId
+                const isAdmin = userRole === 'super_admin' || userRole === 'org_admin'
+                const canManage =
+                  !note.deletedAt && userRole !== 'read_only' && (isAuthor || isAdmin)
+
+                return (
+                  <TableRow key={note.id}>
+                    <TableCell className="max-w-[22rem]">
+                      <button
+                        type="button"
+                        className="block max-w-full truncate text-left font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        onClick={() => setSelectedNote(note)}
+                      >
+                        {note.title}
+                      </button>
+                    </TableCell>
+                    <TableCell className="max-w-[14rem] truncate text-muted-foreground">
+                      {note.authorName ?? 'Unknown'}
+                    </TableCell>
+                    <TableCell
+                      className="text-muted-foreground"
+                      title={new Date(note.updatedAt).toLocaleString()}
+                    >
+                      {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {canManage && (
+                        <div className="inline-flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setEditingNote(note)}
+                            aria-label={`Edit ${note.title}`}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeletingNote(note)}
+                            aria-label={`Delete ${note.title}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {actionError && (
+        <div role="alert" className="text-sm text-destructive">
+          {actionError}
         </div>
       )}
 
@@ -158,6 +271,86 @@ export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
           onOpenChange={setCreateOpen}
         />
       )}
+
+      {editingNote && (
+        <NoteEditorDialog
+          mode="edit"
+          orgId={orgId}
+          hostId={hostId}
+          noteId={editingNote.id}
+          initial={{
+            title: editingNote.title,
+            body: editingNote.body,
+            category: editingNote.category,
+            isPrivate: editingNote.isPrivate,
+            isAuthor: editingNote.authorId === currentUserId,
+          }}
+          open={editingNote != null}
+          onOpenChange={(open) => {
+            if (!open) setEditingNote(null)
+          }}
+        />
+      )}
+
+      <Dialog open={selectedNote != null} onOpenChange={(open) => !open && setSelectedNote(null)}>
+        <DialogContent className="max-w-3xl">
+          {selectedNote && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedNote.title}</DialogTitle>
+                <DialogDescription>
+                  By {selectedNote.authorName ?? 'Unknown'} ·{' '}
+                  {new Date(selectedNote.updatedAt).toLocaleString()}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[65vh] overflow-y-auto rounded-md border bg-background p-4">
+                {selectedNote.body.trim().length > 0 ? (
+                  <MarkdownRenderer>{selectedNote.body}</MarkdownRenderer>
+                ) : (
+                  <p className="text-sm text-muted-foreground">This note has no body.</p>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deletingNote != null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeletingNote(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete <strong>{deletingNote?.title}</strong>? It disappears from every list,
+              but the revision history is kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={deleteMutation.isPending || deletingNote == null}
+              onClick={(e) => {
+                e.preventDefault()
+                if (deletingNote) deleteMutation.mutate(deletingNote.id)
+              }}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 mr-1 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

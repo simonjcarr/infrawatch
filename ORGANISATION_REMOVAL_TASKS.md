@@ -128,19 +128,34 @@ reset lands.
 
 ## Task 2 - Remove Org Auth And Onboarding
 
-Status: Not started
+Status: Blocked
 
-Completed by:
+Completed by: Codex automation `remove-org-from-ct-ops` on 2026-05-09
 
-PR:
+PR: Not opened
 
 Summary:
+Task 2 cannot currently be completed in isolation. The auth/onboarding files can
+be rewritten, but the task's own validation and acceptance scope still requires
+removing `organisationId`, `requireOrg*`, onboarding redirects, and LDAP tenant
+assumptions from `apps/web/lib/actions` and route callers that are owned by
+Task 3's API/action parameter cleanup.
 
 Files changed:
+`ORGANISATION_REMOVAL_TASKS.md`
 
 Validation:
+Reviewed auth/onboarding dependencies and ran
+`rg -n "organisationId|orgId|requireOrg|SameOrg|onboarding|tenant" apps/web/lib/auth apps/web/lib/actions apps/web/app`.
+That output shows Task 2 blockers outside auth-only files, including:
+- `apps/web/lib/actions/alerts.ts`, `tags.ts`, `settings.ts`, `notifications.ts`, `calendar.ts`, `ldap.ts`, and many other server actions that still take `orgId` and call `requireOrg*`
+- `apps/web/lib/actions/auth.ts` and `organisations.ts` still attaching invites and first-run setup to organisations
+- auth pages and redirects still branching on `user.organisationId` because the surrounding action contracts remain org-scoped
 
 Follow-up:
+Combine Tasks 2 and 3 into a single auth/API de-organisation pass, or rewrite
+Task 2 so it is limited to auth/session/redirect/onboarding files and does not
+require removing org-scoped action parameters from `apps/web/lib/actions`.
 
 ### Required work
 

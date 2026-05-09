@@ -5,7 +5,7 @@ import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/ac
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { ldapConfigurations, organisations } from '@/lib/db/schema'
+import { ldapConfigurations } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { encrypt, decrypt } from '@/lib/crypto/encrypt'
 import {
@@ -16,10 +16,19 @@ import {
   buildLdapLoginOptions,
   type LdapLoginOption,
 } from '@/lib/auth/ldap-login-options'
+import { getDefaultOrganisationId } from '@/lib/default-organisation'
 import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
 import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
 export type { LdapConfigurationSafe } from '@/lib/ldap/config-client'
+
+async function getInstanceOrganisationId(): Promise<string> {
+  const organisationId = await getDefaultOrganisationId()
+  if (!organisationId) {
+    throw new Error('Instance setup is incomplete')
+  }
+  return organisationId
+}
 
 function safeDecrypt(value: string): string {
   try { return decrypt(value) } catch { return value }
@@ -75,8 +84,8 @@ const updateLdapConfigSchema = z.object({
 })
 
 export async function getLdapConfigurations(
-  orgId: string,
 ): Promise<LdapConfigurationSafe[]> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgAdminAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
@@ -89,9 +98,9 @@ export async function getLdapConfigurations(
 }
 
 export async function getLdapConfiguration(
-  orgId: string,
   configId: string,
 ): Promise<LdapConfigurationSafe | null> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgAdminAccess(orgId)
   const result = await db.query.ldapConfigurations.findFirst({
     where: and(
@@ -104,9 +113,9 @@ export async function getLdapConfiguration(
 }
 
 export async function createLdapConfiguration(
-  orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgAdminAccess(orgId)
   const parsed = createLdapConfigSchema.safeParse(input)
   if (!parsed.success) {
@@ -147,10 +156,10 @@ export async function createLdapConfiguration(
 }
 
 export async function updateLdapConfiguration(
-  orgId: string,
   configId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgAdminAccess(orgId)
   const parsed = updateLdapConfigSchema.safeParse(input)
   if (!parsed.success) {
@@ -197,9 +206,9 @@ export async function updateLdapConfiguration(
 }
 
 export async function deleteLdapConfiguration(
-  orgId: string,
   configId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgAdminAccess(orgId)
   const existing = await db.query.ldapConfigurations.findFirst({
     where: and(
@@ -219,9 +228,9 @@ export async function deleteLdapConfiguration(
 }
 
 export async function testLdapConnection(
-  orgId: string,
   configId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgAdminAccess(orgId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
@@ -359,22 +368,23 @@ export async function hasLdapLoginEnabled(): Promise<boolean> {
 }
 
 export async function getLdapLoginOptions(): Promise<LdapLoginOption[]> {
-  const rows = await db
-    .select({
-      ldapConfigurationId: ldapConfigurations.id,
-      ldapConfigurationName: ldapConfigurations.name,
-      organisationName: organisations.name,
-      organisationSlug: organisations.slug,
-    })
-    .from(ldapConfigurations)
-    .innerJoin(organisations, eq(ldapConfigurations.organisationId, organisations.id))
-    .where(and(
+  const rows = await db.query.ldapConfigurations.findMany({
+    where: and(
       eq(ldapConfigurations.enabled, true),
       eq(ldapConfigurations.allowLogin, true),
       isNull(ldapConfigurations.deletedAt),
-      isNull(organisations.deletedAt),
-    ))
-    .orderBy(organisations.name, ldapConfigurations.name)
+    ),
+    columns: {
+      id: true,
+      name: true,
+      host: true,
+    },
+    orderBy: [ldapConfigurations.name, ldapConfigurations.host],
+  })
 
-  return buildLdapLoginOptions(rows)
+  return buildLdapLoginOptions(rows.map((row) => ({
+    ldapConfigurationId: row.id,
+    ldapConfigurationName: row.name,
+    ldapConfigurationHost: row.host,
+  })))
 }

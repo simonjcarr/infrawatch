@@ -18,6 +18,27 @@ export const TEST_ORG = {
   slug: 'e2e-test-org',
 } as const
 
+export async function getSeededTestUserContext(): Promise<{
+  instanceId: string
+  userId: string
+}> {
+  const sql = getTestDb()
+  const rows = await sql<Array<{ instance_id: string | null; user_id: string }>>`
+    SELECT organisation_id AS instance_id, id AS user_id
+    FROM "user"
+    WHERE email = ${TEST_USER.email}
+    LIMIT 1
+  `
+  const row = rows[0]
+  if (!row?.instance_id) {
+    throw new Error(`seeded test user not found or missing instance membership: ${TEST_USER.email}`)
+  }
+  return {
+    instanceId: row.instance_id,
+    userId: row.user_id,
+  }
+}
+
 let testUserPasswordHash: string | null = null
 
 async function getTestUserPasswordHash(): Promise<string> {

@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from './email'
+import { getDefaultOrganisationId } from '@/lib/default-organisation'
 import {
   getBetterAuthOrigin,
   getBetterAuthSecret,
@@ -31,7 +32,7 @@ async function getAuthEmailConfigForUser(userId: string) {
     where: (users, { eq }) => eq(users.id, userId),
     columns: { organisationId: true },
   })
-  const organisationId = user?.organisationId
+  const organisationId = user?.organisationId ?? await getDefaultOrganisationId()
   if (!organisationId) return null
 
   const organisation = await db.query.organisations.findFirst({

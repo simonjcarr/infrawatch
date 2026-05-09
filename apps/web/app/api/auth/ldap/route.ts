@@ -1,7 +1,7 @@
 import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users, accounts, sessions, ldapConfigurations, verifications, organisations } from '@/lib/db/schema'
+import { users, accounts, sessions, ldapConfigurations, verifications } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { authenticateUser } from '@/lib/ldap/client'
 import { createId } from '@paralleldrive/cuid2'
@@ -14,7 +14,6 @@ import {
   makeSessionCookieValue,
   shouldUseSecureSessionCookie,
 } from '@/lib/auth/session-cookie'
-import { normalizeLdapTenantSlug } from '@/lib/auth/ldap-tenant'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
 import { SeatAdmissionError, assertUserCanAccessSeat } from '@/lib/seat-admission'
@@ -56,12 +55,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { username, password, organisationSlug } = body as {
+    const { username, password, ldapConfigurationId } = body as {
       username?: string
       password?: string
-      organisationSlug?: string
+      ldapConfigurationId?: string
     }
-    const tenantSlug = normalizeLdapTenantSlug(organisationSlug)
 
     const authSecret = getBetterAuthSecret()
     const authUrl = getBetterAuthUrl()
@@ -70,11 +68,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
     }
 
-    if (!tenantSlug) {
-      return NextResponse.json({ error: 'Organisation slug is required' }, { status: 400 })
+    if (!ldapConfigurationId) {
+      return NextResponse.json({ error: 'A domain integration is required' }, { status: 400 })
     }
 
-    const accountKey = `${tenantSlug}:${username}`
+    const accountKey = `${ldapConfigurationId}:${username}`
     const accountStatus = await passwordLoginAttemptGuard.check(accountKey)
     if (!accountStatus.allowed) {
       return NextResponse.json(
@@ -83,44 +81,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const organisation = await db.query.organisations.findFirst({
+    const config = await db.query.ldapConfigurations.findFirst({
       where: and(
-        eq(organisations.slug, tenantSlug),
-        isNull(organisations.deletedAt),
-      ),
-      columns: { id: true },
-    })
-    if (!organisation) {
-      return NextResponse.json({ error: 'LDAP login is not configured for this organisation' }, { status: 400 })
-    }
-
-    // Authenticate only against the tenant explicitly selected by the caller.
-    const configs = await db.query.ldapConfigurations.findMany({
-      where: and(
-        eq(ldapConfigurations.organisationId, organisation.id),
+        eq(ldapConfigurations.id, ldapConfigurationId),
         eq(ldapConfigurations.enabled, true),
         eq(ldapConfigurations.allowLogin, true),
         isNull(ldapConfigurations.deletedAt),
       ),
     })
 
-    if (configs.length === 0) {
-      return NextResponse.json({ error: 'LDAP login is not configured for this organisation' }, { status: 400 })
+    if (!config) {
+      return NextResponse.json({ error: 'LDAP login is not configured for this integration' }, { status: 400 })
     }
 
     const errors: string[] = []
-    for (const config of configs) {
-      const result = await authenticateUser(config, username, password)
-      if ('error' in result) {
-        console.error(`[LDAP] Auth failed for config "${config.name}" (${config.host}): ${result.error}`)
-        errors.push(`${config.name}: ${result.error}`)
-        continue
-      }
+    const result = await authenticateUser(config, username, password)
+    if ('error' in result) {
+      console.error(`[LDAP] Auth failed for config "${config.name}" (${config.host}): ${result.error}`)
+      errors.push(`${config.name}: ${result.error}`)
+    } else {
 
       const ldapUser = result.user
       const ldapDn = ldapUser.dn
 
-      // Find existing account linked to this LDAP DN for this LDAP config's org.
+      // Find an existing account linked to this LDAP DN for the installation.
       let userId: string
       const [linkedAccount] = await db
         .select({ user: users })
@@ -130,7 +114,6 @@ export async function POST(request: NextRequest) {
           and(
             eq(accounts.providerId, 'ldap'),
             eq(accounts.accountId, ldapDn),
-            eq(users.organisationId, config.organisationId),
             isNull(users.deletedAt),
           ),
         )
@@ -150,12 +133,11 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(users.id, userId))
       } else {
-        // Check if a user with this email already exists in this LDAP config's org.
+        // Reuse an existing installation user with the same email when available.
         const existingUser = ldapUser.email
           ? await db.query.users.findFirst({
               where: and(
                 eq(users.email, ldapUser.email),
-                eq(users.organisationId, config.organisationId),
                 isNull(users.deletedAt),
               ),
             })

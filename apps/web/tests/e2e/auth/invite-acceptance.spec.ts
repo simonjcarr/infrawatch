@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_USER, TEST_ORG } from '../fixtures/seed'
+import { getSeededTestUserContext } from '../fixtures/seed'
 import { issueTestLicence } from '../fixtures/licence'
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false'
@@ -14,6 +14,7 @@ test('invite acceptance rejects logged-in users whose email does not match the i
   const attackerPassword = 'TestPassword123!'
   const invitedEmail = `victim-${suffix}@example.com`
   const inviteToken = `invite-token-${suffix}`
+  const { instanceId, userId: invitedById } = await getSeededTestUserContext()
 
   await page.request.post('/api/auth/sign-up/email', {
     data: {
@@ -47,8 +48,8 @@ test('invite acceptance rejects logged-in users whose email does not match the i
       ${invitedEmail},
       'org_admin',
       ${inviteToken},
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
-      (SELECT id FROM "user" WHERE email = ${TEST_USER.email}),
+      ${instanceId},
+      ${invitedById},
       NOW() + INTERVAL '1 day',
       NOW(),
       NOW()
@@ -63,13 +64,10 @@ test('invite acceptance rejects logged-in users whose email does not match the i
   })
   expect(signInResponse.ok()).toBeTruthy()
 
-  await page.goto('/onboarding')
-  await page.waitForURL('**/onboarding')
-
   await page.goto(`/accept-invite?token=${inviteToken}`)
 
-  await page.waitForURL(/\/onboarding(?:\?|$)/)
-  await expect(page.getByText('Create your organisation', { exact: true })).toBeVisible()
+  await page.waitForURL(/\/login\?error=/)
+  await expect(page.getByTestId('login-error')).toBeVisible()
 
   const [attacker] = await sql<Array<{ organisation_id: string | null; role: string }>>`
     SELECT organisation_id, role
@@ -95,6 +93,7 @@ test('invite acceptance attaches the matching user to the organisation', async (
   const invitedEmail = `invitee-${suffix}@example.com`
   const invitedPassword = 'TestPassword123!'
   const inviteToken = `invite-token-${suffix}`
+  const { instanceId, userId: invitedById } = await getSeededTestUserContext()
 
   const signUpResponse = await page.request.post('/api/auth/sign-up/email', {
     data: {
@@ -129,8 +128,8 @@ test('invite acceptance attaches the matching user to the organisation', async (
       ${invitedEmail},
       'org_admin',
       ${inviteToken},
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
-      (SELECT id FROM "user" WHERE email = ${TEST_USER.email}),
+      ${instanceId},
+      ${invitedById},
       NOW() + INTERVAL '1 day',
       NOW(),
       NOW()
@@ -177,6 +176,7 @@ test('invite signup without required email verification joins the inviting organ
   const invitedEmail = `invite-signup-${suffix}@example.com`
   const invitedPassword = 'TestPassword123!'
   const inviteToken = `invite-signup-token-${suffix}`
+  const { instanceId, userId: invitedById } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO invitations (
@@ -195,8 +195,8 @@ test('invite signup without required email verification joins the inviting organ
       ${invitedEmail},
       'org_admin',
       ${inviteToken},
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
-      (SELECT id FROM "user" WHERE email = ${TEST_USER.email}),
+      ${instanceId},
+      ${invitedById},
       NOW() + INTERVAL '1 day',
       NOW(),
       NOW()
@@ -212,7 +212,7 @@ test('invite signup without required email verification joins the inviting organ
 
   await page.waitForURL('**/dashboard')
   await expect(page.getByTestId('dashboard-heading')).toBeVisible()
-  await expect(page.getByText('Create your organisation', { exact: true })).toHaveCount(0)
+  await expect(page).not.toHaveURL(/\/onboarding(?:\?|$)/)
 
   const [invitee] = await sql<Array<{
     organisation_id: string | null
@@ -249,6 +249,7 @@ test('authenticated invited user without an organisation redeems invite link ins
   const invitedEmail = `signed-in-invitee-${suffix}@example.com`
   const invitedPassword = 'TestPassword123!'
   const inviteToken = `signed-in-invite-token-${suffix}`
+  const { instanceId, userId: invitedById } = await getSeededTestUserContext()
 
   const signUpResponse = await page.request.post('/api/auth/sign-up/email', {
     data: {
@@ -283,8 +284,8 @@ test('authenticated invited user without an organisation redeems invite link ins
       ${invitedEmail},
       'engineer',
       ${inviteToken},
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
-      (SELECT id FROM "user" WHERE email = ${TEST_USER.email}),
+      ${instanceId},
+      ${invitedById},
       NOW() + INTERVAL '1 day',
       NOW(),
       NOW()
@@ -327,22 +328,15 @@ test('invite acceptance rejects when no user seat is available', async ({ page }
   const invitedEmail = `seat-limited-invitee-${suffix}@example.com`
   const invitedPassword = 'TestPassword123!'
   const inviteToken = `seat-limited-invite-token-${suffix}`
-
-  const [org] = await sql<Array<{ id: string }>>`
-    SELECT id
-    FROM organisations
-    WHERE slug = ${TEST_ORG.slug}
-    LIMIT 1
-  `
-  expect(org?.id).toBeTruthy()
+  const { instanceId, userId: invitedById } = await getSeededTestUserContext()
 
   try {
-    const licenceKey = await issueTestLicence({ orgId: org!.id, tier: 'community', maxUsers: 1 })
+    const licenceKey = await issueTestLicence({ orgId: instanceId, tier: 'community', maxUsers: 1 })
     await sql`
       UPDATE organisations
       SET licence_key = ${licenceKey},
           licence_tier = 'community'
-      WHERE id = ${org!.id}
+      WHERE id = ${instanceId}
     `
 
     const signUpResponse = await page.request.post('/api/auth/sign-up/email', {
@@ -378,8 +372,8 @@ test('invite acceptance rejects when no user seat is available', async ({ page }
         ${invitedEmail},
         'engineer',
         ${inviteToken},
-        ${org!.id},
-        (SELECT id FROM "user" WHERE email = ${TEST_USER.email}),
+        ${instanceId},
+        ${invitedById},
         NOW() + INTERVAL '1 day',
         NOW(),
         NOW()
@@ -416,7 +410,7 @@ test('invite acceptance rejects when no user seat is available', async ({ page }
       UPDATE organisations
       SET licence_key = NULL,
           licence_tier = 'community'
-      WHERE id = ${org!.id}
+      WHERE id = ${instanceId}
     `
   }
 })

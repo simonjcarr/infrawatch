@@ -12,6 +12,7 @@ import { SEAT_LIMIT_EXCEEDED_PATH, assertUserCanAccessSeat } from '@/lib/seat-ad
 import { organisations } from '@/lib/db/schema'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import { getTwoFactorPolicyRedirect } from './two-factor-policy'
+import { getDefaultOrganisationId } from '@/lib/default-organisation'
 
 // Re-export User as SessionUser for convenience
 export type { User as SessionUser }
@@ -44,8 +45,11 @@ async function findSessionUser(userId: string): Promise<User | null> {
   })
   if (!user) return null
 
+  const organisationId = user.organisationId ?? await getDefaultOrganisationId()
+
   return {
     ...user,
+    organisationId,
     role: getPrimaryRole(user.roles, user.role),
     roles: normalizeAssignedRoles(user.roles, user.role),
   }

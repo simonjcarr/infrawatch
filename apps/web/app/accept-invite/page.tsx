@@ -19,9 +19,6 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   const session = await getRequiredSession()
   const result = await acceptInvite(token, session.user.id)
   if ('error' in result) {
-    if (!session.user.organisationId) {
-      redirect(`/onboarding?inviteError=${encodeURIComponent(result.error)}`)
-    }
     redirect(`/login?error=${encodeURIComponent(result.error)}`)
   }
 

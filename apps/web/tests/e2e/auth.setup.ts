@@ -7,7 +7,6 @@ const publicRoutes = [
   '/register',
   '/forgot-password',
   '/setup-email',
-  '/onboarding',
   '/accept-invite?token=e2e-warmup',
   '/reset-password/e2e-warmup-token',
   '/verify-email?token=e2e-warmup',

@@ -63,19 +63,38 @@ Before finishing:
 
 ## Task 1 - Reset Schema And Migrations
 
-Status: Not started
+Status: Blocked
 
-Completed by:
+Completed by: Codex automation `remove-org-from-ct-ops` on 2026-05-09
 
-PR:
+PR: Not opened
 
 Summary:
+Task 1 cannot currently be completed in isolation. Removing `organisations`,
+`organisation_id`, and org-scoped RLS from `apps/web/lib/db` immediately breaks
+type-checking across auth, dashboard pages, server actions, and CT-CVE
+integrations because those layers still require `user.organisationId`,
+`hosts.organisationId`, `notes.organisationId`, `withOrgDatabaseScope`, and the
+organisation-backed settings record.
 
 Files changed:
+`ORGANISATION_REMOVAL_TASKS.md`
 
 Validation:
+Checked open PRs with `gh pr list --repo carrtech-dev/ct-ops --state open`.
+Created a dedicated worktree and attempted the schema-only removal locally.
+`pnpm --dir apps/web type-check` could be run after reusing the existing
+`node_modules`; it produced hundreds of downstream errors outside `lib/db`,
+including:
+- `app/(auth)/login/page.tsx` and `app/(auth)/register/page.tsx` expecting `user.organisationId`
+- `lib/auth/session.ts`, `lib/auth/guards.ts`, and `lib/auth/redirects.ts` requiring org-scoped auth types
+- many dashboard pages and CT-CVE integration modules expecting org-owned table columns and `withOrgDatabaseScope`
 
 Follow-up:
+Combine Task 1 with a coordinated first pass of Tasks 2-5, or split out a new
+prerequisite task that removes compile-time/runtime dependencies on
+`organisationId` and `withOrgDatabaseScope` before the schema and migration
+reset lands.
 
 ### Required work
 

@@ -2,6 +2,8 @@ package config
 
 import (
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -43,5 +45,23 @@ func TestLoadBuildsEncodedDatabaseURLFromPostgresEnv(t *testing.T) {
 	want := "postgresql://ctops:Pyth%29n2475%23%23@db:5432/ctops"
 	if cfg.DatabaseURL != want {
 		t.Fatalf("cfg.DatabaseURL = %q, want %q", cfg.DatabaseURL, want)
+	}
+}
+
+func TestLoadSeedsAgentVersionFromConfiguredReleaseManifest(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, ".release-please-manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(`{"agent":"9.9.9"}`), 0o644); err != nil {
+		t.Fatalf("writing release manifest: %v", err)
+	}
+	t.Setenv("INGEST_RELEASE_MANIFEST_PATH", manifestPath)
+
+	cfg, err := Load("/tmp/does-not-exist.yaml")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Agent.LatestVersion != "v9.9.9" {
+		t.Fatalf("cfg.Agent.LatestVersion = %q, want %q", cfg.Agent.LatestVersion, "v9.9.9")
 	}
 }

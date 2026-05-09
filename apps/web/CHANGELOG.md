@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.126.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.125.0...web/v0.126.0) (2026-05-09)
+
+
+### Features
+
+* **web:** remove org scope from host inventory ([#1223](https://github.com/carrtech-dev/ct-ops/issues/1223)) ([8fe035f](https://github.com/carrtech-dev/ct-ops/commit/8fe035f02c5bb3d2281e2a0227618a3fb69469f4))
+
 ## [0.125.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.5...web/v0.125.0) (2026-05-09)
 
 

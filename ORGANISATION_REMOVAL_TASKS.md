@@ -130,7 +130,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1218](https://github.com/carrtech-dev/ct-ops/pull/1218)
 
 Summary: Removed onboarding and organisation-selection from the auth/setup
 path, switched LDAP sign-in to instance-scoped integration IDs, and updated
@@ -141,7 +141,7 @@ Files changed: `ORGANISATION_REMOVAL_TASKS.md`, `apps/web/app/(auth)`,
 `apps/web/app/(dashboard)/settings/{integrations,ldap}`, `apps/web/app/api/auth/ldap/route.ts`,
 `apps/web/app/accept-invite/page.tsx`, `apps/web/lib/actions/{ldap,organisations}.ts`,
 `apps/web/lib/auth/*`, `apps/web/lib/default-organisation.ts`,
-`apps/web/tests/e2e/{auth.setup.ts,auth,invitations/setup,fixtures/seed.ts}`
+`apps/web/tests/e2e/{auth.setup.ts,auth,fixtures/seed.ts,setup}`
 
 Validation: `pnpm --dir apps/web type-check`; `pnpm --dir apps/web lint`
 (warnings only); `pnpm --dir apps/web test:unit` (fails only

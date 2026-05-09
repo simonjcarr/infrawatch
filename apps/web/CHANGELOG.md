@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.124.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.4...web/v0.124.5) (2026-05-09)
+
+
+### Bug Fixes
+
+* **release:** bake latest agent manifest into ct-ops images ([79a22a4](https://github.com/carrtech-dev/ct-ops/commit/79a22a466d5f1e31817d998aa41be698774ab417))
+
 ## [0.124.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.3...web/v0.124.4) (2026-05-09)
 
 

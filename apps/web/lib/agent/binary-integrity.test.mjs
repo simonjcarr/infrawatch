@@ -23,24 +23,13 @@ test('resolveAgentBinary rejects GitHub assets that do not match release checksu
 
   globalThis.fetch = async (url) => {
     const href = String(url)
+    if (href.includes('/releases?')) {
+      return jsonResponse([
+        releasePayload('agent/v0.33.0', trusted, trustedSha256, sidecar),
+      ])
+    }
     if (href.includes('/releases/tags/')) {
-      return jsonResponse({
-        tag_name: 'agent/v0.33.0',
-        assets: [
-          {
-            name: 'ct-ops-agent-linux-amd64',
-            browser_download_url: 'https://downloads.example.com/ct-ops-agent-linux-amd64',
-            digest: `sha256:${trustedSha256}`,
-            size: trusted.byteLength,
-          },
-          {
-            name: 'ct-ops-agent-linux-amd64.sha256',
-            browser_download_url: 'https://downloads.example.com/ct-ops-agent-linux-amd64.sha256',
-            digest: `sha256:${sha256(Buffer.from(sidecar))}`,
-            size: Buffer.byteLength(sidecar),
-          },
-        ],
-      })
+      return jsonResponse(releasePayload('agent/v0.33.0', trusted, trustedSha256, sidecar))
     }
     if (href.endsWith('.sha256')) {
       return textResponse(sidecar)
@@ -70,24 +59,13 @@ test('resolveAgentBinary revalidates cached bytes before serving them', async ()
 
   globalThis.fetch = async (url) => {
     const href = String(url)
+    if (href.includes('/releases?')) {
+      return jsonResponse([
+        releasePayload('agent/v0.33.0', trusted, trustedSha256, sidecar),
+      ])
+    }
     if (href.includes('/releases/tags/')) {
-      return jsonResponse({
-        tag_name: 'agent/v0.33.0',
-        assets: [
-          {
-            name: 'ct-ops-agent-linux-amd64',
-            browser_download_url: 'https://downloads.example.com/ct-ops-agent-linux-amd64',
-            digest: `sha256:${trustedSha256}`,
-            size: trusted.byteLength,
-          },
-          {
-            name: 'ct-ops-agent-linux-amd64.sha256',
-            browser_download_url: 'https://downloads.example.com/ct-ops-agent-linux-amd64.sha256',
-            digest: `sha256:${sha256(Buffer.from(sidecar))}`,
-            size: Buffer.byteLength(sidecar),
-          },
-        ],
-      })
+      return jsonResponse(releasePayload('agent/v0.33.0', trusted, trustedSha256, sidecar))
     }
     if (href.endsWith('.sha256')) {
       return textResponse(sidecar)
@@ -103,6 +81,45 @@ test('resolveAgentBinary revalidates cached bytes before serving them', async ()
   const binary = await resolveAgentBinary('linux', 'amd64')
 
   assert.equal(binary?.bytes.toString(), 'trusted-agent-binary')
+})
+
+test('resolveAgentBinary prefers the latest agent release over the baked manifest version', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ct-ops-agent-binary-'))
+  process.env.AGENT_DIST_DIR = tempDir
+
+  const latest = Buffer.from('latest-agent-binary')
+  const latestSha256 = sha256(latest)
+  const sidecar = `${latestSha256}  ct-ops-agent-linux-amd64\n`
+  let requiredTagRequests = 0
+
+  globalThis.fetch = async (url) => {
+    const href = String(url)
+    if (href.includes('/releases?')) {
+      return jsonResponse([
+        releasePayload('agent/v9.9.9', latest, latestSha256, sidecar),
+      ])
+    }
+    if (href.includes('/releases/tags/')) {
+      requiredTagRequests += 1
+      return new Response('not found', { status: 404 })
+    }
+    if (href.endsWith('.sha256')) {
+      return textResponse(sidecar)
+    }
+    return new Response(latest, {
+      status: 200,
+      headers: { 'content-length': String(latest.byteLength) },
+    })
+  }
+
+  const { resolveAgentBinary } = await import(`./binary.ts?latest=${Date.now()}`)
+
+  const binary = await resolveAgentBinary('linux', 'amd64')
+  const cached = await fs.readFile(path.join(tempDir, 'ct-ops-agent-linux-amd64-v9.9.9'))
+
+  assert.equal(binary?.bytes.toString(), 'latest-agent-binary')
+  assert.equal(cached.toString(), 'latest-agent-binary')
+  assert.equal(requiredTagRequests, 0)
 })
 
 function sha256(data) {
@@ -121,4 +138,24 @@ function textResponse(body) {
     status: 200,
     headers: { 'content-type': 'text/plain' },
   })
+}
+
+function releasePayload(tagName, binary, binarySha256, sidecar) {
+  return {
+    tag_name: tagName,
+    assets: [
+      {
+        name: 'ct-ops-agent-linux-amd64',
+        browser_download_url: 'https://downloads.example.com/ct-ops-agent-linux-amd64',
+        digest: `sha256:${binarySha256}`,
+        size: binary.byteLength,
+      },
+      {
+        name: 'ct-ops-agent-linux-amd64.sha256',
+        browser_download_url: 'https://downloads.example.com/ct-ops-agent-linux-amd64.sha256',
+        digest: `sha256:${sha256(Buffer.from(sidecar))}`,
+        size: Buffer.byteLength(sidecar),
+      },
+    ],
+  }
 }

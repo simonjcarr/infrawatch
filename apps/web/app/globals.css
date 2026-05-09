@@ -187,104 +187,292 @@
 
 /* ── Operations Calendar ──────────────────────────────────────────────────── */
 .ct-ops-calendar {
-  --fc-border-color: var(--border);
-  --fc-page-bg-color: var(--card);
-  --fc-neutral-bg-color: var(--muted);
-  --fc-today-bg-color: color-mix(in oklch, var(--primary) 8%, transparent);
-  --fc-now-indicator-color: oklch(0.62 0.19 27);
-  --fc-small-font-size: 0.75rem;
-  --ct-ops-calendar-workday-slot-height: max(2rem, calc((100svh - 18rem) / 16));
+  --ct-ops-calendar-time-gutter: 4.75rem;
+  --ct-ops-calendar-time-slot-height: max(2rem, calc((100svh - 18rem) / 16));
   height: calc(100svh - 12rem);
   min-height: 560px;
+  overflow: hidden;
   position: relative;
 }
 
-.ct-ops-calendar .fc {
+.ct-ops-calendar-time-view,
+.ct-ops-calendar-month-view {
+  display: flex;
   height: 100%;
+  min-height: 0;
+  flex-direction: column;
   color: var(--foreground);
-  font-family: var(--font-sans);
 }
 
-.ct-ops-calendar .fc-scrollgrid,
-.ct-ops-calendar .fc-theme-standard td,
-.ct-ops-calendar .fc-theme-standard th {
-  border-color: var(--border);
+.ct-ops-calendar-time-header,
+.ct-ops-calendar-all-day-row,
+.ct-ops-calendar-time-grid-body {
+  display: grid;
+  min-width: 720px;
 }
 
-.ct-ops-calendar .fc-col-header-cell,
-.ct-ops-calendar .fc-timegrid-axis,
-.ct-ops-calendar .fc-daygrid-day-frame,
-.ct-ops-calendar .fc-multimonth,
-.ct-ops-calendar .fc-multimonth-month {
-  background: var(--card);
+.ct-ops-calendar-time-header {
+  min-height: 2.35rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.ct-ops-calendar .fc-col-header-cell-cushion,
-.ct-ops-calendar .fc-daygrid-day-number,
-.ct-ops-calendar .fc-timegrid-slot-label-cushion,
-.ct-ops-calendar .fc-multimonth-title {
-  color: var(--foreground);
-  text-decoration: none;
+.ct-ops-calendar-time-header-gutter,
+.ct-ops-calendar-time-header-day,
+.ct-ops-calendar-all-day-label,
+.ct-ops-calendar-all-day-cell {
+  border-right: 1px solid var(--border);
 }
 
-.ct-ops-calendar .fc-col-header-cell-cushion {
-  padding: 0.45rem 0.25rem;
+.ct-ops-calendar-time-header-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.76rem;
   font-weight: 650;
 }
 
-.ct-ops-calendar .fc-timegrid-slot {
-  height: var(--ct-ops-calendar-workday-slot-height);
+.ct-ops-calendar-all-day-row {
+  min-height: 4rem;
+  border-bottom: 2px solid var(--border);
 }
 
-.ct-ops-calendar .fc-timegrid-slots tr {
-  height: var(--ct-ops-calendar-workday-slot-height);
+.ct-ops-calendar-all-day-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
 }
 
-.ct-ops-calendar .fc-timegrid-slot-minor {
-  border-top-style: dashed;
-}
-
-.ct-ops-calendar .fc-daygrid-day-number {
+.ct-ops-calendar-all-day-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.25rem;
   padding: 0.35rem;
-  font-size: 0.75rem;
-}
-
-.ct-ops-calendar .fc-daygrid-body,
-.ct-ops-calendar .fc-daygrid-body table {
-  width: 100% !important;
-}
-
-.ct-ops-calendar .fc-dayGridMonth-view .fc-scrollgrid-sync-table {
-  height: 100% !important;
-}
-
-.ct-ops-calendar .fc-multimonth {
-  border: 0;
-  padding: 0.75rem;
-}
-
-.ct-ops-calendar .fc-multimonth-month {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
-.ct-ops-calendar .fc-multimonth-title {
-  padding: 0.45rem;
+.ct-ops-calendar-time-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ct-ops-calendar-time-label-column {
+  border-right: 1px solid var(--border);
+}
+
+.ct-ops-calendar-time-label,
+.ct-ops-calendar-time-slot {
+  height: var(--ct-ops-calendar-time-slot-height);
+  min-height: var(--ct-ops-calendar-time-slot-height);
+}
+
+.ct-ops-calendar-time-label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0.35rem 0.5rem 0 0.25rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.ct-ops-calendar-time-day-stack {
+  position: relative;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.ct-ops-calendar-time-slot {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 0;
+}
+
+.ct-ops-calendar-time-slot:nth-child(even) {
+  border-bottom-style: dashed;
+}
+
+.ct-ops-calendar-time-slot:enabled {
+  cursor: pointer;
+}
+
+.ct-ops-calendar-time-slot:enabled:hover {
+  background: color-mix(in oklch, var(--accent) 35%, transparent);
+}
+
+.ct-ops-calendar-time-day-stack > .ct-ops-calendar-event {
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  z-index: 2;
+}
+
+.ct-ops-calendar-month-weekdays,
+.ct-ops-calendar-month-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.ct-ops-calendar-month-weekdays {
+  min-height: 2.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ct-ops-calendar-month-weekday {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.ct-ops-calendar-month-days {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: repeat(6, minmax(5.5rem, 1fr));
+}
+
+.ct-ops-calendar-month-day {
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem;
+}
+
+.ct-ops-calendar-month-day--muted {
+  background: color-mix(in oklch, var(--muted) 35%, transparent);
+  color: var(--muted-foreground);
+}
+
+.ct-ops-calendar-month-day-number {
+  margin-bottom: 0.35rem;
+  color: var(--foreground);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.ct-ops-calendar-month-day-events {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ct-ops-calendar-more-events {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+}
+
+.ct-ops-calendar-year-view {
+  height: 100%;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.ct-ops-calendar-year-months {
+  display: grid;
+  min-height: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.ct-ops-calendar-year-month {
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.ct-ops-calendar-year-month-title {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border);
   font-size: 0.8rem;
   font-weight: 650;
 }
 
-.ct-ops-calendar .fc-multimonth .fc-daygrid-day-frame {
-  min-height: 3rem;
+.ct-ops-calendar-year-weekdays,
+.ct-ops-calendar-year-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.ct-ops-calendar-year-weekdays {
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+.ct-ops-calendar-year-weekdays > div {
+  padding: 0.25rem 0;
+}
+
+.ct-ops-calendar-year-days {
+  height: calc(100% - 3.9rem);
+  min-height: 8rem;
+  grid-template-rows: repeat(6, minmax(1.25rem, 1fr));
+}
+
+.ct-ops-calendar-year-day {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.15rem;
+  border-right: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  padding: 0.2rem;
+  font-size: 0.66rem;
+}
+
+.ct-ops-calendar-year-day--muted {
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted) 32%, transparent);
+}
+
+.ct-ops-calendar-year-day-event-count {
+  min-width: 0.85rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.56rem;
+  line-height: 0.85rem;
+  text-align: center;
 }
 
 .ct-ops-calendar-event {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
   border: 0 !important;
   border-radius: 5px !important;
-  padding: 1px 3px !important;
+  color: white;
+  cursor: pointer;
+  gap: 0.05rem;
+  line-height: 1.15;
+  overflow: hidden;
+  padding: 0.18rem 0.3rem !important;
+  text-align: left;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
+}
+
+.ct-ops-calendar-event--compact {
+  display: block;
+  white-space: nowrap;
 }
 
 .ct-ops-calendar-event--maintenance {
@@ -323,6 +511,24 @@
 .ct-ops-calendar-event--exception {
   outline: 2px solid rgb(255 255 255 / 45%);
   outline-offset: -2px;
+}
+
+@media (max-width: 1100px) {
+  .ct-ops-calendar-year-months {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(12rem, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .ct-ops-calendar {
+    --ct-ops-calendar-time-gutter: 3.8rem;
+  }
+
+  .ct-ops-calendar-year-months {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(12, minmax(12rem, 1fr));
+  }
 }
 
 /* ── Build Docs rich Markdown editor ───────────────────────────────────────── */

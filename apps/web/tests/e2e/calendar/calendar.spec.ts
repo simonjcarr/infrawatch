@@ -2,6 +2,8 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
+const CALENDAR_TEST_NOW = new Date('2026-05-09T12:00:00Z')
+
 async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
   const rows = await sql<Array<{ org_id: string; user_id: string }>>`
     SELECT organisations.id AS org_id, "user".id AS user_id
@@ -38,6 +40,7 @@ test('engineer can create a host-linked calendar event with participant roles ac
     VALUES ('calendar-approver-1', 'Calendar Approver', 'calendar-approver@example.com', true, NOW(), NOW(), ${orgId}, 'org_admin', '["org_admin"]'::jsonb, true)
   `
 
+  await page.clock.setFixedTime(CALENDAR_TEST_NOW)
   await page.goto('/calendar')
   await expect(page.getByTestId('operations-calendar-heading')).toBeVisible()
 
@@ -52,12 +55,11 @@ test('engineer can create a host-linked calendar event with participant roles ac
   await page.getByTestId('calendar-event-submit').click()
 
   await expect(page.getByText('Kernel patch planning')).toBeVisible()
-  const timedEvent = page.locator('.fc-timegrid-event').filter({ hasText: 'Kernel patch planning' }).first()
+  const timedEvent = page.locator('.ct-ops-calendar-time-day-stack .ct-ops-calendar-event').filter({ hasText: 'Kernel patch planning' }).first()
   await expect(timedEvent).toBeVisible()
-  await expect(page.locator('.fc-daygrid-event').filter({ hasText: 'Kernel patch planning' })).toHaveCount(0)
   const [timedEventBox, timeGridBox] = await Promise.all([
     timedEvent.boundingBox(),
-    page.locator('.fc-timegrid-body').first().boundingBox(),
+    page.getByTestId('calendar-time-scroll').boundingBox(),
   ])
   expect(timedEventBox).not.toBeNull()
   expect(timeGridBox).not.toBeNull()
@@ -65,7 +67,11 @@ test('engineer can create a host-linked calendar event with participant roles ac
   expect(timedEventBox!.y).toBeGreaterThanOrEqual(timeGridBox!.y)
   expect(timedEventBox!.y + timedEventBox!.height).toBeLessThanOrEqual(timeGridBox!.y + timeGridBox!.height + 1)
 
-  for (const view of ['day', 'work-week', 'full-week', 'month', 'year']) {
+  await page.getByTestId('calendar-view-day').click()
+  await page.getByTestId('calendar-prev').click()
+  await expect(page.getByText('Kernel patch planning')).toBeVisible()
+
+  for (const view of ['work-week', 'full-week', 'month', 'year']) {
     await page.getByTestId(`calendar-view-${view}`).click()
     await expect(page.getByText('Kernel patch planning')).toBeVisible()
   }
@@ -125,6 +131,7 @@ test('dragging one recurring occurrence creates an exception without moving the 
     )
   `
 
+  await page.clock.setFixedTime(CALENDAR_TEST_NOW)
   await page.goto('/calendar')
   await expect(page.getByText('Weekly maintenance window')).toBeVisible()
 
@@ -173,46 +180,57 @@ test('read-only users can view calendar events but cannot create them', async ({
     VALUES ('calendar-readonly-1', ${orgId}, ${userId}, 'Read only maintenance', '2026-05-08T08:00:00Z', '2026-05-08T09:00:00Z', false, 'UTC', 'planned', 'maintenance')
   `
 
+  await page.clock.setFixedTime(CALENDAR_TEST_NOW)
   await page.goto('/calendar')
   await expect(page.getByText('Read only maintenance')).toBeVisible()
   await expect(page.getByTestId('calendar-new-event')).toHaveCount(0)
 })
 
 test('calendar views use operational calendar labels and grid structure', async ({ authenticatedPage: page }) => {
+  await page.clock.setFixedTime(CALENDAR_TEST_NOW)
   await page.goto('/calendar')
   await expect(page.getByTestId('operations-calendar-heading')).toBeVisible()
 
   await page.getByTestId('calendar-view-work-week').click()
   await expect(page.getByTestId('calendar-period-title')).toContainText(/^W\/B \d{1,2} [A-Z][a-z]{2} \d{4}$/)
-  await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '9 AM' }).first()).toBeVisible()
-  await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '9:30 AM' }).first()).toBeVisible()
-  await expect(page.locator('.fc-timegrid-slot-label').filter({ hasText: '5 PM' }).first()).toBeVisible()
-  await expect(page.locator('.fc-col-header-cell').filter({ hasText: 'Sun' })).toHaveCount(0)
-  await expect(page.locator('.fc-timegrid .fc-daygrid-day-number')).toHaveCount(0)
-  expect(await page.locator('.fc-timegrid-slots .fc-timegrid-slot').count()).toBeGreaterThanOrEqual(48)
-  const timeSlotHeights = await page.locator('.fc-timegrid-slots tr').evaluateAll((slots) =>
+  await expect(page.getByTestId('calendar-time-label-09-00')).toBeVisible()
+  await expect(page.getByTestId('calendar-time-label-09-30')).toBeVisible()
+  await expect(page.getByTestId('calendar-time-label-17-00')).toBeVisible()
+  await expect(page.locator('[data-testid^="calendar-time-header-"]').filter({ hasText: /^Sun/ })).toHaveCount(0)
+  await expect(page.getByTestId('calendar-time-grid').locator('.ct-ops-calendar-month-day-number')).toHaveCount(0)
+  expect(await page.locator('.ct-ops-calendar-time-slot').count()).toBeGreaterThanOrEqual(48 * 5)
+  const timeSlotHeights = await page.locator('.ct-ops-calendar-time-slot').evaluateAll((slots) =>
     slots.map((slot) => slot.getBoundingClientRect().height),
   )
   expect(timeSlotHeights.length).toBeGreaterThanOrEqual(48)
   expect(Math.min(...timeSlotHeights)).toBeGreaterThanOrEqual(28)
   const visibleSlotHeight = timeSlotHeights[0]!
-  const scrollerHeight = await page.locator('.fc-timegrid-body').first().evaluate((body) => body.getBoundingClientRect().height)
+  const scrollerHeight = await page.getByTestId('calendar-time-scroll').evaluate((body) => body.getBoundingClientRect().height)
   expect(visibleSlotHeight * 16).toBeGreaterThanOrEqual(scrollerHeight * 0.85)
+  const firstVisibleTimeLabel = await page.getByTestId('calendar-time-scroll').evaluate((scroller) => {
+    const scrollerTop = scroller.getBoundingClientRect().top
+    const labels = Array.from(scroller.querySelectorAll('.ct-ops-calendar-time-label'))
+    return labels.find((label) => label.getBoundingClientRect().top >= scrollerTop - 1)?.textContent
+  })
+  expect(firstVisibleTimeLabel).toBe('09:00')
 
   await page.getByTestId('calendar-view-full-week').click()
-  await expect(page.locator('.fc-col-header-cell').filter({ hasText: /Mon \d{1,2} [A-Z][a-z]{2}/ }).first()).toBeVisible()
-  await expect(page.locator('.fc-col-header-cell').filter({ hasText: /Sun \d{1,2} [A-Z][a-z]{2}/ }).first()).toBeVisible()
-  await expect(page.locator('.fc-timegrid .fc-daygrid-day-number')).toHaveCount(0)
+  await expect(page.locator('[data-testid^="calendar-time-header-"]').filter({ hasText: /^Mon, \d{1,2} [A-Z][a-z]{2}$/ }).first()).toBeVisible()
+  await expect(page.locator('[data-testid^="calendar-time-header-"]').filter({ hasText: /^Sun, \d{1,2} [A-Z][a-z]{2}$/ }).first()).toBeVisible()
+  await expect(page.getByTestId('calendar-time-grid').locator('.ct-ops-calendar-month-day-number')).toHaveCount(0)
 
   await page.getByTestId('calendar-view-month').click()
   await expect(page.getByTestId('calendar-period-title')).toContainText(/^[A-Z][a-z]{2} \d{4}$/)
-  await expect(page.locator('.fc-daygrid-day')).toHaveCount(42)
-  await expect(page.locator('.fc-daygrid-day-frame').first()).toBeVisible()
-  await expect(page.locator('.fc-daygrid-day-number').filter({ hasText: /[A-Z][a-z]{2}/ }).first()).toBeVisible()
+  await expect(page.locator('.ct-ops-calendar-month-day')).toHaveCount(42)
+  await expect(page.locator('.ct-ops-calendar-month-day').first()).toBeVisible()
+  await expect(page.locator('.ct-ops-calendar-month-day-number').filter({ hasText: /[A-Z][a-z]{2}/ }).first()).toBeVisible()
 
   await page.getByTestId('calendar-view-year').click()
-  await expect(page.locator('.fc-multimonth-title').filter({ hasText: /^[A-Z][a-z]{2}$/ }).first()).toBeVisible()
-  await expect(page.locator('.fc-daygrid-day')).not.toHaveCount(0)
+  await expect(page.getByTestId('calendar-period-title')).toContainText(/^\d{4}$/)
+  await expect(page.locator('.ct-ops-calendar-year-month')).toHaveCount(12)
+  await expect(page.getByTestId('calendar-year-month-Jan')).toBeVisible()
+  await expect(page.locator('.ct-ops-calendar-year-day')).not.toHaveCount(0)
+  await expect(page.getByText('Calendar range cannot exceed 370 days')).toHaveCount(0)
 })
 
 declare global {

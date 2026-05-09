@@ -1,22 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import FullCalendar from '@fullcalendar/react'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin, { type EventResizeDoneArg } from '@fullcalendar/interaction'
-import multiMonthPlugin from '@fullcalendar/multimonth'
-import rrulePlugin from '@fullcalendar/rrule'
-import timeGridPlugin from '@fullcalendar/timegrid'
-import type {
-  CalendarApi,
-  DateSelectArg,
-  DatesSetArg,
-  DayCellContentArg,
-  EventClickArg,
-  EventContentArg,
-  EventDropArg,
-  EventInput,
-} from '@fullcalendar/core'
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CalendarDays,
@@ -66,6 +50,7 @@ import {
 } from '@/lib/db/schema/calendar'
 
 type CalendarViewId = 'day' | 'work-week' | 'full-week' | 'month' | 'year'
+type TimeViewId = Extract<CalendarViewId, 'day' | 'work-week' | 'full-week'>
 type DialogMode = 'create' | 'edit'
 type RecurrenceFrequencyDraft = 'none' | CalendarRecurrenceFrequency
 type RecurrenceEndMode = 'never' | 'count' | 'until'
@@ -109,12 +94,12 @@ declare global {
   }
 }
 
-const VIEW_OPTIONS: Array<{ id: CalendarViewId; label: string; viewName: string }> = [
-  { id: 'day', label: 'Day', viewName: 'timeGridDay' },
-  { id: 'work-week', label: 'Work Week', viewName: 'timeGridWorkWeek' },
-  { id: 'full-week', label: 'Full Week', viewName: 'timeGridWeek' },
-  { id: 'month', label: 'Month', viewName: 'dayGridMonth' },
-  { id: 'year', label: 'Year', viewName: 'multiMonthYear' },
+const VIEW_OPTIONS: Array<{ id: CalendarViewId; label: string }> = [
+  { id: 'day', label: 'Day' },
+  { id: 'work-week', label: 'Work Week' },
+  { id: 'full-week', label: 'Full Week' },
+  { id: 'month', label: 'Month' },
+  { id: 'year', label: 'Year' },
 ]
 
 const CATEGORY_LABELS: Record<CalendarEventCategory, string> = {
@@ -154,13 +139,11 @@ const WEEKDAY_LABELS: Record<CalendarWeekday, string> = {
 }
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
-
-function getInitialRange(): CalendarRange {
-  const now = new Date()
-  const startsAt = new Date(now.getFullYear(), now.getMonth(), 1)
-  const endsAt = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() }
-}
+const WEEKDAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+const TIME_SLOT_MINUTES = 30
+const TIME_SLOT_COUNT = 24 * (60 / TIME_SLOT_MINUTES)
+const WORKDAY_SCROLL_SLOT = 9 * (60 / TIME_SLOT_MINUTES)
+const TIME_SLOTS = Array.from({ length: TIME_SLOT_COUNT }, (_, index) => index * TIME_SLOT_MINUTES)
 
 function formatMonthYear(date: Date): string {
   return `${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`
@@ -177,6 +160,145 @@ function startOfWeekMonday(date: Date): Date {
   start.setDate(start.getDate() + offset)
   start.setHours(0, 0, 0, 0)
   return start
+}
+
+function startOfDay(date: Date): Date {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  return start
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function addMonths(date: Date, months: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1)
+}
+
+function addYears(date: Date, years: number): Date {
+  return new Date(date.getFullYear() + years, 0, 1)
+}
+
+function getVisibleDays(view: TimeViewId, periodDate: Date): Date[] {
+  if (view === 'day') return [startOfDay(periodDate)]
+  const weekStart = startOfWeekMonday(periodDate)
+  const count = view === 'work-week' ? 5 : 7
+  return Array.from({ length: count }, (_, index) => addDays(weekStart, index))
+}
+
+function getMonthGridDays(date: Date): Date[] {
+  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
+  const gridStart = startOfWeekMonday(monthStart)
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
+}
+
+function getRangeForView(view: CalendarViewId, periodDate: Date): CalendarRange {
+  if (view === 'day') {
+    const startsAt = startOfDay(periodDate)
+    return { startsAt: startsAt.toISOString(), endsAt: addDays(startsAt, 1).toISOString() }
+  }
+  if (view === 'work-week' || view === 'full-week') {
+    const startsAt = startOfWeekMonday(periodDate)
+    const days = view === 'work-week' ? 5 : 7
+    return { startsAt: startsAt.toISOString(), endsAt: addDays(startsAt, days).toISOString() }
+  }
+  if (view === 'month') {
+    const monthDays = getMonthGridDays(periodDate)
+    return { startsAt: monthDays[0]!.toISOString(), endsAt: addDays(monthDays[monthDays.length - 1]!, 1).toISOString() }
+  }
+  const startsAt = new Date(periodDate.getFullYear(), 0, 1)
+  const endsAt = new Date(periodDate.getFullYear() + 1, 0, 1)
+  return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() }
+}
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function dayStartAndEnd(day: Date): { start: Date; end: Date } {
+  const start = startOfDay(day)
+  return { start, end: addDays(start, 1) }
+}
+
+function eventOverlapsDay(event: CalendarEventInstanceView, day: Date): boolean {
+  const { start, end } = dayStartAndEnd(day)
+  return new Date(event.startsAt) < end && new Date(event.endsAt) > start
+}
+
+function formatTimeLabel(minutes: number): string {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
+
+function formatDayHeader(date: Date): string {
+  return `${WEEKDAY_HEADERS[(date.getDay() + 6) % 7]}, ${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`
+}
+
+function minutesIntoDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes()
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function safeTestId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-')
+}
+
+function hostSummary(event: CalendarEventInstanceView): string | null {
+  if (event.hosts.length === 0) return null
+  return `${event.hosts.slice(0, 2).map((host) => host.displayName ?? host.hostname).join(', ')}${event.hosts.length > 2 ? ` +${event.hosts.length - 2}` : ''}`
+}
+
+function sortEvents(left: CalendarEventInstanceView, right: CalendarEventInstanceView): number {
+  return Date.parse(left.startsAt) - Date.parse(right.startsAt) || Date.parse(left.endsAt) - Date.parse(right.endsAt) || left.title.localeCompare(right.title)
+}
+
+function eventsForDay(events: CalendarEventInstanceView[], day: Date): CalendarEventInstanceView[] {
+  return events.filter((event) => eventOverlapsDay(event, day)).sort(sortEvents)
+}
+
+function timeSlotDate(day: Date, minutes: number): Date {
+  const date = startOfDay(day)
+  date.setMinutes(minutes)
+  return date
+}
+
+function EventPill({
+  event,
+  compact = false,
+  onOpen,
+  style,
+}: {
+  event: CalendarEventInstanceView
+  compact?: boolean
+  onOpen: (event: CalendarEventInstanceView) => void
+  style?: CSSProperties
+}) {
+  const summary = hostSummary(event)
+  return (
+    <button
+      type="button"
+      className={`${eventClassName(event).join(' ')} ${compact ? 'ct-ops-calendar-event--compact' : ''}`}
+      data-testid={`calendar-rendered-event-${safeTestId(event.id)}`}
+      onClick={(clickEvent) => {
+        clickEvent.stopPropagation()
+        onOpen(event)
+      }}
+      style={style}
+    >
+      <span className="truncate text-[0.78rem] font-medium">{event.title}</span>
+      {summary && !compact ? <span className="truncate text-[0.68rem] opacity-80">{summary}</span> : null}
+    </button>
+  )
 }
 
 function toDateTimeLocal(value: string | Date): string {
@@ -274,29 +396,6 @@ function eventClassName(event: CalendarEventInstanceView): string[] {
   ].filter(Boolean)
 }
 
-function renderEventContent(arg: EventContentArg) {
-  const item = arg.event.extendedProps['calendarEvent'] as CalendarEventInstanceView | undefined
-  return (
-    <div className="min-w-0 leading-tight">
-      <div className="truncate text-[0.78rem] font-medium">{arg.event.title}</div>
-      {item && item.hosts.length > 0 ? (
-        <div className="truncate text-[0.68rem] opacity-80">
-          {item.hosts.slice(0, 2).map((host) => host.displayName ?? host.hostname).join(', ')}
-          {item.hosts.length > 2 ? ` +${item.hosts.length - 2}` : ''}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function renderDayCellContent(arg: DayCellContentArg) {
-  return `${arg.date.getDate()} ${MONTH_LABELS[arg.date.getMonth()]}`
-}
-
-function getCalendarApi(ref: React.RefObject<FullCalendar | null>): CalendarApi | null {
-  return ref.current?.getApi() ?? null
-}
-
 export function OperationsCalendarClient({
   orgId,
   canEdit,
@@ -308,9 +407,8 @@ export function OperationsCalendarClient({
   initialHosts: CalendarHostOption[]
   initialUsers: CalendarUserOption[]
 }) {
-  const calendarRef = useRef<FullCalendar | null>(null)
+  const timeScrollerRef = useRef<HTMLDivElement | null>(null)
   const queryClient = useQueryClient()
-  const [range, setRange] = useState<CalendarRange>(getInitialRange)
   const [periodDate, setPeriodDate] = useState(() => new Date())
   const [currentView, setCurrentView] = useState<CalendarViewId>('full-week')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -318,6 +416,7 @@ export function OperationsCalendarClient({
   const [formError, setFormError] = useState<string | null>(null)
   const [hostSearch, setHostSearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
+  const range = useMemo(() => getRangeForView(currentView, periodDate), [currentView, periodDate])
 
   const calendarQuery = useQuery({
     queryKey: ['calendar-events', orgId, range.startsAt, range.endsAt],
@@ -341,17 +440,9 @@ export function OperationsCalendarClient({
     enabled: dialogOpen,
   })
 
-  const events = useMemo<EventInput[]>(() => {
+  const calendarEvents = useMemo<CalendarEventInstanceView[]>(() => {
     if (!calendarQuery.data || 'error' in calendarQuery.data) return []
-    return calendarQuery.data.events.map((event) => ({
-      id: event.id,
-      title: event.title,
-      start: event.startsAt,
-      end: event.endsAt,
-      allDay: event.allDay,
-      classNames: eventClassName(event),
-      extendedProps: { calendarEvent: event },
-    }))
+    return calendarQuery.data.events
   }, [calendarQuery.data])
 
   const saveMutation = useMutation({
@@ -434,18 +525,26 @@ export function OperationsCalendarClient({
     }
   }, [persistMove])
 
+  useEffect(() => {
+    if (currentView !== 'day' && currentView !== 'work-week' && currentView !== 'full-week') return
+    const scroller = timeScrollerRef.current
+    if (!scroller) return
+    const firstSlot = scroller.querySelector<HTMLElement>('[data-time-slot-index="0"]')
+    if (!firstSlot) return
+    scroller.scrollTop = firstSlot.getBoundingClientRect().height * WORKDAY_SCROLL_SLOT
+  }, [currentView, periodDate])
+
   function changeView(view: CalendarViewId) {
-    const option = VIEW_OPTIONS.find((item) => item.id === view)
-    if (!option) return
-    getCalendarApi(calendarRef)?.changeView(option.viewName)
     setCurrentView(view)
   }
 
-  function handleDatesSet(arg: DatesSetArg) {
-    const view = VIEW_OPTIONS.find((item) => item.viewName === arg.view.type)
-    if (view) setCurrentView(view.id)
-    setPeriodDate(arg.view.currentStart)
-    setRange({ startsAt: arg.start.toISOString(), endsAt: arg.end.toISOString() })
+  function movePeriod(direction: -1 | 1) {
+    setPeriodDate((current) => {
+      if (currentView === 'day') return addDays(current, direction)
+      if (currentView === 'work-week' || currentView === 'full-week') return addDays(current, direction * 7)
+      if (currentView === 'month') return addMonths(current, direction)
+      return addYears(current, direction)
+    })
   }
 
   function openCreate(start?: Date, end?: Date, allDay = false) {
@@ -455,45 +554,10 @@ export function OperationsCalendarClient({
     setDialogOpen(true)
   }
 
-  function handleSelect(arg: DateSelectArg) {
-    openCreate(arg.start, arg.end, arg.allDay)
-    getCalendarApi(calendarRef)?.unselect()
-  }
-
-  function handleEventClick(arg: EventClickArg) {
-    const event = arg.event.extendedProps['calendarEvent'] as CalendarEventInstanceView | undefined
-    if (!event) return
+  function openEdit(event: CalendarEventInstanceView) {
     setFormError(null)
     setDraft(draftFromEvent(event))
     setDialogOpen(true)
-  }
-
-  async function handleEventMove(arg: EventDropArg | EventResizeDoneArg) {
-    const event = arg.event.extendedProps['calendarEvent'] as CalendarEventInstanceView | undefined
-    if (!event || !arg.event.start) {
-      arg.revert()
-      return
-    }
-
-    const scope = event.isRecurring && !event.isException
-      ? window.confirm('Move only this occurrence? Press Cancel to move the full series.')
-        ? 'this'
-        : 'series'
-      : 'series'
-    const end = arg.event.end ?? new Date(arg.event.start.getTime() + 60 * 60_000)
-
-    try {
-      await persistMove({
-        eventId: event.eventId,
-        recurrenceInstanceStartAt: event.recurrenceInstanceStartAt ?? undefined,
-        startsAt: arg.event.start.toISOString(),
-        endsAt: end.toISOString(),
-        allDay: arg.event.allDay,
-        scope,
-      })
-    } catch {
-      arg.revert()
-    }
   }
 
   function toggleHost(hostId: string) {
@@ -539,10 +603,193 @@ export function OperationsCalendarClient({
   const userOptions = 'users' in usersQuery.data ? usersQuery.data.users : initialUsers
   const calendarError = calendarQuery.data && 'error' in calendarQuery.data ? calendarQuery.data.error : null
   const currentPeriodTitle = useMemo(() => {
-    if (currentView === 'month' || currentView === 'year') return formatMonthYear(periodDate)
+    if (currentView === 'month') return formatMonthYear(periodDate)
+    if (currentView === 'year') return String(periodDate.getFullYear())
     if (currentView === 'work-week' || currentView === 'full-week') return `W/B ${formatDayMonthYear(startOfWeekMonday(periodDate))}`
     return formatDayMonthYear(periodDate)
   }, [currentView, periodDate])
+
+  function renderTimeView(view: TimeViewId) {
+    const days = getVisibleDays(view, periodDate)
+    const gridStyle: CSSProperties = {
+      gridTemplateColumns: `var(--ct-ops-calendar-time-gutter) repeat(${days.length}, minmax(0, 1fr))`,
+    }
+
+    return (
+      <div className="ct-ops-calendar-time-view" data-testid="calendar-time-grid">
+        <div className="ct-ops-calendar-time-header" style={gridStyle}>
+          <div className="ct-ops-calendar-time-header-gutter" />
+          {days.map((day) => (
+            <div key={localDateKey(day)} className="ct-ops-calendar-time-header-day" data-testid={`calendar-time-header-${localDateKey(day)}`}>
+              {formatDayHeader(day)}
+            </div>
+          ))}
+        </div>
+
+        <div className="ct-ops-calendar-all-day-row" style={gridStyle}>
+          <div className="ct-ops-calendar-all-day-label">all-day</div>
+          {days.map((day) => {
+            const dayEvents = eventsForDay(calendarEvents, day).filter((event) => event.allDay)
+            return (
+              <div key={localDateKey(day)} className="ct-ops-calendar-all-day-cell" data-testid={`calendar-all-day-${localDateKey(day)}`}>
+                {dayEvents.map((event) => (
+                  <EventPill key={`${event.id}-all-day`} event={event} compact onOpen={openEdit} />
+                ))}
+              </div>
+            )
+          })}
+        </div>
+
+        <div ref={timeScrollerRef} className="ct-ops-calendar-time-scroll" data-testid="calendar-time-scroll">
+          <div className="ct-ops-calendar-time-grid-body" style={gridStyle}>
+            <div className="ct-ops-calendar-time-label-column">
+              {TIME_SLOTS.map((minutes, index) => {
+                const label = formatTimeLabel(minutes)
+                return (
+                  <div
+                    key={minutes}
+                    className="ct-ops-calendar-time-label"
+                    data-testid={`calendar-time-label-${label.replace(':', '-')}`}
+                    data-time-slot-index={index}
+                  >
+                    {label}
+                  </div>
+                )
+              })}
+            </div>
+
+            {days.map((day) => {
+              const dayKey = localDateKey(day)
+              const timedEvents = eventsForDay(calendarEvents, day).filter((event) => !event.allDay)
+              return (
+                <div key={dayKey} className="ct-ops-calendar-time-day-stack" data-testid={`calendar-time-day-${dayKey}`}>
+                  {TIME_SLOTS.map((minutes, index) => {
+                    const slotLabel = formatTimeLabel(minutes)
+                    const start = timeSlotDate(day, minutes)
+                    const end = timeSlotDate(day, minutes + TIME_SLOT_MINUTES)
+                    return (
+                      <button
+                        key={`${dayKey}-${minutes}`}
+                        type="button"
+                        className="ct-ops-calendar-time-slot"
+                        data-testid={`calendar-time-slot-${slotLabel.replace(':', '-')}-${dayKey}`}
+                        data-time-slot-index={index}
+                        aria-label={`${slotLabel} on ${formatDayHeader(day)}`}
+                        disabled={!canEdit}
+                        onClick={() => openCreate(start, end, false)}
+                      />
+                    )
+                  })}
+                  {timedEvents.map((event) => {
+                    const dayStart = startOfDay(day)
+                    const startsAt = new Date(event.startsAt)
+                    const endsAt = new Date(event.endsAt)
+                    const startMinutes = startsAt < dayStart ? 0 : minutesIntoDay(startsAt)
+                    const endMinutes = endsAt > addDays(dayStart, 1) ? 24 * 60 : minutesIntoDay(endsAt)
+                    const topSlots = clamp(startMinutes / TIME_SLOT_MINUTES, 0, TIME_SLOT_COUNT)
+                    const heightSlots = Math.max(0.5, clamp(endMinutes / TIME_SLOT_MINUTES, 0, TIME_SLOT_COUNT) - topSlots)
+                    return (
+                      <EventPill
+                        key={`${event.id}-${dayKey}`}
+                        event={event}
+                        onOpen={openEdit}
+                        style={{
+                          top: `calc(${topSlots} * var(--ct-ops-calendar-time-slot-height) + 2px)`,
+                          height: `max(1.5rem, calc(${heightSlots} * var(--ct-ops-calendar-time-slot-height) - 4px))`,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderMonthView() {
+    const activeMonth = periodDate.getMonth()
+    const days = getMonthGridDays(periodDate)
+
+    return (
+      <div className="ct-ops-calendar-month-view" data-testid="calendar-month-grid">
+        <div className="ct-ops-calendar-month-weekdays">
+          {WEEKDAY_HEADERS.map((weekday) => (
+            <div key={weekday} className="ct-ops-calendar-month-weekday">{weekday}</div>
+          ))}
+        </div>
+        <div className="ct-ops-calendar-month-days">
+          {days.map((day) => {
+            const dayEvents = eventsForDay(calendarEvents, day)
+            const dayKey = localDateKey(day)
+            const isCurrentMonth = day.getMonth() === activeMonth
+            return (
+              <div
+                key={dayKey}
+                className={`ct-ops-calendar-month-day ${isCurrentMonth ? '' : 'ct-ops-calendar-month-day--muted'}`}
+                data-testid={`calendar-month-day-${dayKey}`}
+                onDoubleClick={() => {
+                  if (canEdit) openCreate(startOfDay(day), addDays(startOfDay(day), 1), true)
+                }}
+              >
+                <div className="ct-ops-calendar-month-day-number">{day.getDate()} {MONTH_LABELS[day.getMonth()]}</div>
+                <div className="ct-ops-calendar-month-day-events">
+                  {dayEvents.slice(0, 4).map((event) => (
+                    <EventPill key={`${event.id}-${dayKey}`} event={event} compact onOpen={openEdit} />
+                  ))}
+                  {dayEvents.length > 4 ? <div className="ct-ops-calendar-more-events">+{dayEvents.length - 4} more</div> : null}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  function renderYearView() {
+    const year = periodDate.getFullYear()
+
+    return (
+      <div className="ct-ops-calendar-year-view" data-testid="calendar-year-grid">
+        <div className="ct-ops-calendar-year-months">
+          {MONTH_LABELS.map((month, monthIndex) => {
+            const monthDate = new Date(year, monthIndex, 1)
+            const days = getMonthGridDays(monthDate)
+            return (
+              <div key={month} className="ct-ops-calendar-year-month" data-testid={`calendar-year-month-${month}`}>
+                <div className="ct-ops-calendar-year-month-title">{month}</div>
+                <div className="ct-ops-calendar-year-weekdays">
+                  {WEEKDAY_HEADERS.map((weekday) => (
+                    <div key={weekday}>{weekday}</div>
+                  ))}
+                </div>
+                <div className="ct-ops-calendar-year-days">
+                  {days.map((day) => {
+                    const dayKey = localDateKey(day)
+                    const dayEvents = eventsForDay(calendarEvents, day)
+                    const isCurrentMonth = day.getMonth() === monthIndex
+                    return (
+                      <div
+                        key={`${month}-${dayKey}`}
+                        className={`ct-ops-calendar-year-day ${isCurrentMonth ? '' : 'ct-ops-calendar-year-day--muted'}`}
+                        data-testid={`calendar-year-day-${dayKey}`}
+                      >
+                        <span>{day.getDate()}</span>
+                        {dayEvents.length > 0 ? <span className="ct-ops-calendar-year-day-event-count">{dayEvents.length}</span> : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-[calc(100svh-3rem)] flex-col gap-4">
@@ -565,13 +812,13 @@ export function OperationsCalendarClient({
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-2">
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => getCalendarApi(calendarRef)?.prev()} aria-label="Previous">
+          <Button variant="ghost" size="icon-sm" onClick={() => movePeriod(-1)} aria-label="Previous" data-testid="calendar-prev">
             <ChevronLeft className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => getCalendarApi(calendarRef)?.today()}>
+          <Button variant="outline" size="sm" onClick={() => setPeriodDate(new Date())} data-testid="calendar-today">
             Today
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => getCalendarApi(calendarRef)?.next()} aria-label="Next">
+          <Button variant="ghost" size="icon-sm" onClick={() => movePeriod(1)} aria-label="Next" data-testid="calendar-next">
             <ChevronRight className="size-4" />
           </Button>
         </div>
@@ -603,72 +850,18 @@ export function OperationsCalendarClient({
         </div>
       ) : null}
 
-      <div className="ct-ops-calendar flex-1 overflow-auto rounded-lg border bg-card">
+      <div className="ct-ops-calendar flex-1 rounded-lg border bg-card">
         {calendarQuery.isFetching ? (
           <div className="absolute right-8 top-32 z-10 inline-flex items-center rounded-md border bg-popover px-2 py-1 text-xs text-muted-foreground shadow-sm">
             <Loader2 className="mr-1 size-3 animate-spin" />
             Loading
           </div>
         ) : null}
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin, rrulePlugin]}
-          initialView="timeGridWeek"
-          headerToolbar={false}
-          views={{
-            timeGridDay: {
-              dayHeaderFormat: { weekday: 'long' },
-            },
-            timeGridWeek: {
-              dayHeaderFormat: { weekday: 'short', day: 'numeric', month: 'short' },
-            },
-            timeGridWorkWeek: {
-              type: 'timeGridWeek',
-              weekends: false,
-              buttonText: 'Work Week',
-              dayHeaderFormat: { weekday: 'short', day: 'numeric', month: 'short' },
-            },
-            dayGridMonth: {
-              dayHeaderFormat: { weekday: 'short' },
-              dayCellContent: renderDayCellContent,
-              expandRows: true,
-            },
-            multiMonthYear: {
-              dayHeaderFormat: { weekday: 'short' },
-              dayCellContent: renderDayCellContent,
-            },
-          }}
-          firstDay={1}
-          nowIndicator
-          selectable={canEdit}
-          editable={canEdit}
-          eventStartEditable={canEdit}
-          eventDurationEditable={canEdit}
-          selectMirror
-          height="100%"
-          slotMinTime="00:00:00"
-          slotMaxTime="24:00:00"
-          slotDuration="00:30:00"
-          slotLabelInterval="00:30:00"
-          slotLabelFormat={{ hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' }}
-          scrollTime="09:00:00"
-          expandRows={false}
-          dayMaxEvents={4}
-          fixedWeekCount
-          showNonCurrentDates
-          multiMonthMaxColumns={3}
-          multiMonthTitleFormat={{ month: 'short' }}
-          events={events}
-          datesSet={handleDatesSet}
-          select={handleSelect}
-          eventClick={handleEventClick}
-          eventDrop={handleEventMove}
-          eventResize={handleEventMove}
-          eventContent={renderEventContent}
-          eventDidMount={(info) => {
-            info.el.setAttribute('data-testid', `calendar-rendered-event-${info.event.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`)
-          }}
-        />
+        {currentView === 'day' || currentView === 'work-week' || currentView === 'full-week'
+          ? renderTimeView(currentView)
+          : currentView === 'month'
+            ? renderMonthView()
+            : renderYearView()}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

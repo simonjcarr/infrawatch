@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.124.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.123.2...web/v0.124.0) (2026-05-09)
+
+
+### Features
+
+* **notes:** show host notes in table ([#1193](https://github.com/carrtech-dev/ct-ops/issues/1193)) ([3e78d68](https://github.com/carrtech-dev/ct-ops/commit/3e78d687bb34ed9e6d8b07738f7051aa87af67db))
+
 ## [0.123.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.123.1...web/v0.123.2) (2026-05-09)
 
 

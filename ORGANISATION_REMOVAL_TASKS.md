@@ -539,19 +539,38 @@ This slice owns per-host metadata editing and access-control flows.
 
 ## Task 9 - Web Host Groups And Networks Inventory Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
-PR:
+PR: [#1229](https://github.com/carrtech-dev/ct-ops/pull/1229)
 
-Summary:
+Summary: Removed caller-supplied organisation identity from the host groups
+inventory, networks inventory/detail, and network membership picker flows by
+switching those pages to session-derived instance scope, dropping org-scoped
+React Query keys, and trimming unused organisation payload fields from the
+network graph helpers.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/hosts/groups/{page.tsx,groups-client.tsx}`,
+`apps/web/app/(dashboard)/hosts/networks/{page.tsx,networks-client.tsx,all-networks-graph.tsx,components/network-flow-nodes.tsx}`,
+`apps/web/app/(dashboard)/hosts/networks/[id]/{page.tsx,network-detail-client.tsx,network-graph.tsx}`,
+`apps/web/lib/actions/{host-groups,networks}.ts`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web type-check`
+(passes); `pnpm --dir apps/web lint` (passes with pre-existing warnings only);
+`pnpm --dir apps/web test:unit` (fails only `lib/db/rls.test.mjs` and
+`lib/integrations/ct-cve/db-nonce-store.test.mjs`); `pnpm --dir apps/web exec
+playwright test --list` (passes);
+`BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret pnpm --dir apps/web exec playwright test tests/e2e/hosts/groups.spec.ts --project=chromium --grep "create, edit, and delete a host group"`
+(fails before execution because Next instrumentation cannot import
+`./lib/agent/cache-prewarm` in this checkout);
+`rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/groups/page.tsx' 'apps/web/app/(dashboard)/hosts/groups/groups-client.tsx' 'apps/web/app/(dashboard)/hosts/networks' apps/web/lib/actions/{host-groups,networks}.ts`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 10 next. If you need local browser smoke coverage in
+this worktree, fix the missing `apps/web/lib/agent/cache-prewarm` import path
+or use an environment where the instrumentation hook resolves correctly.
 
 ### Required work
 

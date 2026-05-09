@@ -40,7 +40,6 @@ export type HostNodeData = {
   ipAddresses: string[]
   status: string
   hostId: string
-  orgId: string
 }
 
 export type HostFlowNode = Node<HostNodeData, 'hostNode'>

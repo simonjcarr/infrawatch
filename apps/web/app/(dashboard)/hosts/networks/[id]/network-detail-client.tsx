@@ -67,7 +67,6 @@ import type { Network as NetworkType, Host } from '@/lib/db/schema'
 type NetworkWithMembers = NetworkType & { members: Host[] }
 
 interface Props {
-  orgId: string
   initialNetwork: NetworkWithMembers
   initialAllHosts: HostWithAgent[]
 }
@@ -78,7 +77,7 @@ function HostStatusIcon({ status }: { status: string }) {
   return <AlertTriangle className="size-3.5 text-yellow-500" />
 }
 
-export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: Props) {
+export function NetworkDetailClient({ initialNetwork, initialAllHosts }: Props) {
   const queryClient = useQueryClient()
   const [viewMode, setViewMode] = useState<'table' | 'graph'>('table')
   const [addOpen, setAddOpen] = useState(false)
@@ -86,20 +85,20 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
   const [removeTarget, setRemoveTarget] = useState<Host | null>(null)
 
   const { data: network = initialNetwork } = useQuery({
-    queryKey: ['network', orgId, initialNetwork.id],
-    queryFn: () => getNetwork(orgId, initialNetwork.id),
+    queryKey: ['network', initialNetwork.id],
+    queryFn: () => getNetwork(initialNetwork.id),
     initialData: initialNetwork,
     select: (d) => d ?? initialNetwork,
   })
 
   const { data: memberships = [] } = useQuery({
-    queryKey: ['network-memberships', orgId, initialNetwork.id],
-    queryFn: () => listMembershipsForNetwork(orgId, initialNetwork.id),
+    queryKey: ['network-memberships', initialNetwork.id],
+    queryFn: () => listMembershipsForNetwork(initialNetwork.id),
   })
 
   const { data: allHosts = initialAllHosts } = useQuery({
-    queryKey: ['hosts', orgId],
-    queryFn: () => listHosts(orgId),
+    queryKey: ['hosts'],
+    queryFn: () => listHosts(),
     initialData: initialAllHosts,
     enabled: addOpen,
   })
@@ -114,14 +113,14 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
   )
 
   const { mutate: doAdd, isPending: isAdding } = useMutation({
-    mutationFn: (hostId: string) => addHostToNetwork(orgId, network.id, hostId),
+    mutationFn: (hostId: string) => addHostToNetwork(network.id, hostId),
     onSuccess: async (result) => {
       if ('error' in result) return
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['network', orgId, network.id] }),
-        queryClient.invalidateQueries({ queryKey: ['network-memberships', orgId, network.id] }),
-        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
-        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['network', network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['network-memberships', network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['networks'] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts'] }),
       ])
       setAddOpen(false)
       setSearch('')
@@ -129,14 +128,14 @@ export function NetworkDetailClient({ orgId, initialNetwork, initialAllHosts }: 
   })
 
   const { mutate: doRemove, isPending: isRemoving } = useMutation({
-    mutationFn: (hostId: string) => removeHostFromNetwork(orgId, network.id, hostId),
+    mutationFn: (hostId: string) => removeHostFromNetwork(network.id, hostId),
     onSuccess: async (result) => {
       if ('error' in result) return
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['network', orgId, network.id] }),
-        queryClient.invalidateQueries({ queryKey: ['network-memberships', orgId, network.id] }),
-        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
-        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['network', network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['network-memberships', network.id] }),
+        queryClient.invalidateQueries({ queryKey: ['networks'] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts'] }),
       ])
       setRemoveTarget(null)
     },

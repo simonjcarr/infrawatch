@@ -36,32 +36,43 @@ export async function listNetworks(
 }
 
 export async function getNetwork(
-  scopeId: string,
-  networkId: string,
+  ...args: [string] | [string, string]
 ): Promise<(import('@/lib/db/schema').Network & { members: import('@/lib/db/schema').Host[] }) | null> {
-  return getNetworkCore(scopeId, networkId)
+  const session = await getRequiredSession()
+  const [currentScope, networkId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return getNetworkCore(currentScope, networkId)
 }
 
 export async function createNetwork(
-  scopeId: string,
-  data: { name: string; cidr: string; description?: string },
+  ...args:
+    | [{ name: string; cidr: string; description?: string }]
+    | [string, { name: string; cidr: string; description?: string }]
 ): Promise<{ success: true; network: import('@/lib/db/schema').Network } | { error: string }> {
-  return createNetworkCore(scopeId, data)
+  const session = await getRequiredSession()
+  const [currentScope, data] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return createNetworkCore(currentScope, data)
 }
 
 export async function updateNetwork(
-  scopeId: string,
-  networkId: string,
-  data: { name: string; cidr: string; description?: string },
+  ...args:
+    | [string, { name: string; cidr: string; description?: string }]
+    | [string, string, { name: string; cidr: string; description?: string }]
 ): Promise<{ success: true } | { error: string }> {
-  return updateNetworkCore(scopeId, networkId, data)
+  const session = await getRequiredSession()
+  const [currentScope, networkId, data] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  return updateNetworkCore(currentScope, networkId, data)
 }
 
 export async function deleteNetwork(
-  scopeId: string,
-  networkId: string,
+  ...args: [string] | [string, string]
 ): Promise<{ success: true } | { error: string }> {
-  return deleteNetworkCore(scopeId, networkId)
+  const session = await getRequiredSession()
+  const [currentScope, networkId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return deleteNetworkCore(currentScope, networkId)
 }
 
 export async function addHostToNetwork(
@@ -83,23 +94,29 @@ export async function removeHostFromNetwork(
 }
 
 export async function listHostsInNetwork(
-  scopeId: string,
-  networkId: string,
+  ...args: [string] | [string, string]
 ): Promise<import('@/lib/db/schema').Host[]> {
-  return listHostsInNetworkCore(scopeId, networkId)
+  const session = await getRequiredSession()
+  const [currentScope, networkId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return listHostsInNetworkCore(currentScope, networkId)
 }
 
 export async function listMembershipsForNetwork(
-  scopeId: string,
-  networkId: string,
+  ...args: [string] | [string, string]
 ): Promise<NetworkMembershipEntry[]> {
-  return listMembershipsForNetworkCore(scopeId, networkId)
+  const session = await getRequiredSession()
+  const [currentScope, networkId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return listMembershipsForNetworkCore(currentScope, networkId)
 }
 
 export async function listNetworksWithHosts(
-  scopeId: string,
+  ...args: [] | [string]
 ): Promise<NetworkWithHosts[]> {
-  return listNetworksWithHostsCore(scopeId)
+  const session = await getRequiredSession()
+  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  return listNetworksWithHostsCore(currentScope)
 }
 
 export async function listNetworksForHost(

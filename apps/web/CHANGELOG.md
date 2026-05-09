@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.124.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.0...web/v0.124.1) (2026-05-09)
+
+
+### Bug Fixes
+
+* **hosts:** hard-delete pending certificate signing rows ([f4b64af](https://github.com/carrtech-dev/ct-ops/commit/f4b64afd63104f019ae4d05afd2e1dbb19b2c804))
+
 ## [0.124.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.123.2...web/v0.124.0) (2026-05-09)
 
 

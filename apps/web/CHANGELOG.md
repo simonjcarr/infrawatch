@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.124.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.1...web/v0.124.2) (2026-05-09)
+
+
+### Bug Fixes
+
+* **calendar:** replace operations calendar renderer ([#1197](https://github.com/carrtech-dev/ct-ops/issues/1197)) ([5e56336](https://github.com/carrtech-dev/ct-ops/commit/5e5633615dd8428f3f6908016a1e67c9c8c1f7d0))
+
 ## [0.124.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.0...web/v0.124.1) (2026-05-09)
 
 

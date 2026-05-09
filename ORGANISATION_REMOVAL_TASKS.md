@@ -187,19 +187,38 @@ require removing org-scoped action parameters from `apps/web/lib/actions`.
 
 ## Task 3 - Remove Org APIs And Action Params
 
-Status: Not started
+Status: Blocked
 
-Completed by:
+Completed by: Codex automation `remove-org-from-ct-ops` on 2026-05-09
 
-PR:
+PR: Not opened
 
 Summary:
+Task 3 cannot currently be completed in isolation. Removing caller-supplied
+`orgId` / `organisationId` from actions and API routes immediately requires the
+auth/session rewrite from Task 2 and the org-owned schema cleanup from Task 1,
+because the current route and action contracts derive access through
+`getApiOrgSession`, `requireOrg*` helpers, `session.user.organisationId`, and
+per-table `organisationId` filters/inserts.
 
 Files changed:
+`ORGANISATION_REMOVAL_TASKS.md`
 
 Validation:
+Checked open PRs with `gh pr list --repo carrtech-dev/ct-ops --state open`.
+Reviewed the org-scoped API/action surface with
+`rg -n "orgId|organisationId|org_id|organisation_id|requireOrg" apps/web/lib/actions apps/web/app/api apps/web/app`.
+Representative blockers found:
+- `apps/web/app/api/domain-accounts/route.ts` authenticates with `getApiOrgSession()` and passes `session.user.organisationId` into `getDomainAccounts`
+- `apps/web/lib/actions/action-auth.ts` and `action-auth-core.ts` only expose org-scoped guards such as `requireOrgAccess`, `requireOrgAdminAccess`, and `assertOrgAccess`
+- `apps/web/lib/auth/session.ts` still defines `getApiOrgSession`, `getApiOrgAdminSession`, seat checks, and two-factor policy lookup around `user.organisationId`
+- `apps/web/lib/actions/alerts.ts`, `agents.ts`, `ldap.ts`, `tags.ts`, `tag-rules.ts`, `terminal.ts`, and many other actions still accept `orgId`, write audit events with `organisationId`, and query tables by `*.organisationId`
+- dashboard callers such as `apps/web/app/(dashboard)/hosts/groups/page.tsx`, settings pages, report pages, and CT-CVE screens still read `session.user.organisationId` and pass it through the UI/action layer
 
 Follow-up:
+Combine Tasks 2 and 3 into a single auth/API contract rewrite, then land Task 1
+schema removal immediately after or as part of the same pass so the action/API
+surface can stop depending on `organisationId` end to end.
 
 ### Required work
 

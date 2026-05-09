@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.127.0...web/v0.128.0) (2026-05-09)
+
+
+### Features
+
+* **web:** remove org scope from task runs and schedules ([#1232](https://github.com/carrtech-dev/ct-ops/issues/1232)) ([16f1f47](https://github.com/carrtech-dev/ct-ops/commit/16f1f47490055dc3f86117dbddecb15b19f2bfd9))
+
 ## [0.127.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.126.0...web/v0.127.0) (2026-05-09)
 
 

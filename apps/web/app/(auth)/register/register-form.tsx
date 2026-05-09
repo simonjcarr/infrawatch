@@ -70,7 +70,7 @@ export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
   async function onSubmit(values: RegisterValues) {
     setServerError(null)
     const inviteAcceptPath = getInviteAcceptPath(inviteToken)
-    const callbackURL = inviteAcceptPath ?? '/onboarding'
+    const callbackURL = inviteAcceptPath ?? '/dashboard'
     const result = await signUp.email({
       name: values.name,
       email: values.email,

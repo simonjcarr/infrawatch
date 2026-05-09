@@ -118,10 +118,8 @@ function CertificateUpload({
 }
 
 export function LdapSettingsClient({
-  orgId,
   initialConfigs,
 }: {
-  orgId: string
   initialConfigs: LdapConfigurationSafe[]
 }) {
   const queryClient = useQueryClient()
@@ -134,13 +132,13 @@ export function LdapSettingsClient({
   const [testResults, setTestResults] = useState<Record<string, { success?: boolean; error?: string }>>({})
 
   const { data: configs = initialConfigs } = useQuery({
-    queryKey: ['ldap-configs', orgId],
-    queryFn: () => getLdapConfigurations(orgId),
+    queryKey: ['ldap-configs'],
+    queryFn: () => getLdapConfigurations(),
     initialData: initialConfigs,
   })
 
   const addMutation = useMutation({
-    mutationFn: () => createLdapConfiguration(orgId, addForm),
+    mutationFn: () => createLdapConfiguration(addForm),
     onSuccess: (result) => {
       if ('error' in result) {
         setAddError(result.error)
@@ -174,7 +172,7 @@ export function LdapSettingsClient({
       if (editForm.emailAttribute !== editingConfig.emailAttribute) updates.emailAttribute = editForm.emailAttribute
       if (editForm.displayNameAttribute !== editingConfig.displayNameAttribute) updates.displayNameAttribute = editForm.displayNameAttribute
       if (editForm.allowLogin !== editingConfig.allowLogin) updates.allowLogin = editForm.allowLogin
-      return updateLdapConfiguration(orgId, editingConfig.id, updates)
+      return updateLdapConfiguration(editingConfig.id, updates)
     },
     onSuccess: (result) => {
       if (result && 'error' in result) {
@@ -213,24 +211,24 @@ export function LdapSettingsClient({
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      updateLdapConfiguration(orgId, id, { enabled }),
+      updateLdapConfiguration(id, { enabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ldap-configs'] }),
   })
 
   const toggleLoginMutation = useMutation({
     mutationFn: ({ id, allowLogin }: { id: string; allowLogin: boolean }) =>
-      updateLdapConfiguration(orgId, id, { allowLogin }),
+      updateLdapConfiguration(id, { allowLogin }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ldap-configs'] }),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteLdapConfiguration(orgId, id),
+    mutationFn: (id: string) => deleteLdapConfiguration(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ldap-configs'] }),
   })
 
   async function handleTest(configId: string) {
     setTestResults((prev) => ({ ...prev, [configId]: {} }))
-    const result = await testLdapConnection(orgId, configId)
+    const result = await testLdapConnection(configId)
     if ('error' in result) {
       setTestResults((prev) => ({ ...prev, [configId]: { error: result.error } }))
     } else {

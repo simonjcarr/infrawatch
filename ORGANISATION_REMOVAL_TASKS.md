@@ -126,19 +126,33 @@ Follow-up: Start Task 2 next. Do not restore the previous single-PR Task 1.
 
 ## Task 2 - Web Auth, Setup, And Instance Foundation
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
-PR:
+PR: [#1218](https://github.com/carrtech-dev/ct-ops/pull/1218)
 
-Summary:
+Summary: Removed onboarding and organisation-selection from the auth/setup
+path, switched LDAP sign-in to instance-scoped integration IDs, and updated
+auth/setup E2E coverage to seed the instance through the baseline user context
+instead of direct organisation lookups.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`, `apps/web/app/(auth)`,
+`apps/web/app/(dashboard)/settings/{integrations,ldap}`, `apps/web/app/api/auth/ldap/route.ts`,
+`apps/web/app/accept-invite/page.tsx`, `apps/web/lib/actions/{ldap,organisations}.ts`,
+`apps/web/lib/auth/*`, `apps/web/lib/default-organisation.ts`,
+`apps/web/tests/e2e/{auth.setup.ts,auth,fixtures/seed.ts,setup}`
 
-Validation:
+Validation: `pnpm --dir apps/web type-check`; `pnpm --dir apps/web lint`
+(warnings only); `pnpm --dir apps/web test:unit` (fails only
+`lib/db/rls.test.mjs` and `lib/integrations/ct-cve/db-nonce-store.test.mjs`
+because no container runtime is available here); `pnpm --dir apps/web exec playwright test --list`;
+targeted Playwright smoke attempt on `tests/e2e/auth/register.spec.ts`
+failed before execution because the local web server environment did not define
+`BETTER_AUTH_URL`.
 
-Follow-up:
+Follow-up: Start Task 3 next. When re-running auth/setup E2E smoke tests,
+provide the expected web env vars and a working container runtime first.
 
 ### Required work
 

@@ -9,25 +9,21 @@ import {
 
 test('authenticated redirect only accepts active non-deleted users', () => {
   assert.equal(getAuthenticatedRedirectPath({
-    organisationId: 'org_1',
     isActive: true,
     deletedAt: null,
   }), '/dashboard')
 
   assert.equal(getAuthenticatedRedirectPath({
-    organisationId: null,
     isActive: true,
     deletedAt: null,
-  }), '/onboarding')
+  }), '/dashboard')
 
   assert.equal(getAuthenticatedRedirectPath({
-    organisationId: 'org_1',
     isActive: false,
     deletedAt: null,
   }), null)
 
   assert.equal(getAuthenticatedRedirectPath({
-    organisationId: 'org_1',
     isActive: true,
     deletedAt: new Date('2026-04-30T12:00:00.000Z'),
   }), null)

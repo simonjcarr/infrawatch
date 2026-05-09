@@ -17,8 +17,7 @@ export default async function IntegrationsSettingsPage() {
     redirect('/settings')
   }
 
-  const orgId = session.user.organisationId!
-  const configs = await getLdapConfigurations(orgId)
+  const configs = await getLdapConfigurations()
 
   return (
     <div className="space-y-6">
@@ -29,7 +28,7 @@ export default async function IntegrationsSettingsPage() {
           { title: 'CT-CVE', href: '/settings/integrations/ct-cve' },
         ]}
       />
-      <LdapSettingsClient orgId={orgId} initialConfigs={configs} />
+      <LdapSettingsClient initialConfigs={configs} />
     </div>
   )
 }

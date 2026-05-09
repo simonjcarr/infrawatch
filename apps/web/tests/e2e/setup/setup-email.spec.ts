@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { getSeededTestUserContext } from '../fixtures/seed'
 
 test('ldap placeholder users must set a real email before reaching the dashboard', async ({ page }) => {
   const sql = getTestDb()
@@ -8,6 +8,7 @@ test('ldap placeholder users must set a real email before reaching the dashboard
   const placeholderEmail = `ldap-user-${suffix}@ldap.local`
   const realEmail = `ldap-user-${suffix}@example.com`
   const password = 'TestPassword123!'
+  const { instanceId } = await getSeededTestUserContext()
 
   const signUpResponse = await page.request.post('/api/auth/sign-up/email', {
     data: {
@@ -20,7 +21,7 @@ test('ldap placeholder users must set a real email before reaching the dashboard
 
   await sql`
     UPDATE "user"
-    SET organisation_id = (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+    SET organisation_id = ${instanceId},
         email_verified = true,
         role = 'org_admin',
         is_active = true

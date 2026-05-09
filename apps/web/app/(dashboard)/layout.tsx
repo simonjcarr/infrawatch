@@ -18,11 +18,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/pending-approval')
   }
 
-  if (!session.user.organisationId) {
-    redirect('/onboarding')
-  }
-
   const orgId = session.user.organisationId
+  if (!orgId) {
+    throw new Error('Instance scope is not configured')
+  }
   const licence = await getEffectiveLicence(orgId)
 
   return (

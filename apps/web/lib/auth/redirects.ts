@@ -1,6 +1,6 @@
 import type { User } from '@/lib/db/schema'
 
-type RedirectUser = Pick<User, 'organisationId' | 'isActive' | 'deletedAt'>
+type RedirectUser = Pick<User, 'isActive' | 'deletedAt'>
 
 export const EXPIRED_SESSION_LOGIN_PATH = '/login?session=expired'
 
@@ -10,10 +10,10 @@ export function shouldBypassAuthenticatedRedirect(searchParams: Record<string, s
   return session === 'expired'
 }
 
-export function getAuthenticatedRedirectPath(user: RedirectUser | null | undefined): '/dashboard' | '/onboarding' | null {
+export function getAuthenticatedRedirectPath(user: RedirectUser | null | undefined): '/dashboard' | null {
   if (!user?.isActive || user.deletedAt) {
     return null
   }
 
-  return user.organisationId ? '/dashboard' : '/onboarding'
+  return '/dashboard'
 }

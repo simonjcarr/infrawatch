@@ -49,8 +49,8 @@ test('email sign-up requires verification before dashboard access', async ({ pag
   const verificationUrl = await waitForVerificationUrl(email)
   await page.goto(verificationUrl)
 
-  await page.waitForURL('**/onboarding')
-  await expect(page.getByText('Create your organisation', { exact: true })).toBeVisible()
+  await page.waitForURL('**/dashboard')
+  await expect(page.getByTestId('dashboard-heading')).toBeVisible()
 })
 
 test('email sign-up can continue without verification when disabled', async ({ page }) => {
@@ -66,8 +66,8 @@ test('email sign-up can continue without verification when disabled', async ({ p
   await page.getByLabel(/^Confirm password$/).fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
 
-  await page.waitForURL('**/onboarding')
-  await expect(page.getByText('Create your organisation', { exact: true })).toBeVisible()
+  await page.waitForURL('**/dashboard')
+  await expect(page.getByTestId('dashboard-heading')).toBeVisible()
 
   const sql = getTestDb()
   const rows = await sql<Array<{ id: string; email_verified: boolean }>>`
@@ -84,8 +84,8 @@ test('email sign-up can continue without verification when disabled', async ({ p
   await page.getByTestId('login-email').fill(email)
   await page.getByTestId('login-password').fill(password)
   await page.getByTestId('login-submit').click()
-  await page.waitForURL('**/onboarding')
+  await page.waitForURL('**/dashboard')
 
   await page.goto('/dashboard')
-  await page.waitForURL('**/onboarding')
+  await page.waitForURL('**/dashboard')
 })

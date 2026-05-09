@@ -3,20 +3,18 @@ import assert from 'node:assert/strict'
 
 import { buildLdapLoginOptions } from './ldap-login-options.ts'
 
-test('buildLdapLoginOptions uses the integration name when an organisation has one login integration', () => {
+test('buildLdapLoginOptions uses the integration name when there is one login integration', () => {
   assert.deepEqual(
     buildLdapLoginOptions([
       {
         ldapConfigurationId: 'ldap_ctops',
         ldapConfigurationName: 'ctops',
-        organisationName: 'CT-Ops',
-        organisationSlug: 'ct-ops',
+        ldapConfigurationHost: 'ldap.ct-ops.example',
       },
     ]),
     [
       {
         id: 'ldap_ctops',
-        organisationSlug: 'ct-ops',
         label: 'ctops',
       },
     ],
@@ -29,25 +27,21 @@ test('buildLdapLoginOptions returns each login integration as a selectable optio
       {
         ldapConfigurationId: 'ldap_primary',
         ldapConfigurationName: 'Primary AD',
-        organisationName: 'Carrtech',
-        organisationSlug: 'carrtech',
+        ldapConfigurationHost: 'ldap1.carrtech.example',
       },
       {
         ldapConfigurationId: 'ldap_backup',
         ldapConfigurationName: 'Backup AD',
-        organisationName: 'Carrtech',
-        organisationSlug: 'carrtech',
+        ldapConfigurationHost: 'ldap2.carrtech.example',
       },
     ]),
     [
       {
         id: 'ldap_primary',
-        organisationSlug: 'carrtech',
         label: 'Primary AD',
       },
       {
         id: 'ldap_backup',
-        organisationSlug: 'carrtech',
         label: 'Backup AD',
       },
     ],
@@ -60,26 +54,22 @@ test('buildLdapLoginOptions disambiguates duplicate integration names', () => {
       {
         ldapConfigurationId: 'ldap_acme',
         ldapConfigurationName: 'Primary AD',
-        organisationName: 'Acme',
-        organisationSlug: 'acme',
+        ldapConfigurationHost: 'dc1.acme.example',
       },
       {
         ldapConfigurationId: 'ldap_beta',
         ldapConfigurationName: 'Primary AD',
-        organisationName: 'Beta',
-        organisationSlug: 'beta',
+        ldapConfigurationHost: 'dc1.beta.example',
       },
     ]),
     [
       {
         id: 'ldap_acme',
-        organisationSlug: 'acme',
-        label: 'Primary AD (Acme)',
+        label: 'Primary AD (dc1.acme.example)',
       },
       {
         id: 'ldap_beta',
-        organisationSlug: 'beta',
-        label: 'Primary AD (Beta)',
+        label: 'Primary AD (dc1.beta.example)',
       },
     ],
   )

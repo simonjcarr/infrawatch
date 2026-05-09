@@ -30,7 +30,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   const session = await auth.api.getSession({ headers: await headers() })
   if (session) {
     const user = await db.query.users.findFirst({ where: eq(users.id, session.user.id) })
-    if (inviteAcceptPath && user?.isActive && !user.deletedAt && !user.organisationId) {
+    if (inviteAcceptPath && user?.isActive && !user.deletedAt) {
       redirect(inviteAcceptPath)
     }
 

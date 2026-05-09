@@ -24,9 +24,7 @@ const localLoginSchema = z.object({
 })
 
 const domainLoginSchema = z.object({
-  organisationSlug: z.string().trim().min(2, 'Organisation slug is required').regex(/^[a-z0-9-]+$/, {
-    message: 'Use lowercase letters, numbers, and hyphens',
-  }),
+  ldapConfigurationId: z.string().min(1, 'Select a domain integration'),
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
 })
@@ -86,7 +84,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
   const domainForm = useForm<DomainLoginValues>({
     resolver: zodResolver(domainLoginSchema),
     defaultValues: {
-      organisationSlug: defaultLdapLoginOption?.organisationSlug ?? '',
+      ldapConfigurationId: defaultLdapLoginOption?.id ?? '',
     },
   })
 
@@ -162,7 +160,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
               twoFactorMethod: ldapTwoFactorMethod,
             }
           : {
-              organisationSlug: values.organisationSlug,
+              ldapConfigurationId: values.ldapConfigurationId,
               username: values.username,
               password: values.password,
             }),
@@ -522,7 +520,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
                       const option = ldapLoginOptions.find((candidate) => candidate.id === value)
                       if (!option) return
                       setSelectedLdapIntegrationId(option.id)
-                      domainForm.setValue('organisationSlug', option.organisationSlug, {
+                      domainForm.setValue('ldapConfigurationId', option.id, {
                         shouldDirty: true,
                         shouldTouch: true,
                         shouldValidate: true,
@@ -540,8 +538,8 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
                       ))}
                     </SelectContent>
                   </Select>
-                  {domainForm.formState.errors.organisationSlug && (
-                    <p className="text-xs text-destructive">{domainForm.formState.errors.organisationSlug.message}</p>
+                  {domainForm.formState.errors.ldapConfigurationId && (
+                    <p className="text-xs text-destructive">{domainForm.formState.errors.ldapConfigurationId.message}</p>
                   )}
                 </div>
                 <div className="space-y-1.5">

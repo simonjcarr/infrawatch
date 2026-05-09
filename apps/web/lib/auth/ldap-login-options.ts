@@ -1,14 +1,12 @@
 export type LdapLoginOption = {
   id: string
-  organisationSlug: string
   label: string
 }
 
 export type LdapLoginOptionRow = {
   ldapConfigurationId: string
   ldapConfigurationName: string
-  organisationName: string
-  organisationSlug: string
+  ldapConfigurationHost: string
 }
 
 export function buildLdapLoginOptions(rows: readonly LdapLoginOptionRow[]): LdapLoginOption[] {
@@ -22,9 +20,8 @@ export function buildLdapLoginOptions(rows: readonly LdapLoginOptionRow[]): Ldap
     const hasDuplicateName = (nameCounts.get(row.ldapConfigurationName) ?? 0) > 1
     return {
       id: row.ldapConfigurationId,
-      organisationSlug: row.organisationSlug,
       label: hasDuplicateName
-        ? `${row.ldapConfigurationName} (${row.organisationName})`
+        ? `${row.ldapConfigurationName} (${row.ldapConfigurationHost})`
         : row.ldapConfigurationName,
     }
   })

@@ -81,13 +81,8 @@ if [[ -n "${MOCK_CURL_LOG:-}" ]]; then
   printf '%s\n' "$url" >> "$MOCK_CURL_LOG"
 fi
 
-if [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100" \
-  || "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=1" ]]; then
-  printf '%s' "${MOCK_RELEASES_JSON}" > "$out"
-elif [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=2" ]]; then
-  printf '%s' "${MOCK_RELEASES_JSON_PAGE_2:-[]}" > "$out"
-elif [[ "$url" == https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100\&page=* ]]; then
-  printf '[]' > "$out"
+if [[ "$url" == "https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/.release-please-manifest.json" ]]; then
+  printf '%s' "${MOCK_RELEASE_MANIFEST_JSON}" > "$out"
 elif [[ "$url" == *.sha256 ]]; then
   printf '%s  ct-ops-single.zip\n' "${MOCK_CHECKSUM}" > "$out"
 else
@@ -249,14 +244,11 @@ main() {
   rm -f "$bundle_zip"
   (cd "$new_src" && zip -qr "$bundle_zip" ct-ops)
 
-  export MOCK_RELEASES_JSON='[
-    { "tag_name": "ingest/v9.9.9" },
-    { "tag_name": "web/v0.99.0" },
-    { "tag_name": "web/v0.98.0" }
-  ]'
-  export MOCK_RELEASES_JSON_PAGE_2='[
-    { "tag_name": "web/v0.100.0" }
-  ]'
+  export MOCK_RELEASE_MANIFEST_JSON='{
+    "agent": "9.9.9",
+    "apps/ingest": "9.9.9",
+    "apps/web": "0.100.0"
+  }'
   export MOCK_BUNDLE_ZIP="$bundle_zip"
   export MOCK_CURL_LOG="${tmpdir}/curl.log"
   export MOCK_CHECKSUM
@@ -275,7 +267,7 @@ main() {
   grep -q 'example/web:v0.100.0' "${old_install}/docker-compose.yml"
   ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "${old_install}/.env"
   grep -q '"git_tag":"api/v0.100.0"' "${old_install}/password-manager-release.json"
-  unset MOCK_CURL_LOG MOCK_RELEASES_JSON_PAGE_2
+  unset MOCK_CURL_LOG MOCK_RELEASE_MANIFEST_JSON
 
   echo "upgrade.sh local bundle tests passed"
 }

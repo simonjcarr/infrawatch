@@ -12,6 +12,7 @@ set -euo pipefail
 
 REPO_OWNER="carrtech-dev"
 REPO_NAME="ct-ops"
+RELEASE_MANIFEST_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/.release-please-manifest.json"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -104,58 +105,27 @@ require_docker() {
 }
 
 latest_web_tag() {
-  local page releases_tmp tags_tmp tag
-  tags_tmp="$(mktemp -t ct-ops.XXXXXX.release-tags)"
-  page=1
+  local manifest_tmp version
+  manifest_tmp="$(mktemp -t ct-ops.XXXXXX.release-manifest.json)"
+  if ! curl -fsSL -o "$manifest_tmp" "$RELEASE_MANIFEST_URL"; then
+    rm -f "$manifest_tmp"
+    echo "ERROR: could not download the CT-Ops release manifest." >&2
+    echo "Try pinning the current release explicitly:" >&2
+    echo "  CT_OPS_VERSION=v0.124.5 ./upgrade.sh" >&2
+    return 1
+  fi
 
-  while :; do
-    releases_tmp="$(mktemp -t ct-ops.XXXXXX.releases.json)"
-    if ! curl -fsSL \
-      -o "$releases_tmp" \
-      "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases?per_page=100&page=${page}"; then
-      rm -f "$releases_tmp" "$tags_tmp"
-      return 1
-    fi
+  version="$(
+    awk -F '"' '$2 == "apps/web" { print $4; exit }' "$manifest_tmp"
+  )"
+  rm -f "$manifest_tmp"
 
-    awk -F '"' '/"tag_name":[[:space:]]*"web\/v[0-9]+[.][0-9]+[.][0-9]+"/ { print $4 }' "$releases_tmp" >> "$tags_tmp"
-    if ! grep -q '"tag_name":[[:space:]]*"' "$releases_tmp"; then
-      rm -f "$releases_tmp"
-      break
-    fi
-
-    rm -f "$releases_tmp"
-    page=$((page + 1))
-  done
-
-  tag="$(awk -F '"' '
-    {
-      tag = $0
-      version = tag
-      sub(/^web\/v/, "", version)
-      if (version !~ /^[0-9]+[.][0-9]+[.][0-9]+$/) {
-        next
-      }
-      split(version, parts, ".")
-      key = sprintf("%010d.%010d.%010d", parts[1], parts[2], parts[3])
-      if (key > best_key) {
-        best_key = key
-        best_tag = tag
-      }
-    }
-    END {
-      if (best_tag != "") {
-        print best_tag
-      }
-    }
-  ' "$tags_tmp")"
-  rm -f "$tags_tmp"
-
-  if [ -z "$tag" ]; then
-    echo "ERROR: could not find a published web release for ${REPO_OWNER}/${REPO_NAME}." >&2
+  if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+    echo "ERROR: could not read the latest web release from ${RELEASE_MANIFEST_URL}." >&2
     exit 1
   fi
 
-  printf '%s\n' "$tag"
+  printf 'web/v%s\n' "$version"
 }
 
 download_bundle() {

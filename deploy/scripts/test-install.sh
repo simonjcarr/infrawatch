@@ -44,13 +44,8 @@ if [[ -n "${MOCK_CURL_LOG:-}" ]]; then
   printf '%s\n' "$url" >> "$MOCK_CURL_LOG"
 fi
 
-if [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100" \
-  || "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=1" ]]; then
-  printf '%s' "${MOCK_RELEASES_JSON}" > "$out"
-elif [[ "$url" == "https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100&page=2" ]]; then
-  printf '%s' "${MOCK_RELEASES_JSON_PAGE_2:-[]}" > "$out"
-elif [[ "$url" == https://api.github.com/repos/carrtech-dev/ct-ops/releases?per_page=100\&page=* ]]; then
-  printf '[]' > "$out"
+if [[ "$url" == "https://raw.githubusercontent.com/carrtech-dev/ct-ops/main/.release-please-manifest.json" ]]; then
+  printf '%s' "${MOCK_RELEASE_MANIFEST_JSON}" > "$out"
 elif [[ "$url" == *.sha256 ]]; then
   printf '%s  ct-ops-single.zip\n' "${MOCK_CHECKSUM}" > "$out"
 else
@@ -81,14 +76,11 @@ run_match_case() {
   make_mock_bin "$mockbin"
 
   export MOCK_PAYLOAD="verified bundle payload"
-  export MOCK_RELEASES_JSON='[
-    { "tag_name": "ingest/v9.9.9" },
-    { "tag_name": "web/v0.99.0" },
-    { "tag_name": "web/v0.98.0" }
-  ]'
-  export MOCK_RELEASES_JSON_PAGE_2='[
-    { "tag_name": "web/v0.100.0" }
-  ]'
+  export MOCK_RELEASE_MANIFEST_JSON='{
+    "agent": "9.9.9",
+    "apps/ingest": "9.9.9",
+    "apps/web": "0.100.0"
+  }'
   export MOCK_CURL_LOG="${workspace}/curl.log"
   export MOCK_CHECKSUM
   MOCK_CHECKSUM="$(printf '%s' "$MOCK_PAYLOAD" | openssl dgst -sha256 | awk '{print $NF}')"
@@ -106,7 +98,7 @@ run_match_case() {
     exit 1
   fi
   unset MOCK_CURL_LOG
-  unset MOCK_RELEASES_JSON_PAGE_2
+  unset MOCK_RELEASE_MANIFEST_JSON
 }
 
 run_mismatch_case() {
@@ -116,7 +108,7 @@ run_mismatch_case() {
   make_mock_bin "$mockbin"
 
   export MOCK_PAYLOAD="tampered bundle payload"
-  export MOCK_RELEASES_JSON='[{ "tag_name": "web/v1.2.3" }]'
+  export MOCK_RELEASE_MANIFEST_JSON='{ "apps/web": "1.2.3" }'
   export MOCK_CHECKSUM="deadbeef"
   export UNZIP_SHOULD_FAIL="1"
 
@@ -151,7 +143,7 @@ run_pinned_case() {
   make_mock_bin "$mockbin"
 
   export MOCK_PAYLOAD="verified pinned bundle payload"
-  export MOCK_RELEASES_JSON='[{ "tag_name": "ingest/v9.9.9" }]'
+  export MOCK_RELEASE_MANIFEST_JSON='{ "apps/web": "9.9.9" }'
   export MOCK_CURL_LOG="${workspace}/curl.log"
   export MOCK_CHECKSUM
   MOCK_CHECKSUM="$(printf '%s' "$MOCK_PAYLOAD" | openssl dgst -sha256 | awk '{print $NF}')"
@@ -163,8 +155,8 @@ run_pinned_case() {
 
   test -d "${workspace}/ct-ops"
   grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v4.5.6/ct-ops-single-v4.5.6.zip" "$MOCK_CURL_LOG"
-  if grep -Fq "api.github.com" "$MOCK_CURL_LOG"; then
-    echo "pinned installs should not query the releases API" >&2
+  if grep -Fq ".release-please-manifest.json" "$MOCK_CURL_LOG"; then
+    echo "pinned installs should not query the release manifest" >&2
     exit 1
   fi
   unset MOCK_CURL_LOG

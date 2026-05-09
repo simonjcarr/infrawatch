@@ -196,7 +196,51 @@ standalone instance without any organisation prerequisite.
   infrastructure allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web/app apps/web/lib/auth apps/web/tests/e2e`
 
-## Task 3 - Web Inventory, Operations, And Core UI Single-Instance Conversion
+## Task 3 - Split Dashboard Core Conversion Into Smaller Vertical Slices
+
+Status: Complete
+
+Completed by: Codex automation
+
+PR:
+
+Summary: Replaced the oversized dashboard conversion slice with narrower
+product-path tasks after auditing the remaining org-scoped surface and finding
+it still spans hosts, tasks, alerts, notifications, agents, team, terminal,
+certificates, build docs, and multiple APIs. The next implementation task
+should now be a coherent hosts-and-tasks slice instead of an all-dashboard PR.
+
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`
+
+Validation: `rg -l "organisationId|orgId|requireOrg|SameOrg|tenant"
+'apps/web/app/(dashboard)' 'apps/web/app/api' apps/web/components
+apps/web/hooks apps/web/lib/actions apps/web/lib/hosts apps/web/lib/notes
+apps/web/lib/notifications`
+
+Follow-up: Start Task 4 next. Do not restore the previous combined dashboard
+slice.
+
+### Required work
+
+- Replace the previous dashboard-wide Task 3 with smaller independently
+  shippable slices.
+- Keep each new slice focused on complete operator workflows rather than
+  technical layers.
+- Ensure each new slice can land without depending on unrelated dashboard
+  surfaces to move first.
+
+### Acceptance criteria
+
+- The tracker no longer expects one PR to remove organisation identity from the
+  entire dashboard surface.
+- The first available implementation task is a smaller hosts-and-tasks slice
+  that can land independently.
+
+### Validation
+
+- `rg -n "^## Task " ORGANISATION_REMOVAL_TASKS.md`
+
+## Task 4 - Web Hosts, Tasks, Tags, Notes, And Terminal Single-Instance Conversion
 
 Status: Not started
 
@@ -214,25 +258,26 @@ Follow-up:
 
 ### Required work
 
-This slice owns the main dashboard workflows that operators use day to day.
+This slice owns the highest-volume day-to-day operator workflows around hosts
+and task execution.
 
-- Remove `orgId` / `organisationId` parameters from hosts, tags, tasks, notes,
-  alerts, notifications, networks, software inventory, agent enrolment, and
-  related dashboard loaders, server actions, route handlers, request bodies,
-  query strings, and client components.
-- Delete organisation settings/name/slug UI, org prop threading, and React
-  Query keys containing `orgId` for the areas in this slice.
-- Update shared navigation, profile/team surfaces, and dashboard copy touched by
-  these workflows so the UI presents CT-Ops as a standalone instance.
-- Rewrite unit tests and E2E fixtures touched by this slice so they seed
-  standalone instance data and no longer query or insert organisations.
+- Remove `orgId` / `organisationId` parameters from hosts, host groups, task
+  runs, task schedules, tags, notes, host stream helpers, terminal host
+  selectors, and related dashboard loaders, server actions, route handlers,
+  request bodies, query strings, and client components in this slice.
+- Delete org prop threading and React Query keys containing `orgId` for these
+  workflows.
+- Update shared navigation and command-palette surfaces touched by these
+  workflows so the UI presents CT-Ops as a standalone instance.
+- Rewrite unit tests and E2E fixtures touched by these workflows so they seed
+  standalone instance data and no longer query or insert `organisations`.
 
 ### Acceptance criteria
 
-- Hosts, tasks, notes, tags, notifications, networks, software inventory, and
-  agent enrolment flows work without caller-supplied organisation identity.
-- The main dashboard UI presents CT-Ops as a standalone instance for these
-  workflows.
+- Hosts, host groups, task execution, schedules, tags, notes, and terminal host
+  selection work without caller-supplied organisation identity.
+- The dashboard UI and shared components touched by these workflows no longer
+  thread `orgId`.
 - Web tests touched by these workflows no longer insert into or query
   `organisations`.
 
@@ -242,11 +287,112 @@ This slice owns the main dashboard workflows that operators use day to day.
 - `pnpm --dir apps/web lint`
 - `pnpm --dir apps/web test:unit`
 - `pnpm --dir apps/web exec playwright test --list`
-- Targeted E2E smoke runs for agents, hosts, tasks, notes, notifications, and
-  inventory where local infrastructure allows.
-- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" apps/web/app apps/web/components apps/web/hooks apps/web/lib/{actions,hosts,notes,notifications}`
+- Targeted E2E smoke runs for hosts, groups, tasks, schedules, notes, and tags
+  where local infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts' 'apps/web/app/(dashboard)/tasks' apps/web/components/{notes,shared} apps/web/hooks apps/web/lib/{actions,hosts,notes}`
 
-## Task 4 - Web Reporting, Integrations, And Schema Baseline Cleanup
+## Task 5 - Web Alerts, Notifications, Team, And Agent Management Conversion
+
+Status: Not started
+
+Completed by:
+
+PR:
+
+Summary:
+
+Files changed:
+
+Validation:
+
+Follow-up:
+
+### Required work
+
+This slice owns operational coordination and agent management workflows.
+
+- Remove `orgId` / `organisationId` parameters from alerts, silences,
+  notification channels, notification inbox, team membership management,
+  invitation management, agent enrolment tokens, and related loaders, server
+  actions, route handlers, request bodies, query strings, and client
+  components.
+- Delete organisation settings/name/slug UI and org-scoped query keys touched
+  by these workflows.
+- Update topbar, notification bell, team surfaces, and settings copy touched by
+  this slice so the UI presents CT-Ops as a standalone instance.
+- Rewrite unit tests and E2E fixtures touched by these workflows so they seed
+  standalone instance data and no longer query or insert `organisations`.
+
+### Acceptance criteria
+
+- Alerts, notifications, team management, invitation management, and agent
+  enrolment flows work without caller-supplied organisation identity.
+- Shared UI touched by these workflows presents CT-Ops as a standalone
+  instance.
+- Web tests touched by these workflows no longer insert into or query
+  `organisations`.
+
+### Validation
+
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for alerts, notifications, team, invites, and agents
+  where local infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/alerts' 'apps/web/app/(dashboard)/notifications' 'apps/web/app/(dashboard)/team' 'apps/web/app/(dashboard)/settings/agents' 'apps/web/app/(dashboard)/settings/monitoring' apps/web/components/shared/{notification-bell,topbar}.tsx apps/web/lib/{actions,notifications}`
+
+## Task 6 - Web Reporting, Integrations, Certificates, And Remaining Dashboard Conversion
+
+Status: Not started
+
+Completed by:
+
+PR:
+
+Summary:
+
+Files changed:
+
+Validation:
+
+Follow-up:
+
+### Required work
+
+This slice finishes the remaining dashboard/reporting surfaces after the higher
+volume operational paths are converted.
+
+- Remove `orgId` / `organisationId` parameters from reporting, software
+  inventory, vulnerability views, certificates, directory lookup, password
+  manager, bundlers, build docs, service accounts, CT-CVE settings surfaces,
+  and related loaders, server actions, route handlers, request bodies, query
+  strings, and client components.
+- Delete remaining org prop threading and org-scoped query keys touched by
+  these workflows.
+- Rewrite unit tests and E2E fixtures touched by these workflows so they seed
+  standalone instance data and no longer query or insert `organisations`.
+
+### Acceptance criteria
+
+- Reporting, inventory, certificates, directory lookup, build docs, bundlers,
+  service accounts, and adjacent dashboards in this slice work without
+  caller-supplied organisation identity.
+- Web tests touched by these workflows no longer insert into or query
+  `organisations`.
+
+### Validation
+
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web lint`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for reports, certificates, password manager,
+  directory lookup, service accounts, and build docs where local infrastructure
+  allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/reports' 'apps/web/app/(dashboard)/certificates' 'apps/web/app/(dashboard)/bundlers' 'apps/web/app/(dashboard)/build-docs' 'apps/web/app/(dashboard)/directory-lookup' 'apps/web/app/(dashboard)/service-accounts' 'apps/web/app/(dashboard)/password-manager' 'apps/web/app/(dashboard)/settings/integrations' apps/web/app/api/{reports,certificates,service-accounts,build-docs} apps/web/lib/actions/{build-docs,certificates,ct-cve,domain-accounts,software-inventory,vulnerabilities}`
+
+## Task 7 - Web Reporting, Integrations, And Schema Baseline Cleanup
 
 Status: Not started
 
@@ -306,7 +452,7 @@ and migration residue after the earlier slices have converted the live paths.
   allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
 
-## Task 5 - Ingest And Agent Single-Instance Conversion
+## Task 8 - Ingest And Agent Single-Instance Conversion
 
 Status: Not started
 
@@ -350,7 +496,7 @@ Follow-up:
 - `pnpm --dir apps/web type-check`
 - `rg -n "organisation|organization|orgID|orgId|org_id|organisation_id|OrgToken|org_token|tenant" apps/ingest agent proto`
 
-## Task 6 - Docs, Deploy, And External Contracts
+## Task 9 - Docs, Deploy, And External Contracts
 
 Status: Not started
 
@@ -394,7 +540,7 @@ Follow-up:
 - `pnpm --dir apps/docs build`
 - `rg -n "organisation|organization|orgId|organisationId|organisation_id|org_id|tenant|organisations" README.md docs apps/docs deploy .env.example apps/web/.env.example`
 
-## Task 7 - Final Residue Sweep And Validation
+## Task 10 - Final Residue Sweep And Validation
 
 Status: Not started
 

@@ -5,11 +5,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const checksSource = readFileSync(path.join(here, 'checks.ts'), 'utf8')
+const checksSource = readFileSync(path.join(here, 'checks-core.ts'), 'utf8')
 
 function getActionSegment(action) {
   const start = checksSource.indexOf(`export async function ${action}`)
-  assert.notEqual(start, -1, `expected ${action} to exist in checks.ts`)
+  assert.notEqual(start, -1, `expected ${action} to exist in checks-core.ts`)
   const next = checksSource.indexOf('\nexport async function ', start + 1)
   return checksSource.slice(start, next === -1 ? undefined : next)
 }
@@ -27,4 +27,3 @@ test('createCheck validates the target host belongs to the organisation before i
   assert.match(segment, /isNull\(hosts\.deletedAt\)/, 'host lookup must reject soft-deleted hosts')
   assert.match(segment, /if \(!host\) return \{ error: 'Host not found' \}/, 'missing or cross-tenant hosts must fail closed')
 })
-

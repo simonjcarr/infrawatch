@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getHost } from '@/lib/actions/agents'
+import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { getChecksWithHistory } from '@/lib/actions/checks'
 import { listNotesForHost } from '@/lib/actions/notes'
 import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
@@ -21,7 +22,7 @@ export async function GET(
   }
 
   const { id: hostId } = await params
-  const orgId = session.user.organisationId
+  const scopeId = resolveCurrentActionScope(session)
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -32,15 +33,15 @@ export async function GET(
         )
       }
 
-      const initial = await getHost(orgId, hostId)
+      const initial = await getHost(hostId)
       if (!initial) {
         send('error', { message: 'Host not found' })
         controller.close()
         return
       }
       send('update', initial)
-      send('checks', await getChecksWithHistory(orgId, hostId))
-      send('notes', await listNotesForHost(orgId, hostId))
+      send('checks', await getChecksWithHistory(hostId))
+      send('notes', await listNotesForHost(scopeId, hostId))
 
       // Notes change infrequently compared to metrics — poll them every third
       // tick (≈15s) to keep the DB load down. The counter lives in closure so
@@ -49,7 +50,7 @@ export async function GET(
       const interval = setInterval(async () => {
         tick += 1
         try {
-          const host = await getHost(orgId, hostId)
+          const host = await getHost(hostId)
           if (!host) {
             send('error', { message: 'Host not found' })
             clearInterval(interval)
@@ -57,9 +58,9 @@ export async function GET(
             return
           }
           send('update', host)
-          send('checks', await getChecksWithHistory(orgId, hostId))
+          send('checks', await getChecksWithHistory(hostId))
           if (tick % 3 === 0) {
-            send('notes', await listNotesForHost(orgId, hostId))
+            send('notes', await listNotesForHost(scopeId, hostId))
           }
         } catch {
           // transient DB error — skip this tick

@@ -16,7 +16,7 @@ import {
 import { getHostVulnerabilities } from '@/lib/actions/vulnerabilities'
 
 interface Props {
-  orgId: string
+  scopeId: string
   hostId: string
 }
 
@@ -28,10 +28,10 @@ function SeverityBadge({ severity }: { severity: string }) {
   return <Badge variant="outline">Unknown</Badge>
 }
 
-export function VulnerabilitiesTab({ orgId, hostId }: Props) {
+export function VulnerabilitiesTab({ scopeId, hostId }: Props) {
   const { data: findings = [], isLoading } = useQuery({
-    queryKey: ['host-vulnerabilities', orgId, hostId],
-    queryFn: () => getHostVulnerabilities(orgId, hostId),
+    queryKey: ['host-vulnerabilities', scopeId, hostId],
+    queryFn: () => getHostVulnerabilities(scopeId, hostId),
     staleTime: 30_000,
   })
 

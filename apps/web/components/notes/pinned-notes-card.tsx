@@ -8,7 +8,7 @@ import { listNotesForHost } from '@/lib/actions/notes'
 import { NoteCard } from './note-card'
 
 interface Props {
-  orgId: string
+  scopeId: string
   hostId: string
   currentUserId: string
   userRole: string
@@ -21,15 +21,15 @@ interface Props {
 // the Overview doesn't carry an empty section. Cards render in compact mode
 // (collapsed body) so a pin'd runbook doesn't push metrics off the fold.
 export function PinnedNotesCard({
-  orgId,
+  scopeId,
   hostId,
   currentUserId,
   userRole,
   onViewAll,
 }: Props) {
   const { data: notes = [] } = useQuery({
-    queryKey: ['notes-for-host', orgId, hostId],
-    queryFn: () => listNotesForHost(orgId, hostId),
+    queryKey: ['notes-for-host', scopeId, hostId],
+    queryFn: () => listNotesForHost(scopeId, hostId),
   })
 
   const pinned = useMemo(() => notes.filter((n) => n.isPinned), [notes])
@@ -61,7 +61,7 @@ export function PinnedNotesCard({
           <NoteCard
             key={note.id}
             note={note}
-            orgId={orgId}
+            scopeId={scopeId}
             hostId={hostId}
             currentUserId={currentUserId}
             userRole={userRole}

@@ -33,7 +33,7 @@ import { NOTE_CATEGORIES, type NoteCategory } from '@/lib/db/schema'
 
 interface NewNoteProps {
   mode: 'create'
-  orgId: string
+  scopeId: string
   hostId: string
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -41,7 +41,7 @@ interface NewNoteProps {
 
 interface EditNoteProps {
   mode: 'edit'
-  orgId: string
+  scopeId: string
   hostId: string
   noteId: string
   initial: {
@@ -67,7 +67,7 @@ const CATEGORY_LABELS: Record<NoteCategory, string> = {
 }
 
 export function NoteEditorDialog(props: Props) {
-  const { mode, orgId, hostId, open, onOpenChange } = props
+  const { mode, scopeId, hostId, open, onOpenChange } = props
   const queryClient = useQueryClient()
 
   const initial = useMemo(
@@ -98,12 +98,12 @@ export function NoteEditorDialog(props: Props) {
   }
 
   const invalidateHostNotes = () => {
-    queryClient.invalidateQueries({ queryKey: ['notes-for-host', orgId, hostId] })
+    queryClient.invalidateQueries({ queryKey: ['notes-for-host', scopeId, hostId] })
   }
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const result = await createNote(orgId, {
+      const result = await createNote(scopeId, {
         title: title.trim(),
         body,
         category,
@@ -123,7 +123,7 @@ export function NoteEditorDialog(props: Props) {
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (mode !== 'edit') throw new Error('wrong mode')
-      const result = await updateNote(orgId, props.noteId, {
+      const result = await updateNote(scopeId, props.noteId, {
         title: title.trim(),
         body,
         category,
@@ -133,7 +133,7 @@ export function NoteEditorDialog(props: Props) {
       // Privacy is author-only; skip the call if the flag didn't change or the
       // user isn't the author (admins don't see the toggle at all).
       if (props.initial.isAuthor && props.initial.isPrivate !== isPrivate) {
-        const privacyResult = await toggleNotePrivate(orgId, props.noteId, isPrivate)
+        const privacyResult = await toggleNotePrivate(scopeId, props.noteId, isPrivate)
         if ('error' in privacyResult) throw new Error(privacyResult.error)
       }
       return result.note
@@ -141,7 +141,7 @@ export function NoteEditorDialog(props: Props) {
     onSuccess: () => {
       invalidateHostNotes()
       if (mode === 'edit') {
-        queryClient.invalidateQueries({ queryKey: ['note-revisions', orgId, props.noteId] })
+        queryClient.invalidateQueries({ queryKey: ['note-revisions', scopeId, props.noteId] })
       }
       onOpenChange(false)
     },

@@ -22,7 +22,7 @@ import type { SoftwarePackage } from '@/lib/db/schema'
 
 interface Props {
   hostId: string
-  orgId: string
+  scopeId: string
 }
 
 function staleBannerAge(lastScanAt: string | undefined, intervalHours: number): boolean {
@@ -52,14 +52,14 @@ function sourceBadge(source: string) {
   return colors[source] ?? 'bg-gray-100 text-gray-700 border-gray-200'
 }
 
-export function InventoryTab({ hostId, orgId }: Props) {
+export function InventoryTab({ hostId, scopeId }: Props) {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [showRemoved, setShowRemoved] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['host-software-inventory', hostId, showRemoved],
-    queryFn: () => getHostSoftwareInventory(orgId, hostId, showRemoved),
+    queryFn: () => getHostSoftwareInventory(scopeId, hostId, showRemoved),
     // Poll every 5 s while a scan is queued or running, stop when it completes.
     refetchInterval: (query) => {
       const activeScan = (query.state.data as Awaited<ReturnType<typeof getHostSoftwareInventory>> | undefined)?.activeScan
@@ -68,7 +68,7 @@ export function InventoryTab({ hostId, orgId }: Props) {
   })
 
   const triggerMutation = useMutation({
-    mutationFn: () => triggerSoftwareScan(orgId, hostId),
+    mutationFn: () => triggerSoftwareScan(scopeId, hostId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['host-software-inventory', hostId] })
     },

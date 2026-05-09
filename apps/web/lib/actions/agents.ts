@@ -106,19 +106,23 @@ export async function revokeEnrolmentToken(
 }
 
 export async function getHostMetrics(
-  scopeId: string,
-  hostId: string,
-  query: MetricsQuery,
+  ...args: [string, MetricsQuery] | [string, string, MetricsQuery]
 ) {
-  return getHostMetricsCore(scopeId, hostId, query)
+  const session = await getRequiredSession()
+  const currentScope = args.length === 3 ? args[0] : resolveCurrentActionScope(session)
+  const hostId = args.length === 3 ? args[1] : args[0]
+  const query = args.length === 3 ? args[2] : args[1]
+  return getHostMetricsCore(currentScope, hostId, query)
 }
 
 export async function getHeartbeatHistory(
-  scopeId: string,
-  hostId: string,
-  query: MetricsQuery,
+  ...args: [string, MetricsQuery] | [string, string, MetricsQuery]
 ): Promise<HeartbeatPoint[]> {
-  return getHeartbeatHistoryCore(scopeId, hostId, query)
+  const session = await getRequiredSession()
+  const currentScope = args.length === 3 ? args[0] : resolveCurrentActionScope(session)
+  const hostId = args.length === 3 ? args[1] : args[0]
+  const query = args.length === 3 ? args[2] : args[1]
+  return getHeartbeatHistoryCore(currentScope, hostId, query)
 }
 
 export async function getHost(...args: [string] | [string, string]): Promise<HostWithAgent | null> {

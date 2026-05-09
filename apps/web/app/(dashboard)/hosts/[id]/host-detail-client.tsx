@@ -87,7 +87,7 @@ import { PARENT_TABS, TAB_LABELS, type ParentTabId, type Tab } from '@/lib/hosts
 
 interface Props {
   host: HostWithAgent
-  orgId: string
+  scopeId: string
   currentUserId: string
   userRole: string
   latestAgentVersion: string
@@ -255,7 +255,7 @@ function TabButton({
   )
 }
 
-export function HostDetailClient({ host: initialHost, orgId, currentUserId, userRole, latestAgentVersion }: Props) {
+export function HostDetailClient({ host: initialHost, scopeId, currentUserId, userRole, latestAgentVersion }: Props) {
   const canManageHost = canAccessTooling({ role: userRole })
   const canRunHostTasks = userRole === 'org_admin' || userRole === 'super_admin'
   const [activeParentTab, setActiveParentTab] = useState<ParentTabId>('overview')
@@ -301,27 +301,27 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
   const { mutate: removeHost, isPending: isDeleting } = useMutation({
     mutationFn: (opts: { uninstall: boolean }) =>
       opts.uninstall
-        ? uninstallAndDeleteHost(orgId, initialHost.id)
-        : deleteHost(orgId, initialHost.id),
+        ? uninstallAndDeleteHost(initialHost.id)
+        : deleteHost(initialHost.id),
     onSuccess: (result) => {
       if ('success' in result) {
         setDeleteError(null)
         // Cancel and remove all queries for this host before navigating away
         // to stop refetchInterval timers from firing against a deleted resource
-        queryClient.cancelQueries({ queryKey: ['host', orgId, initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['host-metrics', orgId, initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['host-heartbeat-history', orgId, initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['alerts', orgId, 'firing', initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['host-collection-settings', orgId, initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['local-users-count', orgId, initialHost.id] })
-        queryClient.cancelQueries({ queryKey: ['checks-history', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['host', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['host-metrics', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['host-heartbeat-history', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['alerts', orgId, 'firing', initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['host-collection-settings', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['local-users-count', orgId, initialHost.id] })
-        queryClient.removeQueries({ queryKey: ['checks-history', orgId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host', initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-metrics', initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-heartbeat-history', initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['alerts', scopeId, 'firing', initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['host-collection-settings', scopeId, initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['local-users-count', initialHost.id] })
+        queryClient.cancelQueries({ queryKey: ['checks-history', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-metrics', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-heartbeat-history', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['alerts', scopeId, 'firing', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['host-collection-settings', scopeId, initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['local-users-count', initialHost.id] })
+        queryClient.removeQueries({ queryKey: ['checks-history', initialHost.id] })
         // Also invalidate the hosts list so it reflects the deletion
         queryClient.invalidateQueries({ queryKey: ['hosts'] })
         router.push('/hosts')
@@ -334,115 +334,115 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
     },
   })
 
-  useHostStream({ hostId: initialHost.id, orgId })
+  useHostStream({ hostId: initialHost.id })
 
   const { data: host } = useQuery({
-    queryKey: ['host', orgId, initialHost.id],
-    queryFn: () => getHost(orgId, initialHost.id),
+    queryKey: ['host', initialHost.id],
+    queryFn: () => getHost(initialHost.id),
     initialData: initialHost,
     refetchInterval: 30_000,
   })
 
   const { data: metricsData = [], isLoading: metricsLoading } = useQuery({
-    queryKey: ['host-metrics', orgId, initialHost.id, activeQuery],
-    queryFn: () => getHostMetrics(orgId, initialHost.id, activeQuery),
+    queryKey: ['host-metrics', initialHost.id, activeQuery],
+    queryFn: () => getHostMetrics(initialHost.id, activeQuery),
     enabled: activeTab === 'metrics',
     refetchInterval: isZoomed ? false : 60_000,
   })
 
   const { data: heartbeatData = [] } = useQuery<HeartbeatPoint[]>({
-    queryKey: ['host-heartbeat-history', orgId, initialHost.id, activeQuery],
-    queryFn: () => getHeartbeatHistory(orgId, initialHost.id, activeQuery),
+    queryKey: ['host-heartbeat-history', initialHost.id, activeQuery],
+    queryFn: () => getHeartbeatHistory(initialHost.id, activeQuery),
     enabled: activeTab === 'metrics',
     refetchInterval: isZoomed ? false : 60_000,
   })
 
   const { data: activeAlerts = [] } = useQuery({
-    queryKey: ['alerts', orgId, 'firing', initialHost.id],
-    queryFn: () => getAlertInstances(orgId, { status: 'firing', hostId: initialHost.id }),
+    queryKey: ['alerts', scopeId, 'firing', initialHost.id],
+    queryFn: () => getAlertInstances(scopeId, { status: 'firing', hostId: initialHost.id }),
     refetchInterval: 30_000,
   })
   const activeAlertCount = activeAlerts.length
 
   const { data: vulnerabilityAssessment } = useQuery({
-    queryKey: ['host-vulnerability-assessment', orgId, initialHost.id],
-    queryFn: () => getHostVulnerabilityAssessment(orgId, initialHost.id),
+    queryKey: ['host-vulnerability-assessment', scopeId, initialHost.id],
+    queryFn: () => getHostVulnerabilityAssessment(scopeId, initialHost.id),
     refetchInterval: 60_000,
   })
 
   const { data: collectionSettings } = useQuery({
-    queryKey: ['host-collection-settings', orgId, initialHost.id],
-    queryFn: () => getHostCollectionSettings(orgId, initialHost.id),
+    queryKey: ['host-collection-settings', scopeId, initialHost.id],
+    queryFn: () => getHostCollectionSettings(scopeId, initialHost.id),
   })
 
   const { data: localUsers = [] } = useQuery({
-    queryKey: ['local-users-count', orgId, initialHost.id],
-    queryFn: () => getServiceAccounts(orgId, { hostId: initialHost.id, limit: 1 }),
+    queryKey: ['local-users-count', initialHost.id],
+    queryFn: () => getServiceAccounts({ hostId: initialHost.id, limit: 1 }),
     enabled: collectionSettings?.localUsers === true,
   })
   const localUserCount = localUsers.length > 0 ? localUsers.length : 0
 
   const { data: hostGroupsList = [] } = useQuery<HostGroup[]>({
-    queryKey: ['host-groups-for-host', orgId, initialHost.id],
-    queryFn: () => listGroupsForHost(orgId, initialHost.id),
+    queryKey: ['host-groups-for-host', scopeId, initialHost.id],
+    queryFn: () => listGroupsForHost(scopeId, initialHost.id),
     enabled: activeTab === 'groups',
   })
 
   const { data: allGroups = [] } = useQuery<HostGroupWithCount[]>({
-    queryKey: ['host-groups', orgId],
-    queryFn: () => listGroups(orgId),
+    queryKey: ['host-groups', scopeId],
+    queryFn: () => listGroups(scopeId),
     enabled: activeTab === 'groups',
   })
 
   const { data: terminalAccess } = useQuery({
-    queryKey: ['terminal-access', orgId, initialHost.id],
-    queryFn: () => checkTerminalAccess(orgId, initialHost.id),
+    queryKey: ['terminal-access', scopeId, initialHost.id],
+    queryFn: () => checkTerminalAccess(scopeId, initialHost.id),
     enabled: activeTab === 'terminal',
   })
 
   const { mutate: doAddToGroup, isPending: isAddingToGroup } = useMutation({
-    mutationFn: (groupId: string) => addHostToGroup(orgId, groupId, initialHost.id),
+    mutationFn: (groupId: string) => addHostToGroup(scopeId, groupId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', orgId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', scopeId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups', scopeId] })
       setAddGroupOpen(false)
     },
   })
 
   const { mutate: doRemoveFromGroup, isPending: isRemovingFromGroup } = useMutation({
-    mutationFn: (groupId: string) => removeHostFromGroup(orgId, groupId, initialHost.id),
+    mutationFn: (groupId: string) => removeHostFromGroup(scopeId, groupId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', orgId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups-for-host', scopeId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups', scopeId] })
     },
   })
 
   const { data: hostNetworksList = [] } = useQuery<NetworkWithMembership[]>({
-    queryKey: ['networks-for-host', orgId, initialHost.id],
-    queryFn: () => listNetworksForHost(orgId, initialHost.id),
+    queryKey: ['networks-for-host', scopeId, initialHost.id],
+    queryFn: () => listNetworksForHost(scopeId, initialHost.id),
     enabled: activeTab === 'host-networks',
   })
 
   const { data: allNetworks = [] } = useQuery<NetworkWithCount[]>({
-    queryKey: ['networks', orgId],
-    queryFn: () => listNetworks(orgId),
+    queryKey: ['networks', scopeId],
+    queryFn: () => listNetworks(scopeId),
     enabled: activeTab === 'host-networks',
   })
 
   const { mutate: doAddToNetwork, isPending: isAddingToNetwork } = useMutation({
-    mutationFn: (networkId: string) => addHostToNetwork(orgId, networkId, initialHost.id),
+    mutationFn: (networkId: string) => addHostToNetwork(scopeId, networkId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['networks-for-host', orgId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['networks-for-host', scopeId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['networks', scopeId] })
       setAddNetworkOpen(false)
     },
   })
 
   const { mutate: doRemoveFromNetwork, isPending: isRemovingFromNetwork } = useMutation({
-    mutationFn: (networkId: string) => removeHostFromNetwork(orgId, networkId, initialHost.id),
+    mutationFn: (networkId: string) => removeHostFromNetwork(scopeId, networkId, initialHost.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['networks-for-host', orgId, initialHost.id] })
-      queryClient.invalidateQueries({ queryKey: ['networks', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['networks-for-host', scopeId, initialHost.id] })
+      queryClient.invalidateQueries({ queryKey: ['networks', scopeId] })
     },
   })
 
@@ -758,7 +758,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
           </div>
 
           <PinnedNotesCard
-            orgId={orgId}
+            scopeId={scopeId}
             hostId={initialHost.id}
             currentUserId={currentUserId}
             userRole={userRole}
@@ -932,7 +932,7 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
               </Card>
 
               <HostNotificationCharts
-                orgId={orgId}
+                scopeId={scopeId}
                 hostId={initialHost.id}
               />
             </>
@@ -942,22 +942,22 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
       {/* Checks Tab */}
       {activeTab === 'checks' && (
-        <ChecksTab orgId={orgId} hostId={initialHost.id} />
+        <ChecksTab hostId={initialHost.id} />
       )}
 
       {/* Alerts Tab */}
       {activeTab === 'alerts' && (
-        <AlertsTab orgId={orgId} hostId={initialHost.id} />
+        <AlertsTab scopeId={scopeId} hostId={initialHost.id} />
       )}
 
       {/* Users Tab */}
       {activeTab === 'users' && collectionSettings?.localUsers && (
-        <LocalUsersTab orgId={orgId} hostId={initialHost.id} />
+        <LocalUsersTab hostId={initialHost.id} />
       )}
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <SettingsTab orgId={orgId} hostId={initialHost.id} isAdmin={userRole === 'org_admin' || userRole === 'super_admin'} />
+        <SettingsTab scopeId={scopeId} hostId={initialHost.id} isAdmin={userRole === 'org_admin' || userRole === 'super_admin'} />
       )}
 
       {/* Groups Tab */}
@@ -1267,23 +1267,23 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
       {/* Patch Status Tab */}
       {activeTab === 'patch-status' && (
-        <PatchStatusTab orgId={orgId} hostId={initialHost.id} />
+        <PatchStatusTab scopeId={scopeId} hostId={initialHost.id} />
       )}
 
       {/* Inventory Tab */}
       {activeTab === 'packages' && (
-        <InventoryTab orgId={orgId} hostId={initialHost.id} />
+        <InventoryTab scopeId={scopeId} hostId={initialHost.id} />
       )}
 
       {/* Vulnerabilities Tab */}
       {activeTab === 'vulnerabilities' && (
-        <VulnerabilitiesTab orgId={orgId} hostId={initialHost.id} />
+        <VulnerabilitiesTab scopeId={scopeId} hostId={initialHost.id} />
       )}
 
       {/* Notes Tab */}
       {activeTab === 'notes' && (
         <NotesTab
-          orgId={orgId}
+          scopeId={scopeId}
           hostId={initialHost.id}
           currentUserId={currentUserId}
           userRole={userRole}
@@ -1292,18 +1292,18 @@ export function HostDetailClient({ host: initialHost, orgId, currentUserId, user
 
       {/* Tasks Tab */}
       {activeTab === 'tasks' && (
-        <TasksTab orgId={orgId} host={host} canRunTasks={canRunHostTasks} />
+        <TasksTab scopeId={scopeId} host={host} canRunTasks={canRunHostTasks} />
       )}
 
       {/* Logs Tab */}
       {activeTab === 'logs' && (
-        <LogsTab orgId={orgId} hostId={initialHost.id} />
+        <LogsTab scopeId={scopeId} hostId={initialHost.id} />
       )}
 
       {/* Terminal Tab */}
       {activeTab === 'terminal' && (
         <HostTerminalLauncher
-          orgId={orgId}
+          scopeId={scopeId}
           host={host}
           directAccess={terminalAccess?.allowed === true ? terminalAccess.directAccess : false}
           accessDeniedReason={

@@ -48,13 +48,13 @@ const CATEGORY_LABELS: Record<NoteCategory, string> = {
 }
 
 interface Props {
-  orgId: string
+  scopeId: string
   hostId: string
   currentUserId: string
   userRole: string
 }
 
-export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
+export function NotesTab({ scopeId, hostId, currentUserId, userRole }: Props) {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [selectedNote, setSelectedNote] = useState<ResolvedNote | null>(null)
@@ -66,17 +66,17 @@ export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
   const canCreate = userRole !== 'read_only'
 
   const { data: notes = [], isLoading } = useQuery({
-    queryKey: ['notes-for-host', orgId, hostId],
-    queryFn: () => listNotesForHost(orgId, hostId),
+    queryKey: ['notes-for-host', scopeId, hostId],
+    queryFn: () => listNotesForHost(scopeId, hostId),
   })
 
   const invalidateHostNotes = () => {
-    queryClient.invalidateQueries({ queryKey: ['notes-for-host', orgId, hostId] })
+    queryClient.invalidateQueries({ queryKey: ['notes-for-host', scopeId, hostId] })
   }
 
   const deleteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      const result = await deleteNote(orgId, noteId)
+      const result = await deleteNote(scopeId, noteId)
       if ('error' in result) throw new Error(result.error)
     },
     onSuccess: () => {
@@ -265,7 +265,7 @@ export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
       {createOpen && (
         <NoteEditorDialog
           mode="create"
-          orgId={orgId}
+          scopeId={scopeId}
           hostId={hostId}
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -275,7 +275,7 @@ export function NotesTab({ orgId, hostId, currentUserId, userRole }: Props) {
       {editingNote && (
         <NoteEditorDialog
           mode="edit"
-          orgId={orgId}
+          scopeId={scopeId}
           hostId={hostId}
           noteId={editingNote.id}
           initial={{

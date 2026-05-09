@@ -18,12 +18,12 @@ import type { HostCollectionSettings } from '@/lib/db/schema'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 
 interface SettingsTabProps {
-  orgId: string
+  scopeId: string
   hostId: string
   isAdmin: boolean
 }
 
-export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
+export function SettingsTab({ scopeId, hostId, isAdmin }: SettingsTabProps) {
   const queryClient = useQueryClient()
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [newUsername, setNewUsername] = useState('')
@@ -33,18 +33,18 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
   const [newAllowedUser, setNewAllowedUser] = useState('')
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['host-collection-settings', orgId, hostId],
-    queryFn: () => getHostCollectionSettings(orgId, hostId),
+    queryKey: ['host-collection-settings', scopeId, hostId],
+    queryFn: () => getHostCollectionSettings(scopeId, hostId),
   })
 
   const { data: terminalSettings } = useQuery({
-    queryKey: ['host-terminal-settings', orgId, hostId],
-    queryFn: () => getHostTerminalSettings(orgId, hostId),
+    queryKey: ['host-terminal-settings', scopeId, hostId],
+    queryFn: () => getHostTerminalSettings(scopeId, hostId),
   })
 
   const { data: orgUsers } = useQuery({
-    queryKey: ['org-users', orgId],
-    queryFn: () => getOrgUsers(orgId),
+    queryKey: ['org-users', scopeId],
+    queryFn: () => getOrgUsers(scopeId),
     enabled: isAdmin,
   })
 
@@ -52,21 +52,21 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
   const currentTerminalSettings = localTerminalSettings ?? terminalSettings
 
   const terminalMutation = useMutation({
-    mutationFn: (s: HostTerminalSettings) => updateHostTerminalSettings(orgId, hostId, s),
+    mutationFn: (s: HostTerminalSettings) => updateHostTerminalSettings(scopeId, hostId, s),
     onSuccess: (result) => {
       if ('error' in result) return
       setTerminalSaveSuccess(true)
       setLocalTerminalSettings(null)
-      queryClient.invalidateQueries({ queryKey: ['host-terminal-settings', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['host-terminal-settings', scopeId, hostId] })
       setTimeout(() => setTerminalSaveSuccess(false), 3000)
     },
   })
 
   const trustSshHostKeyMutation = useMutation({
-    mutationFn: () => trustPendingSshHostKeys(orgId, hostId),
+    mutationFn: () => trustPendingSshHostKeys(scopeId, hostId),
     onSuccess: (result) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['host-terminal-settings', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['host-terminal-settings', scopeId, hostId] })
     },
   })
 
@@ -100,8 +100,8 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
   const [localTags, setLocalTags] = useState<EditorTag[] | null>(null)
 
   const { data: hostTags } = useQuery({
-    queryKey: ['host-tags', orgId, hostId],
-    queryFn: () => listResourceTags(orgId, 'host', hostId),
+    queryKey: ['host-tags', scopeId, hostId],
+    queryFn: () => listResourceTags(scopeId, 'host', hostId),
   })
   const currentTags: EditorTag[] =
     localTags ?? (hostTags ?? []).map((t) => ({ id: t.resourceTagId, key: t.key, value: t.value }))
@@ -113,7 +113,7 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
   const tagMutation = useMutation({
     mutationFn: (pairs: EditorTag[]) =>
       replaceResourceTags(
-        orgId,
+        scopeId,
         'host',
         hostId,
         pairs.map((t) => ({ key: t.key, value: t.value })),
@@ -122,7 +122,7 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
       if ('error' in result) return
       setTagSaveSuccess(true)
       setLocalTags(null)
-      queryClient.invalidateQueries({ queryKey: ['host-tags', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['host-tags', scopeId, hostId] })
       setTimeout(() => setTagSaveSuccess(false), 3000)
     },
   })
@@ -133,12 +133,12 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
   const currentSettings = localSettings ?? settings
 
   const mutation = useMutation({
-    mutationFn: (s: HostCollectionSettings) => updateHostCollectionSettings(orgId, hostId, s),
+    mutationFn: (s: HostCollectionSettings) => updateHostCollectionSettings(scopeId, hostId, s),
     onSuccess: (result) => {
       if ('error' in result) return
       setSaveSuccess(true)
       setLocalSettings(null)
-      queryClient.invalidateQueries({ queryKey: ['host-collection-settings', orgId, hostId] })
+      queryClient.invalidateQueries({ queryKey: ['host-collection-settings', scopeId, hostId] })
       setTimeout(() => setSaveSuccess(false), 3000)
     },
   })
@@ -395,7 +395,7 @@ export function SettingsTab({ orgId, hostId, isAdmin }: SettingsTabProps) {
         </CardHeader>
         <CardContent>
           <TagEditor
-            orgId={orgId}
+            orgId={scopeId}
             value={currentTags}
             onChange={setLocalTags}
             disabled={!isAdmin}

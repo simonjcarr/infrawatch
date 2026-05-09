@@ -132,14 +132,12 @@ function InfoCard({
 }
 
 export function LocalUserDetailClient({
-  orgId: _orgId,
   hostId,
   account,
   keys,
   events,
   host,
 }: {
-  orgId: string
   hostId: string
   account: ServiceAccount
   keys: SshKey[]

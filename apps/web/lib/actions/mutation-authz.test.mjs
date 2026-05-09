@@ -8,7 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 
 const sources = {
   'alerts.ts': readFileSync(path.join(here, 'alerts.ts'), 'utf8'),
-  'checks.ts': readFileSync(path.join(here, 'checks.ts'), 'utf8'),
+  'checks-core.ts': readFileSync(path.join(here, 'checks-core.ts'), 'utf8'),
   'host-groups.ts': readFileSync(path.join(here, 'host-groups.ts'), 'utf8'),
   'host-settings.ts': readFileSync(path.join(here, 'host-settings.ts'), 'utf8'),
   'tag-rules.ts': readFileSync(path.join(here, 'tag-rules.ts'), 'utf8'),
@@ -30,10 +30,10 @@ const writeGuardedActions = [
   ['alerts.ts', 'acknowledgeAlert'],
   ['alerts.ts', 'createSilence'],
   ['alerts.ts', 'deleteSilence'],
-  ['checks.ts', 'createCheck'],
-  ['checks.ts', 'updateCheck'],
-  ['checks.ts', 'deleteCheckHistory'],
-  ['checks.ts', 'deleteCheck'],
+  ['checks-core.ts', 'createCheck'],
+  ['checks-core.ts', 'updateCheck'],
+  ['checks-core.ts', 'deleteCheckHistory'],
+  ['checks-core.ts', 'deleteCheck'],
   ['host-groups.ts', 'createGroup'],
   ['host-groups.ts', 'updateGroup'],
   ['host-groups.ts', 'deleteGroup'],

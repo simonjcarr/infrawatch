@@ -15,15 +15,14 @@ import {
 import { compareHosts } from '@/lib/actions/software-inventory'
 
 interface Props {
-  orgId: string
   hostIdA: string
   hostIdB: string
 }
 
-export function CompareHostsClient({ orgId, hostIdA, hostIdB }: Props) {
+export function CompareHostsClient({ hostIdA, hostIdB }: Props) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ['host-compare', orgId, hostIdA, hostIdB],
-    queryFn: () => compareHosts(orgId, hostIdA, hostIdB),
+    queryKey: ['host-compare', hostIdA, hostIdB],
+    queryFn: () => compareHosts(hostIdA, hostIdB),
     enabled: !!hostIdB,
   })
 

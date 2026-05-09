@@ -93,7 +93,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1217](https://github.com/carrtech-dev/ct-ops/pull/1217)
 
 Summary: Replaced the blocked all-at-once web conversion with smaller
 independently shippable slices so the next agent can take a real product path

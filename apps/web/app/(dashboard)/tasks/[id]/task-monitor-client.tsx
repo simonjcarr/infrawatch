@@ -40,7 +40,6 @@ import type {
 } from '@/lib/db/schema'
 
 interface Props {
-  orgId: string
   initialTaskRun: TaskRunWithHosts
 }
 
@@ -251,17 +250,15 @@ function OutputPanel({
 // ── Stop button ───────────────────────────────────────────────────────────────
 
 function StopButton({
-  orgId,
   taskRunId,
   onCancelled,
 }: {
-  orgId: string
   taskRunId: string
   onCancelled: () => void
 }) {
   const [open, setOpen] = useState(false)
   const mutation = useMutation({
-    mutationFn: () => cancelTaskRun(orgId, taskRunId),
+    mutationFn: () => cancelTaskRun(taskRunId),
     onSuccess: (result) => {
       if ('error' in result) return
       setOpen(false)
@@ -311,7 +308,7 @@ function StopButton({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
+export function TaskMonitorClient({ initialTaskRun }: Props) {
   const queryClient = useQueryClient()
   const [selectedHostId, setSelectedHostId] = useState<string | null>(
     initialTaskRun.hosts[0]?.hostId ?? null,
@@ -320,8 +317,8 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
   const active = isRunActive(initialTaskRun.status)
 
   const { data: taskRun = initialTaskRun } = useQuery({
-    queryKey: ['task-run', orgId, initialTaskRun.id],
-    queryFn: () => getTaskRun(orgId, initialTaskRun.id),
+    queryKey: ['task-run', initialTaskRun.id],
+    queryFn: () => getTaskRun(initialTaskRun.id),
     initialData: initialTaskRun,
     refetchInterval: (query) => {
       const run = query.state.data
@@ -409,11 +406,10 @@ export function TaskMonitorClient({ orgId, initialTaskRun }: Props) {
             <RunStatusBadge status={taskRun.status} />
             {canStop && (
               <StopButton
-                orgId={orgId}
                 taskRunId={taskRun.id}
                 onCancelled={() =>
                   queryClient.invalidateQueries({
-                    queryKey: ['task-run', orgId, taskRun.id],
+                    queryKey: ['task-run', taskRun.id],
                   })
                 }
               />

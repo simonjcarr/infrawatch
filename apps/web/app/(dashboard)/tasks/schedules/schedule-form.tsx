@@ -68,14 +68,12 @@ const CRON_PRESETS: { label: string; expr: string }[] = [
 ]
 
 export function ScheduleForm({
-  orgId,
   mode,
   hosts,
   groups,
   schedule,
   recentRuns,
 }: {
-  orgId: string
   mode: 'create' | 'edit'
   hosts: HostOption[]
   groups: GroupOption[]
@@ -163,8 +161,8 @@ export function ScheduleForm({
         enabled,
       }
       return mode === 'create'
-        ? createSchedule(orgId, input)
-        : updateSchedule(orgId, schedule!.id, input)
+        ? createSchedule(input)
+        : updateSchedule(schedule!.id, input)
     },
     onSuccess: (result) => {
       if ('error' in result) {

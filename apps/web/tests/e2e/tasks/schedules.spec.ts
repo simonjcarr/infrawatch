@@ -1,26 +1,10 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
-
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
-      AND "user".email = ${TEST_USER.email}
-    LIMIT 1
-  `
-  expect(rows).toHaveLength(1)
-  return {
-    orgId: rows[0]!.org_id,
-    userId: rows[0]!.user_id,
-  }
-}
+import { getSeededTestUserContext } from '../fixtures/seed'
 
 test('admin can review, enable, and delete a scheduled task', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -36,7 +20,7 @@ test('admin can review, enable, and delete a scheduled task', async ({ authentic
     )
     VALUES (
       'schedule-host-1',
-      ${orgId},
+      ${instanceId},
       'schedule-host-1',
       'Schedule Host',
       'Ubuntu 24.04',
@@ -66,7 +50,7 @@ test('admin can review, enable, and delete a scheduled task', async ({ authentic
     )
     VALUES (
       'schedule-e2e-1',
-      ${orgId},
+      ${instanceId},
       ${userId},
       'Weekly patch run',
       'Apply security patches to a critical host.',
@@ -123,7 +107,7 @@ test('admin can review, enable, and delete a scheduled task', async ({ authentic
 
 test('admin can create a patch schedule from the new schedule form', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -139,7 +123,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
     )
     VALUES (
       'schedule-create-host-1',
-      ${orgId},
+      ${instanceId},
       'schedule-create-host-1',
       'Schedule Create Host',
       'Ubuntu 24.04',
@@ -186,7 +170,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
       const rows = await sql<Array<{ id: string }>>`
         SELECT id
         FROM task_schedules
-        WHERE organisation_id = ${orgId}
+        WHERE organisation_id = ${instanceId}
           AND name = 'Nightly patch run'
           AND deleted_at IS NULL
         LIMIT 1
@@ -197,7 +181,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
   const createdScheduleRows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM task_schedules
-    WHERE organisation_id = ${orgId}
+    WHERE organisation_id = ${instanceId}
       AND name = 'Nightly patch run'
       AND deleted_at IS NULL
     LIMIT 1
@@ -219,7 +203,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
       }>>`
         SELECT name, cron_expression, timezone, target_id, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${orgId}
+        WHERE organisation_id = ${instanceId}
           AND name = 'Nightly patch run'
           AND deleted_at IS NULL
         LIMIT 1
@@ -238,7 +222,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
 
 test('admin can create a security-only patch schedule for a host group', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -255,7 +239,7 @@ test('admin can create a security-only patch schedule for a host group', async (
     VALUES
       (
         'schedule-group-host-1',
-        ${orgId},
+        ${instanceId},
         'schedule-group-host-1',
         'Schedule Group Host 1',
         'Ubuntu 24.04',
@@ -266,7 +250,7 @@ test('admin can create a security-only patch schedule for a host group', async (
       ),
       (
         'schedule-group-host-2',
-        ${orgId},
+        ${instanceId},
         'schedule-group-host-2',
         'Schedule Group Host 2',
         'Ubuntu 24.04',
@@ -286,7 +270,7 @@ test('admin can create a security-only patch schedule for a host group', async (
     )
     VALUES (
       'schedule-host-group-1',
-      ${orgId},
+      ${instanceId},
       'Production Linux',
       'Production patch window group'
     )
@@ -302,13 +286,13 @@ test('admin can create a security-only patch schedule for a host group', async (
     VALUES
       (
         'schedule-group-member-1',
-        ${orgId},
+        ${instanceId},
         'schedule-host-group-1',
         'schedule-group-host-1'
       ),
       (
         'schedule-group-member-2',
-        ${orgId},
+        ${instanceId},
         'schedule-host-group-1',
         'schedule-group-host-2'
       )
@@ -358,7 +342,7 @@ test('admin can create a security-only patch schedule for a host group', async (
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, max_parallel, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${orgId}
+        WHERE organisation_id = ${instanceId}
           AND name = 'Weekly security patch wave'
           AND deleted_at IS NULL
         LIMIT 1
@@ -379,7 +363,7 @@ test('admin can create a security-only patch schedule for a host group', async (
 
 test('admin can create a software inventory schedule for a single host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -395,7 +379,7 @@ test('admin can create a software inventory schedule for a single host', async (
     )
     VALUES (
       'schedule-inventory-host-1',
-      ${orgId},
+      ${instanceId},
       'schedule-inventory-host-1',
       'Schedule Inventory Host',
       'Ubuntu 24.04',
@@ -447,7 +431,7 @@ test('admin can create a software inventory schedule for a single host', async (
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${orgId}
+        WHERE organisation_id = ${instanceId}
           AND name = 'Weekly software inventory'
           AND deleted_at IS NULL
         LIMIT 1
@@ -467,7 +451,7 @@ test('admin can create a software inventory schedule for a single host', async (
 
 test('admin can create a custom script schedule for a single host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -483,7 +467,7 @@ test('admin can create a custom script schedule for a single host', async ({ aut
     )
     VALUES (
       'schedule-script-host-1',
-      ${orgId},
+      ${instanceId},
       'schedule-script-host-1',
       'Schedule Script Host',
       'Ubuntu 24.04',
@@ -536,7 +520,7 @@ test('admin can create a custom script schedule for a single host', async ({ aut
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${orgId}
+        WHERE organisation_id = ${instanceId}
           AND name = 'Daily diagnostics script'
           AND deleted_at IS NULL
         LIMIT 1
@@ -560,7 +544,7 @@ test('admin can create a custom script schedule for a single host', async ({ aut
 
 test('admin can edit an existing host-group schedule and review recent runs', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -577,7 +561,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
     VALUES
       (
         'schedule-edit-host-1',
-        ${orgId},
+        ${instanceId},
         'schedule-edit-host-1',
         'Schedule Edit Host 1',
         'Ubuntu 24.04',
@@ -588,7 +572,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
       ),
       (
         'schedule-edit-host-2',
-        ${orgId},
+        ${instanceId},
         'schedule-edit-host-2',
         'Schedule Edit Host 2',
         'Ubuntu 24.04',
@@ -608,7 +592,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
     )
     VALUES (
       'schedule-edit-group-1',
-      ${orgId},
+      ${instanceId},
       'Schedule Edit Group',
       'Hosts used for edit flow coverage'
     )
@@ -624,13 +608,13 @@ test('admin can edit an existing host-group schedule and review recent runs', as
     VALUES
       (
         'schedule-edit-member-1',
-        ${orgId},
+        ${instanceId},
         'schedule-edit-group-1',
         'schedule-edit-host-1'
       ),
       (
         'schedule-edit-member-2',
-        ${orgId},
+        ${instanceId},
         'schedule-edit-group-1',
         'schedule-edit-host-2'
       )
@@ -655,7 +639,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
     )
     VALUES (
       'schedule-edit-1',
-      ${orgId},
+      ${instanceId},
       ${userId},
       'Weekly service restart',
       'Restart nginx each week.',
@@ -689,7 +673,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
     )
     VALUES (
       'schedule-edit-run-1',
-      ${orgId},
+      ${instanceId},
       ${userId},
       'schedule-edit-1',
       'group',
@@ -768,7 +752,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
 
 test('admin can create a service action schedule for a host group', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO hosts (
@@ -784,7 +768,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
     )
     VALUES (
       'schedule-service-host-1',
-      ${orgId},
+      ${instanceId},
       'schedule-service-host-1',
       'Schedule Service Host',
       'Ubuntu 24.04',
@@ -804,7 +788,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
     )
     VALUES (
       'schedule-service-group-1',
-      ${orgId},
+      ${instanceId},
       'Frontend Fleet',
       'Hosts for scheduled service restarts'
     )
@@ -819,7 +803,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
     )
     VALUES (
       'schedule-service-group-member-1',
-      ${orgId},
+      ${instanceId},
       'schedule-service-group-1',
       'schedule-service-host-1'
     )
@@ -869,7 +853,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, max_parallel, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${orgId}
+        WHERE organisation_id = ${instanceId}
           AND name = 'Restart nginx weekly'
           AND deleted_at IS NULL
         LIMIT 1

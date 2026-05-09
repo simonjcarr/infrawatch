@@ -634,19 +634,44 @@ outside the task-run-heavy group operations view.
 
 ## Task 10 - Web Task Runs And Schedule Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
-PR:
+PR: [#1232](https://github.com/carrtech-dev/ct-ops/pull/1232)
 
-Summary:
+Summary: Removed caller-supplied organisation identity from task run
+monitoring, host and group task triggers, task-run deletion/cancellation, and
+schedule CRUD by switching the Task 10-owned pages and actions to
+session-derived instance scope. Split `task-runs.ts` and `task-schedules.ts`
+into thin instance-scoped wrappers over `*-core.ts` modules so the public
+Task 10 action entrypoints no longer expose org-scoped signatures, and updated
+the touched E2E fixtures plus wrapper tests to seed standalone instance data.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/hosts/[id]/{host-detail-client.tsx,tasks-tab.tsx}`,
+`apps/web/app/(dashboard)/hosts/groups/[id]/{group-detail-client.tsx,page.tsx}`,
+`apps/web/app/(dashboard)/tasks/**/*`,
+`apps/web/lib/actions/{agents-core.ts,instance-scope-wrappers.test.mjs,task-runs.ts,task-runs-core.ts,task-runs-authz.test.mjs,task-schedules.ts,task-schedules-core.ts}`,
+`apps/web/tests/e2e/{hosts/group-task-history.spec.ts,tasks/monitor.spec.ts,tasks/schedules.spec.ts}`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web
+type-check` (passes); `pnpm --dir apps/web lint` (passes with pre-existing
+warnings only); `pnpm --dir apps/web test:unit` (fails only
+`lib/db/rls.test.mjs` and `lib/integrations/ct-cve/db-nonce-store.test.mjs`);
+`pnpm --dir apps/web exec playwright test --list` (passes);
+`BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret pnpm --dir apps/web exec playwright test tests/e2e/tasks/monitor.spec.ts --project=chromium --grep "completed grouped task run"`
+(fails before execution because Next instrumentation cannot import
+`./lib/agent/cache-prewarm` in this checkout);
+`rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/tasks' 'apps/web/app/(dashboard)/hosts/[id]/tasks-tab.tsx' 'apps/web/app/(dashboard)/hosts/groups/[id]/group-detail-client.tsx' apps/web/lib/actions/{task-runs,task-schedules}.ts`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 11 next. Task 13 still needs to delete the transitional
+`apps/web/lib/actions/task-runs-core.ts` and
+`apps/web/lib/actions/task-schedules-core.ts` org-scoped internals if they
+remain by then, and local browser smoke coverage is still blocked in this
+checkout by the missing `apps/web/lib/agent/cache-prewarm` instrumentation
+import.
 
 ### Required work
 

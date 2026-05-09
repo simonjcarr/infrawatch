@@ -5,8 +5,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const taskRunsSource = readFileSync(path.join(here, 'task-runs.ts'), 'utf8')
-const taskSchedulesSource = readFileSync(path.join(here, 'task-schedules.ts'), 'utf8')
+const taskRunsSource = readFileSync(path.join(here, 'task-runs-core.ts'), 'utf8')
+const taskSchedulesSource = readFileSync(path.join(here, 'task-schedules-core.ts'), 'utf8')
 
 function getActionSegment(source, action) {
   const start = source.indexOf(`export async function ${action}`)
@@ -36,7 +36,7 @@ test('privileged host task actions require org admin access and derive actors fr
     )
     assert.match(
       segment,
-      /const session = await requireOrgAdminAccess\(orgId\)/,
+      /const session = await requireOrgAdminAccess\(currentScope\)/,
       `${action} must capture an org-admin-authorized session`,
     )
     assert.match(
@@ -53,7 +53,7 @@ test('privileged task schedule mutations require org admin access', () => {
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgAdminAccess\(orgId\)/,
+      /(?:const session = )?await requireOrgAdminAccess\(currentScope\)/,
       `${action} must require org admin access before mutating privileged schedules`,
     )
   }

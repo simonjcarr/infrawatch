@@ -13,6 +13,8 @@ const notesSource = readFileSync(path.join(here, 'notes.ts'), 'utf8')
 const serviceAccountsSource = readFileSync(path.join(here, 'service-accounts.ts'), 'utf8')
 const softwareInventorySource = readFileSync(path.join(here, 'software-inventory.ts'), 'utf8')
 const tagsSource = readFileSync(path.join(here, 'tags.ts'), 'utf8')
+const taskRunsSource = readFileSync(path.join(here, 'task-runs.ts'), 'utf8')
+const taskSchedulesSource = readFileSync(path.join(here, 'task-schedules.ts'), 'utf8')
 const terminalSource = readFileSync(path.join(here, 'terminal.ts'), 'utf8')
 
 test('checks wrapper derives instance scope from the current session', () => {
@@ -53,4 +55,14 @@ test('tags wrapper derives instance scope from the current session', () => {
 test('terminal wrapper derives instance scope from the current session', () => {
   assert.match(terminalSource, /resolveCurrentActionScope\(session\)/)
   assert.doesNotMatch(terminalSource, /\borgId\b/)
+})
+
+test('task runs wrapper derives instance scope from the current session', () => {
+  assert.match(taskRunsSource, /resolveCurrentActionScope\(session\)/)
+  assert.doesNotMatch(taskRunsSource, /\borgId\b/)
+})
+
+test('task schedules wrapper derives instance scope from the current session', () => {
+  assert.match(taskSchedulesSource, /resolveCurrentActionScope\(session\)/)
+  assert.doesNotMatch(taskSchedulesSource, /\borgId\b/)
 })

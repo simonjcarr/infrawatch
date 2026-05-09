@@ -95,7 +95,7 @@ function isRunActive(status: string) {
 }
 
 interface Props {
-  orgId: string
+  scopeId: string
   userRole: string
   initialGroup: HostGroupWithMembers
   initialAllHosts: HostWithAgent[]
@@ -167,7 +167,7 @@ function RunStatusBadge({ status }: { status: string }) {
   }
 }
 
-export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHosts }: Props) {
+export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllHosts }: Props) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const canRunTasks = userRole === 'org_admin' || userRole === 'super_admin'
@@ -196,22 +196,22 @@ export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHos
   const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set())
 
   const { data: group } = useQuery({
-    queryKey: ['host-group', orgId, initialGroup.id],
-    queryFn: () => getGroup(orgId, initialGroup.id),
+    queryKey: ['host-group', scopeId, initialGroup.id],
+    queryFn: () => getGroup(scopeId, initialGroup.id),
     initialData: initialGroup,
     refetchInterval: 30_000,
   })
 
   const { data: allHosts = initialAllHosts } = useQuery({
-    queryKey: ['hosts', orgId],
-    queryFn: () => listHosts(orgId),
+    queryKey: ['hosts', scopeId],
+    queryFn: () => listHosts(scopeId),
     initialData: initialAllHosts,
     enabled: addOpen,
   })
 
   const { data: taskRuns = [] } = useQuery({
-    queryKey: ['task-runs-group', orgId, initialGroup.id],
-    queryFn: () => listTaskRunsForGroup(orgId, initialGroup.id),
+    queryKey: ['task-runs-group', initialGroup.id],
+    queryFn: () => listTaskRunsForGroup(initialGroup.id),
     refetchInterval: (query) => {
       const runs = query.state.data ?? []
       return runs.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
@@ -219,25 +219,24 @@ export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHos
   })
 
   const { mutate: doAdd, isPending: isAdding } = useMutation({
-    mutationFn: (hostId: string) => addHostToGroup(orgId, group!.id, hostId),
+    mutationFn: (hostId: string) => addHostToGroup(scopeId, group!.id, hostId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-group', orgId, initialGroup.id] })
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-group', scopeId, initialGroup.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups', scopeId] })
     },
   })
 
   const { mutate: doRemove, isPending: isRemoving } = useMutation({
-    mutationFn: (hostId: string) => removeHostFromGroup(orgId, group!.id, hostId),
+    mutationFn: (hostId: string) => removeHostFromGroup(scopeId, group!.id, hostId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-group', orgId, initialGroup.id] })
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-group', scopeId, initialGroup.id] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups', scopeId] })
       setRemoveTarget(null)
     },
   })
 
   const { mutate: doPatchGroup, isPending: isPatching } = useMutation({
-    mutationFn: () =>
-      triggerGroupPatchRun(orgId, initialGroup.id, patchMode, maxParallel),
+    mutationFn: () => triggerGroupPatchRun(initialGroup.id, patchMode, maxParallel),
     onSuccess: (result) => {
       setPatchOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -245,8 +244,7 @@ export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHos
   })
 
   const { mutate: doGroupScript, isPending: isScripting } = useMutation({
-    mutationFn: () =>
-      triggerGroupCustomScriptRun(orgId, initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
+    mutationFn: () => triggerGroupCustomScriptRun(initialGroup.id, scriptBody, interpreter, scriptMaxParallel),
     onSuccess: (result) => {
       setScriptOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -254,8 +252,7 @@ export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHos
   })
 
   const { mutate: doGroupService, isPending: isServicing } = useMutation({
-    mutationFn: () =>
-      triggerGroupServiceAction(orgId, initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
+    mutationFn: () => triggerGroupServiceAction(initialGroup.id, serviceName, serviceAction, serviceMaxParallel),
     onSuccess: (result) => {
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -263,10 +260,10 @@ export function GroupDetailClient({ orgId, userRole, initialGroup, initialAllHos
   })
 
   const { mutate: doDeleteRuns, isPending: isDeletingRuns } = useMutation({
-    mutationFn: () => deleteTaskRuns(orgId, [...selectedRunIds]),
+    mutationFn: () => deleteTaskRuns([...selectedRunIds]),
     onSuccess: () => {
       setSelectedRunIds(new Set())
-      queryClient.invalidateQueries({ queryKey: ['task-runs-group', orgId, initialGroup.id] })
+      queryClient.invalidateQueries({ queryKey: ['task-runs-group', initialGroup.id] })
     },
   })
 

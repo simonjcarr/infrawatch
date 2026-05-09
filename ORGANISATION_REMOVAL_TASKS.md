@@ -289,7 +289,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR: pending
+PR: [#1222](https://github.com/carrtech-dev/ct-ops/pull/1222)
 
 Summary: Removed caller-supplied organisation identity from the hosts
 inventory, pending-agent queue, fleet stats, command palette, sidebar terminal

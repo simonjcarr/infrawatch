@@ -630,9 +630,12 @@ export function OperationsCalendarClient({
             },
             dayGridMonth: {
               dayHeaderFormat: { weekday: 'short' },
+              dayCellContent: renderDayCellContent,
+              expandRows: true,
             },
             multiMonthYear: {
               dayHeaderFormat: { weekday: 'short' },
+              dayCellContent: renderDayCellContent,
             },
           }}
           firstDay={1}
@@ -650,7 +653,6 @@ export function OperationsCalendarClient({
           slotLabelFormat={{ hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' }}
           scrollTime="09:00:00"
           expandRows={false}
-          dayCellContent={renderDayCellContent}
           dayMaxEvents={4}
           fixedWeekCount
           showNonCurrentDates

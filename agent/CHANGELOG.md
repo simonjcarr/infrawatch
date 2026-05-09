@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.2](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.1...agent/v0.34.2) (2026-05-09)
+
+
+### Bug Fixes
+
+* **hosts:** ignore virtual bridge IPs for host dedupe ([7110f42](https://github.com/carrtech-dev/ct-ops/commit/7110f421cc2bd2d97bf1d758c41f8b5437db33b5))
+
 ## [0.34.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.0...agent/v0.34.1) (2026-05-08)
 
 

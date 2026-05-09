@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.127.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.126.0...web/v0.127.0) (2026-05-09)
+
+
+### Features
+
+* **web:** remove org scope from host detail core ([#1226](https://github.com/carrtech-dev/ct-ops/issues/1226)) ([d540a3d](https://github.com/carrtech-dev/ct-ops/commit/d540a3df9fdc374f01507613432164d924fd4e4c))
+* **web:** remove org scope from host groups and networks ([#1229](https://github.com/carrtech-dev/ct-ops/issues/1229)) ([19045b8](https://github.com/carrtech-dev/ct-ops/commit/19045b8d68ef29900f6971809241e90c22d628aa))
+* **web:** remove org scope from host settings slice ([#1228](https://github.com/carrtech-dev/ct-ops/issues/1228)) ([48184a2](https://github.com/carrtech-dev/ct-ops/commit/48184a2cd3b4e85ce49aa7ce788c201c5d1371de))
+
 ## [0.126.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.125.0...web/v0.126.0) (2026-05-09)
 
 

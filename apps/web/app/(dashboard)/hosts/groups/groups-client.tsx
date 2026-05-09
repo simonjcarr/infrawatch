@@ -51,7 +51,6 @@ const groupSchema = z.object({
 type GroupFormValues = z.infer<typeof groupSchema>
 
 interface Props {
-  orgId: string
   initialGroups: HostGroupWithCount[]
 }
 
@@ -133,42 +132,42 @@ function GroupForm({
   )
 }
 
-export function GroupsClient({ orgId, initialGroups }: Props) {
+export function GroupsClient({ initialGroups }: Props) {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [editGroup, setEditGroup] = useState<HostGroupWithCount | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<HostGroupWithCount | null>(null)
 
   const { data: groups = initialGroups } = useQuery({
-    queryKey: ['host-groups', orgId],
-    queryFn: () => listGroups(orgId),
+    queryKey: ['host-groups'],
+    queryFn: () => listGroups(),
     initialData: initialGroups,
   })
 
   const { mutate: doCreate, isPending: isCreating } = useMutation({
     mutationFn: (data: GroupFormValues) =>
-      createGroup(orgId, { name: data.name, description: data.description || undefined }),
+      createGroup({ name: data.name, description: data.description || undefined }),
     onSuccess: (result) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups'] })
       setCreateOpen(false)
     },
   })
 
   const { mutate: doUpdate, isPending: isUpdating } = useMutation({
     mutationFn: (data: GroupFormValues) =>
-      updateGroup(orgId, editGroup!.id, { name: data.name, description: data.description || undefined }),
+      updateGroup(editGroup!.id, { name: data.name, description: data.description || undefined }),
     onSuccess: (result) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups'] })
       setEditGroup(null)
     },
   })
 
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
-    mutationFn: (groupId: string) => deleteGroup(orgId, groupId),
+    mutationFn: (groupId: string) => deleteGroup(groupId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['host-groups', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['host-groups'] })
       setDeleteTarget(null)
     },
   })

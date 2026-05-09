@@ -19,25 +19,30 @@ import {
 export type { HostGroupWithCount, HostGroupWithMembers } from './host-groups-core'
 
 export async function createGroup(
-  scopeId: string,
-  input: unknown,
+  ...args: [unknown] | [string, unknown]
 ): Promise<{ success: true; group: import('@/lib/db/schema').HostGroup } | { error: string }> {
-  return createGroupCore(scopeId, input)
+  const session = await getRequiredSession()
+  const [currentScope, input] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return createGroupCore(currentScope, input)
 }
 
 export async function updateGroup(
-  scopeId: string,
-  groupId: string,
-  input: unknown,
+  ...args: [string, unknown] | [string, string, unknown]
 ): Promise<{ success: true } | { error: string }> {
-  return updateGroupCore(scopeId, groupId, input)
+  const session = await getRequiredSession()
+  const [currentScope, groupId, input] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  return updateGroupCore(currentScope, groupId, input)
 }
 
 export async function deleteGroup(
-  scopeId: string,
-  groupId: string,
+  ...args: [string] | [string, string]
 ): Promise<{ success: true } | { error: string }> {
-  return deleteGroupCore(scopeId, groupId)
+  const session = await getRequiredSession()
+  const [currentScope, groupId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return deleteGroupCore(currentScope, groupId)
 }
 
 export async function listGroups(
@@ -49,10 +54,12 @@ export async function listGroups(
 }
 
 export async function getGroup(
-  scopeId: string,
-  groupId: string,
+  ...args: [string] | [string, string]
 ): Promise<HostGroupWithMembers | null> {
-  return getGroupCore(scopeId, groupId)
+  const session = await getRequiredSession()
+  const [currentScope, groupId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return getGroupCore(currentScope, groupId)
 }
 
 export async function addHostToGroup(
@@ -74,10 +81,12 @@ export async function removeHostFromGroup(
 }
 
 export async function listHostsInGroup(
-  scopeId: string,
-  groupId: string,
+  ...args: [string] | [string, string]
 ): Promise<import('@/lib/db/schema').Host[]> {
-  return listHostsInGroupCore(scopeId, groupId)
+  const session = await getRequiredSession()
+  const [currentScope, groupId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return listHostsInGroupCore(currentScope, groupId)
 }
 
 export async function listGroupsForHost(

@@ -89,7 +89,6 @@ function computeLayout(
         ipAddresses: (host.ipAddresses as string[] | null) ?? [],
         status: host.status ?? 'unknown',
         hostId: host.id,
-        orgId: host.organisationId,
       },
     })
 

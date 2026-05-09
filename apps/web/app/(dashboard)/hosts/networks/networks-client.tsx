@@ -59,7 +59,6 @@ const networkSchema = z.object({
 type NetworkFormValues = z.infer<typeof networkSchema>
 
 interface Props {
-  orgId: string
   initialNetworks: NetworkWithCount[]
 }
 
@@ -134,7 +133,7 @@ function NetworkForm({
   )
 }
 
-export function NetworksClient({ orgId, initialNetworks }: Props) {
+export function NetworksClient({ initialNetworks }: Props) {
   const queryClient = useQueryClient()
   const [viewMode, setViewMode] = useState<'table' | 'graph'>('table')
   const [createOpen, setCreateOpen] = useState(false)
@@ -142,20 +141,20 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<NetworkWithCount | null>(null)
 
   const { data: networkList = initialNetworks } = useQuery({
-    queryKey: ['networks', orgId],
-    queryFn: () => listNetworks(orgId),
+    queryKey: ['networks'],
+    queryFn: () => listNetworks(),
     initialData: initialNetworks,
   })
 
   const { data: networksWithHosts = [] } = useQuery({
-    queryKey: ['networks-with-hosts', orgId],
-    queryFn: () => listNetworksWithHosts(orgId),
+    queryKey: ['networks-with-hosts'],
+    queryFn: () => listNetworksWithHosts(),
     enabled: viewMode === 'graph',
   })
 
   const { mutate: doCreate, isPending: isCreating } = useMutation({
     mutationFn: (data: NetworkFormValues) =>
-      createNetwork(orgId, {
+      createNetwork({
         name: data.name,
         cidr: data.cidr,
         description: data.description || undefined,
@@ -163,8 +162,8 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
     onSuccess: async (result) => {
       if ('error' in result) return
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
-        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks'] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts'] }),
       ])
       setCreateOpen(false)
     },
@@ -172,7 +171,7 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
 
   const { mutate: doUpdate, isPending: isUpdating } = useMutation({
     mutationFn: (data: NetworkFormValues) =>
-      updateNetwork(orgId, editNetwork!.id, {
+      updateNetwork(editNetwork!.id, {
         name: data.name,
         cidr: data.cidr,
         description: data.description || undefined,
@@ -180,20 +179,20 @@ export function NetworksClient({ orgId, initialNetworks }: Props) {
     onSuccess: async (result) => {
       if ('error' in result) return
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
-        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks'] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts'] }),
       ])
       setEditNetwork(null)
     },
   })
 
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
-    mutationFn: (networkId: string) => deleteNetwork(orgId, networkId),
+    mutationFn: (networkId: string) => deleteNetwork(networkId),
     onSuccess: async (result) => {
       if ('error' in result) return
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['networks', orgId] }),
-        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts', orgId] }),
+        queryClient.invalidateQueries({ queryKey: ['networks'] }),
+        queryClient.invalidateQueries({ queryKey: ['networks-with-hosts'] }),
       ])
       setDeleteTarget(null)
     },

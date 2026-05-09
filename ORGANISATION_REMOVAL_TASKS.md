@@ -23,6 +23,34 @@ finishing so the next agent can continue without duplicating work.
 - Existing development data does not need to be preserved. Development installs
   can be deleted and reinstalled.
 
+## Recovery And Drift Controls
+
+The current web implementation is intentionally passing through a transitional
+state where several completed slices expose instance-scoped wrappers while some
+lower-level core/database code can still contain organisation-scoped names or
+assumptions. That transition is allowed only to keep Tasks 10-12 independently
+shippable. It must not become the final architecture.
+
+For Tasks 10-12:
+
+- Prefer deleting organisation code in the selected workflow over wrapping it.
+- Only introduce a temporary wrapper when the slice cannot land without it.
+- If a temporary wrapper leaves org-scoped core code, schema, migrations, RLS,
+  tests, or copy behind, record that exact residue in the task `Follow-up` so
+  Task 13 has a concrete deletion list.
+- Do not add compatibility aliases, overloaded signatures, or route/query
+  shims that allow caller-supplied organisation identity to keep working.
+- Do not mark a task complete if its owned public actions, route handlers, or
+  UI still accept `orgId`, `organisationId`, `organisation_id`, `org_id`, or
+  tenant identity from callers.
+
+Task 13 is the hard cleanup gate for the web app. It must collapse the
+transitional wrapper/core split where it only exists to preserve old
+organisation-scoped internals, remove the schema and migration residue, and
+prove a fresh standalone web install has no organisation table, columns, RLS
+settings, helper APIs, or test fixtures. Do not soften Task 13 into a cosmetic
+grep cleanup.
+
 ## Why This Tracker Was Resequenced
 
 The original task split put schema removal, auth removal, and API/action removal
@@ -773,6 +801,11 @@ Follow-up:
 This slice finishes the remaining web product areas and removes the last schema
 and migration residue after the earlier slices have converted the live paths.
 
+- Build a residue map before editing by running the Task 13 grep validation and
+  grouping every match by owner: schema/migrations/RLS, server actions/APIs,
+  UI/routes, tests/fixtures, docs/copy, or allowed unrelated English usage.
+- Review the `Follow-up` notes from Tasks 10-12 and explicitly delete or
+  justify every listed transitional wrapper/core residue.
 - Remove the `organisations` schema module and all exports of it.
 - Remove every remaining `organisation_id` / `org_id` column from web app
   schemas.
@@ -782,26 +815,46 @@ and migration residue after the earlier slices have converted the live paths.
   suitable for reinstalling development environments.
 - Remove `withOrgDatabaseScope`, `runWithOrgDatabaseScope`, and
   `app.organisation_id` database session setting code.
+- Delete transitional `*-core.ts` or wrapper splits where their only remaining
+  purpose is to hide organisation-scoped internals behind instance-scoped entry
+  points.
+- Remove action/API parameters, request body fields, query string parameters,
+  cache keys, React props, generated types, and route assumptions that still
+  carry organisation or tenant identity.
 - Update CT-CVE web routes/settings, licence checks, settings, reports,
   calendar, certificates, service accounts, build docs, and remaining admin or
   export flows to be instance-scoped.
 - Rewrite remaining unit tests and E2E fixtures touched by this slice so they
   seed standalone instance users and no longer query or insert organisations.
 - Remove tenant-isolation tests rather than adapting them into no-op tests.
+- For any remaining grep match, either delete it or move it into `Remaining
+  Allowed Matches` with a specific reason. "Legacy", "compatibility", and
+  "future migration" are not acceptable reasons.
 
 ### Acceptance criteria
 
 - A fresh web database created from migrations has no `organisations` table.
 - No web app table has `organisation_id` or `org_id`.
 - No RLS policy references `app.organisation_id`.
+- No web schema, migration, snapshot, constraint, index, policy, trigger,
+  function, or generated type preserves organisation scoping.
+- No transitional wrapper/core split remains solely to preserve org-scoped
+  implementation details.
 - No public or internal web action/API requires caller-supplied organisation
   identity.
+- No public or internal web action/API silently accepts old organisation fields
+  and ignores them.
 - The remaining web UI presents CT-Ops as a standalone instance.
 - Web tests no longer insert into or query `organisations`.
+- Tests that previously asserted tenant isolation are deleted or replaced with
+  meaningful instance-level authorization tests.
 - Tenant-isolation tests are removed, not softened.
+- The task summary records the residue categories found before cleanup and the
+  exact categories eliminated.
 
 ### Validation
 
+- Initial residue map command and categorized findings recorded in this task.
 - `pnpm --dir apps/web db:validate`
 - `pnpm --dir apps/web type-check`
 - `pnpm --dir apps/web lint`
@@ -811,6 +864,8 @@ and migration residue after the earlier slices have converted the live paths.
   certificates, service accounts, and build docs where local infrastructure
   allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
+  must return no matches except entries documented in `Remaining Allowed
+  Matches`.
 
 ## Task 14 - Ingest And Agent Single-Instance Conversion
 

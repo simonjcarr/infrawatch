@@ -17,11 +17,34 @@ finishing so the next agent can continue without duplicating work.
 - Do not keep organisation code behind feature flags, compatibility shims,
   aliases, overloads, or legacy wrappers.
 - Do not preserve old organisation docs, tests, examples, migrations, route
-  shapes, types, or UI copy as "legacy" references.
+  shapes, types, or UI copy as legacy references.
 - Do not add a path to reinstate organisation features.
 - Git history is the only history needed.
 - Existing development data does not need to be preserved. Development installs
   can be deleted and reinstalled.
+
+## Why This Tracker Was Resequenced
+
+The original task split put schema removal, auth removal, and API/action removal
+in separate tasks. That order was tried and it blocked agents:
+
+- PR `#1213` recorded that schema-only removal breaks auth, dashboard loaders,
+  server actions, and CT-CVE integrations.
+- PR `#1214` recorded that auth/onboarding removal is not shippable while
+  action/API contracts remain org-scoped.
+- PR `#1215` recorded that action/API org removal is not shippable while auth
+  and schema remain org-scoped.
+
+Do not retry schema-only, auth-only, or API-only removal as standalone tasks.
+The first real implementation task below intentionally owns the web schema,
+auth, actions, APIs, UI, and web tests together so it can land as a coherent
+single-instance conversion.
+
+If an agent believes Task 1 is too large for one PR, that agent must first open
+a tracker-only PR that replaces Task 1 with smaller vertical slices. Each new
+slice must be independently shippable, leave `pnpm --dir apps/web type-check`
+passing, and move a complete product path away from organisations. Do not split
+by technical layer in a way that recreates the blocked schema/auth/API cycle.
 
 ## Agent Workflow
 
@@ -40,8 +63,10 @@ While working:
 - Complete only the selected task unless a small adjacent edit is required to
   keep the repo building.
 - Delete org-based code entirely rather than routing around it.
-- Prefer renaming concepts to `instance`, `installation`, or `team` only when
-  the product still needs a replacement concept.
+- Prefer `instance`, `installation`, or `team` only where the product still
+  needs a replacement concept.
+- Do not create `memory.md` or sidecar automation notes for this workstream.
+  This tracker is the handoff record.
 - If you find a separate issue outside the selected task, create a GitHub issue
   as required by `AGENTS.md` rather than expanding scope.
 
@@ -52,7 +77,8 @@ Before finishing:
 3. Fill in `Completed by`, `Summary`, `Files changed`, `Validation`, `PR`, and
    `Follow-up` for that task.
 4. If a task cannot be completed, leave it as `Blocked`, explain exactly why,
-   and list the next concrete action.
+   and list the next concrete action. Do not mark later tasks blocked simply
+   because earlier tasks remain unfinished.
 
 ## Status Values
 
@@ -61,195 +87,87 @@ Before finishing:
 - `Blocked`: cannot continue until the listed blocker is resolved.
 - `Complete`: merged to `main` with validation recorded.
 
-## Task 1 - Reset Schema And Migrations
+## Task 1 - Core Web Single-Instance Conversion
 
-Status: Blocked
+Status: Not started
 
-Completed by: Codex automation `remove-org-from-ct-ops` on 2026-05-09
+Completed by:
 
-PR: Not opened
+PR:
 
 Summary:
-Task 1 cannot currently be completed in isolation. Removing `organisations`,
-`organisation_id`, and org-scoped RLS from `apps/web/lib/db` immediately breaks
-type-checking across auth, dashboard pages, server actions, and CT-CVE
-integrations because those layers still require `user.organisationId`,
-`hosts.organisationId`, `notes.organisationId`, `withOrgDatabaseScope`, and the
-organisation-backed settings record.
 
 Files changed:
-`ORGANISATION_REMOVAL_TASKS.md`
 
 Validation:
-Checked open PRs with `gh pr list --repo carrtech-dev/ct-ops --state open`.
-Created a dedicated worktree and attempted the schema-only removal locally.
-`pnpm --dir apps/web type-check` could be run after reusing the existing
-`node_modules`; it produced hundreds of downstream errors outside `lib/db`,
-including:
-- `app/(auth)/login/page.tsx` and `app/(auth)/register/page.tsx` expecting `user.organisationId`
-- `lib/auth/session.ts`, `lib/auth/guards.ts`, and `lib/auth/redirects.ts` requiring org-scoped auth types
-- many dashboard pages and CT-CVE integration modules expecting org-owned table columns and `withOrgDatabaseScope`
 
 Follow-up:
-Combine Task 1 with a coordinated first pass of Tasks 2-5, or split out a new
-prerequisite task that removes compile-time/runtime dependencies on
-`organisationId` and `withOrgDatabaseScope` before the schema and migration
-reset lands.
 
 ### Required work
+
+This task supersedes the previously blocked schema-only, auth-only, and
+API-only tasks. It must remove organisation concepts from the web app as one
+coherent vertical change.
 
 - Remove the `organisations` schema module and all exports of it.
-- Remove every `organisation_id` / `org_id` column from app schemas.
-- Remove every foreign key, index, unique constraint, and row-level-security
-  policy whose purpose is organisation scoping.
+- Remove every `organisation_id` / `org_id` column from web app schemas.
+- Remove every web migration, snapshot, foreign key, index, unique constraint,
+  and RLS policy whose purpose is organisation scoping.
+- Replace the current web migration chain with a clean standalone baseline
+  suitable for reinstalling development environments.
 - Remove `withOrgDatabaseScope`, `runWithOrgDatabaseScope`, and
   `app.organisation_id` database session setting code.
-- Replace org-owned settings with instance-level storage. Use an existing
-  instance/system config table if it fits; otherwise create a clear standalone
-  settings table.
-- Replace the current migration chain with a clean standalone baseline suitable
-  for reinstalling development environments. Do not add an additive
-  organisation-removal migration that preserves old org structures.
-- Update Drizzle snapshots and migration journal so `db:validate` passes.
-
-### Acceptance criteria
-
-- A fresh database created from migrations has no `organisations` table.
-- No app table has `organisation_id` or `org_id`.
-- No RLS policy references `app.organisation_id`.
-- TypeScript schema exports contain no organisation model or organisation
-  foreign keys.
-
-### Validation
-
-- `pnpm --dir apps/web db:validate`
-- `pnpm --dir apps/web type-check`
-- `rg -n "organisations|organisation_id|org_id|app\\.organisation_id|withOrgDatabaseScope|runWithOrgDatabaseScope" apps/web/lib/db`
-
-## Task 2 - Remove Org Auth And Onboarding
-
-Status: Blocked
-
-Completed by: Codex automation `remove-org-from-ct-ops` on 2026-05-09
-
-PR: Not opened
-
-Summary:
-Task 2 cannot currently be completed in isolation. The auth/onboarding files can
-be rewritten, but the task's own validation and acceptance scope still requires
-removing `organisationId`, `requireOrg*`, onboarding redirects, and LDAP tenant
-assumptions from `apps/web/lib/actions` and route callers that are owned by
-Task 3's API/action parameter cleanup.
-
-Files changed:
-`ORGANISATION_REMOVAL_TASKS.md`
-
-Validation:
-Reviewed auth/onboarding dependencies and ran
-`rg -n "organisationId|orgId|requireOrg|SameOrg|onboarding|tenant" apps/web/lib/auth apps/web/lib/actions apps/web/app`.
-That output shows Task 2 blockers outside auth-only files, including:
-- `apps/web/lib/actions/alerts.ts`, `tags.ts`, `settings.ts`, `notifications.ts`, `calendar.ts`, `ldap.ts`, and many other server actions that still take `orgId` and call `requireOrg*`
-- `apps/web/lib/actions/auth.ts` and `organisations.ts` still attaching invites and first-run setup to organisations
-- auth pages and redirects still branching on `user.organisationId` because the surrounding action contracts remain org-scoped
-
-Follow-up:
-Combine Tasks 2 and 3 into a single auth/API de-organisation pass, or rewrite
-Task 2 so it is limited to auth/session/redirect/onboarding files and does not
-require removing org-scoped action parameters from `apps/web/lib/actions`.
-
-### Required work
-
+- Replace org-owned settings with instance-level storage. Use the existing
+  system config table if it fits; otherwise add a standalone instance settings
+  table.
 - Delete organisation creation actions and onboarding screens.
 - Remove `users.organisationId` from auth/session/user types and all session
   loading logic.
-- Remove org membership guards, same-org checks, and org-admin wrappers.
-- Replace role checks with instance-level admin/write/read checks.
+- Replace org membership guards, same-org checks, and org-admin wrappers with
+  instance-level role checks.
 - Remove redirects that send users without an organisation to `/onboarding`.
 - Remove LDAP tenant/organisation selection. LDAP configuration and login must
   be instance-scoped.
 - Remove invitation assumptions that attach a user to an organisation. Invites
   should invite users into the instance.
-- Ensure the first setup/admin flow belongs to the standalone instance.
+- Remove `orgId` / `organisationId` parameters from web server actions,
+  route handlers, request bodies, query strings, dashboard loaders, and client
+  components.
+- Update CT-CVE web routes/settings, licence checks, settings, reports,
+  notifications, tasks, hosts, tags, calendar, certificates, service accounts,
+  build docs, notes, alerts, networks, software inventory, and agent enrolment
+  web code to be instance-scoped.
+- Delete organisation settings/name/slug UI, org prop threading, React Query
+  keys containing `orgId`, and user-facing organisation wording in the web UI.
+- Rewrite web unit tests and E2E fixtures touched by this conversion so they
+  seed standalone instance users and no longer query or insert organisations.
+- Remove tenant-isolation tests rather than adapting them into no-op tests.
 
 ### Acceptance criteria
 
+- A fresh web database created from migrations has no `organisations` table.
+- No web app table has `organisation_id` or `org_id`.
+- No RLS policy references `app.organisation_id`.
 - Authenticated users are never blocked because they lack an organisation.
 - There is no `/onboarding` route for creating an organisation.
-- Guard code talks about instance/user/role access, not organisation access.
-- LDAP login does not ask for or resolve an organisation tenant.
+- No public or internal web action/API requires caller-supplied organisation
+  identity.
+- The web UI presents CT-Ops as a standalone instance.
+- Web tests no longer insert into or query `organisations`.
+- Tenant-isolation tests are removed, not softened.
 
 ### Validation
 
-- `pnpm --dir apps/web type-check`
-- `pnpm --dir apps/web lint`
-- `node --experimental-strip-types --test apps/web/lib/auth/*.test.mjs apps/web/lib/actions/*auth*.test.mjs`
-- `rg -n "organisationId|orgId|requireOrg|SameOrg|onboarding|tenant" apps/web/lib/auth apps/web/lib/actions apps/web/app`
-
-## Task 3 - Remove Org APIs And Action Params
-
-Status: Blocked
-
-Completed by: Codex automation `remove-org-from-ct-ops` on 2026-05-09
-
-PR: Not opened
-
-Summary:
-Task 3 cannot currently be completed in isolation. Removing caller-supplied
-`orgId` / `organisationId` from actions and API routes immediately requires the
-auth/session rewrite from Task 2 and the org-owned schema cleanup from Task 1,
-because the current route and action contracts derive access through
-`getApiOrgSession`, `requireOrg*` helpers, `session.user.organisationId`, and
-per-table `organisationId` filters/inserts.
-
-Files changed:
-`ORGANISATION_REMOVAL_TASKS.md`
-
-Validation:
-Checked open PRs with `gh pr list --repo carrtech-dev/ct-ops --state open`.
-Reviewed the org-scoped API/action surface with
-`rg -n "orgId|organisationId|org_id|organisation_id|requireOrg" apps/web/lib/actions apps/web/app/api apps/web/app`.
-Representative blockers found:
-- `apps/web/app/api/domain-accounts/route.ts` authenticates with `getApiOrgSession()` and passes `session.user.organisationId` into `getDomainAccounts`
-- `apps/web/lib/actions/action-auth.ts` and `action-auth-core.ts` only expose org-scoped guards such as `requireOrgAccess`, `requireOrgAdminAccess`, and `assertOrgAccess`
-- `apps/web/lib/auth/session.ts` still defines `getApiOrgSession`, `getApiOrgAdminSession`, seat checks, and two-factor policy lookup around `user.organisationId`
-- `apps/web/lib/actions/alerts.ts`, `agents.ts`, `ldap.ts`, `tags.ts`, `tag-rules.ts`, `terminal.ts`, and many other actions still accept `orgId`, write audit events with `organisationId`, and query tables by `*.organisationId`
-- dashboard callers such as `apps/web/app/(dashboard)/hosts/groups/page.tsx`, settings pages, report pages, and CT-CVE screens still read `session.user.organisationId` and pass it through the UI/action layer
-
-Follow-up:
-Combine Tasks 2 and 3 into a single auth/API contract rewrite, then land Task 1
-schema removal immediately after or as part of the same pass so the action/API
-surface can stop depending on `organisationId` end to end.
-
-### Required work
-
-- Remove `orgId` / `organisationId` parameters from server actions.
-- Remove `orgId` query parameters and request body fields from API routes.
-- Update callers so access is derived from the authenticated user and
-  instance-level role only.
-- Update CT-CVE routes, licence checks, settings, reports, notifications,
-  tasks, hosts, tags, calendar, certificates, service accounts, and agent
-  enrolment APIs.
-- Do not keep compatibility overloads, aliases, or request fallbacks that accept
-  org identifiers.
-- Update audit events and rate-limit keys so they are instance-scoped or
-  user-scoped as appropriate.
-
-### Acceptance criteria
-
-- No public or internal action requires caller-supplied organisation identity.
-- API contracts do not document or accept `orgId`, `organisationId`, `org_id`,
-  or `organisation_id`.
-- Authorization failures depend on session/role state, not organisation
-  matching.
-
-### Validation
-
+- `pnpm --dir apps/web db:validate`
 - `pnpm --dir apps/web type-check`
 - `pnpm --dir apps/web lint`
 - `pnpm --dir apps/web test:unit`
-- `rg -n "orgId|organisationId|org_id|organisation_id|requireOrg" apps/web/lib/actions apps/web/app/api apps/web/app`
+- `pnpm --dir apps/web exec playwright test --list`
+- Targeted E2E smoke runs for auth, setup, settings, agents, hosts, tasks,
+  reports, CT-CVE, and calendar where local infrastructure allows.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
 
-## Task 4 - Simplify Ingest And Agent Identity
+## Task 2 - Ingest And Agent Single-Instance Conversion
 
 Status: Not started
 
@@ -276,6 +194,7 @@ Follow-up:
   public protobuf/API can be changed safely. Use `enrolment_token`.
 - Regenerate protobuf bindings if the protobuf contract changes.
 - Update agent-side config, registration, load testing, and tests.
+- Update any Go code that depends on web schema columns removed in Task 1.
 
 ### Acceptance criteria
 
@@ -283,102 +202,16 @@ Follow-up:
 - Agent registration, heartbeat, terminal, inventory, and certificate renewal
   work without organisation IDs.
 - Ingest SQL does not select, insert, compare, or log organisation identifiers.
+- Agent and ingest tests no longer refer to org IDs or org tokens except where
+  asserting the old public field was removed.
 
 ### Validation
 
 - `go test ./...`
 - `pnpm --dir apps/web type-check`
-- `rg -n "organisation|orgID|orgId|org_id|organisation_id|OrgToken|org_token" apps/ingest agent proto`
+- `rg -n "organisation|organization|orgID|orgId|org_id|organisation_id|OrgToken|org_token|tenant" apps/ingest agent proto`
 
-## Task 5 - Clean Frontend UX
-
-Status: Not started
-
-Completed by:
-
-PR:
-
-Summary:
-
-Files changed:
-
-Validation:
-
-Follow-up:
-
-### Required work
-
-- Delete organisation settings/name/slug UI.
-- Delete onboarding screens and navigation paths tied to organisation setup.
-- Remove org prop threading through dashboard pages and client components.
-- Remove React Query keys that include `orgId`.
-- Replace user-facing "organisation" wording with `instance`,
-  `installation`, `team`, or simpler wording only where a replacement concept is
-  required.
-- Remove organisation-specific settings cards, labels, placeholders, and
-  validation text.
-- Update sidebar, command palette, settings pages, team pages, CT-CVE settings,
-  agent enrolment, reports, and dashboard copy.
-
-### Acceptance criteria
-
-- The UI presents CT-Ops as a standalone instance.
-- No visible screen asks for an organisation name, slug, tenant, or org switch.
-- Client components do not accept or pass org IDs.
-
-### Validation
-
-- `pnpm --dir apps/web type-check`
-- `pnpm --dir apps/web lint`
-- Targeted Playwright list/smoke checks for auth, settings, agents, hosts,
-  tasks, reports, CT-CVE, and calendar.
-- `rg -n "orgId|organisationId|organisation|tenant|workspace" apps/web/app apps/web/components apps/web/hooks`
-
-## Task 6 - Rewrite Tests And Fixtures
-
-Status: Not started
-
-Completed by:
-
-PR:
-
-Summary:
-
-Files changed:
-
-Validation:
-
-Follow-up:
-
-### Required work
-
-- Rewrite E2E fixtures to seed a standalone instance admin and users without
-  organisations.
-- Remove tenant-isolation tests. Do not adapt them into no-op tests.
-- Update SQL fixtures and setup data across hosts, tasks, calendar, reports,
-  LDAP, certificates, service accounts, tags, CT-CVE, alerts, notes, build
-  docs, notifications, networks, and software inventory.
-- Update unit/source tests that assert org-scoped auth helpers or SQL filters.
-- Remove test helper names and constants such as `TEST_ORG`, `orgId`, and
-  `getOrgId`.
-- Keep meaningful access-control tests for instance-level roles.
-
-### Acceptance criteria
-
-- Tests no longer insert into or query `organisations`.
-- Tests no longer seed `organisation_id`.
-- No test depends on org-scoped auth helpers.
-- Tenant-isolation tests are removed, not softened.
-
-### Validation
-
-- `pnpm --dir apps/web test:unit`
-- `pnpm --dir apps/web exec playwright test --list`
-- Targeted E2E smoke runs for auth, settings, agents, hosts, tasks, reports,
-  CT-CVE, and calendar where local infrastructure allows.
-- `rg -n "TEST_ORG|getOrgId|orgId|organisationId|organisation_id|organisations|tenant" apps/web/tests apps/web/lib/**/*.test.mjs`
-
-## Task 7 - Update Docs And Deploy Assets
+## Task 3 - Docs, Deploy, And External Contracts
 
 Status: Not started
 
@@ -414,13 +247,15 @@ Follow-up:
   environments or customers.
 - No docs tell users to create, select, switch, or manage organisations.
 - Deploy scripts do not query `organisations`.
+- External contracts no longer require `orgId`, `organisationId`,
+  `organisation_id`, or `org_id`.
 
 ### Validation
 
 - `pnpm --dir apps/docs build`
 - `rg -n "organisation|organization|orgId|organisationId|organisation_id|org_id|tenant|organisations" README.md docs apps/docs deploy .env.example apps/web/.env.example`
 
-## Task 8 - Final Residue Sweep And Validation
+## Task 4 - Final Residue Sweep And Validation
 
 Status: Not started
 
@@ -459,14 +294,16 @@ Follow-up:
 - `pnpm --dir apps/web type-check`
 - `pnpm --dir apps/web lint`
 - `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web exec playwright test --list`
+- `pnpm --dir apps/docs build`
 - `go test ./...`
-- Targeted E2E list/smoke checks for auth, setup, settings, agents, hosts,
-  tasks, reports, CT-CVE, and calendar where local infrastructure allows.
+- Targeted E2E smoke checks for auth, setup, settings, agents, hosts, tasks,
+  reports, CT-CVE, and calendar where local infrastructure allows.
 - `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant|organisation|organization" .`
 
 ## Remaining Allowed Matches
 
-Record any allowed residue here during Task 8. Leave this empty until then.
+Record any allowed residue here during Task 4. Leave this empty until then.
 
 | Path | Match | Reason |
 | --- | --- | --- |

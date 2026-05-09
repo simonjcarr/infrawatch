@@ -23,12 +23,19 @@ import {
   LDAP_TWO_FACTOR_COOKIE_NAME,
   serialiseLdapTwoFactorChallenge,
 } from '@/lib/auth/ldap-two-factor'
+import { z } from 'zod'
 
 // 5 attempts per IP per 60 seconds — prevents brute-force and user enumeration
 const ldapRateLimit = createRateLimiter({
   scope: 'auth:ldap',
   windowMs: 60_000,
   max: 5,
+})
+
+const ldapLoginSchema = z.object({
+  username: z.string().trim().min(1, 'Username and password are required'),
+  password: z.string().min(1, 'Username and password are required'),
+  ldapConfigurationId: z.string().trim().min(1, 'A domain integration is required'),
 })
 
 // Enforce a minimum response time for all auth outcomes to resist timing-based
@@ -54,23 +61,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { username, password, ldapConfigurationId } = body as {
-      username?: string
-      password?: string
-      ldapConfigurationId?: string
+    const parsedBody = ldapLoginSchema.safeParse(await request.json())
+    if (!parsedBody.success) {
+      const issue = parsedBody.error.issues[0]
+      return NextResponse.json(
+        { error: issue?.message ?? 'Invalid request body' },
+        { status: 400 },
+      )
     }
+    const { username, password, ldapConfigurationId } = parsedBody.data
 
     const authSecret = getBetterAuthSecret()
     const authUrl = getBetterAuthUrl()
-
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
-    }
-
-    if (!ldapConfigurationId) {
-      return NextResponse.json({ error: 'A domain integration is required' }, { status: 400 })
-    }
 
     const accountKey = `${ldapConfigurationId}:${username}`
     const accountStatus = await passwordLoginAttemptGuard.check(accountKey)

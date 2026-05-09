@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -48,6 +49,7 @@ func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname 
 	if ips == nil {
 		ips = []string{}
 	}
+	ips = FilterHostIdentityIPs(ips)
 	row := pool.QueryRow(ctx, q, orgID, hostname, ips)
 	var c HostCollision
 	if err := row.Scan(&c.HostID, &c.AgentID, &c.Hostname, &c.HostStatus, &c.AgentStatus); err != nil {
@@ -57,6 +59,46 @@ func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname 
 		return nil, err
 	}
 	return &c, nil
+}
+
+// FilterHostIdentityIPs returns only IPs that are useful for host identity
+// collision checks. Linux hosts commonly expose host-local bridge gateway
+// addresses such as docker0's 172.17.0.1; those addresses are duplicated on
+// unrelated machines and must not block fresh registrations.
+func FilterHostIdentityIPs(ips []string) []string {
+	filtered := make([]string, 0, len(ips))
+	seen := make(map[string]struct{}, len(ips))
+	for _, raw := range ips {
+		addr, err := netip.ParseAddr(raw)
+		if err != nil || isWeakHostIdentityIP(addr) {
+			continue
+		}
+		normalized := addr.String()
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		filtered = append(filtered, normalized)
+	}
+	return filtered
+}
+
+func isWeakHostIdentityIP(addr netip.Addr) bool {
+	if !addr.IsValid() ||
+		addr.IsLoopback() ||
+		addr.IsLinkLocalUnicast() ||
+		addr.IsMulticast() ||
+		addr.IsUnspecified() {
+		return true
+	}
+
+	if addr.Is4() {
+		octets := addr.As4()
+		if octets[3] == 1 && addr.IsPrivate() {
+			return true
+		}
+	}
+	return false
 }
 
 // RotateAgentPublicKey replaces the public key on an existing agent row.

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	agentv1 "github.com/carrtech-dev/ct-ops/proto/agent/v1"
@@ -156,7 +157,8 @@ func (r *Registrar) Register(ctx context.Context, existingAgentID string) (*iden
 
 // localIPs returns the non-loopback IP addresses currently bound on this host,
 // so the server can detect duplicate-host registrations by IP overlap.
-// Mirrors the filtering used by the heartbeat's network interface reporter.
+// Container and host-local bridge interfaces are intentionally ignored because
+// their gateway addresses are commonly duplicated across unrelated hosts.
 func localIPs() []string {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -164,10 +166,7 @@ func localIPs() []string {
 	}
 	var ips []string
 	for _, iface := range ifaces {
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		if iface.Flags&net.FlagUp == 0 {
+		if !isRegistrationIdentityInterface(iface) {
 			continue
 		}
 		addrs, err := iface.Addrs()
@@ -179,8 +178,50 @@ func localIPs() []string {
 			if err != nil {
 				continue
 			}
+			if !isRegistrationIdentityIP(ip) {
+				continue
+			}
 			ips = append(ips, ip.String())
 		}
 	}
 	return ips
+}
+
+func isRegistrationIdentityInterface(iface net.Interface) bool {
+	if iface.Flags&net.FlagLoopback != 0 {
+		return false
+	}
+	if iface.Flags&net.FlagUp == 0 {
+		return false
+	}
+
+	name := strings.ToLower(iface.Name)
+	virtualPrefixes := []string{
+		"br-",
+		"cali",
+		"cni",
+		"docker",
+		"flannel",
+		"lxcbr",
+		"podman",
+		"veth",
+		"virbr",
+	}
+	for _, prefix := range virtualPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return false
+		}
+	}
+	return true
+}
+
+func isRegistrationIdentityIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	return !ip.IsLoopback() &&
+		!ip.IsLinkLocalUnicast() &&
+		!ip.IsLinkLocalMulticast() &&
+		!ip.IsMulticast() &&
+		!ip.IsUnspecified()
 }

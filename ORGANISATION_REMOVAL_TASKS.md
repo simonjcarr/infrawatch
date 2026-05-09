@@ -289,15 +289,17 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR: pending
+PR: [#1223](https://github.com/carrtech-dev/ct-ops/pull/1223)
 
 Summary: Removed caller-supplied organisation identity from the hosts
 inventory, pending-agent queue, fleet stats, command palette, sidebar terminal
 launcher, and terminal host picker by switching those surfaces to derive the
 instance scope from the authenticated session. Split `agents.ts` and
 `terminal.ts` into thin instance-scoped wrappers over `*-core.ts` so the Task
-5-owned action entrypoints no longer expose org-scoped signatures, and updated
-source-inspection unit tests to follow the new structure.
+5-owned action entrypoints no longer expose org-scoped signatures, updated
+source-inspection unit tests to follow the new structure, and repaired the
+replacement PR after Turbopack rejected `export *` from `"use server"` action
+modules.
 
 Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
 `apps/web/app/(dashboard)/hosts/{page.tsx,hosts-client.tsx,[id]/host-terminal-launcher.tsx,networks/components/host-node-terminal-dialog.tsx}`,
@@ -315,7 +317,9 @@ Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web type-check`
 both failing because no working container runtime is available in this
 environment); `pnpm --dir apps/web exec playwright test --list` (passes);
 `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/hosts/page.tsx' 'apps/web/app/(dashboard)/hosts/hosts-client.tsx' apps/web/components/shared/sidebar.tsx apps/web/components/shared/command-palette/{command-palette,providers}.tsx apps/web/components/terminal/{host-selector-dialog,terminal-session}.tsx apps/web/hooks/use-host-stream.ts apps/web/lib/actions/{agents,terminal}.ts`
-(no matches)
+(no matches); `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret pnpm --dir apps/web build`
+(compiles and finishes TypeScript; local page-data collection still requires
+database env such as `DATABASE_URL` or `POSTGRES_PASSWORD`)
 
 Follow-up: Start Task 6 next. The remaining `test:unit` failures still need a
 container runtime; no Task 5-specific test failures remain.

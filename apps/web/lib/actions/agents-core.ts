@@ -43,7 +43,7 @@ import { HOST_HIGH_USAGE_THRESHOLD, HOST_STALE_MINUTES } from '@/lib/db/schema/h
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { escapeLikePattern } from '@/lib/utils'
 import { getOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
-import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs'
+import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs-core'
 import { assignTagsToResource, getOrgDefaultTags, mergeTagLayers } from '@/lib/actions/tags'
 import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'

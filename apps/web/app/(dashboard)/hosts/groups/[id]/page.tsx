@@ -27,7 +27,7 @@ export default async function GroupDetailPage({ params }: Props) {
 
   return (
     <GroupDetailClient
-      orgId={orgId}
+      scopeId={orgId}
       userRole={session.user.role}
       initialGroup={group}
       initialAllHosts={allHosts}

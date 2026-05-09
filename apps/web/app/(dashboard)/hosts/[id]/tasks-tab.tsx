@@ -62,7 +62,6 @@ import type { HostWithAgent } from '@/lib/actions/agents-core'
 import { useRouter } from 'next/navigation'
 
 interface Props {
-  scopeId: string
   host: HostWithAgent
   canRunTasks: boolean
 }
@@ -173,7 +172,7 @@ function TaskDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: strin
   return <span className="text-sm text-muted-foreground">—</span>
 }
 
-export function TasksTab({ scopeId, host, canRunTasks }: Props) {
+export function TasksTab({ host, canRunTasks }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const isLinux = host.os?.toLowerCase() === 'linux'
@@ -198,8 +197,8 @@ export function TasksTab({ scopeId, host, canRunTasks }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: taskRuns = [] } = useQuery({
-    queryKey: ['task-runs-host', scopeId, host.id],
-    queryFn: () => listTaskRunsForHost(scopeId, host.id),
+    queryKey: ['task-runs-host', host.id],
+    queryFn: () => listTaskRunsForHost(host.id),
     refetchInterval: (query) => {
       const runs = query.state.data ?? []
       return runs.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
@@ -237,7 +236,7 @@ export function TasksTab({ scopeId, host, canRunTasks }: Props) {
   }
 
   const { mutate: doPatchRun, isPending: isPatching } = useMutation({
-    mutationFn: () => triggerPatchRun(scopeId, host.id, patchMode),
+    mutationFn: () => triggerPatchRun(host.id, patchMode),
     onSuccess: (result) => {
       setPatchOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -245,7 +244,7 @@ export function TasksTab({ scopeId, host, canRunTasks }: Props) {
   })
 
   const { mutate: doScriptRun, isPending: isScripting } = useMutation({
-    mutationFn: () => triggerCustomScriptRun(scopeId, host.id, scriptBody, interpreter),
+    mutationFn: () => triggerCustomScriptRun(host.id, scriptBody, interpreter),
     onSuccess: (result) => {
       setScriptOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -253,7 +252,7 @@ export function TasksTab({ scopeId, host, canRunTasks }: Props) {
   })
 
   const { mutate: doServiceAction, isPending: isServicing } = useMutation({
-    mutationFn: () => triggerServiceAction(scopeId, host.id, serviceName, serviceAction),
+    mutationFn: () => triggerServiceAction(host.id, serviceName, serviceAction),
     onSuccess: (result) => {
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
@@ -261,10 +260,10 @@ export function TasksTab({ scopeId, host, canRunTasks }: Props) {
   })
 
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
-    mutationFn: () => deleteTaskRuns(scopeId, [...selectedIds]),
+    mutationFn: () => deleteTaskRuns([...selectedIds]),
     onSuccess: () => {
       setSelectedIds(new Set())
-      queryClient.invalidateQueries({ queryKey: ['task-runs-host', scopeId, host.id] })
+      queryClient.invalidateQueries({ queryKey: ['task-runs-host', host.id] })
     },
   })
 

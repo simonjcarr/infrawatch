@@ -49,11 +49,9 @@ function formatMaybeDate(d: Date | string | null): string {
 }
 
 export function SchedulesClient({
-  orgId,
   userRole,
   initialSchedules,
 }: {
-  orgId: string
   userRole: string
   initialSchedules: ScheduleWithTargetName[]
 }) {
@@ -65,23 +63,23 @@ export function SchedulesClient({
   const canEdit = userRole === 'org_admin' || userRole === 'super_admin'
 
   const { data: schedules = initialSchedules } = useQuery({
-    queryKey: ['task-schedules', orgId],
-    queryFn: () => listSchedules(orgId),
+    queryKey: ['task-schedules'],
+    queryFn: () => listSchedules(),
     initialData: initialSchedules,
     staleTime: 10_000,
   })
 
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      setScheduleEnabled(orgId, id, enabled),
+      setScheduleEnabled(id, enabled),
     onSuccess: (result) => {
       if ('error' in result) setErrorMsg(result.error)
-      queryClient.invalidateQueries({ queryKey: ['task-schedules', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['task-schedules'] })
     },
   })
 
   const runNow = useMutation({
-    mutationFn: (id: string) => runScheduleNow(orgId, id),
+    mutationFn: (id: string) => runScheduleNow(id),
     onSuccess: (result) => {
       if ('error' in result) {
         setErrorMsg(result.error)
@@ -92,11 +90,11 @@ export function SchedulesClient({
   })
 
   const remove = useMutation({
-    mutationFn: (id: string) => deleteSchedule(orgId, id),
+    mutationFn: (id: string) => deleteSchedule(id),
     onSuccess: (result) => {
       if ('error' in result) setErrorMsg(result.error)
       setDeleteTarget(null)
-      queryClient.invalidateQueries({ queryKey: ['task-schedules', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['task-schedules'] })
     },
   })
 

@@ -1,33 +1,16 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
-
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
-      AND "user".email = ${TEST_USER.email}
-    LIMIT 1
-  `
-
-  expect(rows).toHaveLength(1)
-  return {
-    orgId: rows[0]!.org_id,
-    userId: rows[0]!.user_id,
-  }
-}
+import { getSeededTestUserContext } from '../fixtures/seed'
 
 test('authenticated user can bulk delete task history from a host group', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO host_groups (id, organisation_id, name, description)
     VALUES (
       'group-task-history',
-      ${orgId},
+      ${instanceId},
       'Task History Group',
       'Used to verify task history cleanup'
     )
@@ -47,7 +30,7 @@ test('authenticated user can bulk delete task history from a host group', async 
     )
     VALUES (
       'group-task-history-host',
-      ${orgId},
+      ${instanceId},
       'ops-01',
       'Ops Host 01',
       'linux',
@@ -62,7 +45,7 @@ test('authenticated user can bulk delete task history from a host group', async 
     INSERT INTO host_group_members (id, organisation_id, group_id, host_id)
     VALUES (
       'group-task-history-member',
-      ${orgId},
+      ${instanceId},
       'group-task-history',
       'group-task-history-host'
     )
@@ -85,7 +68,7 @@ test('authenticated user can bulk delete task history from a host group', async 
     VALUES
       (
         'group-task-run-patch',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'group',
         'group-task-history',
@@ -98,7 +81,7 @@ test('authenticated user can bulk delete task history from a host group', async 
       ),
       (
         'group-task-run-service',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'group',
         'group-task-history',
@@ -125,7 +108,7 @@ test('authenticated user can bulk delete task history from a host group', async 
     VALUES
       (
         'group-task-run-host-patch',
-        ${orgId},
+        ${instanceId},
         'group-task-run-patch',
         'group-task-history-host',
         'success',
@@ -135,7 +118,7 @@ test('authenticated user can bulk delete task history from a host group', async 
       ),
       (
         'group-task-run-host-service',
-        ${orgId},
+        ${instanceId},
         'group-task-run-service',
         'group-task-history-host',
         'failed',

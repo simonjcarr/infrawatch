@@ -1,27 +1,10 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
-
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
-      AND "user".email = ${TEST_USER.email}
-    LIMIT 1
-  `
-
-  expect(rows).toHaveLength(1)
-  return {
-    orgId: rows[0]!.org_id,
-    userId: rows[0]!.user_id,
-  }
-}
+import { getSeededTestUserContext } from '../fixtures/seed'
 
 test('admin can review a completed grouped task run and switch between host outputs', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getSeededTestUserContext()
 
   await sql`
     INSERT INTO host_groups (
@@ -32,7 +15,7 @@ test('admin can review a completed grouped task run and switch between host outp
     )
     VALUES (
       'task-monitor-group-1',
-      ${orgId},
+      ${instanceId},
       'Task Monitor Group',
       'Used to verify the task run monitor view'
     )
@@ -53,7 +36,7 @@ test('admin can review a completed grouped task run and switch between host outp
     VALUES
       (
         'task-monitor-host-1',
-        ${orgId},
+        ${instanceId},
         'task-monitor-node-1',
         'Task Monitor Alpha',
         'Ubuntu 24.04',
@@ -64,7 +47,7 @@ test('admin can review a completed grouped task run and switch between host outp
       ),
       (
         'task-monitor-host-2',
-        ${orgId},
+        ${instanceId},
         'task-monitor-node-2',
         'Task Monitor Beta',
         'Ubuntu 24.04',
@@ -85,13 +68,13 @@ test('admin can review a completed grouped task run and switch between host outp
     VALUES
       (
         'task-monitor-member-1',
-        ${orgId},
+        ${instanceId},
         'task-monitor-group-1',
         'task-monitor-host-1'
       ),
       (
         'task-monitor-member-2',
-        ${orgId},
+        ${instanceId},
         'task-monitor-group-1',
         'task-monitor-host-2'
       )
@@ -113,7 +96,7 @@ test('admin can review a completed grouped task run and switch between host outp
     )
     VALUES (
       'task-monitor-run-1',
-      ${orgId},
+      ${instanceId},
       ${userId},
       'group',
       'task-monitor-group-1',
@@ -142,7 +125,7 @@ test('admin can review a completed grouped task run and switch between host outp
     VALUES
       (
         'task-monitor-run-host-1',
-        ${orgId},
+        ${instanceId},
         'task-monitor-run-1',
         'task-monitor-host-1',
         'success',
@@ -154,7 +137,7 @@ test('admin can review a completed grouped task run and switch between host outp
       ),
       (
         'task-monitor-run-host-2',
-        ${orgId},
+        ${instanceId},
         'task-monitor-run-1',
         'task-monitor-host-2',
         'failed',

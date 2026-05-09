@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { canAccessTooling } from '@/lib/auth/tooling'
+import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { getTaskRun } from '@/lib/actions/task-runs'
 import { TaskMonitorClient } from './task-monitor-client'
 
@@ -17,10 +18,9 @@ export default async function TaskRunPage({ params }: Props) {
   const { id } = await params
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
-  const orgId = session.user.organisationId!
-
-  const taskRun = await getTaskRun(orgId, id)
+  const currentScope = resolveCurrentActionScope(session)
+  const taskRun = await getTaskRun(currentScope, id)
   if (!taskRun) notFound()
 
-  return <TaskMonitorClient orgId={orgId} initialTaskRun={taskRun} />
+  return <TaskMonitorClient initialTaskRun={taskRun} />
 }

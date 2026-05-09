@@ -1290,7 +1290,7 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
 
       {/* Tasks Tab */}
       {activeTab === 'tasks' && (
-        <TasksTab scopeId={scopeId} host={host} canRunTasks={canRunHostTasks} />
+        <TasksTab host={host} canRunTasks={canRunHostTasks} />
       )}
 
       {/* Logs Tab */}

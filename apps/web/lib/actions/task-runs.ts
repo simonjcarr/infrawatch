@@ -1,659 +1,187 @@
 'use server'
 
-import { logError } from '@/lib/logging'
-import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
-
-import { db } from '@/lib/db'
+import { getRequiredSession } from '@/lib/auth/session'
+import { resolveCurrentActionScope } from './action-scope'
 import {
-  taskRuns,
-  taskRunHosts,
-  hosts,
-  hostGroupMembers,
-} from '@/lib/db/schema'
-import { eq, and, isNull, isNotNull, desc, inArray } from 'drizzle-orm'
-import type {
-  TaskRun,
-  TaskRunHost,
-  TaskType,
-  TaskConfig,
-  PatchTaskConfig,
-  CustomScriptTaskConfig,
-  ServiceTaskConfig,
-  AgentUninstallTaskConfig,
-  Host,
-} from '@/lib/db/schema'
+  cancelTaskRun as cancelTaskRunCore,
+  deleteTaskRuns as deleteTaskRunsCore,
+  getTaskRun as getTaskRunCore,
+  listAutomatedRunsForHost as listAutomatedRunsForHostCore,
+  listTaskRunsForGroup as listTaskRunsForGroupCore,
+  listTaskRunsForHost as listTaskRunsForHostCore,
+  triggerAgentUninstall as triggerAgentUninstallCore,
+  triggerCustomScriptRun as triggerCustomScriptRunCore,
+  triggerGroupCustomScriptRun as triggerGroupCustomScriptRunCore,
+  triggerGroupPatchRun as triggerGroupPatchRunCore,
+  triggerGroupServiceAction as triggerGroupServiceActionCore,
+  triggerPatchRun as triggerPatchRunCore,
+  triggerServiceAction as triggerServiceActionCore,
+  type TaskRunWithHosts,
+} from './task-runs-core'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+export type { TaskRunHostWithHost, TaskRunWithHosts } from './task-runs-core'
 
-export type TaskRunHostWithHost = TaskRunHost & { host: Host }
-export type TaskRunWithHosts = TaskRun & { hosts: TaskRunHostWithHost[] }
+const TASK_TYPES = new Set(['patch', 'custom_script', 'service', 'agent_uninstall', 'software_inventory'])
 
-// ── Generic helpers ───────────────────────────────────────────────────────────
-
-/**
- * Creates a task_run record and task_run_hosts rows for each target host.
- * Hosts that should be skipped (wrong OS etc.) must be passed as skipHosts with
- * a reason; they are inserted immediately in 'skipped' status.
- */
-async function createTaskRun(
-  orgId: string,
-  userId: string,
-  targetType: 'host' | 'group',
-  targetId: string,
-  taskType: TaskType,
-  config: TaskConfig,
-  maxParallel: number,
-  pendingHostIds: string[],
-  skipHosts: { hostId: string; reason: string }[],
-): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  try {
-    return await db.transaction(async (tx) => {
-      const [run] = await tx
-        .insert(taskRuns)
-        .values({
-          organisationId: orgId,
-          triggeredBy: userId,
-          targetType,
-          targetId,
-          taskType,
-          config,
-          maxParallel,
-        })
-        .returning()
-
-      if (!run) return { error: 'Failed to create task run' }
-
-      const hostRows: (typeof taskRunHosts.$inferInsert)[] = [
-        ...pendingHostIds.map((hostId) => ({
-          organisationId: orgId,
-          taskRunId: run.id,
-          hostId,
-          status: 'pending' as const,
-        })),
-        ...skipHosts.map(({ hostId, reason }) => ({
-          organisationId: orgId,
-          taskRunId: run.id,
-          hostId,
-          status: 'skipped' as const,
-          skipReason: reason,
-        })),
-      ]
-
-      if (hostRows.length > 0) {
-        await tx.insert(taskRunHosts).values(hostRows)
-      }
-
-      return { success: true, taskRunId: run.id }
-    })
-  } catch (err) {
-    logError('Failed to create task run:', err)
-    return { error: 'Failed to create task run' }
-  }
+function isTaskType(value: string | undefined): value is string {
+  return value !== undefined && TASK_TYPES.has(value)
 }
 
-// ── Queries ───────────────────────────────────────────────────────────────────
-
-/**
- * Returns the full task run with per-host details and host display info.
- * Used by the monitor page and for status polling.
- */
 export async function getTaskRun(
-  orgId: string,
-  taskRunId: string,
+  ...args: [string] | [string, string]
 ): Promise<TaskRunWithHosts | null> {
-  await requireOrgToolingAccess(orgId)
-  const run = await db.query.taskRuns.findFirst({
-    where: and(
-      eq(taskRuns.id, taskRunId),
-      eq(taskRuns.organisationId, orgId),
-      isNull(taskRuns.deletedAt),
-    ),
-  })
-  if (!run) return null
-
-  const hostRows = await db.query.taskRunHosts.findMany({
-    where: and(
-      eq(taskRunHosts.taskRunId, taskRunId),
-      eq(taskRunHosts.organisationId, orgId),
-      isNull(taskRunHosts.deletedAt),
-    ),
-  })
-
-  const hostIds = hostRows.map((r) => r.hostId)
-  const hostDetails =
-    hostIds.length > 0
-      ? await db.query.hosts.findMany({
-          where: and(
-            inArray(hosts.id, hostIds),
-            eq(hosts.organisationId, orgId),
-          ),
-        })
-      : []
-
-  const hostMap = new Map(hostDetails.map((h) => [h.id, h]))
-
-  return {
-    ...run,
-    hosts: hostRows.map((r) => ({
-      ...r,
-      host: hostMap.get(r.hostId) ?? ({} as Host),
-    })),
-  }
+  const session = await getRequiredSession()
+  const [currentScope, taskRunId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return getTaskRunCore(currentScope, taskRunId)
 }
 
-/**
- * Returns the most recent user-triggered task runs that include a given host.
- * Automated runs created by the system sweeper (triggered_by IS NULL) are
- * excluded — those surface under the host's Logs tab instead.
- * Optionally filtered by task_type.
- */
 export async function listTaskRunsForHost(
-  orgId: string,
-  hostId: string,
-  taskType?: string,
+  ...args: [string] | [string, string] | [string, string, string]
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgToolingAccess(orgId)
-  // Find task_run_hosts rows for this host
-  const hostRunRows = await db.query.taskRunHosts.findMany({
-    where: and(
-      eq(taskRunHosts.hostId, hostId),
-      eq(taskRunHosts.organisationId, orgId),
-      isNull(taskRunHosts.deletedAt),
-    ),
-    columns: { taskRunId: true },
-  })
-
-  if (hostRunRows.length === 0) return []
-
-  const runIds = [...new Set(hostRunRows.map((r) => r.taskRunId))]
-
-  const runs = await db.query.taskRuns.findMany({
-    where: and(
-      inArray(taskRuns.id, runIds),
-      eq(taskRuns.organisationId, orgId),
-      isNull(taskRuns.deletedAt),
-      isNotNull(taskRuns.triggeredBy),
-      ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
-    ),
-    orderBy: [desc(taskRuns.createdAt)],
-    limit: 50,
-  })
-
-  return Promise.all(runs.map((run) => getTaskRun(orgId, run.id).then((r) => r!)))
+  const session = await getRequiredSession()
+  if (args.length === 1) return listTaskRunsForHostCore(resolveCurrentActionScope(session), args[0])
+  if (args.length === 2) {
+    return isTaskType(args[1])
+      ? listTaskRunsForHostCore(resolveCurrentActionScope(session), args[0], args[1])
+      : listTaskRunsForHostCore(args[0], args[1])
+  }
+  return listTaskRunsForHostCore(args[0], args[1], args[2])
 }
 
-/**
- * Returns the most recent automated (system-triggered) task runs for a host.
- * These are runs created by the ingest sweepers — e.g. software inventory
- * scans — and have triggered_by IS NULL. Rendered under the host's Logs tab.
- */
 export async function listAutomatedRunsForHost(
-  orgId: string,
-  hostId: string,
-  taskType?: string,
+  ...args: [string] | [string, string] | [string, string, string]
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgToolingAccess(orgId)
-  const hostRunRows = await db.query.taskRunHosts.findMany({
-    where: and(
-      eq(taskRunHosts.hostId, hostId),
-      eq(taskRunHosts.organisationId, orgId),
-      isNull(taskRunHosts.deletedAt),
-    ),
-    columns: { taskRunId: true },
-  })
-
-  if (hostRunRows.length === 0) return []
-
-  const runIds = [...new Set(hostRunRows.map((r) => r.taskRunId))]
-
-  const runs = await db.query.taskRuns.findMany({
-    where: and(
-      inArray(taskRuns.id, runIds),
-      eq(taskRuns.organisationId, orgId),
-      isNull(taskRuns.deletedAt),
-      isNull(taskRuns.triggeredBy),
-      ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
-    ),
-    orderBy: [desc(taskRuns.createdAt)],
-    limit: 50,
-  })
-
-  return Promise.all(runs.map((run) => getTaskRun(orgId, run.id).then((r) => r!)))
+  const session = await getRequiredSession()
+  if (args.length === 1) return listAutomatedRunsForHostCore(resolveCurrentActionScope(session), args[0])
+  if (args.length === 2) {
+    return isTaskType(args[1])
+      ? listAutomatedRunsForHostCore(resolveCurrentActionScope(session), args[0], args[1])
+      : listAutomatedRunsForHostCore(args[0], args[1])
+  }
+  return listAutomatedRunsForHostCore(args[0], args[1], args[2])
 }
 
-/**
- * Returns the most recent task runs targeting a group.
- * Optionally filtered by task_type.
- */
 export async function listTaskRunsForGroup(
-  orgId: string,
-  groupId: string,
-  taskType?: string,
+  ...args: [string] | [string, string] | [string, string, string]
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgToolingAccess(orgId)
-  const runs = await db.query.taskRuns.findMany({
-    where: and(
-      eq(taskRuns.organisationId, orgId),
-      eq(taskRuns.targetType, 'group'),
-      eq(taskRuns.targetId, groupId),
-      isNull(taskRuns.deletedAt),
-      ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
-    ),
-    orderBy: [desc(taskRuns.createdAt)],
-    limit: 50,
-  })
-
-  return Promise.all(runs.map((run) => getTaskRun(orgId, run.id).then((r) => r!)))
+  const session = await getRequiredSession()
+  if (args.length === 1) return listTaskRunsForGroupCore(resolveCurrentActionScope(session), args[0])
+  if (args.length === 2) {
+    return isTaskType(args[1])
+      ? listTaskRunsForGroupCore(resolveCurrentActionScope(session), args[0], args[1])
+      : listTaskRunsForGroupCore(args[0], args[1])
+  }
+  return listTaskRunsForGroupCore(args[0], args[1], args[2])
 }
 
-// ── Cancellation ──────────────────────────────────────────────────────────────
-
-/**
- * Cancels an active task run.
- * - Pending hosts (not yet started) are marked 'cancelled' immediately.
- * - Running hosts are moved to 'cancelling'; the ingest service will signal
- *   the agent to stop the process and the row will transition to 'cancelled'
- *   once the agent acknowledges.
- * - The parent task_run is marked 'cancelling'.
- */
 export async function cancelTaskRun(
-  orgId: string,
-  taskRunId: string,
+  ...args: [string] | [string, string]
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
-  try {
-    return await db.transaction(async (tx) => {
-      // Verify ownership and that the run is still active.
-      const run = await tx.query.taskRuns.findFirst({
-        where: and(
-          eq(taskRuns.id, taskRunId),
-          eq(taskRuns.organisationId, orgId),
-          isNull(taskRuns.deletedAt),
-        ),
-      })
-      if (!run) return { error: 'Task run not found' }
-      if (['completed', 'failed', 'cancelled', 'cancelling'].includes(run.status)) {
-        return { error: 'Task run is already finished or being cancelled' }
-      }
-
-      const now = new Date()
-
-      // Cancel hosts that haven't started yet — no agent signal needed.
-      await tx
-        .update(taskRunHosts)
-        .set({ status: 'cancelled', completedAt: now, updatedAt: now })
-        .where(
-          and(
-            eq(taskRunHosts.taskRunId, taskRunId),
-            eq(taskRunHosts.organisationId, orgId),
-            eq(taskRunHosts.status, 'pending'),
-            isNull(taskRunHosts.deletedAt),
-          ),
-        )
-
-      // Signal running hosts to stop — the agent will acknowledge on the
-      // next heartbeat and the status will transition to 'cancelled'.
-      await tx
-        .update(taskRunHosts)
-        .set({ status: 'cancelling', updatedAt: now })
-        .where(
-          and(
-            eq(taskRunHosts.taskRunId, taskRunId),
-            eq(taskRunHosts.organisationId, orgId),
-            eq(taskRunHosts.status, 'running'),
-            isNull(taskRunHosts.deletedAt),
-          ),
-        )
-
-      // Move the parent run to 'cancelling' so the UI reflects the intent.
-      await tx
-        .update(taskRuns)
-        .set({ status: 'cancelling', updatedAt: now })
-        .where(
-          and(
-            eq(taskRuns.id, taskRunId),
-            isNull(taskRuns.deletedAt),
-          ),
-        )
-
-      return { success: true }
-    })
-  } catch (err) {
-    logError('Failed to cancel task run:', err)
-    return { error: 'Failed to cancel task run' }
-  }
+  const session = await getRequiredSession()
+  const [currentScope, taskRunId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return cancelTaskRunCore(currentScope, taskRunId)
 }
 
-// ── Custom script actions ─────────────────────────────────────────────────────
-
-// 64 KB is enough for any reasonable operational script; larger payloads are
-// almost certainly mistakes or abuse attempts.
-const MAX_SCRIPT_LENGTH: Record<'sh' | 'bash' | 'python3', number> = {
-  sh:      65_536,
-  bash:    65_536,
-  python3: 65_536,
-}
-
-/**
- * Triggers a custom script run against a single host.
- * Works on any OS — the agent will return an error if the interpreter is absent.
- */
 export async function triggerCustomScriptRun(
-  orgId: string,
-  hostId: string,
-  script: string,
-  interpreter: 'sh' | 'bash' | 'python3',
-  timeoutSeconds?: number,
+  ...args:
+    | [string, string, 'sh' | 'bash' | 'python3', number?]
+    | [string, string, string, 'sh' | 'bash' | 'python3', number?]
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(orgId)
-  if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
-    return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
+  const session = await getRequiredSession()
+  if (args.length >= 4 && (args[2] === 'sh' || args[2] === 'bash' || args[2] === 'python3')) {
+    const [hostId, script, interpreter, timeoutSeconds] = args as [string, string, 'sh' | 'bash' | 'python3', number?]
+    return triggerCustomScriptRunCore(resolveCurrentActionScope(session), hostId, script, interpreter, timeoutSeconds)
   }
-
-  const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-  })
-  if (!host) return { error: 'Host not found' }
-
-  const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
-  return createTaskRun(orgId, session.user.id, 'host', hostId, 'custom_script', config, 1, [hostId], [])
+  const [currentScope, hostId, script, interpreter, timeoutSeconds] = args as [string, string, string, 'sh' | 'bash' | 'python3', number?]
+  return triggerCustomScriptRunCore(currentScope, hostId, script, interpreter, timeoutSeconds)
 }
 
-/**
- * Triggers a custom script run against all hosts in a group.
- * All hosts are targeted regardless of OS — the agent handles interpreter availability.
- */
 export async function triggerGroupCustomScriptRun(
-  orgId: string,
-  groupId: string,
-  script: string,
-  interpreter: 'sh' | 'bash' | 'python3',
-  maxParallel: number,
-  timeoutSeconds?: number,
+  ...args:
+    | [string, string, 'sh' | 'bash' | 'python3', number, number?]
+    | [string, string, string, 'sh' | 'bash' | 'python3', number, number?]
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(orgId)
-  if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
-    return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
+  const session = await getRequiredSession()
+  if (args.length >= 5 && (args[2] === 'sh' || args[2] === 'bash' || args[2] === 'python3')) {
+    const [groupId, script, interpreter, maxParallel, timeoutSeconds] = args as [string, string, 'sh' | 'bash' | 'python3', number, number?]
+    return triggerGroupCustomScriptRunCore(resolveCurrentActionScope(session), groupId, script, interpreter, maxParallel, timeoutSeconds)
   }
-  const members = await db.query.hostGroupMembers.findMany({
-    where: and(
-      eq(hostGroupMembers.groupId, groupId),
-      eq(hostGroupMembers.organisationId, orgId),
-      isNull(hostGroupMembers.deletedAt),
-    ),
-    columns: { hostId: true },
-  })
-  if (members.length === 0) return { error: 'Group has no members' }
-
-  const hostIds = members.map((m) => m.hostId)
-  const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
-  return createTaskRun(orgId, session.user.id, 'group', groupId, 'custom_script', config, maxParallel, hostIds, [])
+  const [currentScope, groupId, script, interpreter, maxParallel, timeoutSeconds] = args as [string, string, string, 'sh' | 'bash' | 'python3', number, number?]
+  return triggerGroupCustomScriptRunCore(currentScope, groupId, script, interpreter, maxParallel, timeoutSeconds)
 }
 
-// ── Service management actions ────────────────────────────────────────────────
-
-/**
- * Triggers a systemctl service action against a single Linux host.
- * Returns an error for non-Linux hosts.
- */
 export async function triggerServiceAction(
-  orgId: string,
-  hostId: string,
-  serviceName: string,
-  action: 'start' | 'stop' | 'restart' | 'status',
+  ...args:
+    | [string, string, 'start' | 'stop' | 'restart' | 'status']
+    | [string, string, string, 'start' | 'stop' | 'restart' | 'status']
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(orgId)
-  const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-  })
-  if (!host) return { error: 'Host not found' }
-  if (host.os?.toLowerCase() !== 'linux') {
-    return { error: 'Service management is only supported on Linux hosts' }
+  const session = await getRequiredSession()
+  if (args.length === 3) {
+    const [hostId, serviceName, action] = args
+    return triggerServiceActionCore(resolveCurrentActionScope(session), hostId, serviceName, action)
   }
-
-  const config: ServiceTaskConfig = { service_name: serviceName, action }
-  return createTaskRun(orgId, session.user.id, 'host', hostId, 'service', config, 1, [hostId], [])
+  const [currentScope, hostId, serviceName, action] = args
+  return triggerServiceActionCore(currentScope, hostId, serviceName, action)
 }
 
-/**
- * Triggers a systemctl service action against all Linux hosts in a group.
- * Non-Linux hosts are immediately recorded as 'skipped'.
- */
 export async function triggerGroupServiceAction(
-  orgId: string,
-  groupId: string,
-  serviceName: string,
-  action: 'start' | 'stop' | 'restart' | 'status',
-  maxParallel: number,
+  ...args:
+    | [string, string, 'start' | 'stop' | 'restart' | 'status', number]
+    | [string, string, string, 'start' | 'stop' | 'restart' | 'status', number]
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  const session = await requireOrgAdminAccess(orgId)
-  const members = await db.query.hostGroupMembers.findMany({
-    where: and(
-      eq(hostGroupMembers.groupId, groupId),
-      eq(hostGroupMembers.organisationId, orgId),
-      isNull(hostGroupMembers.deletedAt),
-    ),
-    columns: { hostId: true },
-  })
-  if (members.length === 0) return { error: 'Group has no members' }
-
-  const hostIds = members.map((m) => m.hostId)
-  const groupHosts = await db.query.hosts.findMany({
-    where: and(
-      inArray(hosts.id, hostIds),
-      eq(hosts.organisationId, orgId),
-      isNull(hosts.deletedAt),
-    ),
-  })
-
-  const pendingHostIds: string[] = []
-  const skipHosts: { hostId: string; reason: string }[] = []
-
-  for (const host of groupHosts) {
-    if (host.os?.toLowerCase() === 'linux') {
-      pendingHostIds.push(host.id)
-    } else {
-      skipHosts.push({
-        hostId: host.id,
-        reason: `non-Linux host (os: ${host.os ?? 'unknown'})`,
-      })
-    }
+  const session = await getRequiredSession()
+  if (args.length === 4) {
+    const [groupId, serviceName, action, maxParallel] = args
+    return triggerGroupServiceActionCore(resolveCurrentActionScope(session), groupId, serviceName, action, maxParallel)
   }
-
-  if (pendingHostIds.length === 0 && skipHosts.length === 0) {
-    return { error: 'No hosts found in group' }
-  }
-
-  const config: ServiceTaskConfig = { service_name: serviceName, action }
-  const result = await createTaskRun(
-    orgId, session.user.id, 'group', groupId, 'service', config, maxParallel, pendingHostIds, skipHosts,
-  )
-
-  if ('error' in result) return result
-
-  return {
-    success: true,
-    taskRunId: result.taskRunId,
-    targetedCount: pendingHostIds.length,
-    skippedCount: skipHosts.length,
-  }
+  const [currentScope, groupId, serviceName, action, maxParallel] = args
+  return triggerGroupServiceActionCore(currentScope, groupId, serviceName, action, maxParallel)
 }
 
-// ── Agent uninstall action ────────────────────────────────────────────────────
-
-/**
- * Triggers a remote agent uninstall on a single host.
- *
- * The agent handler returns a "scheduled" result as soon as it has staged
- * a detached uninstaller child process. The actual uninstall completes
- * out-of-band on the host — see apps/agent/internal/tasks/uninstall.go and
- * apps/agent/internal/install/uninstall.go.
- *
- * Callers that need to delete the host record after the uninstall has been
- * scheduled should poll task_run_hosts.status and then invoke deleteHost.
- */
 export async function triggerAgentUninstall(
-  orgId: string,
-  hostId: string,
+  ...args: [string] | [string, string]
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(orgId)
-  const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-  })
-  if (!host) return { error: 'Host not found' }
-
-  const config: AgentUninstallTaskConfig = {}
-  return createTaskRun(orgId, session.user.id, 'host', hostId, 'agent_uninstall', config, 1, [hostId], [])
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return triggerAgentUninstallCore(currentScope, hostId)
 }
 
-// ── Deletion ──────────────────────────────────────────────────────────────────
-
-/**
- * Soft-deletes one or more task runs (and their host rows).
- * Both tables filter by isNull(deletedAt) in all queries, so the rows
- * disappear automatically after this call.
- */
 export async function deleteTaskRuns(
-  orgId: string,
-  taskRunIds: string[],
+  ...args: [string[]] | [string, string[]]
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
-  if (taskRunIds.length === 0) return { success: true }
-  try {
-    const now = new Date()
-    await db.transaction(async (tx) => {
-      await tx
-        .update(taskRunHosts)
-        .set({ deletedAt: now, updatedAt: now })
-        .where(
-          and(
-            inArray(taskRunHosts.taskRunId, taskRunIds),
-            eq(taskRunHosts.organisationId, orgId),
-            isNull(taskRunHosts.deletedAt),
-          ),
-        )
-      await tx
-        .update(taskRuns)
-        .set({ deletedAt: now, updatedAt: now })
-        .where(
-          and(
-            inArray(taskRuns.id, taskRunIds),
-            eq(taskRuns.organisationId, orgId),
-            isNull(taskRuns.deletedAt),
-          ),
-        )
-    })
-    return { success: true }
-  } catch (err) {
-    logError('Failed to delete task runs:', err)
-    return { error: 'Failed to delete task runs' }
-  }
+  const session = await getRequiredSession()
+  const [currentScope, taskRunIds] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  return deleteTaskRunsCore(currentScope, taskRunIds)
 }
 
-// ── Patch-specific actions ────────────────────────────────────────────────────
-
-/**
- * Triggers a patch run against a single host.
- * The host must be Linux — returns an error for non-Linux hosts.
- */
 export async function triggerPatchRun(
-  orgId: string,
-  hostId: string,
-  mode: 'security' | 'all',
+  ...args: [string, 'security' | 'all'] | [string, string, 'security' | 'all']
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(orgId)
-  const host = await db.query.hosts.findFirst({
-    where: and(
-      eq(hosts.id, hostId),
-      eq(hosts.organisationId, orgId),
-      isNull(hosts.deletedAt),
-    ),
-  })
-  if (!host) return { error: 'Host not found' }
-  if (host.os?.toLowerCase() !== 'linux') {
-    return { error: 'Patch runs are only supported on Linux hosts' }
+  const session = await getRequiredSession()
+  if (args.length === 2) {
+    const [hostId, mode] = args
+    return triggerPatchRunCore(resolveCurrentActionScope(session), hostId, mode)
   }
-
-  const config: PatchTaskConfig = { mode }
-  return createTaskRun(orgId, session.user.id, 'host', hostId, 'patch', config, 1, [hostId], [])
+  const [currentScope, hostId, mode] = args
+  return triggerPatchRunCore(currentScope, hostId, mode)
 }
 
-/**
- * Triggers a patch run against all Linux hosts in a group.
- * Non-Linux hosts are immediately recorded as 'skipped' with a reason.
- * Returns the number of hosts targeted and skipped.
- */
 export async function triggerGroupPatchRun(
-  orgId: string,
-  groupId: string,
-  mode: 'security' | 'all',
-  maxParallel: number,
+  ...args: [string, 'security' | 'all', number] | [string, string, 'security' | 'all', number]
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  const session = await requireOrgAdminAccess(orgId)
-  // Fetch all members of the group
-  const members = await db.query.hostGroupMembers.findMany({
-    where: and(
-      eq(hostGroupMembers.groupId, groupId),
-      eq(hostGroupMembers.organisationId, orgId),
-      isNull(hostGroupMembers.deletedAt),
-    ),
-    columns: { hostId: true },
-  })
-
-  if (members.length === 0) {
-    return { error: 'Group has no members' }
+  const session = await getRequiredSession()
+  if (args.length === 3) {
+    const [groupId, mode, maxParallel] = args
+    return triggerGroupPatchRunCore(resolveCurrentActionScope(session), groupId, mode, maxParallel)
   }
-
-  const hostIds = members.map((m) => m.hostId)
-  const groupHosts = await db.query.hosts.findMany({
-    where: and(
-      inArray(hosts.id, hostIds),
-      eq(hosts.organisationId, orgId),
-      isNull(hosts.deletedAt),
-    ),
-  })
-
-  const pendingHostIds: string[] = []
-  const skipHosts: { hostId: string; reason: string }[] = []
-
-  for (const host of groupHosts) {
-    if (host.os?.toLowerCase() === 'linux') {
-      pendingHostIds.push(host.id)
-    } else {
-      skipHosts.push({
-        hostId: host.id,
-        reason: `non-Linux host (os: ${host.os ?? 'unknown'})`,
-      })
-    }
-  }
-
-  if (pendingHostIds.length === 0 && skipHosts.length === 0) {
-    return { error: 'No hosts found in group' }
-  }
-
-  const config: PatchTaskConfig = { mode }
-  const result = await createTaskRun(
-    orgId,
-    session.user.id,
-    'group',
-    groupId,
-    'patch',
-    config,
-    maxParallel,
-    pendingHostIds,
-    skipHosts,
-  )
-
-  if ('error' in result) return result
-
-  return {
-    success: true,
-    taskRunId: result.taskRunId,
-    targetedCount: pendingHostIds.length,
-    skippedCount: skipHosts.length,
-  }
+  const [currentScope, groupId, mode, maxParallel] = args
+  return triggerGroupPatchRunCore(currentScope, groupId, mode, maxParallel)
 }

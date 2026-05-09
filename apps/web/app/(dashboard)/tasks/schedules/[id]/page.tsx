@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
-import { db } from '@/lib/db'
-import { hosts, hostGroups } from '@/lib/db/schema'
-import { and, eq, isNull, asc } from 'drizzle-orm'
+import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
+import { listHosts } from '@/lib/actions/agents'
+import { listGroups } from '@/lib/actions/host-groups'
 import { getSchedule } from '@/lib/actions/task-schedules'
 import { ScheduleForm } from '../schedule-form'
 
@@ -20,27 +20,18 @@ export default async function SchedulePage({ params }: Props) {
   const { id } = await params
   const session = await getRequiredSession()
   if (!ADMIN_ROLES.includes(session.user.role)) redirect('/tasks')
-  const orgId = session.user.organisationId!
+  const currentScope = resolveCurrentActionScope(session)
 
-  const result = await getSchedule(orgId, id)
+  const result = await getSchedule(currentScope, id)
   if (!result) notFound()
 
   const [hostRows, groupRows] = await Promise.all([
-    db.query.hosts.findMany({
-      where: and(eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
-      columns: { id: true, hostname: true, os: true },
-      orderBy: asc(hosts.hostname),
-    }),
-    db.query.hostGroups.findMany({
-      where: and(eq(hostGroups.organisationId, orgId), isNull(hostGroups.deletedAt)),
-      columns: { id: true, name: true },
-      orderBy: asc(hostGroups.name),
-    }),
+    listHosts(currentScope),
+    listGroups(currentScope),
   ])
 
   return (
     <ScheduleForm
-      orgId={orgId}
       mode="edit"
       hosts={hostRows}
       groups={groupRows}

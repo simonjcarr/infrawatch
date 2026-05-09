@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.4...ingest/v0.9.5) (2026-05-09)
+
+
+### Bug Fixes
+
+* **hosts:** ignore virtual bridge IPs for host dedupe ([7110f42](https://github.com/carrtech-dev/ct-ops/commit/7110f421cc2bd2d97bf1d758c41f8b5437db33b5))
+
 ## [0.9.4](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.3...ingest/v0.9.4) (2026-05-08)
 
 

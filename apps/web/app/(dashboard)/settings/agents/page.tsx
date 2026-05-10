@@ -16,8 +16,7 @@ export default async function AgentsSettingsPage() {
     session.user.role === 'super_admin' || session.user.role === 'org_admin'
   if (!isAdmin) redirect('/dashboard')
 
-  const orgId = session.user.organisationId!
-  const tokens = await listEnrolmentTokens(orgId)
+  const tokens = await listEnrolmentTokens()
 
   const appUrl = process.env.AGENT_DOWNLOAD_BASE_URL ?? ''
 
@@ -32,7 +31,6 @@ export default async function AgentsSettingsPage() {
         ]}
       />
       <AgentsSettingsClient
-        orgId={orgId}
         initialTokens={tokens}
         appUrl={appUrl}
       />

@@ -32,11 +32,9 @@ function hasSuperAdminRole(role: string | null | undefined, roles: readonly stri
   return normalizeAssignedRoles(roles, role).includes('super_admin')
 }
 
-export async function getOrgUsers(
-  scopeId?: string,
-): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
+export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
   const session = await getRequiredSession()
-  const currentScope = scopeId ?? resolveCurrentActionScope(session)
+  const currentScope = resolveCurrentActionScope(session)
   await requireOrgAccess(currentScope)
 
   const [members, pendingInvites] = await Promise.all([
@@ -56,9 +54,10 @@ export async function getOrgUsers(
 }
 
 export async function inviteUser(
-  orgId: string,
   input: { email: string; roles: string[] },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
+  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const orgId = currentScope
   await requireOrgAccess(orgId)
   const parsed = inviteSchema.safeParse(input)
   if (!parsed.success) {
@@ -184,10 +183,11 @@ export async function inviteUser(
 }
 
 export async function updateUserRole(
-  orgId: string,
   targetUserId: string,
   roles: string[],
 ): Promise<{ success: true } | { error: string }> {
+  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const orgId = currentScope
   await requireOrgAccess(orgId)
   const parsed = updateRoleSchema.safeParse({ roles })
   if (!parsed.success) {
@@ -251,9 +251,10 @@ export async function updateUserRole(
 }
 
 export async function deactivateUser(
-  orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const orgId = currentScope
   await requireOrgAccess(orgId)
   try {
     const session = await requireOrgAdminAccess(orgId)
@@ -316,9 +317,10 @@ export async function deactivateUser(
 }
 
 export async function reactivateUser(
-  orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const orgId = currentScope
   await requireOrgAccess(orgId)
   try {
     const session = await requireOrgAdminAccess(orgId)
@@ -370,9 +372,10 @@ export async function reactivateUser(
 }
 
 export async function removeUser(
-  orgId: string,
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const orgId = currentScope
   await requireOrgAccess(orgId)
   try {
     const session = await requireOrgAdminAccess(orgId)
@@ -433,9 +436,10 @@ export async function removeUser(
 }
 
 export async function cancelInvite(
-  orgId: string,
   inviteId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const orgId = currentScope
   await requireOrgAccess(orgId)
   try {
     const session = await requireOrgAdminAccess(orgId)

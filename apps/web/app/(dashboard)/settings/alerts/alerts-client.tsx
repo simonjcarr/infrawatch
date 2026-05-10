@@ -75,12 +75,10 @@ function ruleSummary(rule: AlertRule): string {
 // ─── Add Default Dialog ───────────────────────────────────────────────────────
 
 function AddDefaultDialog({
-  orgId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: () => void
@@ -102,7 +100,7 @@ function AddDefaultDialog({
   })
 
   async function onSubmit(values: RuleFormValues) {
-    const result = await createGlobalAlertDefault(orgId, {
+    const result = await createGlobalAlertDefault({
       name: values.name,
       severity: values.severity,
       config: {
@@ -221,23 +219,22 @@ function AddDefaultDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface GlobalAlertsClientProps {
-  orgId: string
   initialDefaults: AlertRule[]
 }
 
-export function GlobalAlertsClient({ orgId, initialDefaults }: GlobalAlertsClientProps) {
+export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const queryClient = useQueryClient()
 
   const { data: defaults = initialDefaults } = useQuery({
-    queryKey: ['global-alert-defaults', orgId],
-    queryFn: () => getGlobalAlertDefaults(orgId),
+    queryKey: ['global-alert-defaults'],
+    queryFn: () => getGlobalAlertDefaults(),
     initialData: initialDefaults,
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (ruleId: string) => deleteGlobalAlertDefault(orgId, ruleId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['global-alert-defaults', orgId] }),
+    mutationFn: (ruleId: string) => deleteGlobalAlertDefault(ruleId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['global-alert-defaults'] }),
   })
 
   return (
@@ -323,10 +320,9 @@ export function GlobalAlertsClient({ orgId, initialDefaults }: GlobalAlertsClien
       </div>
 
       <AddDefaultDialog
-        orgId={orgId}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['global-alert-defaults', orgId] })}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['global-alert-defaults'] })}
       />
     </div>
   )

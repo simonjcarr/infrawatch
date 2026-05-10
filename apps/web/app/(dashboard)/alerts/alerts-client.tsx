@@ -143,12 +143,10 @@ const webhookFormSchema = z.object({
 type WebhookFormValues = z.infer<typeof webhookFormSchema>
 
 function AddWebhookDialog({
-  orgId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: SuccessHandler
@@ -161,7 +159,7 @@ function AddWebhookDialog({
   } = useForm<WebhookFormValues>({ resolver: zodResolver(webhookFormSchema) })
 
   async function onSubmit(values: WebhookFormValues) {
-    const result = await createNotificationChannel(orgId, {
+    const result = await createNotificationChannel({
       name: values.name,
       type: 'webhook',
       config: { url: values.url, secret: values.secret || undefined },
@@ -238,12 +236,10 @@ const smtpFormSchema = z.object({
 type SmtpFormValues = z.infer<typeof smtpFormSchema>
 
 function AddSmtpDialog({
-  orgId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: SuccessHandler
@@ -261,7 +257,7 @@ function AddSmtpDialog({
       .map((e) => e.trim())
       .filter(Boolean)
 
-    const result = await createNotificationChannel(orgId, {
+    const result = await createNotificationChannel({
       name: values.name,
       type: 'smtp',
       config: {
@@ -388,13 +384,11 @@ const editWebhookFormSchema = z.object({
 type EditWebhookFormValues = z.infer<typeof editWebhookFormSchema>
 
 function EditWebhookDialog({
-  orgId,
   channel,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   channel: NotificationChannelSafe & { type: 'webhook' }
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -412,7 +406,7 @@ function EditWebhookDialog({
   }, [open, channel, reset])
 
   async function onSubmit(values: EditWebhookFormValues) {
-    const result = await updateNotificationChannel(orgId, channel.id, {
+    const result = await updateNotificationChannel(channel.id, {
       name: values.name,
       url: values.url,
       secret: values.secret || undefined,
@@ -477,13 +471,11 @@ const editSmtpFormSchema = z.object({
 type EditSmtpFormValues = z.infer<typeof editSmtpFormSchema>
 
 function EditSmtpDialog({
-  orgId,
   channel,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   channel: NotificationChannelSafe & { type: 'smtp' }
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -507,7 +499,7 @@ function EditSmtpDialog({
       .map((e) => e.trim())
       .filter(Boolean)
 
-    const result = await updateNotificationChannel(orgId, channel.id, {
+    const result = await updateNotificationChannel(channel.id, {
       name: values.name,
       toAddresses,
     })
@@ -570,12 +562,10 @@ const editSlackFormSchema = z.object({
 type EditSlackFormValues = z.infer<typeof editSlackFormSchema>
 
 function AddSlackDialog({
-  orgId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: SuccessHandler
@@ -588,7 +578,7 @@ function AddSlackDialog({
   } = useForm<SlackFormValues>({ resolver: zodResolver(slackFormSchema) })
 
   async function onSubmit(values: SlackFormValues) {
-    const result = await createNotificationChannel(orgId, {
+    const result = await createNotificationChannel({
       name: values.name,
       type: 'slack',
       config: { webhookUrl: values.webhookUrl },
@@ -639,13 +629,11 @@ function AddSlackDialog({
 }
 
 function EditSlackDialog({
-  orgId,
   channel,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   channel: NotificationChannelSafe & { type: 'slack' }
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -663,7 +651,7 @@ function EditSlackDialog({
   }, [open, channel, reset])
 
   async function onSubmit(values: EditSlackFormValues) {
-    const result = await updateNotificationChannel(orgId, channel.id, {
+    const result = await updateNotificationChannel(channel.id, {
       name: values.name,
       webhookUrl: values.webhookUrl,
     })
@@ -719,12 +707,10 @@ const telegramFormSchema = z.object({
 type TelegramFormValues = z.infer<typeof telegramFormSchema>
 
 function AddTelegramDialog({
-  orgId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: SuccessHandler
@@ -737,7 +723,7 @@ function AddTelegramDialog({
   } = useForm<TelegramFormValues>({ resolver: zodResolver(telegramFormSchema) })
 
   async function onSubmit(values: TelegramFormValues) {
-    const result = await createNotificationChannel(orgId, {
+    const result = await createNotificationChannel({
       name: values.name,
       type: 'telegram',
       config: { botToken: values.botToken, chatId: values.chatId },
@@ -808,13 +794,11 @@ const editTelegramFormSchema = z.object({
 type EditTelegramFormValues = z.infer<typeof editTelegramFormSchema>
 
 function EditTelegramDialog({
-  orgId,
   channel,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  orgId: string
   channel: NotificationChannelSafe & { type: 'telegram' }
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -832,7 +816,7 @@ function EditTelegramDialog({
   }, [open, channel, reset])
 
   async function onSubmit(values: EditTelegramFormValues) {
-    const result = await updateNotificationChannel(orgId, channel.id, {
+    const result = await updateNotificationChannel(channel.id, {
       name: values.name,
       botToken: values.botToken || undefined,
       chatId: values.chatId,
@@ -905,14 +889,12 @@ const silenceFormSchema = z.object({
 type SilenceFormValues = z.infer<typeof silenceFormSchema>
 
 function AddSilenceDialog({
-  orgId,
   hosts,
   open,
   onOpenChange,
   onSuccess,
   prefilledHostId,
 }: {
-  orgId: string
   hosts: HostWithAgent[]
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -937,7 +919,7 @@ function AddSilenceDialog({
   })
 
   async function onSubmit(values: SilenceFormValues) {
-    const result = await createSilence(orgId, {
+    const result = await createSilence({
       hostId: values.hostId || null,
       reason: values.reason,
       startsAt: new Date(values.startsAt).toISOString(),
@@ -1009,7 +991,6 @@ function AddSilenceDialog({
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 interface AlertsClientProps {
-  orgId: string
   initialActive: AlertInstanceWithRule[]
   initialChannels: NotificationChannelSafe[]
   initialSilences: AlertSilenceWithHost[]
@@ -1021,7 +1002,6 @@ type SeverityFilter = 'all' | AlertSeverity
 const HISTORY_PAGE_SIZE = 25
 
 export function AlertsClient({
-  orgId,
   initialActive,
   initialChannels,
   initialSilences,
@@ -1051,16 +1031,16 @@ export function AlertsClient({
   }
 
   const { data: activeAlerts = [] } = useQuery({
-    queryKey: ['alerts', orgId, 'firing'],
-    queryFn: () => getAlertInstances(orgId, { status: 'firing', limit: 100 }),
+    queryKey: ['alerts', 'firing'],
+    queryFn: () => getAlertInstances({ status: 'firing', limit: 100 }),
     initialData: initialActive,
     refetchInterval: 30_000,
   })
 
   const { data: historyAlerts = [], isFetching: historyFetching } = useQuery({
-    queryKey: ['alerts', orgId, 'history', historyPage, historyFilters],
+    queryKey: ['alerts', 'history', historyPage, historyFilters],
     queryFn: () =>
-      getAlertInstances(orgId, {
+      getAlertInstances({
         ...historyFilters,
         limit: HISTORY_PAGE_SIZE,
         offset: historyPage * HISTORY_PAGE_SIZE,
@@ -1069,48 +1049,48 @@ export function AlertsClient({
   })
 
   const { data: historyTotal = 0 } = useQuery({
-    queryKey: ['alerts', orgId, 'history-count', historyFilters],
-    queryFn: () => getAlertInstanceCount(orgId, historyFilters),
+    queryKey: ['alerts', 'history-count', historyFilters],
+    queryFn: () => getAlertInstanceCount(historyFilters),
   })
 
   const { data: channels = [] } = useQuery({
-    queryKey: ['notification-channels', orgId],
-    queryFn: () => getNotificationChannels(orgId),
+    queryKey: ['notification-channels'],
+    queryFn: () => getNotificationChannels(),
     initialData: initialChannels,
     refetchInterval: 60_000,
   })
 
   const { data: silences = [] } = useQuery({
-    queryKey: ['silences', orgId],
-    queryFn: () => getSilences(orgId),
+    queryKey: ['silences'],
+    queryFn: () => getSilences(),
     initialData: initialSilences,
     refetchInterval: 60_000,
   })
 
   const acknowledgeMutation = useMutation({
-    mutationFn: (instanceId: string) => acknowledgeAlert(orgId, instanceId),
+    mutationFn: (instanceId: string) => acknowledgeAlert(instanceId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['alerts', orgId] })
+      qc.invalidateQueries({ queryKey: ['alerts'] })
     },
   })
 
   const deleteChannelMutation = useMutation({
-    mutationFn: (channelId: string) => deleteNotificationChannel(orgId, channelId),
+    mutationFn: (channelId: string) => deleteNotificationChannel(channelId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+      qc.invalidateQueries({ queryKey: ['notification-channels'] })
     },
   })
 
   const deleteSilenceMutation = useMutation({
-    mutationFn: (silenceId: string) => deleteSilence(orgId, silenceId),
+    mutationFn: (silenceId: string) => deleteSilence(silenceId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['silences', orgId] })
+      qc.invalidateQueries({ queryKey: ['silences'] })
     },
   })
 
   async function handleTestNotification(channel: NotificationChannelSafe) {
     setTestingChannelId(channel.id)
-    const result = await sendTestNotification(orgId, channel.id)
+    const result = await sendTestNotification(channel.id)
     setTestingChannelId(null)
     setTestLog({
       channelName: channel.name,
@@ -1619,84 +1599,75 @@ export function AlertsClient({
       </Card>
 
       <AddSilenceDialog
-        orgId={orgId}
         hosts={hosts}
         open={addSilenceOpen}
         onOpenChange={setAddSilenceOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['silences', orgId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['silences'] })}
       />
       <AddWebhookDialog
-        orgId={orgId}
         open={addWebhookOpen}
         onOpenChange={setAddWebhookOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels'] })}
       />
       <AddSmtpDialog
-        orgId={orgId}
         open={addSmtpOpen}
         onOpenChange={setAddSmtpOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels'] })}
       />
       <AddSlackDialog
-        orgId={orgId}
         open={addSlackOpen}
         onOpenChange={setAddSlackOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels'] })}
       />
       <AddTelegramDialog
-        orgId={orgId}
         open={addTelegramOpen}
         onOpenChange={setAddTelegramOpen}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['notification-channels'] })}
       />
       {testLog && (
         <TestLogDialog entry={testLog} onClose={() => setTestLog(null)} />
       )}
       {editingChannel?.type === 'webhook' && (
         <EditWebhookDialog
-          orgId={orgId}
           channel={editingChannel}
           open={true}
           onOpenChange={(v) => { if (!v) setEditingChannel(null) }}
           onSuccess={() => {
             setEditingChannel(null)
-            qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+            qc.invalidateQueries({ queryKey: ['notification-channels'] })
           }}
         />
       )}
       {editingChannel?.type === 'smtp' && (
         <EditSmtpDialog
-          orgId={orgId}
           channel={editingChannel}
           open={true}
           onOpenChange={(v) => { if (!v) setEditingChannel(null) }}
           onSuccess={() => {
             setEditingChannel(null)
-            qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+            qc.invalidateQueries({ queryKey: ['notification-channels'] })
           }}
         />
       )}
       {editingChannel?.type === 'slack' && (
         <EditSlackDialog
-          orgId={orgId}
           channel={editingChannel}
           open={true}
           onOpenChange={(v) => { if (!v) setEditingChannel(null) }}
           onSuccess={() => {
             setEditingChannel(null)
-            qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+            qc.invalidateQueries({ queryKey: ['notification-channels'] })
           }}
         />
       )}
       {editingChannel?.type === 'telegram' && (
         <EditTelegramDialog
-          orgId={orgId}
           channel={editingChannel}
           open={true}
           onOpenChange={(v) => { if (!v) setEditingChannel(null) }}
           onSuccess={() => {
             setEditingChannel(null)
-            qc.invalidateQueries({ queryKey: ['notification-channels', orgId] })
+            qc.invalidateQueries({ queryKey: ['notification-channels'] })
           }}
         />
       )}

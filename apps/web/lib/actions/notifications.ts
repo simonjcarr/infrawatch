@@ -1,6 +1,8 @@
 'use server'
 
 import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { getRequiredSession } from '@/lib/auth/session'
+import { resolveCurrentActionScope } from './action-scope'
 
 import { db } from '@/lib/db'
 import { notifications } from '@/lib/db/schema'
@@ -8,10 +10,11 @@ import { eq, and, desc, count, inArray, gte, sql, isNull } from 'drizzle-orm'
 import type { Notification } from '@/lib/db/schema'
 
 export async function getNotifications(
-  orgId: string,
   limit = 20,
   offset = 0,
 ): Promise<Notification[]> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   return db.query.notifications.findMany({
     where: and(
@@ -25,7 +28,9 @@ export async function getNotifications(
   })
 }
 
-export async function getUnreadCount(orgId: string): Promise<number> {
+export async function getUnreadCount(): Promise<number> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   const [result] = await db
     .select({ value: count() })
@@ -42,9 +47,10 @@ export async function getUnreadCount(orgId: string): Promise<number> {
 }
 
 export async function markAsRead(
-  orgId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   try {
     await db
@@ -64,9 +70,9 @@ export async function markAsRead(
   }
 }
 
-export async function markAllAsRead(
-  orgId: string,
-): Promise<{ success: true } | { error: string }> {
+export async function markAllAsRead(): Promise<{ success: true } | { error: string }> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   try {
     await db
@@ -87,9 +93,10 @@ export async function markAllAsRead(
 }
 
 export async function deleteNotification(
-  orgId: string,
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   try {
     await db
@@ -110,9 +117,10 @@ export async function deleteNotification(
 }
 
 export async function deleteNotifications(
-  orgId: string,
   ids: string[],
 ): Promise<{ success: true } | { error: string }> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   if (ids.length === 0) return { success: true }
   try {
@@ -134,10 +142,11 @@ export async function deleteNotifications(
 }
 
 export async function markBatchReadStatus(
-  orgId: string,
   ids: string[],
   read: boolean,
 ): Promise<{ success: true } | { error: string }> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   if (ids.length === 0) return { success: true }
   try {
@@ -164,9 +173,10 @@ export type NotificationSeverityStat = {
 }
 
 export async function getNotificationStats(
-  orgId: string,
   hostId?: string,
 ): Promise<NotificationSeverityStat[]> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   const results = await db
     .select({
@@ -207,10 +217,11 @@ export type NotificationTimeSeriesPoint = {
 }
 
 export async function getNotificationsOverTime(
-  orgId: string,
   range: TrendRange = '30d',
   hostId?: string,
 ): Promise<NotificationTimeSeriesPoint[]> {
+  const authSession = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(authSession)
   const session = await requireOrgAccess(orgId)
   // Intentionally does NOT filter on deletedAt so that deleting notifications
   // from the inbox does not affect the historical trend.

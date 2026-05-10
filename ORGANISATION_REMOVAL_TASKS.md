@@ -391,7 +391,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1234](https://github.com/carrtech-dev/ct-ops/pull/1234)
 
 Summary: Replaced the mixed host-detail metadata slice after auditing the
 remaining org-scoped surface and finding the previous task still spans host
@@ -432,7 +432,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1235](https://github.com/carrtech-dev/ct-ops/pull/1235)
 
 Summary: Removed caller-supplied organisation identity from the host detail
 page, host stream route, checks flows, compare view, and local-user detail/list
@@ -706,19 +706,56 @@ This slice owns task execution and scheduling workflows.
 
 ## Task 11 - Web Alerts, Notifications, Team, And Agent Management Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
 PR:
 
-Summary:
+Summary: Removed caller-supplied organisation identity from the Task 11-owned
+alerts, notifications, team management, and agent-enrolment surfaces by
+switching those pages, shared topbar notification UI, and public actions to
+derive instance scope from the authenticated session. Also updated the
+monitoring and agent settings pages touched by this slice to load their org
+backing record through session-derived helpers instead of reading an
+organisation id in the route layer.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/{alerts,notifications,team}`,
+`apps/web/app/(dashboard)/settings/{agents,monitoring,alerts,tag-rules}`,
+`apps/web/app/(dashboard)/hosts/{[id],bulk-tag}`,
+`apps/web/app/(dashboard)/layout.tsx`,
+`apps/web/components/shared/{notification-bell,topbar}.tsx`,
+`apps/web/lib/actions/{agents,alerts,notifications,settings,tag-rules,users}.ts`,
+`apps/web/lib/actions/notifications-authz.test.mjs`,
+`apps/web/lib/notifications/notification-inbox.test.mjs`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web type-check`
+(passes); `pnpm --dir apps/web lint` (passes with pre-existing warnings only,
+including a few newly-exposed unused vars in Task 11-adjacent host alert UI);
+`pnpm --dir apps/web test:unit` (fails only `lib/db/rls.test.mjs` and
+`lib/integrations/ct-cve/db-nonce-store.test.mjs` because no working container
+runtime is available here); `pnpm --dir apps/web exec playwright test --list`
+(passes); `BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=dummy-secret-for-ci-build-only-at-least-32
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/dummy pnpm --filter
+web run build` (passes after removing a stray type-only server-action export
+that broke `/tasks` and `/tasks/schedules/[id]` during Next page-data
+collection); `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret
+pnpm --dir apps/web exec playwright test tests/e2e/notifications/bell.spec.ts
+--project=chromium --grep "authenticated user can review topbar notifications
+and open the linked resource"` (fails before execution because Next
+instrumentation still cannot import `./lib/agent/cache-prewarm` in this
+checkout); targeted `rg` over the Task 11-owned pages/components shows the
+public UI no longer threads `orgId`, while the broad task grep still reports
+expected org-scoped internals and unrelated later-slice files.
 
-Follow-up:
+Follow-up: Start Task 12 next. Task 13 still needs to remove the remaining
+org-scoped internals left in `apps/web/lib/actions/alerts.ts` and the broader
+unrelated `apps/web/lib/actions/*` residue that the Task 11 validation grep
+still surfaces; local browser smoke coverage is still blocked in this checkout
+by the missing `apps/web/lib/agent/cache-prewarm` instrumentation import.
 
 ### Required work
 

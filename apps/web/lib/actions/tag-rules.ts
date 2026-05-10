@@ -2,6 +2,7 @@
 
 import { logError } from '@/lib/logging'
 import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { getRequiredSession } from '@/lib/auth/session'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -10,6 +11,7 @@ import type { HostFilter, TagRule, TagPair } from '@/lib/db/schema'
 import { and, eq, isNull } from 'drizzle-orm'
 import { buildHostFilterWhere, isEmptyFilter, type HostFilterResult } from '@/lib/hosts/filter'
 import { assignTagsToResource } from '@/lib/actions/tags'
+import { resolveCurrentActionScope } from './action-scope'
 
 const tagPairSchema = z.object({
   key: z.string().min(1).max(100),
@@ -94,7 +96,9 @@ export async function bulkAssignTags(
   }
 }
 
-export async function listTagRules(orgId: string): Promise<TagRule[]> {
+export async function listTagRules(): Promise<TagRule[]> {
+  const session = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(session)
   await requireOrgAccess(orgId)
   return db.query.tagRules.findMany({
     where: and(eq(tagRules.organisationId, orgId), isNull(tagRules.deletedAt)),
@@ -103,9 +107,10 @@ export async function listTagRules(orgId: string): Promise<TagRule[]> {
 }
 
 export async function createTagRule(
-  orgId: string,
   input: { name: string; filter: HostFilter; tags: TagPair[]; enabled?: boolean },
 ): Promise<{ success: true; id: string } | { error: string }> {
+  const session = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(session)
   await requireOrgAdminAccess(orgId)
   try {
     const parsed = createRuleSchema.safeParse(input)
@@ -130,10 +135,11 @@ export async function createTagRule(
 }
 
 export async function updateTagRule(
-  orgId: string,
   ruleId: string,
   input: Partial<{ name: string; filter: HostFilter; tags: TagPair[]; enabled: boolean }>,
 ): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(session)
   await requireOrgAdminAccess(orgId)
   try {
     const existing = await db.query.tagRules.findFirst({
@@ -172,9 +178,10 @@ export async function updateTagRule(
 }
 
 export async function deleteTagRule(
-  orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(session)
   await requireOrgAdminAccess(orgId)
   try {
     await db
@@ -192,9 +199,10 @@ export async function deleteTagRule(
 // "Run now" button in the admin UI and (below) to auto-apply rules on host
 // approval.
 export async function runTagRule(
-  orgId: string,
   ruleId: string,
 ): Promise<{ success: true; applied: number } | { error: string }> {
+  const session = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(session)
   await requireOrgWriteAccess(orgId)
   try {
     const rule = await db.query.tagRules.findFirst({

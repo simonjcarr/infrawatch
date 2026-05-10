@@ -81,7 +81,6 @@ export async function listDistinctHostOses(...args: [] | [string]): Promise<stri
 }
 
 export async function createEnrolmentToken(
-  scopeId: string,
   input: {
     label: string
     autoApprove: boolean
@@ -91,18 +90,20 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
-  return createEnrolmentTokenCore(scopeId, input)
+  const session = await getRequiredSession()
+  return createEnrolmentTokenCore(resolveCurrentActionScope(session), input)
 }
 
-export async function listEnrolmentTokens(scopeId: string): Promise<EnrolmentTokenSafe[]> {
-  return listEnrolmentTokensCore(scopeId)
+export async function listEnrolmentTokens(): Promise<EnrolmentTokenSafe[]> {
+  const session = await getRequiredSession()
+  return listEnrolmentTokensCore(resolveCurrentActionScope(session))
 }
 
 export async function revokeEnrolmentToken(
-  scopeId: string,
   tokenId: string,
 ): Promise<{ success: true } | { error: string }> {
-  return revokeEnrolmentTokenCore(scopeId, tokenId)
+  const session = await getRequiredSession()
+  return revokeEnrolmentTokenCore(resolveCurrentActionScope(session), tokenId)
 }
 
 export async function getHostMetrics(

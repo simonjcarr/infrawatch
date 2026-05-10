@@ -15,10 +15,6 @@ import {
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '@/lib/actions/notifications'
 import type { Notification } from '@/lib/db/schema'
 
-interface NotificationBellProps {
-  orgId: string
-}
-
 function getResourceUrl(resourceType: string, resourceId: string): string {
   switch (resourceType) {
     case 'host': return `/hosts/${resourceId}`
@@ -36,36 +32,36 @@ function severityDot(severity: string) {
   return <span className={`inline-block size-2 rounded-full shrink-0 mt-1.5 ${cls}`} />
 }
 
-export function NotificationBell({ orgId }: NotificationBellProps) {
+export function NotificationBell() {
   const qc = useQueryClient()
 
   const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['notifications-unread', orgId],
-    queryFn: () => getUnreadCount(orgId),
+    queryKey: ['notifications-unread'],
+    queryFn: () => getUnreadCount(),
     refetchInterval: 20_000,
     staleTime: 10_000,
   })
 
   const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications-recent', orgId],
-    queryFn: () => getNotifications(orgId, 10),
+    queryKey: ['notifications-recent'],
+    queryFn: () => getNotifications(10),
     refetchInterval: 20_000,
     staleTime: 10_000,
   })
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => markAsRead(orgId, id),
+    mutationFn: (id: string) => markAsRead(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread'] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent'] })
     },
   })
 
   const markAllMutation = useMutation({
-    mutationFn: () => markAllAsRead(orgId),
+    mutationFn: () => markAllAsRead(),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications-unread', orgId] })
-      qc.invalidateQueries({ queryKey: ['notifications-recent', orgId] })
+      qc.invalidateQueries({ queryKey: ['notifications-unread'] })
+      qc.invalidateQueries({ queryKey: ['notifications-recent'] })
     },
   })
 

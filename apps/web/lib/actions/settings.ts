@@ -13,10 +13,20 @@ import { encodeActivationToken } from '@/lib/licence-activation-token'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
 import { getTrustedEffectiveLicence } from '@/lib/actions/licence-guard'
+import { getRequiredSession } from '@/lib/auth/session'
+import { resolveCurrentActionScope } from './action-scope'
 
 const updateOrgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
 })
+
+export async function getCurrentOrganisationSettingsRecord() {
+  const session = await getRequiredSession()
+  const orgId = resolveCurrentActionScope(session)
+  return db.query.organisations.findFirst({
+    where: eq(organisations.id, orgId),
+  })
+}
 
 export async function updateOrgName(
   orgId: string,

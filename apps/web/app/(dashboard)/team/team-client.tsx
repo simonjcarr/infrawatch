@@ -49,7 +49,6 @@ const inviteSchema = z.object({
 type InviteValues = z.infer<typeof inviteSchema>
 
 interface TeamClientProps {
-  orgId: string
   currentUserId: string
   currentUserRole: string
   initialMembers: User[]
@@ -64,7 +63,6 @@ function getDisplayedRoles(entity: Pick<User | Invitation, 'role' | 'roles'>): s
 }
 
 export function TeamClient({
-  orgId,
   currentUserId,
   currentUserRole,
   initialMembers,
@@ -76,15 +74,15 @@ export function TeamClient({
   const [copiedLink, setCopiedLink] = useState(false)
 
   const { data } = useQuery({
-    queryKey: ['org-users', orgId],
-    queryFn: () => getOrgUsers(orgId),
+    queryKey: ['org-users'],
+    queryFn: () => getOrgUsers(),
     initialData: { members: initialMembers, pendingInvites: initialPendingInvites },
   })
 
   const members = data?.members ?? []
   const pendingInvites = data?.pendingInvites ?? []
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['org-users', orgId] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['org-users'] })
 
   const {
     handleSubmit,
@@ -103,7 +101,7 @@ export function TeamClient({
   const [inviteError, setInviteError] = useState<string | null>(null)
 
   const inviteMutation = useMutation({
-    mutationFn: (values: InviteValues) => inviteUser(orgId, values),
+    mutationFn: (values: InviteValues) => inviteUser(values),
     onSuccess: (result) => {
       if ('error' in result) {
         setInviteError(result.error)
@@ -122,7 +120,7 @@ export function TeamClient({
 
   const updateRoleMutation = useMutation({
     mutationFn: ({ userId, roles }: { userId: string; roles: string[] }) =>
-      updateUserRole(orgId, userId, roles),
+      updateUserRole(userId, roles),
     onSuccess: (result) => {
       if ('success' in result) {
         invalidate()
@@ -131,22 +129,22 @@ export function TeamClient({
   })
 
   const deactivateMutation = useMutation({
-    mutationFn: (targetId: string) => deactivateUser(orgId, targetId),
+    mutationFn: (targetId: string) => deactivateUser(targetId),
     onSuccess: invalidate,
   })
 
   const reactivateMutation = useMutation({
-    mutationFn: (targetId: string) => reactivateUser(orgId, targetId),
+    mutationFn: (targetId: string) => reactivateUser(targetId),
     onSuccess: invalidate,
   })
 
   const removeMutation = useMutation({
-    mutationFn: (targetId: string) => removeUser(orgId, targetId),
+    mutationFn: (targetId: string) => removeUser(targetId),
     onSuccess: invalidate,
   })
 
   const cancelInviteMutation = useMutation({
-    mutationFn: (inviteId: string) => cancelInvite(orgId, inviteId),
+    mutationFn: (inviteId: string) => cancelInvite(inviteId),
     onSuccess: invalidate,
   })
 

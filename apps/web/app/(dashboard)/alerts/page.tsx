@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { getRequiredSession } from '@/lib/auth/session'
 import { getAlertInstances, getNotificationChannels, getSilences } from '@/lib/actions/alerts'
 import { listHosts } from '@/lib/actions/agents'
 import { AlertsClient } from './alerts-client'
@@ -9,19 +8,15 @@ export const metadata: Metadata = {
 }
 
 export default async function AlertsPage() {
-  const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
-
   const [activeAlerts, channels, silences, hosts] = await Promise.all([
-    getAlertInstances(orgId, { status: 'firing', limit: 100 }),
-    getNotificationChannels(orgId),
-    getSilences(orgId),
-    listHosts(orgId),
+    getAlertInstances({ status: 'firing', limit: 100 }),
+    getNotificationChannels(),
+    getSilences(),
+    listHosts(),
   ])
 
   return (
     <AlertsClient
-      orgId={orgId}
       initialActive={activeAlerts}
       initialChannels={channels}
       initialSilences={silences}

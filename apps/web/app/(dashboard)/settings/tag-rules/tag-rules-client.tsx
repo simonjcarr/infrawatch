@@ -24,7 +24,6 @@ import {
 import type { TagRule } from '@/lib/db/schema'
 
 interface TagRulesClientProps {
-  orgId: string
   initialRules: TagRule[]
 }
 
@@ -43,20 +42,20 @@ function summariseFilter(filter: TagRule['filter']): string {
   return parts.join(' AND ') || '(empty filter — matches nothing)'
 }
 
-export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
+export function TagRulesClient({ initialRules }: TagRulesClientProps) {
   const qc = useQueryClient()
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null)
 
   const { data: rules = initialRules } = useQuery({
-    queryKey: ['tag-rules', orgId],
-    queryFn: () => listTagRules(orgId),
+    queryKey: ['tag-rules'],
+    queryFn: () => listTagRules(),
     initialData: initialRules,
   })
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['tag-rules', orgId] })
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['tag-rules'] })
 
   const runMutation = useMutation({
-    mutationFn: (ruleId: string) => runTagRule(orgId, ruleId),
+    mutationFn: (ruleId: string) => runTagRule(ruleId),
     onSuccess: (result) => {
       if ('error' in result) setMessage({ kind: 'error', text: result.error })
       else setMessage({ kind: 'info', text: `Applied rule to ${result.applied} host(s).` })
@@ -65,7 +64,7 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
 
   const toggleMutation = useMutation({
     mutationFn: ({ ruleId, enabled }: { ruleId: string; enabled: boolean }) =>
-      updateTagRule(orgId, ruleId, { enabled }),
+      updateTagRule(ruleId, { enabled }),
     onSuccess: (result) => {
       if ('error' in result) setMessage({ kind: 'error', text: result.error })
       invalidate()
@@ -73,7 +72,7 @@ export function TagRulesClient({ orgId, initialRules }: TagRulesClientProps) {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (ruleId: string) => deleteTagRule(orgId, ruleId),
+    mutationFn: (ruleId: string) => deleteTagRule(ruleId),
     onSuccess: (result) => {
       if ('error' in result) setMessage({ kind: 'error', text: result.error })
       else setMessage({ kind: 'info', text: 'Rule deleted.' })

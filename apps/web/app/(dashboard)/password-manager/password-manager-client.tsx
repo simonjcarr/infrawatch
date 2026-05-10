@@ -558,6 +558,73 @@ export function PasswordManagerClientShell({
     handleWorkspaceUiError(error, fallbackMessage)
   }
 
+  async function loadMemberPublicKeyEnvelopesForRotation(activeMembers: MemberRecord[]): Promise<{
+    currentUserPasswordManagerId: string | null
+    envelopes: Record<string, PasswordManagerPublicKeyEnvelope>
+  }> {
+    if (!selectedVault || activeMembers.length === 0) {
+      return { currentUserPasswordManagerId: null, envelopes: {} }
+    }
+
+    const externalUserIds = Array.from(
+      new Set([
+        ...instanceUsers.map((user) => user.id),
+        ...activeMembers.map((member) => member.user_id),
+      ]),
+    ).filter((userId) => userId.trim().length > 0)
+    if (externalUserIds.length === 0) {
+      return { currentUserPasswordManagerId: null, envelopes: {} }
+    }
+
+    const chunks: string[][] = []
+    for (let index = 0; index < externalUserIds.length; index += 100) {
+      chunks.push(externalUserIds.slice(index, index + 100))
+    }
+
+    const responses = await Promise.all(
+      chunks.map((chunk) =>
+        client.lookupMemberRecipients({
+          vaultId: selectedVault.id,
+          externalUserIds: chunk,
+        }),
+      ),
+    )
+
+    const nextRecipients: Record<string, MemberRecipientRecord> = {}
+    const nextEnvelopeCache: Record<string, PasswordManagerPublicKeyEnvelope> = {}
+    let nextCurrentPasswordManagerUserId: string | null = null
+    for (const recipient of responses.flatMap((response) => response.recipients)) {
+      nextRecipients[recipient.external_user_id] = recipient
+      if (recipient.external_user_id === currentUserId) {
+        nextCurrentPasswordManagerUserId = recipient.user_id
+      }
+      if (recipient.setup_configured && recipient.public_key_envelope) {
+        nextEnvelopeCache[recipient.user_id] = recipient.public_key_envelope as unknown as PasswordManagerPublicKeyEnvelope
+      }
+    }
+
+    setMemberRecipients((current) => ({ ...current, ...nextRecipients }))
+    if (nextCurrentPasswordManagerUserId) {
+      setCurrentPasswordManagerUserId(nextCurrentPasswordManagerUserId)
+    }
+    memberPublicKeyEnvelopeCacheRef.current = {
+      ...memberPublicKeyEnvelopeCacheRef.current,
+      ...nextEnvelopeCache,
+    }
+    setMemberPublicKeyEnvelopeInputs((current) => {
+      const next = { ...current }
+      for (const [userId, envelope] of Object.entries(nextEnvelopeCache)) {
+        next[userId] = JSON.stringify(envelope, null, 2)
+      }
+      return next
+    })
+
+    return {
+      currentUserPasswordManagerId: nextCurrentPasswordManagerUserId,
+      envelopes: nextEnvelopeCache,
+    }
+  }
+
   useEffect(() => {
     if (state.view !== 'launching') {
       return
@@ -1522,19 +1589,21 @@ export function PasswordManagerClientShell({
           return
         }
 
+        const rotationPublicKeys = await loadMemberPublicKeyEnvelopesForRotation(members)
+        const currentRotationUserId = rotationPublicKeys.currentUserPasswordManagerId ?? currentPasswordManagerUserId
         const vaultKey = await generateVaultKey()
         const rotatedMembers: Array<{ userId: string; wrappedVaultKeyEnvelope: PasswordManagerWrappedVaultKeyEnvelope }> = []
 
         for (const member of members) {
           let memberPublicKey: CryptoKey
-          if (member.user_id === currentPasswordManagerUserId) {
+          if (member.user_id === currentRotationUserId || member.user_id === currentUserId) {
             memberPublicKey = state.activeKeyPair.publicKey as CryptoKey
           } else {
-            const cachedEnvelope = memberPublicKeyEnvelopeCacheRef.current[member.user_id]
+            const cachedEnvelope = memberPublicKeyEnvelopeCacheRef.current[member.user_id] ?? rotationPublicKeys.envelopes[member.user_id]
             const pastedEnvelope = memberPublicKeyEnvelopeInputs[member.user_id]?.trim()
             const envelope = cachedEnvelope ?? (pastedEnvelope ? (JSON.parse(pastedEnvelope) as PasswordManagerPublicKeyEnvelope) : null)
             if (!envelope) {
-              setWorkspaceError(`Paste the Password Manager public-key envelope for ${member.user_id} before rotating this vault key.`)
+              setWorkspaceError(`Password Manager could not find a stored public-key envelope for ${member.user_id}. Ask that user to launch Password Manager once, then refresh and retry this rotation.`)
               return
             }
             memberPublicKey = await importPublicKeyEnvelope(envelope)

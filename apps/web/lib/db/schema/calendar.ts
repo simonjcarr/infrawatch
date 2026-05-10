@@ -1,7 +1,7 @@
 import { createId } from '@paralleldrive/cuid2'
 import { sql } from 'drizzle-orm'
 import { boolean, index, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { users } from './auth.ts'
 import { hosts } from './hosts.ts'
 
@@ -28,7 +28,7 @@ export interface CalendarRecurrenceRule {
 
 export const calendarEvents = pgTable('calendar_events', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   createdBy: text('created_by').references(() => users.id),
   title: text('title').notNull(),
   description: text('description'),
@@ -47,33 +47,33 @@ export const calendarEvents = pgTable('calendar_events', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (t) => [
-  index('calendar_events_org_range_idx').on(t.organisationId, t.startsAt, t.endsAt),
-  index('calendar_events_org_series_idx').on(t.organisationId, t.seriesId, t.recurrenceInstanceStartAt),
-  uniqueIndex('calendar_events_org_client_request_idx').on(t.organisationId, t.clientRequestId),
+  index('calendar_events_org_range_idx').on(t.instanceId, t.startsAt, t.endsAt),
+  index('calendar_events_org_series_idx').on(t.instanceId, t.seriesId, t.recurrenceInstanceStartAt),
+  uniqueIndex('calendar_events_org_client_request_idx').on(t.instanceId, t.clientRequestId),
   uniqueIndex('calendar_events_org_series_occurrence_idx')
-    .on(t.organisationId, t.seriesId, t.recurrenceInstanceStartAt)
+    .on(t.instanceId, t.seriesId, t.recurrenceInstanceStartAt)
     .where(sql`${t.seriesId} IS NOT NULL AND ${t.recurrenceInstanceStartAt} IS NOT NULL`),
 ])
 
 export const calendarEventHosts = pgTable('calendar_event_hosts', {
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   eventId: text('event_id').notNull().references(() => calendarEvents.id, { onDelete: 'cascade' }),
   hostId: text('host_id').notNull().references(() => hosts.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.eventId, t.hostId], name: 'calendar_event_hosts_pk' }),
-  index('calendar_event_hosts_org_host_idx').on(t.organisationId, t.hostId),
+  index('calendar_event_hosts_org_host_idx').on(t.instanceId, t.hostId),
 ])
 
 export const calendarEventParticipants = pgTable('calendar_event_participants', {
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   eventId: text('event_id').notNull().references(() => calendarEvents.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   role: text('role').notNull().$type<CalendarParticipantRole>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.eventId, t.userId], name: 'calendar_event_participants_pk' }),
-  index('calendar_event_participants_org_user_idx').on(t.organisationId, t.userId),
+  index('calendar_event_participants_org_user_idx').on(t.instanceId, t.userId),
 ])
 
 export type CalendarEvent = typeof calendarEvents.$inferSelect

@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,11 +15,11 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('software report supports search, saved filters, new packages, and drift views', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -30,7 +30,7 @@ test('software report supports search, saved filters, new packages, and drift vi
     VALUES
       (
         'software-report-host-linux-1',
-        ${orgId},
+        ${instanceId},
         'linux-app-01',
         'Linux App 01',
         'linux',
@@ -40,7 +40,7 @@ test('software report supports search, saved filters, new packages, and drift vi
       ),
       (
         'software-report-host-linux-2',
-        ${orgId},
+        ${instanceId},
         'linux-app-02',
         'Linux App 02',
         'linux',
@@ -50,7 +50,7 @@ test('software report supports search, saved filters, new packages, and drift vi
       ),
       (
         'software-report-host-windows-1',
-        ${orgId},
+        ${instanceId},
         'windows-edge-01',
         'Windows Edge 01',
         'windows',
@@ -63,13 +63,13 @@ test('software report supports search, saved filters, new packages, and drift vi
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
     VALUES (
       'software-report-group-1',
-      ${orgId},
+      ${instanceId},
       'Production Estate',
       'Hosts used for software report E2E coverage.'
     )
@@ -78,20 +78,20 @@ test('software report supports search, saved filters, new packages, and drift vi
   await sql`
     INSERT INTO host_group_members (
       id,
-      organisation_id,
+      instance_id,
       group_id,
       host_id
     )
     VALUES
       (
         'software-report-group-member-1',
-        ${orgId},
+        ${instanceId},
         'software-report-group-1',
         'software-report-host-linux-1'
       ),
       (
         'software-report-group-member-2',
-        ${orgId},
+        ${instanceId},
         'software-report-group-1',
         'software-report-host-linux-2'
       )
@@ -100,7 +100,7 @@ test('software report supports search, saved filters, new packages, and drift vi
   await sql`
     INSERT INTO software_packages (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       name,
       version,
@@ -116,7 +116,7 @@ test('software report supports search, saved filters, new packages, and drift vi
     VALUES
       (
         'software-report-pkg-linux-1',
-        ${orgId},
+        ${instanceId},
         'software-report-host-linux-1',
         'openssl',
         '3.0.2',
@@ -131,7 +131,7 @@ test('software report supports search, saved filters, new packages, and drift vi
       ),
       (
         'software-report-pkg-linux-2',
-        ${orgId},
+        ${instanceId},
         'software-report-host-linux-2',
         'openssl',
         '3.0.3',
@@ -146,7 +146,7 @@ test('software report supports search, saved filters, new packages, and drift vi
       ),
       (
         'software-report-pkg-windows-1',
-        ${orgId},
+        ${instanceId},
         'software-report-host-windows-1',
         'openssl',
         '3.0.3',
@@ -161,7 +161,7 @@ test('software report supports search, saved filters, new packages, and drift vi
       ),
       (
         'software-report-pkg-windows-2',
-        ${orgId},
+        ${instanceId},
         'software-report-host-windows-1',
         'git',
         '2.45.1',

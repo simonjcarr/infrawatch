@@ -4,7 +4,7 @@ import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
@@ -12,7 +12,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user can create, edit, and delete a host group', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await page.goto('/hosts/groups')
 
@@ -33,7 +33,7 @@ test('authenticated user can create, edit, and delete a host group', async ({ au
   const createdRows = await sql<Array<{ id: string; deleted_at: string | null }>>`
     SELECT id, deleted_at
     FROM host_groups
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND name = 'Linux Servers'
     LIMIT 1
   `
@@ -46,7 +46,7 @@ test('authenticated user can create, edit, and delete a host group', async ({ au
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -57,7 +57,7 @@ test('authenticated user can create, edit, and delete a host group', async ({ au
     )
     VALUES (
       'group-host-1',
-      ${orgId},
+      ${instanceId},
       'app-01',
       'App Server 01',
       'Ubuntu',

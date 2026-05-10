@@ -1,7 +1,7 @@
 'use server'
 
 import { logError, logWarn } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess, requireInstanceToolingAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -86,19 +86,19 @@ const createEnrolmentTokenSchema = z.object({
 
 async function resolveCurrentActionScope(): Promise<string> {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId
-  if (!orgId) {
+  const instanceId = session.user.instanceId
+  if (!instanceId) {
     throw new Error('Instance scope is not configured')
   }
-  return orgId
+  return instanceId
 }
 
-export async function listPendingAgents(orgId?: string): Promise<Agent[]> {
-  const currentScope = orgId ?? await resolveCurrentActionScope()
-  await requireOrgAccess(currentScope)
+export async function listPendingAgents(instanceId?: string): Promise<Agent[]> {
+  const currentScope = instanceId ?? await resolveCurrentActionScope()
+  await requireInstanceAccess(currentScope)
   return db.query.agents.findMany({
     where: and(
-      eq(agents.organisationId, currentScope),
+      eq(agents.instanceId, currentScope),
       eq(agents.status, 'pending'),
       isNull(agents.deletedAt),
     ),
@@ -109,20 +109,20 @@ export async function approveAgent(
   agentId: string,
 ): Promise<{ success: true } | { error: string }>
 export async function approveAgent(
-  orgId: string,
+  instanceId: string,
   agentId: string,
 ): Promise<{ success: true } | { error: string }>
 export async function approveAgent(
-  orgIdOrAgentId: string,
+  instanceIdOrAgentId: string,
   maybeAgentId?: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = maybeAgentId ? orgIdOrAgentId : await resolveCurrentActionScope()
-  const agentId = maybeAgentId ?? orgIdOrAgentId
-  const session = await requireOrgToolingAccess(orgId)
+  const instanceId = maybeAgentId ? instanceIdOrAgentId : await resolveCurrentActionScope()
+  const agentId = maybeAgentId ?? instanceIdOrAgentId
+  const session = await requireInstanceToolingAccess(instanceId)
   const actorId = session.user.id
   try {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
+      where: and(eq(agents.id, agentId), eq(agents.instanceId, instanceId)),
     })
     if (!agent) return { error: 'Agent not found' }
     if (agent.status !== 'pending') return { error: 'Agent is not in pending state' }
@@ -136,15 +136,15 @@ export async function approveAgent(
     const pendingHost = await db.query.hosts.findFirst({
       where: and(
         eq(hosts.agentId, agentId),
-        eq(hosts.organisationId, orgId),
+        eq(hosts.instanceId, instanceId),
         isNull(hosts.deletedAt),
       ),
     })
     const pendingIps = (pendingHost?.ipAddresses ?? []) as string[]
-    const collision = await findOnlineHostCollision(orgId, agentId, pendingHost?.hostname ?? agent.hostname, pendingIps)
+    const collision = await findOnlineHostCollision(instanceId, agentId, pendingHost?.hostname ?? agent.hostname, pendingIps)
     if (collision) {
       return {
-        error: `Cannot approve: another host (${collision.hostname}) matching this hostname or IP is already online in this organisation. Delete the existing host first.`,
+        error: `Cannot approve: another host (${collision.hostname}) matching this hostname or IP is already online in this instance. Delete the existing host first.`,
       }
     }
 
@@ -157,18 +157,18 @@ export async function approveAgent(
           approvedAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(and(eq(agents.id, agentId), eq(agents.organisationId, orgId)))
+        .where(and(eq(agents.id, agentId), eq(agents.instanceId, instanceId)))
 
       await tx.insert(agentStatusHistory).values({
         agentId,
-        organisationId: orgId,
+        instanceId: instanceId,
         status: 'active',
         actorId,
         reason: 'Approved by admin',
       })
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: actorId,
         action: 'agent.approved',
         targetType: 'agent',
@@ -186,19 +186,19 @@ export async function approveAgent(
 
     // Apply defaults to the associated host (best-effort, outside transaction)
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.agentId, agentId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.agentId, agentId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
     })
     if (host) {
-      await applyGlobalDefaultsToHost(orgId, host.id)
+      await applyGlobalDefaultsToHost(instanceId, host.id)
 
       // Apply org default collection settings + drain any pendingTags the
       // ingest handler stashed at register time. pendingTags already represent
       // the (token → CLI) merge on the ingest side; here we layer org defaults
       // underneath (weakest), then run any saved tag_rules last.
-      const defaults = await getOrgDefaultCollectionSettings(orgId)
+      const defaults = await getOrgDefaultCollectionSettings(instanceId)
       const currentMetadata = parseHostMetadata(host.metadata)
       const pendingTags: TagPair[] = currentMetadata.pendingTags ?? []
-      const orgDefaultTags = await getOrgDefaultTags(orgId)
+      const orgDefaultTags = await getOrgDefaultTags(instanceId)
       const finalTags = await mergeTagLayers(orgDefaultTags, pendingTags)
 
       const nextMetadata: HostMetadata = {
@@ -213,17 +213,17 @@ export async function approveAgent(
           metadata: nextMetadata,
           updatedAt: new Date(),
         })
-        .where(and(eq(hosts.id, host.id), eq(hosts.organisationId, orgId)))
+        .where(and(eq(hosts.id, host.id), eq(hosts.instanceId, instanceId)))
 
       if (finalTags.length > 0) {
-        const result = await assignTagsToResource(orgId, 'host', host.id, finalTags)
+        const result = await assignTagsToResource(instanceId, 'host', host.id, finalTags)
         if ('error' in result) {
           logWarn('Failed to apply tags on approval:', result.error)
         }
       }
 
       // Saved rules run last so they never overwrite explicit per-host intent.
-      await runMatchingTagRules(orgId, host.id)
+      await runMatchingTagRules(instanceId, host.id)
     }
 
     return { success: true }
@@ -238,7 +238,7 @@ export async function approveAgent(
 // ip_addresses jsonb array overlaps any of the provided ips. Used by
 // approveAgent to block activation when doing so would produce a duplicate.
 async function findOnlineHostCollision(
-  orgId: string,
+  instanceId: string,
   excludeAgentId: string,
   hostname: string,
   ips: string[],
@@ -250,7 +250,7 @@ async function findOnlineHostCollision(
     await db.query.hosts.findFirst({
       columns: { id: true, hostname: true },
       where: and(
-        eq(hosts.organisationId, orgId),
+        eq(hosts.instanceId, instanceId),
         isNull(hosts.deletedAt),
         eq(hosts.status, 'online'),
         sql`(${hosts.agentId} IS NULL OR ${hosts.agentId} <> ${excludeAgentId})`,
@@ -264,20 +264,20 @@ export async function rejectAgent(
   agentId: string,
 ): Promise<{ success: true } | { error: string }>
 export async function rejectAgent(
-  orgId: string,
+  instanceId: string,
   agentId: string,
 ): Promise<{ success: true } | { error: string }>
 export async function rejectAgent(
-  orgIdOrAgentId: string,
+  instanceIdOrAgentId: string,
   maybeAgentId?: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = maybeAgentId ? orgIdOrAgentId : await resolveCurrentActionScope()
-  const agentId = maybeAgentId ?? orgIdOrAgentId
-  const session = await requireOrgToolingAccess(orgId)
+  const instanceId = maybeAgentId ? instanceIdOrAgentId : await resolveCurrentActionScope()
+  const agentId = maybeAgentId ?? instanceIdOrAgentId
+  const session = await requireInstanceToolingAccess(instanceId)
   const actorId = session.user.id
   try {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.organisationId, orgId)),
+      where: and(eq(agents.id, agentId), eq(agents.instanceId, instanceId)),
     })
     if (!agent) return { error: 'Agent not found' }
 
@@ -285,11 +285,11 @@ export async function rejectAgent(
       await tx
         .update(agents)
         .set({ status: 'revoked', updatedAt: new Date() })
-        .where(and(eq(agents.id, agentId), eq(agents.organisationId, orgId)))
+        .where(and(eq(agents.id, agentId), eq(agents.instanceId, instanceId)))
 
       await tx.insert(agentStatusHistory).values({
         agentId,
-        organisationId: orgId,
+        instanceId: instanceId,
         status: 'revoked',
         actorId,
         reason: 'Rejected by admin',
@@ -299,14 +299,14 @@ export async function rejectAgent(
       // revocation list so the ingest will reject any future handshake.
       if (agent.clientCertSerial) {
         await tx.insert(revokedCertificates).values({
-          organisationId: orgId,
+          instanceId: instanceId,
           serial: agent.clientCertSerial,
           reason: 'Rejected by admin',
         }).onConflictDoNothing()
       }
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: actorId,
         action: 'agent.rejected',
         targetType: 'agent',
@@ -332,14 +332,14 @@ export async function rejectAgent(
 
 export type HostWithAgent = Host & { agent: Agent | null }
 
-export async function listHosts(orgId?: string): Promise<HostWithAgent[]> {
-  const currentScope = orgId ?? await resolveCurrentActionScope()
-  await requireOrgAccess(currentScope)
+export async function listHosts(instanceId?: string): Promise<HostWithAgent[]> {
+  const currentScope = instanceId ?? await resolveCurrentActionScope()
+  await requireInstanceAccess(currentScope)
   const rows = await db
     .select()
     .from(hosts)
     .leftJoin(agents, eq(hosts.agentId, agents.id))
-    .where(and(eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)))
+    .where(and(eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)))
 
   return rows.map((row) => ({
     ...row.hosts,
@@ -352,7 +352,7 @@ export async function listHosts(orgId?: string): Promise<HostWithAgent[]> {
 // listHosts above returns every host in one shot. It is used by features that
 // genuinely need the whole set (network graph, terminal host picker, bulk-tag,
 // group membership). The main /hosts page instead uses the paginated variant
-// below so that a tenant with thousands of hosts does not ship every row to
+// below so that a instance with thousands of hosts does not ship every row to
 // the browser on first paint.
 
 export type HostSortField =
@@ -385,22 +385,22 @@ const HOST_PAGE_MAX = 200
 
 export async function listHostsPaginated(params?: HostListParams): Promise<HostListResult>
 export async function listHostsPaginated(
-  orgId: string,
+  instanceId: string,
   params?: HostListParams,
 ): Promise<HostListResult>
 export async function listHostsPaginated(
-  orgIdOrParams?: string | HostListParams,
+  instanceIdOrParams?: string | HostListParams,
   maybeParams?: HostListParams,
 ): Promise<HostListResult> {
-  const orgId = typeof orgIdOrParams === 'string' ? orgIdOrParams : await resolveCurrentActionScope()
-  const params = typeof orgIdOrParams === 'string' ? (maybeParams ?? {}) : (orgIdOrParams ?? {})
-  await requireOrgAccess(orgId)
+  const instanceId = typeof instanceIdOrParams === 'string' ? instanceIdOrParams : await resolveCurrentActionScope()
+  const params = typeof instanceIdOrParams === 'string' ? (maybeParams ?? {}) : (instanceIdOrParams ?? {})
+  await requireInstanceAccess(instanceId)
   const limit = Math.max(1, Math.min(params.limit ?? 50, HOST_PAGE_MAX))
   const offset = Math.max(0, params.offset ?? 0)
   const sortBy: HostSortField = params.sortBy ?? 'hostname'
   const sortDir: HostSortDir = params.sortDir ?? 'asc'
 
-  const conditions = [eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)]
+  const conditions = [eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)]
 
   if (params.status) {
     conditions.push(eq(hosts.status, params.status))
@@ -480,11 +480,11 @@ export interface HostInventoryStats {
 }
 
 export async function getHostInventoryStats(): Promise<HostInventoryStats>
-export async function getHostInventoryStats(orgId: string): Promise<HostInventoryStats>
-export async function getHostInventoryStats(orgId?: string): Promise<HostInventoryStats> {
-  const currentScope = orgId ?? await resolveCurrentActionScope()
-  await requireOrgAccess(currentScope)
-  const baseWhere = and(eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt))
+export async function getHostInventoryStats(instanceId: string): Promise<HostInventoryStats>
+export async function getHostInventoryStats(instanceId?: string): Promise<HostInventoryStats> {
+  const currentScope = instanceId ?? await resolveCurrentActionScope()
+  await requireInstanceAccess(currentScope)
+  const baseWhere = and(eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt))
   const threshold = HOST_HIGH_USAGE_THRESHOLD
   const staleCutoff = new Date(Date.now() - HOST_STALE_MINUTES * 60 * 1000)
 
@@ -516,7 +516,7 @@ export async function getHostInventoryStats(orgId?: string): Promise<HostInvento
       .from(agents)
       .where(
         and(
-          eq(agents.organisationId, currentScope),
+          eq(agents.instanceId, currentScope),
           eq(agents.status, 'pending'),
           isNull(agents.deletedAt),
         ),
@@ -528,7 +528,7 @@ export async function getHostInventoryStats(orgId?: string): Promise<HostInvento
       .from(alertInstances)
       .where(
         and(
-          eq(alertInstances.organisationId, currentScope),
+          eq(alertInstances.instanceId, currentScope),
           eq(alertInstances.status, 'firing'),
         ),
       ),
@@ -554,20 +554,20 @@ export async function getHostInventoryStats(orgId?: string): Promise<HostInvento
 }
 
 export async function listDistinctHostOses(): Promise<string[]>
-export async function listDistinctHostOses(orgId: string): Promise<string[]>
-export async function listDistinctHostOses(orgId?: string): Promise<string[]> {
-  const currentScope = orgId ?? await resolveCurrentActionScope()
-  await requireOrgAccess(currentScope)
+export async function listDistinctHostOses(instanceId: string): Promise<string[]>
+export async function listDistinctHostOses(instanceId?: string): Promise<string[]> {
+  const currentScope = instanceId ?? await resolveCurrentActionScope()
+  await requireInstanceAccess(currentScope)
   const rows = await db
     .selectDistinct({ os: hosts.os })
     .from(hosts)
-    .where(and(eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)))
+    .where(and(eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)))
     .orderBy(asc(hosts.os))
   return rows.map((r) => r.os).filter((v): v is string => v !== null && v !== '')
 }
 
 export async function createEnrolmentToken(
-  orgId: string,
+  instanceId: string,
   input: {
     label: string
     autoApprove: boolean
@@ -577,9 +577,9 @@ export async function createEnrolmentToken(
     tags?: Array<{ key: string; value: string }>
   },
 ): Promise<{ token: string; id: string } | { error: string }> {
-  const session = await requireOrgToolingAccess(orgId)
+  const session = await requireInstanceToolingAccess(instanceId)
   const userId = session.user.id
-  if (!await createEnrolmentTokenLimiter.check(orgId)) {
+  if (!await createEnrolmentTokenLimiter.check(instanceId)) {
     return { error: 'Too many requests — please wait before creating another enrolment token.' }
   }
   const parsed = createEnrolmentTokenSchema.safeParse(input)
@@ -605,7 +605,7 @@ export async function createEnrolmentToken(
     const [record] = await db
       .insert(agentEnrolmentTokens)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         label: parsed.data.label,
         createdById: userId,
         autoApprove: parsed.data.autoApprove,
@@ -621,7 +621,7 @@ export async function createEnrolmentToken(
     if (!record) return { error: 'Failed to create enrolment token' }
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: userId,
       action: 'agent.enrolment_token.created',
       targetType: 'agent_enrolment_token',
@@ -648,11 +648,11 @@ export type EnrolmentTokenSafe = Omit<AgentEnrolmentToken, 'token' | 'tokenHash'
   tokenHint: string
 }
 
-export async function listEnrolmentTokens(orgId: string): Promise<EnrolmentTokenSafe[]> {
-  await requireOrgAccess(orgId)
+export async function listEnrolmentTokens(instanceId: string): Promise<EnrolmentTokenSafe[]> {
+  await requireInstanceAccess(instanceId)
   const rows = await db.query.agentEnrolmentTokens.findMany({
     where: and(
-      eq(agentEnrolmentTokens.organisationId, orgId),
+      eq(agentEnrolmentTokens.instanceId, instanceId),
       isNull(agentEnrolmentTokens.deletedAt),
     ),
   })
@@ -663,15 +663,15 @@ export async function listEnrolmentTokens(orgId: string): Promise<EnrolmentToken
 }
 
 export async function revokeEnrolmentToken(
-  orgId: string,
+  instanceId: string,
   tokenId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgToolingAccess(orgId)
+  const session = await requireInstanceToolingAccess(instanceId)
   try {
     const token = await db.query.agentEnrolmentTokens.findFirst({
       where: and(
         eq(agentEnrolmentTokens.id, tokenId),
-        eq(agentEnrolmentTokens.organisationId, orgId),
+        eq(agentEnrolmentTokens.instanceId, instanceId),
         isNull(agentEnrolmentTokens.deletedAt),
       ),
       columns: {
@@ -691,11 +691,11 @@ export async function revokeEnrolmentToken(
         .update(agentEnrolmentTokens)
         .set({ deletedAt: new Date(), updatedAt: new Date() })
         .where(
-          and(eq(agentEnrolmentTokens.id, tokenId), eq(agentEnrolmentTokens.organisationId, orgId)),
+          and(eq(agentEnrolmentTokens.id, tokenId), eq(agentEnrolmentTokens.instanceId, instanceId)),
         )
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'agent.enrolment_token.revoked',
         targetType: 'agent_enrolment_token',
@@ -790,11 +790,11 @@ function bucketIntervalStr(intervalSecs: number): string {
 }
 
 export async function getHostMetrics(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   query: MetricsQuery,
 ): Promise<HostMetric[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const { from, to, fromISO, toISO } = resolveTimeBounds(query)
   const bucketMode = computeBucketMode(to.getTime() - from.getTime())
 
@@ -805,7 +805,7 @@ export async function getHostMetrics(
       try {
         const rows = await db.execute<{
           id: string
-          organisation_id: string
+          instance_id: string
           host_id: string
           recorded_at: Date
           cpu_percent: number | null
@@ -816,7 +816,7 @@ export async function getHostMetrics(
         }>(sql`
           SELECT
             concat(${hostId}, '-', bucket::text) AS id,
-            ${orgId}                             AS organisation_id,
+            ${instanceId}                             AS instance_id,
             ${hostId}                            AS host_id,
             bucket                               AS recorded_at,
             cpu_percent,
@@ -825,7 +825,7 @@ export async function getHostMetrics(
             NULL::integer                        AS uptime_seconds,
             bucket                               AS created_at
           FROM ${sql.identifier(view)}
-          WHERE organisation_id = ${orgId}
+          WHERE instance_id = ${instanceId}
             AND host_id         = ${hostId}
             AND bucket         >= ${fromISO}
             AND bucket         <= ${toISO}
@@ -836,7 +836,7 @@ export async function getHostMetrics(
         if (rowArr.length > 0) {
           return rowArr.map((r) => ({
             id: r.id,
-            organisationId: r.organisation_id,
+            instanceId: r.instance_id,
             hostId: r.host_id,
             recordedAt: new Date(r.recorded_at),
             cpuPercent: r.cpu_percent,
@@ -870,7 +870,7 @@ export async function getHostMetrics(
           AVG(memory_percent)::real  AS memory_percent,
           AVG(disk_percent)::real    AS disk_percent
         FROM host_metrics
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND host_id         = ${hostId}
           AND recorded_at    >= ${fromISO}
           AND recorded_at    <= ${toISO}
@@ -882,7 +882,7 @@ export async function getHostMetrics(
       if (rowArr.length > 0) {
         return rowArr.map((r) => ({
           id: `${hostId}-${r.recorded_at}`,
-          organisationId: orgId,
+          instanceId: instanceId,
           hostId,
           recordedAt: new Date(r.recorded_at),
           cpuPercent: r.cpu_percent,
@@ -900,7 +900,7 @@ export async function getHostMetrics(
   // Raw path (short spans) or final fallback — always capped to prevent huge payloads
   return db.query.hostMetrics.findMany({
     where: and(
-      eq(hostMetrics.organisationId, orgId),
+      eq(hostMetrics.instanceId, instanceId),
       eq(hostMetrics.hostId, hostId),
       gte(hostMetrics.recordedAt, from),
       lte(hostMetrics.recordedAt, to),
@@ -911,11 +911,11 @@ export async function getHostMetrics(
 }
 
 export async function getAgentOfflinePeriods(
-  orgId: string,
+  instanceId: string,
   agentId: string,
   query: MetricsQuery,
 ): Promise<OfflinePeriod[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const { from, to } = resolveTimeBounds(query)
   const windowStart = from.getTime()
   // Look back one extra hour before the window to capture an offline event that
@@ -926,7 +926,7 @@ export async function getAgentOfflinePeriods(
     columns: { status: true, createdAt: true },
     where: and(
       eq(agentStatusHistory.agentId, agentId),
-      eq(agentStatusHistory.organisationId, orgId),
+      eq(agentStatusHistory.instanceId, instanceId),
       gte(agentStatusHistory.createdAt, lookback),
       lte(agentStatusHistory.createdAt, to),
     ),
@@ -958,11 +958,11 @@ export async function getAgentOfflinePeriods(
 export type HeartbeatPoint = { time: number; intervalSecs: number }
 
 export async function getHeartbeatHistory(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   query: MetricsQuery,
 ): Promise<HeartbeatPoint[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const { from, to, fromISO, toISO } = resolveTimeBounds(query)
   const bucketMode = computeBucketMode(to.getTime() - from.getTime())
 
@@ -975,7 +975,7 @@ export async function getHeartbeatHistory(
           recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
         ))::float AS interval_secs
       FROM host_metrics
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND host_id         = ${hostId}
         AND recorded_at    >= ${fromISO}
         AND recorded_at    <= ${toISO}
@@ -1003,7 +1003,7 @@ export async function getHeartbeatHistory(
             recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
           ))::float AS interval_secs
         FROM host_metrics
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND host_id         = ${hostId}
           AND recorded_at    >= ${fromISO}
           AND recorded_at    <= ${toISO}
@@ -1032,7 +1032,7 @@ export async function getHeartbeatHistory(
           recorded_at - LAG(recorded_at) OVER (ORDER BY recorded_at)
         ))::float AS interval_secs
       FROM host_metrics
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND host_id         = ${hostId}
         AND recorded_at    >= ${fromISO}
         AND recorded_at    <= ${toISO}
@@ -1048,8 +1048,8 @@ export async function getHeartbeatHistory(
   }
 }
 
-export async function getHost(orgId: string, hostId: string): Promise<HostWithAgent | null> {
-  await requireOrgAccess(orgId)
+export async function getHost(instanceId: string, hostId: string): Promise<HostWithAgent | null> {
+  await requireInstanceAccess(instanceId)
   const rows = await db
     .select()
     .from(hosts)
@@ -1057,7 +1057,7 @@ export async function getHost(orgId: string, hostId: string): Promise<HostWithAg
     .where(
       and(
         eq(hosts.id, hostId),
-        eq(hosts.organisationId, orgId),
+        eq(hosts.instanceId, instanceId),
         isNull(hosts.deletedAt),
       ),
     )
@@ -1072,10 +1072,10 @@ export async function getHost(orgId: string, hostId: string): Promise<HostWithAg
 }
 
 export async function deleteHost(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(orgId)
+  await requireInstanceToolingAccess(instanceId)
   try {
     const session = await getRequiredSession()
     // Capture the result of the "not found" check that happens inside the
@@ -1088,7 +1088,7 @@ export async function deleteHost(
       const [host] = await tx
         .select()
         .from(hosts)
-        .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+        .where(and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId)))
         .for('update')
 
       if (!host) {
@@ -1097,7 +1097,7 @@ export async function deleteHost(
       }
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'host.deleted',
         targetType: 'host',
@@ -1113,29 +1113,29 @@ export async function deleteHost(
       // 1. Identity events (references service_account_id, ssh_key_id, host_id)
       await tx
         .delete(identityEvents)
-        .where(and(eq(identityEvents.hostId, hostId), eq(identityEvents.organisationId, orgId)))
+        .where(and(eq(identityEvents.hostId, hostId), eq(identityEvents.instanceId, instanceId)))
 
       // 2. SSH keys (references host_id, service_account_id)
       await tx
         .delete(sshKeys)
-        .where(and(eq(sshKeys.hostId, hostId), eq(sshKeys.organisationId, orgId)))
+        .where(and(eq(sshKeys.hostId, hostId), eq(sshKeys.instanceId, instanceId)))
 
       // 3. Service accounts
       await tx
         .delete(serviceAccounts)
-        .where(and(eq(serviceAccounts.hostId, hostId), eq(serviceAccounts.organisationId, orgId)))
+        .where(and(eq(serviceAccounts.hostId, hostId), eq(serviceAccounts.instanceId, instanceId)))
 
       // 4. Check results (references check_id which references host_id)
       await tx
         .delete(checkResults)
-        .where(and(eq(checkResults.hostId, hostId), eq(checkResults.organisationId, orgId)))
+        .where(and(eq(checkResults.hostId, hostId), eq(checkResults.instanceId, instanceId)))
 
       // 5. Certificate events & certificates (certificates reference both
       //    discovered_by_host_id AND check_id, so must be deleted before checks)
       const hostCheckIds = (
         await tx.query.checks.findMany({
           columns: { id: true },
-          where: and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)),
+          where: and(eq(checks.hostId, hostId), eq(checks.instanceId, instanceId)),
         })
       ).map((c) => c.id)
 
@@ -1144,15 +1144,15 @@ export async function deleteHost(
       // checks table is deleted.
       await tx
         .delete(hostPatchStatuses)
-        .where(and(eq(hostPatchStatuses.hostId, hostId), eq(hostPatchStatuses.organisationId, orgId)))
+        .where(and(eq(hostPatchStatuses.hostId, hostId), eq(hostPatchStatuses.instanceId, instanceId)))
       await tx
         .delete(hostPackageUpdates)
-        .where(and(eq(hostPackageUpdates.hostId, hostId), eq(hostPackageUpdates.organisationId, orgId)))
+        .where(and(eq(hostPackageUpdates.hostId, hostId), eq(hostPackageUpdates.instanceId, instanceId)))
 
       const hostCerts = await tx.query.certificates.findMany({
         columns: { id: true },
         where: and(
-          eq(certificates.organisationId, orgId),
+          eq(certificates.instanceId, instanceId),
           sql`(${certificates.discoveredByHostId} = ${hostId}${
             hostCheckIds.length > 0
               ? sql` OR ${certificates.checkId} IN (${sql.join(hostCheckIds.map((id) => sql`${id}`), sql`, `)})`
@@ -1167,26 +1167,26 @@ export async function deleteHost(
           .delete(certificateEvents)
           .where(and(
             inArray(certificateEvents.certificateId, certIds),
-            eq(certificateEvents.organisationId, orgId),
+            eq(certificateEvents.instanceId, instanceId),
           ))
         await tx
           .delete(certificates)
           .where(and(
             inArray(certificates.id, certIds),
-            eq(certificates.organisationId, orgId),
+            eq(certificates.instanceId, instanceId),
           ))
       }
 
       // 6. Checks (host-specific only — now safe, certificates removed above)
       await tx
         .delete(checks)
-        .where(and(eq(checks.hostId, hostId), eq(checks.organisationId, orgId)))
+        .where(and(eq(checks.hostId, hostId), eq(checks.instanceId, instanceId)))
 
       // 7a. Notifications referencing this host's alert instances (FK constraint)
       const hostAlertInstanceIds = (
         await tx.query.alertInstances.findMany({
           columns: { id: true },
-          where: and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId)),
+          where: and(eq(alertInstances.hostId, hostId), eq(alertInstances.instanceId, instanceId)),
         })
       ).map((instance) => instance.id)
 
@@ -1199,27 +1199,27 @@ export async function deleteHost(
       // 7b. Alert instances
       await tx
         .delete(alertInstances)
-        .where(and(eq(alertInstances.hostId, hostId), eq(alertInstances.organisationId, orgId)))
+        .where(and(eq(alertInstances.hostId, hostId), eq(alertInstances.instanceId, instanceId)))
 
       // 8. Alert silences (host-specific only)
       await tx
         .delete(alertSilences)
-        .where(and(eq(alertSilences.hostId, hostId), eq(alertSilences.organisationId, orgId)))
+        .where(and(eq(alertSilences.hostId, hostId), eq(alertSilences.instanceId, instanceId)))
 
       // 9. Alert rules (host-specific only)
       await tx
         .delete(alertRules)
-        .where(and(eq(alertRules.hostId, hostId), eq(alertRules.organisationId, orgId)))
+        .where(and(eq(alertRules.hostId, hostId), eq(alertRules.instanceId, instanceId)))
 
       // 11. Agent queries
       await tx
         .delete(agentQueries)
-        .where(and(eq(agentQueries.hostId, hostId), eq(agentQueries.organisationId, orgId)))
+        .where(and(eq(agentQueries.hostId, hostId), eq(agentQueries.instanceId, instanceId)))
 
       // 12. Host metrics
       await tx
         .delete(hostMetrics)
-        .where(and(eq(hostMetrics.hostId, hostId), eq(hostMetrics.organisationId, orgId)))
+        .where(and(eq(hostMetrics.hostId, hostId), eq(hostMetrics.instanceId, instanceId)))
 
       // 13. Resource tags
       await tx
@@ -1227,20 +1227,20 @@ export async function deleteHost(
         .where(and(
           eq(resourceTags.resourceId, hostId),
           eq(resourceTags.resourceType, 'host'),
-          eq(resourceTags.organisationId, orgId),
+          eq(resourceTags.instanceId, instanceId),
         ))
 
       // 13a. Vulnerability findings reference software_packages, and software
       //      scans reference task_run_hosts, so remove in FK order.
       await tx
         .delete(hostVulnerabilityFindings)
-        .where(and(eq(hostVulnerabilityFindings.hostId, hostId), eq(hostVulnerabilityFindings.organisationId, orgId)))
+        .where(and(eq(hostVulnerabilityFindings.hostId, hostId), eq(hostVulnerabilityFindings.instanceId, instanceId)))
       await tx
         .delete(softwarePackages)
-        .where(and(eq(softwarePackages.hostId, hostId), eq(softwarePackages.organisationId, orgId)))
+        .where(and(eq(softwarePackages.hostId, hostId), eq(softwarePackages.instanceId, instanceId)))
       await tx
         .delete(softwareScans)
-        .where(and(eq(softwareScans.hostId, hostId), eq(softwareScans.organisationId, orgId)))
+        .where(and(eq(softwareScans.hostId, hostId), eq(softwareScans.instanceId, instanceId)))
 
       // 13b. Task run host rows (FK to hosts; must be removed before the host
       //      is deleted or the transaction fails). Group-targeted task_runs
@@ -1250,12 +1250,12 @@ export async function deleteHost(
         .delete(taskRunHosts)
         .where(and(
           eq(taskRunHosts.hostId, hostId),
-          eq(taskRunHosts.organisationId, orgId),
+          eq(taskRunHosts.instanceId, instanceId),
         ))
       await tx
         .delete(taskRuns)
         .where(and(
-          eq(taskRuns.organisationId, orgId),
+          eq(taskRuns.instanceId, instanceId),
           eq(taskRuns.targetType, 'host'),
           eq(taskRuns.targetId, hostId),
         ))
@@ -1263,7 +1263,7 @@ export async function deleteHost(
       // 14a. Terminal sessions (FK to hosts)
       await tx
         .delete(terminalSessions)
-        .where(and(eq(terminalSessions.hostId, hostId), eq(terminalSessions.organisationId, orgId)))
+        .where(and(eq(terminalSessions.hostId, hostId), eq(terminalSessions.instanceId, instanceId)))
 
       // 14c. Host group memberships (FK to hosts)
       await tx
@@ -1275,13 +1275,13 @@ export async function deleteHost(
         .delete(hostNetworkMemberships)
         .where(and(
           eq(hostNetworkMemberships.hostId, hostId),
-          eq(hostNetworkMemberships.organisationId, orgId),
+          eq(hostNetworkMemberships.instanceId, instanceId),
         ))
 
       // 15. Host itself
       await tx
         .delete(hosts)
-        .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+        .where(and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId)))
 
       // 15. Agent status history + agent (host deletion revokes the agent so it
       //     can no longer connect; without this the agent keeps heartbeating
@@ -1298,7 +1298,7 @@ export async function deleteHost(
           await tx
             .insert(revokedCertificates)
             .values({
-              organisationId: orgId,
+              instanceId: instanceId,
               serial: agentRow.clientCertSerial,
               reason: 'Host deleted',
             })
@@ -1340,16 +1340,16 @@ export async function deleteHost(
  *     between retrying, viewing task history, or deleting the host record only.
  */
 export async function uninstallAndDeleteHost(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<
   | { success: true }
   | { error: string; taskRunId?: string; agentOffline?: boolean }
 > {
-  await requireOrgAdminAccess(orgId)
+  await requireInstanceAdminAccess(instanceId)
   try {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)),
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId)),
     })
     if (!host) return { error: 'Host not found' }
 
@@ -1365,7 +1365,7 @@ export async function uninstallAndDeleteHost(
       }
     }
 
-    const trigger = await triggerAgentUninstall(orgId, hostId)
+    const trigger = await triggerAgentUninstall(instanceId, hostId)
     if ('error' in trigger) return { error: trigger.error }
 
     // Poll until the agent reports the uninstall as scheduled, or we hit
@@ -1375,7 +1375,7 @@ export async function uninstallAndDeleteHost(
     const deadlineMs = Date.now() + 45_000
     let reachedSuccess = false
     while (Date.now() < deadlineMs) {
-      const run = await getTaskRun(orgId, trigger.taskRunId)
+      const run = await getTaskRun(instanceId, trigger.taskRunId)
       const hostRun = run?.hosts[0]
       if (hostRun?.status === 'success') {
         reachedSuccess = true
@@ -1398,7 +1398,7 @@ export async function uninstallAndDeleteHost(
       }
     }
 
-    return await deleteHost(orgId, hostId)
+    return await deleteHost(instanceId, hostId)
   } catch (err) {
     logError('Failed to uninstall agent and delete host:', err)
     return { error: 'An unexpected error occurred while uninstalling the agent' }

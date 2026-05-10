@@ -275,7 +275,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByRole('button', { name: 'Delete vault permanently' }).click()
   await expect(page.getByTestId('password-manager-vault-vault-1')).toHaveCount(0)
 
-  await passwordManagerMock.switchAuthenticatedOrganisation()
+  await passwordManagerMock.switchAuthenticatedInstance()
   await page.reload()
   await expect(page.getByTestId('password-manager-state-setup-required')).toBeVisible()
 

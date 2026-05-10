@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { users } from './auth.ts'
 
 const tsvector = customType<{ data: string; driverData: string }>({
@@ -83,7 +83,7 @@ export const buildDocTemplates = pgTable(
   'build_doc_templates',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     createdById: text('created_by_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
     name: text('name').notNull(),
     description: text('description').notNull().default(''),
@@ -97,9 +97,9 @@ export const buildDocTemplates = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
-    index('build_doc_templates_org_active_idx').on(t.organisationId, t.deletedAt, t.isActive),
+    index('build_doc_templates_org_active_idx').on(t.instanceId, t.deletedAt, t.isActive),
     uniqueIndex('build_doc_templates_default_uidx')
-      .on(t.organisationId, t.isDefault)
+      .on(t.instanceId, t.isDefault)
       .where(sql`${t.isDefault} = TRUE AND ${t.deletedAt} IS NULL`),
   ],
 )
@@ -108,7 +108,7 @@ export const buildDocTemplateVersions = pgTable(
   'build_doc_template_versions',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     templateId: text('template_id').notNull().references(() => buildDocTemplates.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
     name: text('name').notNull(),
@@ -120,7 +120,7 @@ export const buildDocTemplateVersions = pgTable(
   },
   (t) => [
     uniqueIndex('build_doc_template_versions_template_version_uidx').on(t.templateId, t.version),
-    index('build_doc_template_versions_org_idx').on(t.organisationId, t.templateId),
+    index('build_doc_template_versions_instance_idx').on(t.instanceId, t.templateId),
   ],
 )
 
@@ -128,7 +128,7 @@ export const buildDocSnippets = pgTable(
   'build_doc_snippets',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     createdById: text('created_by_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
     lastEditedById: text('last_edited_by_id').references(() => users.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
@@ -145,7 +145,7 @@ export const buildDocSnippets = pgTable(
     metadata: jsonb('metadata').$type<BuildDocSnippetMetadata>(),
   },
   (t) => [
-    index('build_doc_snippets_org_updated_idx').on(t.organisationId, t.deletedAt, t.updatedAt),
+    index('build_doc_snippets_org_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
     index('build_doc_snippets_search_vector_idx').using('gin', t.searchVector),
   ],
 )
@@ -154,7 +154,7 @@ export const buildDocs = pgTable(
   'build_docs',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     templateVersionId: text('template_version_id')
       .notNull()
       .references(() => buildDocTemplateVersions.id, { onDelete: 'restrict' }),
@@ -174,9 +174,9 @@ export const buildDocs = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
-    index('build_docs_org_updated_idx').on(t.organisationId, t.deletedAt, t.updatedAt),
+    index('build_docs_org_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
     index('build_docs_template_idx').on(t.templateVersionId),
-    index('build_docs_status_idx').on(t.organisationId, t.status),
+    index('build_docs_status_idx').on(t.instanceId, t.status),
     index('build_docs_search_vector_idx').using('gin', t.searchVector),
   ],
 )
@@ -185,7 +185,7 @@ export const buildDocSections = pgTable(
   'build_doc_sections',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     buildDocId: text('build_doc_id').notNull().references(() => buildDocs.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     body: text('body').notNull().default(''),
@@ -202,7 +202,7 @@ export const buildDocSections = pgTable(
   },
   (t) => [
     index('build_doc_sections_doc_position_idx').on(t.buildDocId, t.position),
-    index('build_doc_sections_org_idx').on(t.organisationId, t.deletedAt),
+    index('build_doc_sections_instance_idx').on(t.instanceId, t.deletedAt),
     index('build_doc_sections_search_vector_idx').using('gin', t.searchVector),
   ],
 )
@@ -211,7 +211,7 @@ export const buildDocAssets = pgTable(
   'build_doc_assets',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     buildDocId: text('build_doc_id').notNull().references(() => buildDocs.id, { onDelete: 'cascade' }),
     sectionId: text('section_id').references(() => buildDocSections.id, { onDelete: 'set null' }),
     uploadedById: text('uploaded_by_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
@@ -235,7 +235,7 @@ export const buildDocRevisions = pgTable(
   'build_doc_revisions',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     buildDocId: text('build_doc_id').notNull().references(() => buildDocs.id, { onDelete: 'cascade' }),
     editorId: text('editor_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
     snapshot: jsonb('snapshot').$type<BuildDocRevisionSnapshot>().notNull(),
@@ -248,14 +248,14 @@ export const buildDocAssetStorageSettings = pgTable(
   'build_doc_asset_storage_settings',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     updatedById: text('updated_by_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
     provider: text('provider').notNull().$type<BuildDocAssetStorageProvider>().default('filesystem'),
     config: jsonb('config').$type<BuildDocStorageSettingsConfig>().notNull().default({ provider: 'filesystem' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('build_doc_asset_storage_settings_org_uidx').on(t.organisationId)],
+  (t) => [uniqueIndex('build_doc_asset_storage_settings_org_uidx').on(t.instanceId)],
 )
 
 export type BuildDocTemplate = typeof buildDocTemplates.$inferSelect

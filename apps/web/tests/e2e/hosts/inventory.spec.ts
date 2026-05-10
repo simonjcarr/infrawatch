@@ -2,30 +2,30 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = 'e2e@example.com'
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('authenticated user can search and filter the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -40,7 +40,7 @@ test('authenticated user can search and filter the host inventory', async ({ aut
     VALUES
       (
         'host-alpha',
-        ${orgId},
+        ${instanceId},
         'alpha-node',
         'Alpha Node',
         'Ubuntu 24.04',
@@ -54,7 +54,7 @@ test('authenticated user can search and filter the host inventory', async ({ aut
       ),
       (
         'host-beta',
-        ${orgId},
+        ${instanceId},
         'beta-node',
         'Beta Node',
         'Windows 11',
@@ -101,12 +101,12 @@ test('authenticated user can search and filter the host inventory', async ({ aut
 
 test('authenticated user can paginate through the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -120,7 +120,7 @@ test('authenticated user can paginate through the host inventory', async ({ auth
     )
     SELECT
       'paged-host-' || lpad(gs::text, 3, '0'),
-      ${orgId},
+      ${instanceId},
       'paged-node-' || lpad(gs::text, 3, '0'),
       'Paged Node ' || lpad(gs::text, 3, '0'),
       'Ubuntu 24.04',
@@ -167,12 +167,12 @@ test('authenticated user can paginate through the host inventory', async ({ auth
 
 test('admin can approve a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO agents (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       public_key,
       status,
@@ -181,7 +181,7 @@ test('admin can approve a pending agent from the host inventory page', async ({ 
     )
     VALUES (
       'pending-agent-1',
-      ${orgId},
+      ${instanceId},
       'pending-node',
       'pending-public-key-1',
       'pending',
@@ -193,7 +193,7 @@ test('admin can approve a pending agent from the host inventory page', async ({ 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       agent_id,
       hostname,
       display_name,
@@ -204,7 +204,7 @@ test('admin can approve a pending agent from the host inventory page', async ({ 
     )
     VALUES (
       'pending-host-1',
-      ${orgId},
+      ${instanceId},
       'pending-agent-1',
       'pending-node',
       'Pending Node',
@@ -239,12 +239,12 @@ test('admin can approve a pending agent from the host inventory page', async ({ 
 
 test('admin can reject a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO agents (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       public_key,
       status,
@@ -254,7 +254,7 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
     )
     VALUES (
       'pending-agent-reject-1',
-      ${orgId},
+      ${instanceId},
       'rejected-node',
       'pending-public-key-reject-1',
       'pending',
@@ -267,7 +267,7 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       agent_id,
       hostname,
       display_name,
@@ -278,7 +278,7 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
     )
     VALUES (
       'pending-host-reject-1',
-      ${orgId},
+      ${instanceId},
       'pending-agent-reject-1',
       'rejected-node',
       'Rejected Node',
@@ -325,7 +325,7 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
   const revokedRows = await sql<Array<{ serial: string; reason: string | null }>>`
     SELECT serial, reason
     FROM revoked_certificates
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND serial = 'reject-serial-1'
     LIMIT 1
   `
@@ -337,7 +337,7 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
 
 test('authenticated user can sort and paginate the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getOrgAndUserIds(sql)
 
   for (let index = 1; index <= 55; index += 1) {
     const hostNumber = String(index).padStart(3, '0')
@@ -345,7 +345,7 @@ test('authenticated user can sort and paginate the host inventory', async ({ aut
     await sql`
       INSERT INTO hosts (
         id,
-        organisation_id,
+        instance_id,
         hostname,
         display_name,
         os,
@@ -359,7 +359,7 @@ test('authenticated user can sort and paginate the host inventory', async ({ aut
       )
       VALUES (
         ${`host-paged-${hostNumber}`},
-        ${orgId},
+        ${instanceId},
         ${`host-${hostNumber}`},
         ${`Host ${hostNumber}`},
         'Ubuntu 24.04',

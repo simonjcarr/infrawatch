@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -49,10 +49,10 @@ export type CertificateCounts = {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getCertificates(
-  orgId: string,
+  instanceId: string,
   filters: CertificateListFilters = {},
 ): Promise<Certificate[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const {
     status,
     host,
@@ -63,7 +63,7 @@ export async function getCertificates(
   } = filters
 
   const conditions = [
-    eq(certificates.organisationId, orgId),
+    eq(certificates.instanceId, instanceId),
     isNull(certificates.deletedAt),
     ...(status != null ? [eq(certificates.status, status)] : []),
     ...(host != null && host !== ''
@@ -89,14 +89,14 @@ export async function getCertificates(
 }
 
 export async function getCertificate(
-  orgId: string,
+  instanceId: string,
   certId: string,
 ): Promise<{ certificate: Certificate; events: CertificateEvent[] } | null> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const certificate = await db.query.certificates.findFirst({
     where: and(
       eq(certificates.id, certId),
-      eq(certificates.organisationId, orgId),
+      eq(certificates.instanceId, instanceId),
       isNull(certificates.deletedAt),
     ),
   })
@@ -105,7 +105,7 @@ export async function getCertificate(
   const events = await db.query.certificateEvents.findMany({
     where: and(
       eq(certificateEvents.certificateId, certId),
-      eq(certificateEvents.organisationId, orgId),
+      eq(certificateEvents.instanceId, instanceId),
     ),
     orderBy: desc(certificateEvents.occurredAt),
   })
@@ -113,15 +113,15 @@ export async function getCertificate(
   return { certificate, events }
 }
 
-export async function getCertificateCounts(orgId: string): Promise<CertificateCounts> {
-  await requireOrgAccess(orgId)
+export async function getCertificateCounts(instanceId: string): Promise<CertificateCounts> {
+  await requireInstanceAccess(instanceId)
   const rows = await db
     .select({
       status: certificates.status,
       count: sql<number>`cast(count(*) as int)`,
     })
     .from(certificates)
-    .where(and(eq(certificates.organisationId, orgId), isNull(certificates.deletedAt)))
+    .where(and(eq(certificates.instanceId, instanceId), isNull(certificates.deletedAt)))
     .groupBy(certificates.status)
 
   const counts: CertificateCounts = { valid: 0, expiringSoon: 0, expired: 0, invalid: 0 }
@@ -136,17 +136,17 @@ export async function getCertificateCounts(orgId: string): Promise<CertificateCo
 }
 
 export async function deleteCertificate(
-  orgId: string,
+  instanceId: string,
   certId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'Insufficient permissions to delete certificates' }
   }
   const existing = await db.query.certificates.findFirst({
     where: and(
       eq(certificates.id, certId),
-      eq(certificates.organisationId, orgId),
+      eq(certificates.instanceId, instanceId),
       isNull(certificates.deletedAt),
     ),
   })
@@ -155,7 +155,7 @@ export async function deleteCertificate(
   await db
     .update(certificates)
     .set({ deletedAt: new Date() })
-    .where(and(eq(certificates.id, certId), eq(certificates.organisationId, orgId)))
+    .where(and(eq(certificates.id, certId), eq(certificates.instanceId, instanceId)))
 
   return { success: true }
 }
@@ -217,7 +217,7 @@ function sanValues(parsed: ParsedCertificate): string[] {
 }
 
 async function findExistingCertByIdentity(
-  orgId: string,
+  instanceId: string,
   host: string,
   port: number,
   serverName: string,
@@ -225,7 +225,7 @@ async function findExistingCertByIdentity(
 ): Promise<Certificate | undefined> {
   return db.query.certificates.findFirst({
     where: and(
-      eq(certificates.organisationId, orgId),
+      eq(certificates.instanceId, instanceId),
       eq(certificates.host, host),
       eq(certificates.port, port),
       eq(certificates.serverName, serverName),
@@ -256,11 +256,11 @@ function buildTrackingMetadata(
 }
 
 export async function trackCertificateFromUrl(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<TrackCertificateResult> {
-  await requireOrgAccess(orgId)
-  if (!await trackFromUrlLimiter.check(orgId)) {
+  await requireInstanceAccess(instanceId)
+  if (!await trackFromUrlLimiter.check(instanceId)) {
     return { error: 'Too many requests — please wait before adding more certificates.' }
   }
 
@@ -285,7 +285,7 @@ export async function trackCertificateFromUrl(
   const status = computeExpiryStatus(notAfter)
 
   const existing = await findExistingCertByIdentity(
-    orgId, host, port, serverName, certificate.fingerprintSha256,
+    instanceId, host, port, serverName, certificate.fingerprintSha256,
   )
   if (existing) {
     const currentTlsSkipVerify = asTrackingMetadata(existing.metadata).tlsSkipVerify === true
@@ -312,7 +312,7 @@ export async function trackCertificateFromUrl(
   const [inserted] = await db
     .insert(certificates)
     .values({
-      organisationId: orgId,
+      instanceId: instanceId,
       source: 'imported',
       host,
       port,
@@ -335,7 +335,7 @@ export async function trackCertificateFromUrl(
   if (!inserted) return { error: 'Failed to insert certificate' }
 
   await db.insert(certificateEvents).values({
-    organisationId: orgId,
+    instanceId: instanceId,
     certificateId: inserted.id,
     eventType: 'discovered',
     newStatus: status,
@@ -346,10 +346,10 @@ export async function trackCertificateFromUrl(
 }
 
 export async function trackCertificateFromUpload(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<TrackCertificateResult> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
 
   const parsed = trackFromUploadSchema.safeParse(input)
   if (!parsed.success) {
@@ -376,7 +376,7 @@ export async function trackCertificateFromUpload(
   const status = computeExpiryStatus(notAfter)
 
   const existing = await findExistingCertByIdentity(
-    orgId, host, port, serverName, certificate.fingerprintSha256,
+    instanceId, host, port, serverName, certificate.fingerprintSha256,
   )
   if (existing) {
     return { success: false, alreadyTracked: true, certificateId: existing.id }
@@ -385,7 +385,7 @@ export async function trackCertificateFromUpload(
   const [inserted] = await db
     .insert(certificates)
     .values({
-      organisationId: orgId,
+      instanceId: instanceId,
       source: 'imported',
       host,
       port,
@@ -404,7 +404,7 @@ export async function trackCertificateFromUpload(
   if (!inserted) return { error: 'Failed to insert certificate' }
 
   await db.insert(certificateEvents).values({
-    organisationId: orgId,
+    instanceId: instanceId,
     certificateId: inserted.id,
     eventType: 'discovered',
     newStatus: status,

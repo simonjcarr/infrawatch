@@ -55,8 +55,8 @@ test('signPasswordManagerLaunchAssertion emits the required claims', async () =>
 
   const assertion = await signPasswordManagerLaunchAssertion(
     {
-      organisationId: 'org-123',
-      organisationName: 'Example Org',
+      instanceId: 'org-123',
+      instanceName: 'Example Org',
       userId: 'user-456',
       email: 'ops@example.com',
       name: 'Example Operator',
@@ -85,7 +85,7 @@ test('signPasswordManagerLaunchAssertion emits the required claims', async () =>
   assert.equal(payload.exp, 1778003100 + PASSWORD_MANAGER_LAUNCH_ASSERTION_TTL_SECONDS)
 })
 
-test('signPasswordManagerLaunchAssertion omits the optional organisation name when absent', async () => {
+test('signPasswordManagerLaunchAssertion omits the optional instance name when absent', async () => {
   const { privateKeyDerBase64, publicKey } = createLaunchKeyPair()
   const config = getPasswordManagerLaunchAssertionConfig({
     BETTER_AUTH_URL: 'https://ct-ops.example.com',
@@ -95,7 +95,7 @@ test('signPasswordManagerLaunchAssertion omits the optional organisation name wh
 
   const assertion = await signPasswordManagerLaunchAssertion(
     {
-      organisationId: 'org-123',
+      instanceId: 'org-123',
       userId: 'user-456',
       email: 'ops@example.com',
       name: 'Example Operator',

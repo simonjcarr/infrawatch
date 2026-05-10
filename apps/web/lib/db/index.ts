@@ -1,7 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres, { type Sql } from 'postgres'
 import * as schema from './schema/index.ts'
-import { runWithOrgDatabaseScope } from './rls.ts'
 import { getDatabaseUrl } from './connection-string.ts'
 
 const connectionString = getDatabaseUrl()
@@ -19,13 +18,6 @@ export const db = rootDb
 export const authDb = authBootstrapRootDb
 export type Database = typeof rootDb
 export type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
-
-export async function withOrgDatabaseScope<T>(
-  orgId: string,
-  run: (db: TransactionDatabase) => Promise<T>,
-): Promise<T> {
-  return runWithOrgDatabaseScope<TransactionDatabase, T>(rootDb, orgId, run)
-}
 
 function getMaxConnections(): number {
   const raw = process.env['POSTGRES_POOL_MAX']

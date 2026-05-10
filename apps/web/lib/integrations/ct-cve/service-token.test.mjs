@@ -11,7 +11,7 @@ import {
 const TOKEN = {
   id: 'ctcve_test_token',
   secret: Buffer.from('ct-cve unit test signing key only').toString('base64url'),
-  orgId: 'org_123',
+  instanceId: 'org_123',
   scopes: ['findings:write', 'connection:read'],
 }
 
@@ -36,26 +36,26 @@ function signedHeaders({ body = '{}', timestamp = '2026-04-30T09:20:00.000Z', no
 }
 
 test('accepts a correctly signed CT-CVE service request', async () => {
-  const body = JSON.stringify({ orgId: TOKEN.orgId })
+  const body = JSON.stringify({ instanceId: TOKEN.instanceId })
   const result = await verifyCtCveServiceRequest({
     method: 'POST',
     path: '/api/integrations/ct-cve/v1/finding-batches',
     body,
     headers: signedHeaders({ body }),
     requiredScope: 'findings:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
   })
 
   assert.equal(result.ok, true)
-  assert.equal(result.ok && result.token.orgId, TOKEN.orgId)
+  assert.equal(result.ok && result.token.instanceId, TOKEN.instanceId)
 })
 
 test('rejects replayed nonces within the replay window', async () => {
   const nonceStore = createInMemoryCtCveNonceStore()
-  const body = JSON.stringify({ orgId: TOKEN.orgId })
+  const body = JSON.stringify({ instanceId: TOKEN.instanceId })
   const headers = signedHeaders({ body })
   const request = {
     method: 'POST',
@@ -63,7 +63,7 @@ test('rejects replayed nonces within the replay window', async () => {
     body,
     headers,
     requiredScope: 'findings:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore,
@@ -92,7 +92,7 @@ test('accepts connection-health requests with the connection read scope', async 
       }),
     }),
     requiredScope: 'connection:read',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
@@ -102,7 +102,7 @@ test('accepts connection-health requests with the connection read scope', async 
 })
 
 test('rejects stale timestamps', async () => {
-  const body = JSON.stringify({ orgId: TOKEN.orgId })
+  const body = JSON.stringify({ instanceId: TOKEN.instanceId })
   const timestamp = '2026-04-30T09:00:00.000Z'
   const result = await verifyCtCveServiceRequest({
     method: 'POST',
@@ -110,7 +110,7 @@ test('rejects stale timestamps', async () => {
     body,
     headers: signedHeaders({ body, timestamp }),
     requiredScope: 'findings:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
@@ -124,10 +124,10 @@ test('rejects body hash mismatches before signature verification', async () => {
   const result = await verifyCtCveServiceRequest({
     method: 'POST',
     path: '/api/integrations/ct-cve/v1/finding-batches',
-    body: JSON.stringify({ orgId: TOKEN.orgId, changed: true }),
-    headers: signedHeaders({ body: JSON.stringify({ orgId: TOKEN.orgId }) }),
+    body: JSON.stringify({ instanceId: TOKEN.instanceId, changed: true }),
+    headers: signedHeaders({ body: JSON.stringify({ instanceId: TOKEN.instanceId }) }),
     requiredScope: 'findings:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
@@ -139,14 +139,14 @@ test('rejects body hash mismatches before signature verification', async () => {
 
 test('rejects invalid signatures without recording the nonce', async () => {
   const nonceStore = createInMemoryCtCveNonceStore()
-  const body = JSON.stringify({ orgId: TOKEN.orgId })
+  const body = JSON.stringify({ instanceId: TOKEN.instanceId })
   const bad = await verifyCtCveServiceRequest({
     method: 'POST',
     path: '/api/integrations/ct-cve/v1/finding-batches',
     body,
     headers: signedHeaders({ body, signature: 'bad_signature' }),
     requiredScope: 'findings:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore,
@@ -161,7 +161,7 @@ test('rejects invalid signatures without recording the nonce', async () => {
     body,
     headers: signedHeaders({ body }),
     requiredScope: 'findings:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore,
@@ -170,8 +170,8 @@ test('rejects invalid signatures without recording the nonce', async () => {
   assert.equal(good.ok, true)
 })
 
-test('rejects tokens without the required scope or organisation binding', async () => {
-  const body = JSON.stringify({ orgId: TOKEN.orgId })
+test('rejects tokens without the required scope or instance binding', async () => {
+  const body = JSON.stringify({ instanceId: TOKEN.instanceId })
 
   const wrongScope = await verifyCtCveServiceRequest({
     method: 'POST',
@@ -179,7 +179,7 @@ test('rejects tokens without the required scope or organisation binding', async 
     body,
     headers: signedHeaders({ body, nonce: 'nonce_scope' }),
     requiredScope: 'inventory:write',
-    orgId: TOKEN.orgId,
+    instanceId: TOKEN.instanceId,
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
@@ -193,7 +193,7 @@ test('rejects tokens without the required scope or organisation binding', async 
     body,
     headers: signedHeaders({ body, nonce: 'nonce_org' }),
     requiredScope: 'findings:write',
-    orgId: 'org_other',
+    instanceId: 'org_other',
     now: new Date('2026-04-30T09:20:30.000Z'),
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
@@ -207,7 +207,7 @@ test('parses configured CT-CVE service tokens and rejects weak secrets', () => {
     {
       id: TOKEN.id,
       secret: TOKEN.secret,
-      orgId: TOKEN.orgId,
+      instanceId: TOKEN.instanceId,
       scopes: ['findings:write', 'connection:read', 'unsupported'],
     },
   ]))
@@ -217,7 +217,7 @@ test('parses configured CT-CVE service tokens and rejects weak secrets', () => {
     () => parseCtCveServiceTokens(JSON.stringify([{
       id: 'weak',
       secret: 'short',
-      orgId: TOKEN.orgId,
+      instanceId: TOKEN.instanceId,
       scopes: ['findings:write'],
     }])),
     /secret must contain at least 32 bytes/,

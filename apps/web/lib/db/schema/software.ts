@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { taskRunHosts } from './task-runs.ts'
 import { users } from './auth.ts'
@@ -27,7 +27,7 @@ export const softwarePackages = pgTable(
   'software_packages',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     hostId: text('host_id').notNull().references(() => hosts.id),
     name: text('name').notNull(),
     version: text('version').notNull(),
@@ -57,11 +57,11 @@ export const softwarePackages = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex('sw_pkg_uniq').on(t.organisationId, t.hostId, t.name, t.version, t.architecture),
-    index('sw_pkg_org_name_idx').on(t.organisationId, t.name),
+    uniqueIndex('sw_pkg_uniq').on(t.instanceId, t.hostId, t.name, t.version, t.architecture),
+    index('sw_pkg_org_name_idx').on(t.instanceId, t.name),
     index('sw_pkg_source_name_idx').on(t.source, t.distroId, t.distroCodename, t.sourceName),
     index('sw_pkg_host_idx').on(t.hostId),
-    index('sw_pkg_first_seen_idx').on(t.organisationId, t.firstSeenAt),
+    index('sw_pkg_first_seen_idx').on(t.instanceId, t.firstSeenAt),
   ],
 )
 
@@ -73,7 +73,7 @@ export const softwareScans = pgTable(
   'software_scans',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     hostId: text('host_id').notNull().references(() => hosts.id),
     taskRunHostId: text('task_run_host_id').references(() => taskRunHosts.id),
     status: text('status').notNull().$type<'running' | 'success' | 'partial' | 'failed'>(),
@@ -89,7 +89,7 @@ export const softwareScans = pgTable(
   },
   (t) => [
     index('sw_scan_host_idx').on(t.hostId, t.createdAt),
-    index('sw_scan_org_idx').on(t.organisationId, t.createdAt),
+    index('sw_scan_instance_idx').on(t.instanceId, t.createdAt),
   ],
 )
 
@@ -101,7 +101,7 @@ export const savedSoftwareReports = pgTable(
   'saved_software_reports',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     userId: text('user_id').notNull().references(() => users.id),
     name: text('name').notNull(),
     // The full filter shape serialised as JSON. Validated against the current

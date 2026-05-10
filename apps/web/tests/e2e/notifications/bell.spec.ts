@@ -2,30 +2,30 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('authenticated user can review topbar notifications and open the linked resource', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -36,7 +36,7 @@ test('authenticated user can review topbar notifications and open the linked res
     )
     VALUES (
       'notification-bell-host-1',
-      ${orgId},
+      ${instanceId},
       'notification-bell-host-1',
       'Notification Bell Host',
       'Ubuntu 24.04',
@@ -50,7 +50,7 @@ test('authenticated user can review topbar notifications and open the linked res
   await sql`
     INSERT INTO notifications (
       id,
-      organisation_id,
+      instance_id,
       user_id,
       subject,
       body,
@@ -63,7 +63,7 @@ test('authenticated user can review topbar notifications and open the linked res
     VALUES
       (
         'notification-bell-unread-host',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Host needs attention',
         'Notification Bell Host missed a recent heartbeat.',
@@ -75,7 +75,7 @@ test('authenticated user can review topbar notifications and open the linked res
       ),
       (
         'notification-bell-unread-certificate',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Certificate expires soon',
         'edge.example.com expires in five days.',

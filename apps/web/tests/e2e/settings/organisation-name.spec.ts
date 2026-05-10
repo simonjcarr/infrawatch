@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
 
-test('admin can update the organisation name from settings', async ({ authenticatedPage: page }) => {
+test('admin can update the instance name from settings', async ({ authenticatedPage: page }) => {
   const updatedName = `Updated Org ${Date.now()}`
   const sql = getTestDb()
 
@@ -19,7 +19,7 @@ test('admin can update the organisation name from settings', async ({ authentica
 
   const beforeRows = await sql<Array<{ name: string }>>`
     SELECT name
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -37,7 +37,7 @@ test('admin can update the organisation name from settings', async ({ authentica
 
   const rows = await sql<Array<{ name: string }>>`
     SELECT name
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -46,11 +46,11 @@ test('admin can update the organisation name from settings', async ({ authentica
   expect(rows[0]?.name).toBe(updatedName)
 })
 
-test('organisation name validation rejects names shorter than two characters', async ({ authenticatedPage: page }) => {
+test('instance name validation rejects names shorter than two characters', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await sql`
-    UPDATE organisations
+    UPDATE instance_settings
     SET name = ${TEST_ORG.name}
     WHERE slug = ${TEST_ORG.slug}
   `
@@ -69,7 +69,7 @@ test('organisation name validation rejects names shorter than two characters', a
 
   const rows = await sql<Array<{ name: string }>>`
     SELECT name
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `

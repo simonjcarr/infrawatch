@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,11 +15,11 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can review, filter, and add service accounts', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO domain_accounts (
       id,
-      organisation_id,
+      instance_id,
       username,
       display_name,
       email,
@@ -28,7 +28,7 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
     VALUES
       (
         'svc-account-active',
-        ${orgId},
+        ${instanceId},
         'svc-active',
         'Deploy Service',
         'svc-active@example.com',
@@ -36,7 +36,7 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
       ),
       (
         'svc-account-disabled',
-        ${orgId},
+        ${instanceId},
         'svc-disabled',
         'Legacy Service',
         'svc-disabled@example.com',
@@ -44,7 +44,7 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
       ),
       (
         'svc-account-locked',
-        ${orgId},
+        ${instanceId},
         'svc-locked',
         'Locked Service',
         'svc-locked@example.com',
@@ -52,7 +52,7 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
       ),
       (
         'svc-account-expired',
-        ${orgId},
+        ${instanceId},
         'svc-expired',
         'Expired Service',
         'svc-expired@example.com',
@@ -113,7 +113,7 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
   const rows = await sql<Array<{ username: string; status: string; email: string | null }>>`
     SELECT username, status, email
     FROM domain_accounts
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND username = 'svc-reporting'
       AND deleted_at IS NULL
     LIMIT 1
@@ -129,11 +129,11 @@ test('admin can review, filter, and add service accounts', async ({ authenticate
 
 test('admin can update and delete a service account from the detail page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO domain_accounts (
       id,
-      organisation_id,
+      instance_id,
       username,
       display_name,
       email,
@@ -142,7 +142,7 @@ test('admin can update and delete a service account from the detail page', async
     )
     VALUES (
       'svc-account-detail',
-      ${orgId},
+      ${instanceId},
       'svc-detail',
       'Ops Service',
       'ops-service@example.com',

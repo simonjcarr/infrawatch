@@ -2,30 +2,30 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('authenticated user can review, filter, and bulk delete notifications', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
       id,
-      organisation_id,
+      instance_id,
       user_id,
       subject,
       body,
@@ -38,7 +38,7 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
     VALUES
       (
         'notification-unread-critical',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'CPU usage is above threshold',
         'CPU usage on alpha-node exceeded the configured threshold.',
@@ -50,7 +50,7 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
       ),
       (
         'notification-unread-warning',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Disk usage is climbing',
         'Disk usage on beta-node crossed the warning threshold.',
@@ -62,7 +62,7 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
       ),
       (
         'notification-read-info',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Inventory scan completed',
         'The latest inventory scan completed successfully.',
@@ -134,12 +134,12 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
 
 test('authenticated user can mark all unread notifications as read', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
       id,
-      organisation_id,
+      instance_id,
       user_id,
       subject,
       body,
@@ -152,7 +152,7 @@ test('authenticated user can mark all unread notifications as read', async ({ au
     VALUES
       (
         'notification-mark-all-read-1',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Certificate expires soon',
         'api.internal.example expires in three days.',
@@ -164,7 +164,7 @@ test('authenticated user can mark all unread notifications as read', async ({ au
       ),
       (
         'notification-mark-all-read-2',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Agent heartbeat missed',
         'worker-01 has not checked in recently.',
@@ -176,7 +176,7 @@ test('authenticated user can mark all unread notifications as read', async ({ au
       ),
       (
         'notification-mark-all-read-3',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Inventory completed',
         'The overnight inventory sync finished successfully.',
@@ -222,12 +222,12 @@ test('authenticated user can mark all unread notifications as read', async ({ au
 
 test('authenticated user can mark selected read notifications as unread', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
       id,
-      organisation_id,
+      instance_id,
       user_id,
       subject,
       body,
@@ -240,7 +240,7 @@ test('authenticated user can mark selected read notifications as unread', async 
     VALUES
       (
         'notification-mark-unread-1',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Patch window completed',
         'The scheduled patch run completed successfully.',
@@ -252,7 +252,7 @@ test('authenticated user can mark selected read notifications as unread', async 
       ),
       (
         'notification-mark-unread-2',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Certificate inventory refreshed',
         'A certificate scan refreshed the inventory.',
@@ -264,7 +264,7 @@ test('authenticated user can mark selected read notifications as unread', async 
       ),
       (
         'notification-mark-unread-3',
-        ${orgId},
+        ${instanceId},
         ${userId},
         'Agent check-in recovered',
         'worker-02 is reporting normally again.',
@@ -321,12 +321,12 @@ test('authenticated user can mark selected read notifications as unread', async 
 
 test('authenticated user can expand a notification, change its read state, and delete it', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
       id,
-      organisation_id,
+      instance_id,
       user_id,
       subject,
       body,
@@ -338,7 +338,7 @@ test('authenticated user can expand a notification, change its read state, and d
     )
     VALUES (
       'notification-row-actions-1',
-      ${orgId},
+      ${instanceId},
       ${userId},
       'Review the host details',
       'The host detail page has new inventory data ready to review.',

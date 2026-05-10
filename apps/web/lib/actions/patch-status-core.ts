@@ -2,7 +2,7 @@
 
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 
 export interface PatchPackageUpdate {
   id: string
@@ -106,10 +106,10 @@ function toHostPatchStatus(row: HostPatchRow, updates: PatchPackageUpdate[]): Ho
 }
 
 export async function getHostPatchStatus(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<HostPatchStatusDetails | null> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
 
   const rows = (await db.execute(sql`
     SELECT
@@ -128,9 +128,9 @@ export async function getHostPatchStatus(
       hps.checked_at
     FROM host_patch_statuses hps
     JOIN hosts h ON h.id = hps.host_id
-    WHERE hps.organisation_id = ${orgId}
+    WHERE hps.instance_id = ${instanceId}
       AND hps.host_id = ${hostId}
-      AND h.organisation_id = ${orgId}
+      AND h.instance_id = ${instanceId}
       AND h.deleted_at IS NULL
     ORDER BY hps.checked_at DESC
     LIMIT 1
@@ -139,15 +139,15 @@ export async function getHostPatchStatus(
   const row = rows[0]
   if (!row) return null
 
-  const updates = await getCurrentUpdatesForHost(orgId, hostId)
+  const updates = await getCurrentUpdatesForHost(instanceId, hostId)
   return toHostPatchStatus(row, updates)
 }
 
 export async function getCurrentUpdatesForHost(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<PatchPackageUpdate[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
 
   const rows = (await db.execute(sql`
     SELECT
@@ -161,7 +161,7 @@ export async function getCurrentUpdatesForHost(
       first_seen_at AS "firstSeenAt",
       last_seen_at AS "lastSeenAt"
     FROM host_package_updates
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND host_id = ${hostId}
       AND status = 'current'
     ORDER BY name ASC
@@ -171,8 +171,8 @@ export async function getCurrentUpdatesForHost(
   return rows
 }
 
-export async function getPatchManagementReport(orgId: string): Promise<PatchManagementReport> {
-  await requireOrgAccess(orgId)
+export async function getPatchManagementReport(instanceId: string): Promise<PatchManagementReport> {
+  await requireInstanceAccess(instanceId)
 
   const rows = (await db.execute(sql`
     SELECT
@@ -200,19 +200,19 @@ export async function getPatchManagementReport(orgId: string): Promise<PatchMana
       SELECT *
       FROM host_patch_statuses latest
       WHERE latest.host_id = h.id
-        AND latest.organisation_id = h.organisation_id
+        AND latest.instance_id = h.instance_id
       ORDER BY latest.checked_at DESC
       LIMIT 1
     ) hps ON true
     LEFT JOIN host_network_memberships hnm
       ON hnm.host_id = h.id
-     AND hnm.organisation_id = h.organisation_id
+     AND hnm.instance_id = h.instance_id
      AND hnm.deleted_at IS NULL
     LEFT JOIN networks n
       ON n.id = hnm.network_id
-     AND n.organisation_id = h.organisation_id
+     AND n.instance_id = h.instance_id
      AND n.deleted_at IS NULL
-    WHERE h.organisation_id = ${orgId}
+    WHERE h.instance_id = ${instanceId}
       AND h.deleted_at IS NULL
     GROUP BY h.id, hps.id, hps.status, hps.last_patched_at, hps.patch_age_days,
       hps.max_age_days, hps.package_manager, hps.updates_supported,

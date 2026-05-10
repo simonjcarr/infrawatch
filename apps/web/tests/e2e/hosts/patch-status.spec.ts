@@ -4,7 +4,7 @@ import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
@@ -12,12 +12,12 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('host infrastructure tab shows network memberships and patch status for the selected host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -28,7 +28,7 @@ test('host infrastructure tab shows network memberships and patch status for the
     )
     VALUES (
       'patch-host-1',
-      ${orgId},
+      ${instanceId},
       'patch-node-1',
       'Patch Node 1',
       'Ubuntu 24.04',
@@ -42,7 +42,7 @@ test('host infrastructure tab shows network memberships and patch status for the
   await sql`
     INSERT INTO host_patch_statuses (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       check_id,
       status,
@@ -58,7 +58,7 @@ test('host infrastructure tab shows network memberships and patch status for the
     )
     VALUES (
       'patch-status-1',
-      ${orgId},
+      ${instanceId},
       'patch-host-1',
       NULL,
       'fail',
@@ -77,7 +77,7 @@ test('host infrastructure tab shows network memberships and patch status for the
   await sql`
     INSERT INTO host_package_updates (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       name,
       current_version,
@@ -88,34 +88,34 @@ test('host infrastructure tab shows network memberships and patch status for the
       last_seen_at
     )
     VALUES
-      ('patch-update-1', ${orgId}, 'patch-host-1', 'openssl', '3.0.2-1', '3.0.2-2', 'apt', 'current', NOW(), NOW()),
-      ('patch-update-2', ${orgId}, 'patch-host-1', 'libssl3', '3.0.2-1', '3.0.2-2', 'apt', 'current', NOW(), NOW())
+      ('patch-update-1', ${instanceId}, 'patch-host-1', 'openssl', '3.0.2-1', '3.0.2-2', 'apt', 'current', NOW(), NOW()),
+      ('patch-update-2', ${instanceId}, 'patch-host-1', 'libssl3', '3.0.2-1', '3.0.2-2', 'apt', 'current', NOW(), NOW())
   `
 
   await sql`
     INSERT INTO networks (
       id,
-      organisation_id,
+      instance_id,
       name,
       cidr,
       description
     )
     VALUES
-      ('network-auto-1', ${orgId}, 'Office LAN', '10.20.0.0/24', 'Auto-discovered office subnet'),
-      ('network-manual-1', ${orgId}, 'DMZ', '10.30.0.0/24', 'Manually managed network')
+      ('network-auto-1', ${instanceId}, 'Office LAN', '10.20.0.0/24', 'Auto-discovered office subnet'),
+      ('network-manual-1', ${instanceId}, 'DMZ', '10.30.0.0/24', 'Manually managed network')
   `
 
   await sql`
     INSERT INTO host_network_memberships (
       id,
-      organisation_id,
+      instance_id,
       network_id,
       host_id,
       auto_assigned
     )
     VALUES (
       'membership-auto-1',
-      ${orgId},
+      ${instanceId},
       'network-auto-1',
       'patch-host-1',
       true
@@ -161,12 +161,12 @@ test('host infrastructure tab shows network memberships and patch status for the
 
 test('deleting a host removes patch status data before checks', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -177,7 +177,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
     )
     VALUES (
       'patch-delete-host-1',
-      ${orgId},
+      ${instanceId},
       'patch-delete-node-1',
       'Patch Delete Node 1',
       'Ubuntu 24.04',
@@ -191,7 +191,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
   await sql`
     INSERT INTO checks (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       name,
       check_type,
@@ -201,7 +201,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
     )
     VALUES (
       'patch-delete-check-1',
-      ${orgId},
+      ${instanceId},
       'patch-delete-host-1',
       'Patch status',
       'patch_status',
@@ -214,7 +214,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
   await sql`
     INSERT INTO host_patch_statuses (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       check_id,
       status,
@@ -229,7 +229,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
     )
     VALUES (
       'patch-delete-status-1',
-      ${orgId},
+      ${instanceId},
       'patch-delete-host-1',
       'patch-delete-check-1',
       'fail',
@@ -247,7 +247,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
   await sql`
     INSERT INTO host_package_updates (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       name,
       current_version,
@@ -259,7 +259,7 @@ test('deleting a host removes patch status data before checks', async ({ authent
     )
     VALUES (
       'patch-delete-update-1',
-      ${orgId},
+      ${instanceId},
       'patch-delete-host-1',
       'openssl',
       '3.0.2-1',
@@ -279,19 +279,19 @@ test('deleting a host removes patch status data before checks', async ({ authent
   const remaining = await sql<Array<{ table_name: string; count: string }>>`
     SELECT 'hosts' AS table_name, count(*)::text AS count
       FROM hosts
-      WHERE id = 'patch-delete-host-1' AND organisation_id = ${orgId}
+      WHERE id = 'patch-delete-host-1' AND instance_id = ${instanceId}
     UNION ALL
     SELECT 'checks' AS table_name, count(*)::text AS count
       FROM checks
-      WHERE id = 'patch-delete-check-1' AND organisation_id = ${orgId}
+      WHERE id = 'patch-delete-check-1' AND instance_id = ${instanceId}
     UNION ALL
     SELECT 'host_patch_statuses' AS table_name, count(*)::text AS count
       FROM host_patch_statuses
-      WHERE id = 'patch-delete-status-1' AND organisation_id = ${orgId}
+      WHERE id = 'patch-delete-status-1' AND instance_id = ${instanceId}
     UNION ALL
     SELECT 'host_package_updates' AS table_name, count(*)::text AS count
       FROM host_package_updates
-      WHERE id = 'patch-delete-update-1' AND organisation_id = ${orgId}
+      WHERE id = 'patch-delete-update-1' AND instance_id = ${instanceId}
   `
 
   expect(remaining).toEqual([

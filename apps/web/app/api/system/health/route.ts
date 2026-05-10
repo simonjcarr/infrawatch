@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { agents, hosts, organisations } from '@/lib/db/schema'
+import { agents, hosts, instanceSettings } from '@/lib/db/schema'
 import { eq, and, isNull, count, inArray, sql } from 'drizzle-orm'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 import {
@@ -34,8 +34,8 @@ export async function GET() {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const orgId = session.user.organisationId
-  if (!orgId) {
+  const instanceId = session.user.instanceId
+  if (!instanceId) {
     const ingestSummary = calculateIngestHealthSummary([], [])
     const agentUpgradeSummary = calculateAgentUpgradeSummary([], REQUIRED_AGENT_VERSION)
     return Response.json({
@@ -62,17 +62,17 @@ export async function GET() {
       .select({ status: agents.status, count: count() })
       .from(agents)
       .innerJoin(hosts, and(eq(hosts.agentId, agents.id), isNull(hosts.deletedAt)))
-      .where(and(eq(agents.organisationId, orgId), isNull(agents.deletedAt)))
+      .where(and(eq(agents.instanceId, instanceId), isNull(agents.deletedAt)))
       .groupBy(agents.status),
 
-    db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
     }),
 
     db.query.agents.findMany({
       columns: { version: true },
       where: and(
-        eq(agents.organisationId, orgId),
+        eq(agents.instanceId, instanceId),
         isNull(agents.deletedAt),
         inArray(agents.status, ['active', 'offline']),
       ),
@@ -146,7 +146,7 @@ export async function GET() {
         FROM pending_cert_signings pcs
         INNER JOIN agents a ON a.id = pcs.agent_id
         LEFT JOIN hosts h ON h.agent_id = a.id AND h.deleted_at IS NULL
-        WHERE a.organisation_id = ${orgId}
+        WHERE a.instance_id = ${instanceId}
           AND a.deleted_at IS NULL
           AND pcs.last_error IS NOT NULL
 
@@ -162,7 +162,7 @@ export async function GET() {
         FROM agent_queries aq
         INNER JOIN hosts h ON h.id = aq.host_id
         LEFT JOIN agents a ON a.id = h.agent_id
-        WHERE aq.organisation_id = ${orgId}
+        WHERE aq.instance_id = ${instanceId}
           AND aq.status = 'error'
           AND aq.error IS NOT NULL
           AND aq.deleted_at IS NULL
@@ -180,7 +180,7 @@ export async function GET() {
         FROM software_scans ss
         INNER JOIN hosts h ON h.id = ss.host_id
         LEFT JOIN agents a ON a.id = h.agent_id
-        WHERE ss.organisation_id = ${orgId}
+        WHERE ss.instance_id = ${instanceId}
           AND ss.status = 'failed'
           AND ss.error_message IS NOT NULL
           AND h.deleted_at IS NULL
@@ -198,7 +198,7 @@ export async function GET() {
         INNER JOIN hosts h ON h.id = trh.host_id
         INNER JOIN task_runs tr ON tr.id = trh.task_run_id
         LEFT JOIN agents a ON a.id = h.agent_id
-        WHERE trh.organisation_id = ${orgId}
+        WHERE trh.instance_id = ${instanceId}
           AND trh.status = 'failed'
           AND trh.deleted_at IS NULL
           AND tr.deleted_at IS NULL

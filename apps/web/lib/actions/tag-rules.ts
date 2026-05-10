@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 import { getRequiredSession } from '@/lib/auth/session'
 
 import { z } from 'zod'
@@ -41,15 +41,15 @@ const createRuleSchema = z.object({
 // Returns matching hosts without mutating anything. Used for the "Preview
 // matches" step in the bulk-tag UI before the user commits the change.
 export async function previewHostFilter(
-  orgId: string,
+  instanceId: string,
   filter: HostFilter,
 ): Promise<HostFilterResult[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const parsed = hostFilterSchema.safeParse(filter)
   if (!parsed.success) return []
   if (isEmptyFilter(parsed.data)) return []
 
-  const where = buildHostFilterWhere(orgId, parsed.data)
+  const where = buildHostFilterWhere(instanceId, parsed.data)
   if (!where) return []
 
   const rows = await db.query.hosts.findMany({
@@ -71,11 +71,11 @@ export async function previewHostFilter(
 // One-shot bulk assign — matches the filter now and applies tags to every
 // matching host. Does NOT persist the rule; use createTagRule for that.
 export async function bulkAssignTags(
-  orgId: string,
+  instanceId: string,
   filter: HostFilter,
   pairs: TagPair[],
 ): Promise<{ success: true; applied: number } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   try {
     const parsedFilter = hostFilterSchema.safeParse(filter)
     if (!parsedFilter.success) return { error: 'Invalid filter' }
@@ -83,10 +83,10 @@ export async function bulkAssignTags(
     if (!parsedTags.success) return { error: 'At least one tag is required' }
     if (isEmptyFilter(parsedFilter.data)) return { error: 'Filter must target at least one host' }
 
-    const matches = await previewHostFilter(orgId, parsedFilter.data)
+    const matches = await previewHostFilter(instanceId, parsedFilter.data)
     let applied = 0
     for (const host of matches) {
-      const res = await assignTagsToResource(orgId, 'host', host.id, parsedTags.data)
+      const res = await assignTagsToResource(instanceId, 'host', host.id, parsedTags.data)
       if ('success' in res) applied += 1
     }
     return { success: true, applied }
@@ -98,11 +98,11 @@ export async function bulkAssignTags(
 
 export async function listTagRules(): Promise<TagRule[]> {
   const session = await getRequiredSession()
-  const orgId = resolveOptionalActionScope(session)
-  if (!orgId) return []
-  await requireOrgAccess(orgId)
+  const instanceId = resolveOptionalActionScope(session)
+  if (!instanceId) return []
+  await requireInstanceAccess(instanceId)
   return db.query.tagRules.findMany({
-    where: and(eq(tagRules.organisationId, orgId), isNull(tagRules.deletedAt)),
+    where: and(eq(tagRules.instanceId, instanceId), isNull(tagRules.deletedAt)),
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   })
 }
@@ -111,8 +111,8 @@ export async function createTagRule(
   input: { name: string; filter: HostFilter; tags: TagPair[]; enabled?: boolean },
 ): Promise<{ success: true; id: string } | { error: string }> {
   const session = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(session)
-  await requireOrgAdminAccess(orgId)
+  const instanceId = resolveCurrentActionScope(session)
+  await requireInstanceAdminAccess(instanceId)
   try {
     const parsed = createRuleSchema.safeParse(input)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -120,7 +120,7 @@ export async function createTagRule(
     const [row] = await db
       .insert(tagRules)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         name: parsed.data.name,
         filter: parsed.data.filter,
         tags: parsed.data.tags,
@@ -140,13 +140,13 @@ export async function updateTagRule(
   input: Partial<{ name: string; filter: HostFilter; tags: TagPair[]; enabled: boolean }>,
 ): Promise<{ success: true } | { error: string }> {
   const session = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(session)
-  await requireOrgAdminAccess(orgId)
+  const instanceId = resolveCurrentActionScope(session)
+  await requireInstanceAdminAccess(instanceId)
   try {
     const existing = await db.query.tagRules.findFirst({
       where: and(
         eq(tagRules.id, ruleId),
-        eq(tagRules.organisationId, orgId),
+        eq(tagRules.instanceId, instanceId),
         isNull(tagRules.deletedAt),
       ),
     })
@@ -170,7 +170,7 @@ export async function updateTagRule(
         enabled: parsed.data.enabled,
         updatedAt: new Date(),
       })
-      .where(and(eq(tagRules.id, ruleId), eq(tagRules.organisationId, orgId)))
+      .where(and(eq(tagRules.id, ruleId), eq(tagRules.instanceId, instanceId)))
     return { success: true }
   } catch (err) {
     logError('Failed to update tag rule:', err)
@@ -182,13 +182,13 @@ export async function deleteTagRule(
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
   const session = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(session)
-  await requireOrgAdminAccess(orgId)
+  const instanceId = resolveCurrentActionScope(session)
+  await requireInstanceAdminAccess(instanceId)
   try {
     await db
       .update(tagRules)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(tagRules.id, ruleId), eq(tagRules.organisationId, orgId)))
+      .where(and(eq(tagRules.id, ruleId), eq(tagRules.instanceId, instanceId)))
     return { success: true }
   } catch (err) {
     logError('Failed to delete tag rule:', err)
@@ -203,18 +203,18 @@ export async function runTagRule(
   ruleId: string,
 ): Promise<{ success: true; applied: number } | { error: string }> {
   const session = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(session)
-  await requireOrgWriteAccess(orgId)
+  const instanceId = resolveCurrentActionScope(session)
+  await requireInstanceWriteAccess(instanceId)
   try {
     const rule = await db.query.tagRules.findFirst({
       where: and(
         eq(tagRules.id, ruleId),
-        eq(tagRules.organisationId, orgId),
+        eq(tagRules.instanceId, instanceId),
         isNull(tagRules.deletedAt),
       ),
     })
     if (!rule) return { error: 'Rule not found' }
-    return bulkAssignTags(orgId, rule.filter, rule.tags)
+    return bulkAssignTags(instanceId, rule.filter, rule.tags)
   } catch (err) {
     logError('Failed to run tag rule:', err)
     return { error: 'An unexpected error occurred' }
@@ -227,27 +227,27 @@ export async function runTagRule(
 // per-host tags set by the operator because assignTagsToResource dedupes by
 // key with last-wins and rule tags only fill in keys not already present.
 export async function runMatchingTagRules(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<void> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
   })
   if (!host) return
 
   const rules = await db.query.tagRules.findMany({
     where: and(
-      eq(tagRules.organisationId, orgId),
+      eq(tagRules.instanceId, instanceId),
       eq(tagRules.enabled, true),
       isNull(tagRules.deletedAt),
     ),
   })
 
   for (const rule of rules) {
-    const matches = await previewHostFilter(orgId, rule.filter)
+    const matches = await previewHostFilter(instanceId, rule.filter)
     if (matches.some((m) => m.id === hostId)) {
-      await assignTagsToResource(orgId, 'host', hostId, rule.tags)
+      await assignTagsToResource(instanceId, 'host', hostId, rule.tags)
     }
   }
 }

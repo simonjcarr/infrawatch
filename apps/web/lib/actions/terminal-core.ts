@@ -1,15 +1,15 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
-import { organisations, hosts, terminalSessions } from '@/lib/db/schema'
+import { instanceSettings, hosts, terminalSessions } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { createHash, randomBytes } from 'node:crypto'
 import { getRequiredSession } from '@/lib/auth/session'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import { parseHostMetadata, type SshHostKeyMetadata } from '@/lib/db/schema/hosts'
 import { MEMBERSHIP_ROLES } from '@/lib/auth/roles'
 import { hasRole } from '@/lib/auth/guards'
@@ -27,11 +27,11 @@ export interface TerminalAccessDenied {
 
 async function resolveCurrentActionScope(): Promise<string> {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId
-  if (!orgId) {
+  const instanceId = session.user.instanceId
+  if (!instanceId) {
     throw new Error('Instance scope is not configured')
   }
-  return orgId
+  return instanceId
 }
 
 /**
@@ -42,16 +42,16 @@ export async function checkTerminalAccess(
   hostId: string,
 ): Promise<TerminalAccessResult | TerminalAccessDenied>
 export async function checkTerminalAccess(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<TerminalAccessResult | TerminalAccessDenied>
 export async function checkTerminalAccess(
-  orgIdOrHostId: string,
+  instanceIdOrHostId: string,
   maybeHostId?: string,
 ): Promise<TerminalAccessResult | TerminalAccessDenied> {
-  const orgId = maybeHostId ? orgIdOrHostId : await resolveCurrentActionScope()
-  const hostId = maybeHostId ?? orgIdOrHostId
-  const session = await requireOrgAccess(orgId)
+  const instanceId = maybeHostId ? instanceIdOrHostId : await resolveCurrentActionScope()
+  const hostId = maybeHostId ?? instanceIdOrHostId
+  const session = await requireInstanceAccess(instanceId)
   const { user } = session
 
   // 1. Role check
@@ -60,18 +60,18 @@ export async function checkTerminalAccess(
   }
 
   // 2. Org-level terminal enabled
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const orgMeta = parseOrgMetadata(org?.metadata)
+  const orgMeta = parseInstanceMetadata(org?.metadata)
   if (orgMeta.terminalEnabled === false) {
-    return { allowed: false, reason: 'Terminal access is disabled for this organisation' }
+    return { allowed: false, reason: 'Terminal access is disabled for this instance' }
   }
 
   // 3. Host-level terminal enabled
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
     columns: { metadata: true },
   })
   if (!host) {
@@ -106,20 +106,20 @@ export async function createTerminalSession(
   username?: string,
 ): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }>
 export async function createTerminalSession(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   username?: string,
 ): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }>
 export async function createTerminalSession(
-  orgIdOrHostId: string,
+  instanceIdOrHostId: string,
   hostIdOrUsername?: string,
   maybeUsername?: string,
 ): Promise<{ sessionId: string; ingestWsUrl: string; websocketToken: string } | { error: string }> {
-  const orgId = maybeUsername !== undefined ? orgIdOrHostId : await resolveCurrentActionScope()
-  const hostId = maybeUsername !== undefined ? hostIdOrUsername! : orgIdOrHostId
+  const instanceId = maybeUsername !== undefined ? instanceIdOrHostId : await resolveCurrentActionScope()
+  const hostId = maybeUsername !== undefined ? hostIdOrUsername! : instanceIdOrHostId
   const username = maybeUsername !== undefined ? maybeUsername : hostIdOrUsername
-  await requireOrgAccess(orgId)
-  const access = await checkTerminalAccess(orgId, hostId)
+  await requireInstanceAccess(instanceId)
+  const access = await checkTerminalAccess(instanceId, hostId)
   if (!access.allowed) {
     return { error: access.reason }
   }
@@ -144,7 +144,7 @@ export async function createTerminalSession(
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
 
     await db.insert(terminalSessions).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       hostId,
       userId: session.user.id,
       sessionId,
@@ -190,14 +190,14 @@ export interface OrgTerminalSettings {
 }
 
 export async function getOrgTerminalSettings(
-  orgId: string,
+  instanceId: string,
 ): Promise<OrgTerminalSettings> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  await requireInstanceAccess(instanceId)
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseOrgMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(org?.metadata)
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalLoggingEnabled: meta.terminalLoggingEnabled === true,
@@ -206,24 +206,24 @@ export async function getOrgTerminalSettings(
 }
 
 export async function updateOrgTerminalSettings(
-  orgId: string,
+  instanceId: string,
   settings: OrgTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
   let session
   try {
-    session = await requireOrgAdminAccess(orgId)
+    session = await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
   try {
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { id: true, metadata: true },
     })
-    if (!org) return { error: 'Organisation not found' }
+    if (!org) return { error: 'Instance not found' }
 
-    const currentMetadata = parseOrgMetadata(org.metadata)
+    const currentMetadata = parseInstanceMetadata(org.metadata)
     const updatedMetadata = {
       ...currentMetadata,
       terminalEnabled: settings.terminalEnabled,
@@ -232,17 +232,17 @@ export async function updateOrgTerminalSettings(
     }
 
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'terminal.org_settings.updated',
-      targetType: 'organisation',
-      targetId: orgId,
-      summary: 'Updated organisation terminal settings',
+      targetType: 'instance',
+      targetId: instanceId,
+      summary: 'Updated instance terminal settings',
       metadata: {
         previous: {
           terminalEnabled: currentMetadata.terminalEnabled !== false,
@@ -272,12 +272,12 @@ export interface HostTerminalSettings {
 }
 
 export async function getHostTerminalSettings(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<HostTerminalSettings> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
     columns: { metadata: true },
   })
   const meta = parseHostMetadata(host?.metadata)
@@ -292,20 +292,20 @@ export async function getHostTerminalSettings(
 }
 
 export async function updateHostTerminalSettings(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   settings: HostTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
   let session
   try {
-    session = await requireOrgAdminAccess(orgId)
+    session = await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
   try {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
       columns: { id: true, metadata: true },
     })
     if (!host) return { error: 'Host not found' }
@@ -320,10 +320,10 @@ export async function updateHostTerminalSettings(
     await db
       .update(hosts)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+      .where(and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId)))
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'terminal.host_settings.updated',
       targetType: 'host',
@@ -346,19 +346,19 @@ export async function updateHostTerminalSettings(
 }
 
 export async function trustPendingSshHostKeys(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
   let session
   try {
-    session = await requireOrgAdminAccess(orgId)
+    session = await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
   try {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
       columns: { id: true, metadata: true },
     })
     if (!host) return { error: 'Host not found' }
@@ -381,10 +381,10 @@ export async function trustPendingSshHostKeys(
     await db
       .update(hosts)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId)))
+      .where(and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId)))
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'terminal.host_ssh_key.trusted',
       targetType: 'host',

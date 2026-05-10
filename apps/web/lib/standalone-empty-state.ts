@@ -47,7 +47,7 @@ export function createCommunityLicence(): EffectiveLicence {
   }
 }
 
-export function createEmptyCtCveConnectorSetupOverview(orgId = ''): CtCveConnectorSetupOverview {
+export function createEmptyCtCveConnectorSetupOverview(instanceId = ''): CtCveConnectorSetupOverview {
   return {
     configured: false,
     enabled: false,
@@ -66,7 +66,7 @@ export function createEmptyCtCveConnectorSetupOverview(orgId = ''): CtCveConnect
     },
     status: {
       contractVersion: '2026-04-30',
-      orgId,
+      instanceId,
       configured: false,
       enabled: false,
       lastInventoryPushAt: null,

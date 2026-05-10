@@ -24,7 +24,7 @@ export async function getSeededTestUserContext(): Promise<{
 }> {
   const sql = getTestDb()
   const rows = await sql<Array<{ instance_id: string | null; user_id: string }>>`
-    SELECT organisation_id AS instance_id, id AS user_id
+    SELECT instance_id AS instance_id, id AS user_id
     FROM "user"
     WHERE email = ${TEST_USER.email}
     LIMIT 1
@@ -51,13 +51,13 @@ async function getTestUserPasswordHash(): Promise<string> {
 // round-trip through the app server before each spec.
 export async function seedOrgAndUser(): Promise<void> {
   const sql = getTestDb()
-  const orgId = createId()
+  const instanceId = createId()
   const userId = createId()
   const passwordHash = await getTestUserPasswordHash()
 
   await sql`
-    INSERT INTO organisations (id, name, slug)
-    VALUES (${orgId}, ${TEST_ORG.name}, ${TEST_ORG.slug})
+    INSERT INTO instance_settings (id, name, slug)
+    VALUES (${instanceId}, ${TEST_ORG.name}, ${TEST_ORG.slug})
     ON CONFLICT (slug) DO UPDATE
     SET name = EXCLUDED.name
   `
@@ -70,7 +70,7 @@ export async function seedOrgAndUser(): Promise<void> {
       email_verified,
       created_at,
       updated_at,
-      organisation_id,
+      instance_id,
       role,
       roles,
       is_active
@@ -82,7 +82,7 @@ export async function seedOrgAndUser(): Promise<void> {
       true,
       NOW(),
       NOW(),
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
       'org_admin',
       '[]'::jsonb,
       true
@@ -91,7 +91,7 @@ export async function seedOrgAndUser(): Promise<void> {
     SET name = EXCLUDED.name,
         email_verified = EXCLUDED.email_verified,
         updated_at = NOW(),
-        organisation_id = EXCLUDED.organisation_id,
+        instance_id = EXCLUDED.instance_id,
         role = EXCLUDED.role,
         roles = EXCLUDED.roles,
         is_active = EXCLUDED.is_active
@@ -105,7 +105,7 @@ export async function seedOrgAndUser(): Promise<void> {
       email_verified,
       created_at,
       updated_at,
-      organisation_id,
+      instance_id,
       role,
       roles,
       is_active
@@ -117,7 +117,7 @@ export async function seedOrgAndUser(): Promise<void> {
       true,
       NOW(),
       NOW(),
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
       'member',
       '[]'::jsonb,
       true
@@ -126,7 +126,7 @@ export async function seedOrgAndUser(): Promise<void> {
     SET name = EXCLUDED.name,
         email_verified = EXCLUDED.email_verified,
         updated_at = NOW(),
-        organisation_id = EXCLUDED.organisation_id,
+        instance_id = EXCLUDED.instance_id,
         role = EXCLUDED.role,
         roles = EXCLUDED.roles,
         is_active = EXCLUDED.is_active,

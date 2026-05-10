@@ -22,19 +22,19 @@ function decodeBase32Secret(encoded: string): string {
   return new TextDecoder().decode(new Uint8Array(bytes))
 }
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
 
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
@@ -224,12 +224,12 @@ test('authenticated user can switch profile theme preferences and persist the se
     .toBe('light')
 })
 
-test('authenticated user can opt out of in-app notifications when the organisation allows it', async ({ authenticatedPage: page }) => {
+test('authenticated user can opt out of in-app notifications when the instance allows it', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
-    UPDATE organisations
+    UPDATE instance_settings
     SET metadata = jsonb_build_object(
       'notificationSettings',
       jsonb_build_object(
@@ -238,7 +238,7 @@ test('authenticated user can opt out of in-app notifications when the organisati
         'inAppRoles', '["owner","admin","member"]'::jsonb
       )
     )
-    WHERE id = ${orgId}
+    WHERE id = ${instanceId}
   `
 
   await sql`
@@ -273,12 +273,12 @@ test('authenticated user can opt out of in-app notifications when the organisati
     .toBe(false)
 })
 
-test('authenticated user cannot opt out of in-app notifications when the organisation requires them', async ({ authenticatedPage: page }) => {
+test('authenticated user cannot opt out of in-app notifications when the instance requires them', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
-    UPDATE organisations
+    UPDATE instance_settings
     SET metadata = jsonb_build_object(
       'notificationSettings',
       jsonb_build_object(
@@ -287,7 +287,7 @@ test('authenticated user cannot opt out of in-app notifications when the organis
         'inAppRoles', '["owner","admin","member"]'::jsonb
       )
     )
-    WHERE id = ${orgId}
+    WHERE id = ${instanceId}
   `
 
   await sql`

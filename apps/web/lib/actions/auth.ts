@@ -89,8 +89,8 @@ export async function acceptInvite(
       return { error: 'Account not found' }
     }
 
-    if (user.organisationId) {
-      return { error: 'This account already belongs to an organisation' }
+    if (user.instanceId) {
+      return { error: 'This account already belongs to an instance' }
     }
 
     if (getRequireEmailVerification() && !user.emailVerified) {
@@ -104,12 +104,12 @@ export async function acceptInvite(
     const inviteRoles = normalizeAssignedRoles(invite.roles, invite.role)
     const inviteRole = getPrimaryRole(inviteRoles, invite.role)
 
-    await assertCanReserveUserSeat(invite.organisationId, { excludeInviteId: invite.id })
+    await assertCanReserveUserSeat(invite.instanceId, { excludeInviteId: invite.id })
 
     await db
       .update(users)
       .set({
-        organisationId: invite.organisationId,
+        instanceId: invite.instanceId,
         role: inviteRole,
         roles: inviteRoles,
         updatedAt: new Date(),

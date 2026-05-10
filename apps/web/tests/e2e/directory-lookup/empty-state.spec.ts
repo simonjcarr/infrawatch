@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,11 +15,11 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user sees the LDAP setup empty state when no directory is configured', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     DELETE FROM ldap_configurations
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
   `
 
   await page.goto('/directory-lookup')
@@ -41,12 +41,12 @@ test('authenticated user sees the LDAP setup empty state when no directory is co
 
 test('authenticated user can access the directory lookup UI when enabled LDAP configs exist', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO ldap_configurations (
       id,
-      organisation_id,
+      instance_id,
       name,
       host,
       port,
@@ -59,7 +59,7 @@ test('authenticated user can access the directory lookup UI when enabled LDAP co
     VALUES
       (
         'ldap-config-directory-primary',
-        ${orgId},
+        ${instanceId},
         'Primary Directory',
         'ldap.primary.internal',
         389,
@@ -71,7 +71,7 @@ test('authenticated user can access the directory lookup UI when enabled LDAP co
       ),
       (
         'ldap-config-directory-secondary',
-        ${orgId},
+        ${instanceId},
         'Secondary Directory',
         'ldap.secondary.internal',
         636,
@@ -83,7 +83,7 @@ test('authenticated user can access the directory lookup UI when enabled LDAP co
       ),
       (
         'ldap-config-directory-disabled',
-        ${orgId},
+        ${instanceId},
         'Disabled Directory',
         'ldap.disabled.internal',
         389,
@@ -95,7 +95,7 @@ test('authenticated user can access the directory lookup UI when enabled LDAP co
       ),
       (
         'ldap-config-directory-deleted',
-        ${orgId},
+        ${instanceId},
         'Deleted Directory',
         'ldap.deleted.internal',
         389,

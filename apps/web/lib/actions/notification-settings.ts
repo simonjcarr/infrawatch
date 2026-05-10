@@ -1,13 +1,13 @@
 'use server'
 
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
+import { instanceSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
-import type { OrgNotificationSettings } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
+import type { InstanceNotificationSettings } from '@/lib/db/schema/instance-settings'
 import { DEFAULT_NOTIFICATION_ROLES } from '@/lib/auth/roles'
 import { encrypt, decrypt } from '@/lib/crypto/encrypt'
 import { assertPublicHost } from '@/lib/net/ssrf-guard'
@@ -28,15 +28,15 @@ const smtpRelayTestLimiter = createRateLimiter({
   max: 5,
 })
 
-const updateOrgNotificationSettingsSchema = z.object({
+const updateInstanceNotificationSettingsSchema = z.object({
   inAppEnabled: z.boolean(),
   inAppRoles: z.array(z.string()).min(1, 'At least one role must be selected'),
   allowUserOptOut: z.boolean(),
 })
 
-export type OrgNotificationSettingsInput = z.infer<typeof updateOrgNotificationSettingsSchema>
+export type InstanceNotificationSettingsInput = z.infer<typeof updateInstanceNotificationSettingsSchema>
 
-export interface OrgNotificationSettingsFull {
+export interface InstanceNotificationSettingsFull {
   inAppEnabled: boolean
   inAppRoles: string[]
   allowUserOptOut: boolean
@@ -58,22 +58,22 @@ const updateOrgSmtpRelaySettingsSchema = z.object({
   fromName: z.string().optional(),
 })
 
-export type OrgSmtpRelaySettingsInput = z.infer<typeof updateOrgSmtpRelaySettingsSchema>
+export type InstanceSmtpRelaySettingsInput = z.infer<typeof updateOrgSmtpRelaySettingsSchema>
 
 export interface SmtpRelayTestLogEntry {
   level: 'info' | 'success' | 'error'
   message: string
 }
 
-export async function getOrgNotificationSettings(
-  orgId: string,
-): Promise<OrgNotificationSettingsFull> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+export async function getInstanceNotificationSettings(
+  instanceId: string,
+): Promise<InstanceNotificationSettingsFull> {
+  await requireInstanceAccess(instanceId)
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseOrgMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(org?.metadata)
   const ns = meta.notificationSettings ?? {}
   return {
     inAppEnabled: ns.inAppEnabled !== false,
@@ -82,44 +82,44 @@ export async function getOrgNotificationSettings(
   }
 }
 
-export async function updateOrgNotificationSettings(
-  orgId: string,
+export async function updateInstanceNotificationSettings(
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to update notification settings' }
   }
 
-  const parsed = updateOrgNotificationSettingsSchema.safeParse(input)
+  const parsed = updateInstanceNotificationSettingsSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }
 
   const { inAppEnabled, inAppRoles, allowUserOptOut } = parsed.data
 
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  if (!org) return { error: 'Organisation not found' }
+  if (!org) return { error: 'Instance not found' }
 
-  const currentMetadata = parseOrgMetadata(org.metadata)
+  const currentMetadata = parseInstanceMetadata(org.metadata)
   const updatedMetadata = {
     ...currentMetadata,
     notificationSettings: {
       inAppEnabled,
       inAppRoles,
       allowUserOptOut,
-    } satisfies OrgNotificationSettings,
+    } satisfies InstanceNotificationSettings,
   }
 
   try {
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
     return { success: true }
   } catch {
     return { error: 'Failed to update notification settings' }
@@ -127,41 +127,41 @@ export async function updateOrgNotificationSettings(
 }
 
 export async function getOrgSmtpRelaySettings(
-  orgId: string,
+  instanceId: string,
 ): Promise<SmtpRelaySettingsSafe | null> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  await requireInstanceAccess(instanceId)
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseOrgMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(org?.metadata)
   return sanitiseSmtpRelayForClient(meta.notificationSettings?.smtpRelay)
 }
 
-async function getAdminOrgMetadata(orgId: string): Promise<
-  | { metadata: ReturnType<typeof parseOrgMetadata>; error?: undefined }
+async function getAdminInstanceMetadata(instanceId: string): Promise<
+  | { metadata: ReturnType<typeof parseInstanceMetadata>; error?: undefined }
   | { metadata?: undefined; error: string }
 > {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to update SMTP settings' }
   }
 
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  if (!org) return { error: 'Organisation not found' }
+  if (!org) return { error: 'Instance not found' }
 
-  return { metadata: parseOrgMetadata(org.metadata) }
+  return { metadata: parseInstanceMetadata(org.metadata) }
 }
 
 export async function updateOrgSmtpRelaySettings(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const access = await getAdminOrgMetadata(orgId)
+  const access = await getAdminInstanceMetadata(instanceId)
   if ('error' in access) return { error: access.error ?? 'Unable to load SMTP settings' }
 
   const parsed = updateOrgSmtpRelaySettingsSchema.safeParse(input)
@@ -190,14 +190,14 @@ export async function updateOrgSmtpRelaySettings(
     notificationSettings: {
       ...access.metadata.notificationSettings,
       smtpRelay,
-    } satisfies OrgNotificationSettings,
+    } satisfies InstanceNotificationSettings,
   }
 
   try {
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
     return { success: true }
   } catch {
     return { error: 'Failed to update SMTP settings' }
@@ -205,18 +205,18 @@ export async function updateOrgSmtpRelaySettings(
 }
 
 export async function sendTestSmtpRelaySettings(
-  orgId: string,
+  instanceId: string,
   recipientInput: unknown,
 ): Promise<{ success: true; log: SmtpRelayTestLogEntry[] } | { error: string; log: SmtpRelayTestLogEntry[] }> {
   const log: SmtpRelayTestLogEntry[] = []
-  const access = await getAdminOrgMetadata(orgId)
+  const access = await getAdminInstanceMetadata(instanceId)
   if ('error' in access) {
     return {
       error: access.error ?? 'Unable to load SMTP settings',
       log: [{ level: 'error', message: access.error ?? 'Unable to load SMTP settings' }],
     }
   }
-  if (!await smtpRelayTestLimiter.check(orgId)) {
+  if (!await smtpRelayTestLimiter.check(instanceId)) {
     return {
       error: 'Too many requests — please wait before sending another SMTP test.',
       log: [{ level: 'error', message: 'SMTP test rate limit exceeded' }],

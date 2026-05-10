@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import type { SmtpEncryption } from '../../notifications/smtp-settings.ts'
 import { hosts } from './hosts.ts'
 import { users } from './auth.ts'
@@ -36,7 +36,7 @@ export interface WebhookChannelConfig {
 }
 
 export interface SmtpChannelConfig {
-  /** Recipient routing for SMTP alert delivery. Relay settings live in organisation metadata. */
+  /** Recipient routing for SMTP alert delivery. Relay settings live in instance metadata. */
   toAddresses: string[]
   /** Legacy relay fields kept only so existing rows can be read and migrated in-place. */
   host?: string
@@ -62,7 +62,7 @@ export type NotificationChannelType = 'webhook' | 'smtp' | 'slack' | 'telegram'
 
 export const alertRules = pgTable('alert_rules', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').references(() => hosts.id),
   name: text('name').notNull(),
   conditionType: text('condition_type').notNull().$type<AlertConditionType>(),
@@ -75,16 +75,16 @@ export const alertRules = pgTable('alert_rules', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('alert_rules_org_host_idx').on(table.organisationId, table.hostId),
-  index('alert_rules_org_enabled_idx').on(table.organisationId, table.enabled),
-  index('alert_rules_org_global_idx').on(table.organisationId, table.isGlobalDefault),
+  index('alert_rules_org_host_idx').on(table.instanceId, table.hostId),
+  index('alert_rules_org_enabled_idx').on(table.instanceId, table.enabled),
+  index('alert_rules_org_global_idx').on(table.instanceId, table.isGlobalDefault),
 ])
 
 export const alertInstances = pgTable('alert_instances', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   ruleId: text('rule_id').notNull().references(() => alertRules.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   status: text('status').notNull().default('firing').$type<AlertInstanceStatus>(),
   message: text('message').notNull(),
   triggeredAt: timestamp('triggered_at', { withTimezone: true }).notNull(),
@@ -93,13 +93,13 @@ export const alertInstances = pgTable('alert_instances', {
   acknowledgedBy: text('acknowledged_by'),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('alert_instances_org_status_idx').on(table.organisationId, table.status),
+  index('alert_instances_org_status_idx').on(table.instanceId, table.status),
   index('alert_instances_rule_host_status_idx').on(table.ruleId, table.hostId, table.status),
 ])
 
 export const notificationChannels = pgTable('notification_channels', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   name: text('name').notNull(),
   type: text('type').notNull().$type<NotificationChannelType>(),
   config: jsonb('config').notNull().$type<WebhookChannelConfig | SmtpChannelConfig | SlackChannelConfig | TelegramChannelConfig>(),
@@ -109,12 +109,12 @@ export const notificationChannels = pgTable('notification_channels', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('notification_channels_org_enabled_idx').on(table.organisationId, table.enabled),
+  index('notification_channels_org_enabled_idx').on(table.instanceId, table.enabled),
 ])
 
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   userId: text('user_id').notNull().references(() => users.id),
   alertInstanceId: text('alert_instance_id').references(() => alertInstances.id),
   subject: text('subject').notNull(),
@@ -127,14 +127,14 @@ export const notifications = pgTable('notifications', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => [
   index('notifications_user_read_idx').on(table.userId, table.read),
-  index('notifications_org_user_idx').on(table.organisationId, table.userId),
+  index('notifications_org_user_idx').on(table.instanceId, table.userId),
   index('notifications_user_created_idx').on(table.userId, table.createdAt),
   index('notifications_deleted_at_idx').on(table.deletedAt).where(sql`${table.deletedAt} IS NOT NULL`),
 ])
 
 export const alertSilences = pgTable('alert_silences', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').references(() => hosts.id),      // null = org-wide silence
   ruleId: text('rule_id').references(() => alertRules.id), // null = silence all rules
   reason: text('reason').notNull(),
@@ -146,8 +146,8 @@ export const alertSilences = pgTable('alert_silences', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('alert_silences_org_host_idx').on(table.organisationId, table.hostId),
-  index('alert_silences_org_active_idx').on(table.organisationId, table.startsAt, table.endsAt),
+  index('alert_silences_org_host_idx').on(table.instanceId, table.hostId),
+  index('alert_silences_org_active_idx').on(table.instanceId, table.startsAt, table.endsAt),
 ])
 
 export type AlertRule = typeof alertRules.$inferSelect

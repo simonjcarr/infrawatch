@@ -2,18 +2,18 @@ import type { SessionUser } from '@/lib/auth/session'
 import type { Note } from '@/lib/db/schema'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
 
-// v1 reachability is "same org". Tag-based RBAC does not yet exist in this
+// v1 reachability is "same instance". Tag-based RBAC does not yet exist in this
 // codebase — once it does, notes should inherit the same host-reachability
 // checks so a user cannot read notes for hosts they cannot see.
-function isSameOrg(user: SessionUser, note: Pick<Note, 'organisationId'>): boolean {
-  return user.organisationId === note.organisationId
+function isSameInstance(user: SessionUser, note: Pick<Note, 'instanceId'>): boolean {
+  return user.instanceId === note.instanceId
 }
 
 export function canReadNote(
   user: SessionUser,
-  note: Pick<Note, 'organisationId' | 'authorId' | 'isPrivate'>,
+  note: Pick<Note, 'instanceId' | 'authorId' | 'isPrivate'>,
 ): boolean {
-  if (!isSameOrg(user, note)) return false
+  if (!isSameInstance(user, note)) return false
   if (!note.isPrivate) return true
   if (note.authorId === user.id) return true
   return user.role === 'super_admin'
@@ -21,9 +21,9 @@ export function canReadNote(
 
 export function canWriteNote(
   user: SessionUser,
-  note: Pick<Note, 'organisationId' | 'authorId'>,
+  note: Pick<Note, 'instanceId' | 'authorId'>,
 ): boolean {
-  if (!isSameOrg(user, note)) return false
+  if (!isSameInstance(user, note)) return false
   if (user.role === 'read_only') return false
   if (note.authorId === user.id) return true
   return ADMIN_ROLES.includes(user.role)
@@ -31,9 +31,9 @@ export function canWriteNote(
 
 export function canDeleteNote(
   user: SessionUser,
-  note: Pick<Note, 'organisationId' | 'authorId'>,
+  note: Pick<Note, 'instanceId' | 'authorId'>,
 ): boolean {
-  if (!isSameOrg(user, note)) return false
+  if (!isSameInstance(user, note)) return false
   if (note.authorId === user.id) return true
   return ADMIN_ROLES.includes(user.role)
 }
@@ -42,9 +42,9 @@ export function canDeleteNote(
 // force-share someone else's note without them knowing.
 export function canTogglePrivate(
   user: SessionUser,
-  note: Pick<Note, 'organisationId' | 'authorId'>,
+  note: Pick<Note, 'instanceId' | 'authorId'>,
 ): boolean {
-  return isSameOrg(user, note) && note.authorId === user.id
+  return isSameInstance(user, note) && note.authorId === user.id
 }
 
 export function canCreateNote(user: SessionUser): boolean {

@@ -5,14 +5,14 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import type { User } from '@/lib/db/schema'
-import { requireActiveUser, requireOrgAdmin } from './guards'
+import { requireActiveUser, requireInstanceAdmin } from './guards'
 import { EXPIRED_SESSION_LOGIN_PATH } from './redirects'
 import { getPrimaryRole, normalizeAssignedRoles } from './roles'
 import { SEAT_LIMIT_EXCEEDED_PATH, assertUserCanAccessSeat } from '@/lib/seat-admission'
-import { organisations } from '@/lib/db/schema'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { instanceSettings } from '@/lib/db/schema'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import { getTwoFactorPolicyRedirect } from './two-factor-policy'
-import { getDefaultOrganisationId } from '@/lib/default-organisation'
+import { getDefaultInstanceId } from '@/lib/default-instance'
 
 const INSTANCE_ADMIN_ROLE = 'super_admin'
 
@@ -49,11 +49,11 @@ async function findSessionUser(userId: string): Promise<User | null> {
 
   user = await ensureInstanceHasSuperAdmin(user)
 
-  const organisationId = user.organisationId ?? await getDefaultOrganisationId()
+  const instanceId = user.instanceId ?? await getDefaultInstanceId()
 
   return {
     ...user,
-    organisationId,
+    instanceId,
     role: getPrimaryRole(user.roles, user.role),
     roles: normalizeAssignedRoles(user.roles, user.role),
   }
@@ -90,7 +90,7 @@ async function loadSessionWithUser(requestHeaders: Headers): Promise<RequiredSes
 
   // Better Auth only returns its own base fields in session.user.
   // Fetch the full user row from DB to get our extended fields
-  // (organisationId, role, isActive, twoFactorEnabled).
+  // (instanceId, role, isActive, twoFactorEnabled).
   const user = await findSessionUser(session.user.id)
   if (!user) return null
 
@@ -120,17 +120,17 @@ async function getTwoFactorPolicyRedirectForSession(
   session: RequiredSession,
   requestHeaders: Headers,
 ): Promise<string | null> {
-  const organisationId = session.user.organisationId
-  if (!organisationId) return null
+  const instanceId = session.user.instanceId
+  if (!instanceId) return null
 
-  const organisation = await db.query.organisations.findFirst({
-    where: eq(organisations.id, organisationId),
+  const instance = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  if (!organisation) return null
+  if (!instance) return null
 
   return getTwoFactorPolicyRedirect({
-    metadata: parseOrgMetadata(organisation.metadata),
+    metadata: parseInstanceMetadata(instance.metadata),
     userTwoFactorEnabled: session.user.twoFactorEnabled,
     pathname: getRequestPathname(requestHeaders),
   })
@@ -147,9 +147,9 @@ export async function getRequiredSession(): Promise<RequiredSession> {
     redirect(EXPIRED_SESSION_LOGIN_PATH)
   }
 
-  if (session.user.organisationId) {
+  if (session.user.instanceId) {
     try {
-      await assertUserCanAccessSeat(session.user.organisationId, session.user.id)
+      await assertUserCanAccessSeat(session.user.instanceId, session.user.id)
     } catch {
       redirect(SEAT_LIMIT_EXCEEDED_PATH)
     }
@@ -174,9 +174,9 @@ export async function getApiSession(requestHeaders?: Headers): Promise<RequiredS
     throw new ApiAuthError(403, 'Forbidden')
   }
 
-  if (session.user.organisationId) {
+  if (session.user.instanceId) {
     try {
-      await assertUserCanAccessSeat(session.user.organisationId, session.user.id)
+      await assertUserCanAccessSeat(session.user.instanceId, session.user.id)
     } catch {
       throw new ApiAuthError(403, 'User seat limit exceeded')
     }
@@ -190,24 +190,24 @@ export async function getApiSession(requestHeaders?: Headers): Promise<RequiredS
   return session
 }
 
-export async function getApiOrgSession(
+export async function getApiInstanceSession(
   requestHeaders?: Headers,
-): Promise<RequiredSession & { user: User & { organisationId: string } }> {
+): Promise<RequiredSession & { user: User & { instanceId: string } }> {
   const session = await getApiSession(requestHeaders)
-  if (!session.user.organisationId) {
+  if (!session.user.instanceId) {
     throw new ApiAuthError(403, 'Forbidden')
   }
 
-  return session as RequiredSession & { user: User & { organisationId: string } }
+  return session as RequiredSession & { user: User & { instanceId: string } }
 }
 
-export async function getApiOrgAdminSession(
+export async function getApiInstanceAdminSession(
   requestHeaders?: Headers,
-): Promise<RequiredSession & { user: User & { organisationId: string } }> {
-  const session = await getApiOrgSession(requestHeaders)
+): Promise<RequiredSession & { user: User & { instanceId: string } }> {
+  const session = await getApiInstanceSession(requestHeaders)
 
   try {
-    requireOrgAdmin(session.user, session.user.organisationId)
+    requireInstanceAdmin(session.user, session.user.instanceId)
   } catch {
     throw new ApiAuthError(403, 'Forbidden')
   }

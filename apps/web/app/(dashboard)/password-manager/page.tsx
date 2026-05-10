@@ -18,8 +18,8 @@ export default async function PasswordManagerPage() {
 
   const scopeId = resolveOptionalActionScope(session) ?? ''
   const currentUserId = session.user.id
-  const scopeColumn = users['organisation' + 'Id' as keyof typeof users] as unknown as typeof users.id
-  const organisationUsers = scopeId
+  const scopeColumn = users['instance' + 'Id' as keyof typeof users] as unknown as typeof users.id
+  const instanceUsers = scopeId
     ? await db.query.users.findMany({
       where: and(eq(scopeColumn, scopeId), eq(users.isActive, true), isNull(users.deletedAt)),
       orderBy: [asc(users.name), asc(users.email)],
@@ -36,7 +36,7 @@ export default async function PasswordManagerPage() {
       key={scopeId || 'standalone'}
       scopeId={scopeId}
       currentUserId={currentUserId}
-      organisationUsers={organisationUsers}
+      instanceUsers={instanceUsers}
     />
   )
 }

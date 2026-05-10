@@ -14,7 +14,7 @@ function getActionSegment(action) {
   return checksSource.slice(start, next === -1 ? undefined : next)
 }
 
-test('createCheck validates the target host belongs to the organisation before insert', () => {
+test('createCheck validates the target host belongs to the instance before insert', () => {
   const segment = getActionSegment('createCheck')
   const hostLookupIndex = segment.indexOf('db.query.hosts.findFirst')
   const insertIndex = segment.indexOf('.insert(checks)')
@@ -23,7 +23,7 @@ test('createCheck validates the target host belongs to the organisation before i
   assert.notEqual(insertIndex, -1, 'createCheck must insert the validated check')
   assert.ok(hostLookupIndex < insertIndex, 'host ownership must be validated before insert')
   assert.match(segment, /eq\(hosts\.id, data\.hostId\)/, 'host lookup must use the requested host ID')
-  assert.match(segment, /eq\(hosts\.organisationId, orgId\)/, 'host lookup must be scoped to the caller organisation')
+  assert.match(segment, /eq\(hosts\.instanceId, instanceId\)/, 'host lookup must be scoped to the caller instance')
   assert.match(segment, /isNull\(hosts\.deletedAt\)/, 'host lookup must reject soft-deleted hosts')
-  assert.match(segment, /if \(!host\) return \{ error: 'Host not found' \}/, 'missing or cross-tenant hosts must fail closed')
+  assert.match(segment, /if \(!host\) return \{ error: 'Host not found' \}/, 'missing or cross-instance hosts must fail closed')
 })

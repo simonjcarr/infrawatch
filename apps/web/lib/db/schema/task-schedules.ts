@@ -1,12 +1,12 @@
 import { pgTable, text, timestamp, jsonb, integer, boolean, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { users } from './auth.ts'
 import type { TaskType, TaskConfig } from './task-runs.ts'
 
 export const taskSchedules = pgTable('task_schedules', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   createdBy: text('created_by').references(() => users.id),
   name: text('name').notNull(),
   description: text('description'),
@@ -26,7 +26,7 @@ export const taskSchedules = pgTable('task_schedules', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (t) => [
-  index('task_schedules_org_idx').on(t.organisationId, t.createdAt),
+  index('task_schedules_instance_idx').on(t.instanceId, t.createdAt),
   index('task_schedules_due_idx').on(t.enabled, t.nextRunAt),
 ])
 

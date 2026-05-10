@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAdminAccess, requireInstanceToolingAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { taskSchedules, taskRuns, hostGroups, hosts } from '@/lib/db/schema'
@@ -85,14 +85,14 @@ async function verifyTargetExists(
 ): Promise<{ ok: true } | { error: string }> {
   if (targetType === 'host') {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, targetId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.id, targetId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
       columns: { id: true },
     })
     if (!host) return { error: 'Host not found' }
     return { ok: true }
   }
   const group = await db.query.hostGroups.findFirst({
-    where: and(eq(hostGroups.id, targetId), eq(hostGroups.organisationId, currentScope), isNull(hostGroups.deletedAt)),
+    where: and(eq(hostGroups.id, targetId), eq(hostGroups.instanceId, currentScope), isNull(hostGroups.deletedAt)),
     columns: { id: true },
   })
   if (!group) return { error: 'Host group not found' }
@@ -100,9 +100,9 @@ async function verifyTargetExists(
 }
 
 export async function listSchedules(currentScope: string): Promise<ScheduleWithTargetName[]> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   const rows = await db.query.taskSchedules.findMany({
-    where: and(eq(taskSchedules.organisationId, currentScope), isNull(taskSchedules.deletedAt)),
+    where: and(eq(taskSchedules.instanceId, currentScope), isNull(taskSchedules.deletedAt)),
     orderBy: [desc(taskSchedules.createdAt)],
   })
 
@@ -116,7 +116,7 @@ export async function listSchedules(currentScope: string): Promise<ScheduleWithT
       ? db.query.hosts.findMany({
           where: and(
             inArray(hosts.id, hostIds),
-            eq(hosts.organisationId, currentScope),
+            eq(hosts.instanceId, currentScope),
             isNull(hosts.deletedAt),
           ),
           columns: { id: true, hostname: true },
@@ -126,7 +126,7 @@ export async function listSchedules(currentScope: string): Promise<ScheduleWithT
       ? db.query.hostGroups.findMany({
           where: and(
             inArray(hostGroups.id, groupIds),
-            eq(hostGroups.organisationId, currentScope),
+            eq(hostGroups.instanceId, currentScope),
             isNull(hostGroups.deletedAt),
           ),
           columns: { id: true, name: true },
@@ -147,11 +147,11 @@ export async function getSchedule(
   currentScope: string,
   id: string,
 ): Promise<{ schedule: TaskSchedule; recentRuns: Awaited<ReturnType<typeof recentRunsForSchedule>> } | null> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   const schedule = await db.query.taskSchedules.findFirst({
     where: and(
       eq(taskSchedules.id, id),
-      eq(taskSchedules.organisationId, currentScope),
+      eq(taskSchedules.instanceId, currentScope),
       isNull(taskSchedules.deletedAt),
     ),
   })
@@ -165,7 +165,7 @@ async function recentRunsForSchedule(currentScope: string, scheduleId: string) {
   return db.query.taskRuns.findMany({
     where: and(
       eq(taskRuns.scheduledFromId, scheduleId),
-      eq(taskRuns.organisationId, currentScope),
+      eq(taskRuns.instanceId, currentScope),
       isNull(taskRuns.deletedAt),
     ),
     orderBy: [desc(taskRuns.createdAt)],
@@ -177,7 +177,7 @@ export async function createSchedule(
   currentScope: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
 
   const parsed = scheduleInputSchema.safeParse(input)
   if (!parsed.success) {
@@ -199,7 +199,7 @@ export async function createSchedule(
     const [row] = await db
       .insert(taskSchedules)
       .values({
-        organisationId: currentScope,
+        instanceId: currentScope,
         createdBy: session.user.id,
         name: data.name,
         description: data.description ?? null,
@@ -228,12 +228,12 @@ export async function updateSchedule(
   id: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAdminAccess(currentScope)
+  await requireInstanceAdminAccess(currentScope)
 
   const existing = await db.query.taskSchedules.findFirst({
     where: and(
       eq(taskSchedules.id, id),
-      eq(taskSchedules.organisationId, currentScope),
+      eq(taskSchedules.instanceId, currentScope),
       isNull(taskSchedules.deletedAt),
     ),
   })
@@ -288,12 +288,12 @@ export async function setScheduleEnabled(
   id: string,
   enabled: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAdminAccess(currentScope)
+  await requireInstanceAdminAccess(currentScope)
 
   const existing = await db.query.taskSchedules.findFirst({
     where: and(
       eq(taskSchedules.id, id),
-      eq(taskSchedules.organisationId, currentScope),
+      eq(taskSchedules.instanceId, currentScope),
       isNull(taskSchedules.deletedAt),
     ),
   })
@@ -324,7 +324,7 @@ export async function deleteSchedule(
   currentScope: string,
   id: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAdminAccess(currentScope)
+  await requireInstanceAdminAccess(currentScope)
 
   try {
     await db
@@ -333,7 +333,7 @@ export async function deleteSchedule(
       .where(
         and(
           eq(taskSchedules.id, id),
-          eq(taskSchedules.organisationId, currentScope),
+          eq(taskSchedules.instanceId, currentScope),
           isNull(taskSchedules.deletedAt),
         ),
       )
@@ -348,12 +348,12 @@ export async function runScheduleNow(
   currentScope: string,
   id: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  await requireOrgAdminAccess(currentScope)
+  await requireInstanceAdminAccess(currentScope)
 
   const schedule = await db.query.taskSchedules.findFirst({
     where: and(
       eq(taskSchedules.id, id),
-      eq(taskSchedules.organisationId, currentScope),
+      eq(taskSchedules.instanceId, currentScope),
       isNull(taskSchedules.deletedAt),
     ),
   })

@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
@@ -35,11 +35,11 @@ export type ResolvedNote = Omit<Note, 'searchVector'> & {
 // the result into a cache table is deferred — the CTE is small enough at v1
 // scale and avoids a new invalidation surface.
 export async function resolveNotesForHost(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   opts: { includePrivate?: boolean; categories?: NoteCategory[] } = {},
 ): Promise<ResolvedNote[]> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   const userId = session.user.id
   const isSuperAdmin = hasRole(session.user, 'super_admin')
@@ -66,14 +66,14 @@ export async function resolveNotesForHost(
     WITH direct AS (
       SELECT nt.note_id, nt.is_pinned, nt.id AS direct_target_id
       FROM note_targets nt
-      WHERE nt.organisation_id = ${orgId}
+      WHERE nt.instance_id = ${instanceId}
         AND nt.target_type = 'host'
         AND nt.target_id = ${hostId}
     ),
     host_groups_cte AS (
       SELECT hgm.group_id
       FROM host_group_members hgm
-      WHERE hgm.organisation_id = ${orgId}
+      WHERE hgm.instance_id = ${instanceId}
         AND hgm.host_id = ${hostId}
         AND hgm.deleted_at IS NULL
     ),
@@ -81,21 +81,21 @@ export async function resolveNotesForHost(
       SELECT nt.note_id, nt.is_pinned
       FROM note_targets nt
       JOIN host_groups_cte g ON g.group_id = nt.target_id
-      WHERE nt.organisation_id = ${orgId}
+      WHERE nt.instance_id = ${instanceId}
         AND nt.target_type = 'host_group'
     ),
     host_tags AS (
       SELECT lower(t.key) AS key, lower(t.value) AS value
       FROM resource_tags rt
       JOIN tags t ON t.id = rt.tag_id
-      WHERE rt.organisation_id = ${orgId}
+      WHERE rt.instance_id = ${instanceId}
         AND rt.resource_type = 'host'
         AND rt.resource_id = ${hostId}
     ),
     via_tag AS (
       SELECT nt.note_id
       FROM note_targets nt
-      WHERE nt.organisation_id = ${orgId}
+      WHERE nt.instance_id = ${instanceId}
         AND nt.target_type = 'tag_selector'
         AND nt.tag_selector IS NOT NULL
         AND (
@@ -141,7 +141,7 @@ export async function resolveNotesForHost(
       GROUP BY note_id
     )
     SELECT
-      n.id, n.organisation_id, n.author_id, n.last_edited_by_id,
+      n.id, n.instance_id, n.author_id, n.last_edited_by_id,
       n.title, n.body, n.category, n.is_private,
       n.created_at, n.updated_at, n.deleted_at, n.metadata,
       m.is_pinned, m.sources,
@@ -154,7 +154,7 @@ export async function resolveNotesForHost(
     LEFT JOIN "user" author ON author.id = n.author_id
     LEFT JOIN "user" editor ON editor.id = n.last_edited_by_id
     WHERE n.deleted_at IS NULL
-      AND n.organisation_id = ${orgId}
+      AND n.instance_id = ${instanceId}
       AND (
         ${includePrivateFilter ? sql`(n.is_private = FALSE OR n.author_id = ${userId} OR ${isSuperAdmin})` : sql`n.is_private = FALSE`}
       )
@@ -166,7 +166,7 @@ export async function resolveNotesForHost(
   // of the app consumes.
   return (rows as unknown as Array<Record<string, unknown>>).map((r) => ({
     id: r.id as string,
-    organisationId: r.organisation_id as string,
+    instanceId: r.instance_id as string,
     authorId: r.author_id as string,
     lastEditedById: (r.last_edited_by_id as string | null) ?? null,
     title: r.title as string,

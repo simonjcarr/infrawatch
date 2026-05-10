@@ -3,7 +3,7 @@ function isSessionUserMember(node) {
     node?.type === 'MemberExpression' &&
     !node.computed &&
     node.property.type === 'Identifier' &&
-    (node.property.name === 'organisationId' || node.property.name === 'role') &&
+    (node.property.name === 'instanceId' || node.property.name === 'role') &&
     node.object?.type === 'MemberExpression' &&
     !node.object.computed &&
     node.object.property.type === 'Identifier' &&

@@ -4,19 +4,19 @@ import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
 }
 
-test('patch status report shows organisation compliance by network and host', async ({ authenticatedPage: page }) => {
+test('patch status report shows instance compliance by network and host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -29,7 +29,7 @@ test('patch status report shows organisation compliance by network and host', as
     VALUES
       (
         'patch-report-host-1',
-        ${orgId},
+        ${instanceId},
         'db-01',
         'Database 01',
         'Ubuntu',
@@ -41,7 +41,7 @@ test('patch status report shows organisation compliance by network and host', as
       ),
       (
         'patch-report-host-2',
-        ${orgId},
+        ${instanceId},
         'web-01',
         'Web 01',
         'Debian',
@@ -56,33 +56,33 @@ test('patch status report shows organisation compliance by network and host', as
   await sql`
     INSERT INTO networks (
       id,
-      organisation_id,
+      instance_id,
       name,
       cidr,
       description
     )
     VALUES
-      ('patch-report-network-1', ${orgId}, 'Production', '10.70.0.0/24', 'Production subnet'),
-      ('patch-report-network-2', ${orgId}, 'DMZ', '10.71.0.0/24', 'DMZ subnet')
+      ('patch-report-network-1', ${instanceId}, 'Production', '10.70.0.0/24', 'Production subnet'),
+      ('patch-report-network-2', ${instanceId}, 'DMZ', '10.71.0.0/24', 'DMZ subnet')
   `
 
   await sql`
     INSERT INTO host_network_memberships (
       id,
-      organisation_id,
+      instance_id,
       network_id,
       host_id,
       auto_assigned
     )
     VALUES
-      ('patch-report-membership-1', ${orgId}, 'patch-report-network-1', 'patch-report-host-1', true),
-      ('patch-report-membership-2', ${orgId}, 'patch-report-network-2', 'patch-report-host-2', false)
+      ('patch-report-membership-1', ${instanceId}, 'patch-report-network-1', 'patch-report-host-1', true),
+      ('patch-report-membership-2', ${instanceId}, 'patch-report-network-2', 'patch-report-host-2', false)
   `
 
   await sql`
     INSERT INTO host_patch_statuses (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       check_id,
       status,
@@ -100,7 +100,7 @@ test('patch status report shows organisation compliance by network and host', as
     VALUES
       (
         'patch-report-status-1',
-        ${orgId},
+        ${instanceId},
         'patch-report-host-1',
         NULL,
         'fail',
@@ -117,7 +117,7 @@ test('patch status report shows organisation compliance by network and host', as
       ),
       (
         'patch-report-status-2',
-        ${orgId},
+        ${instanceId},
         'patch-report-host-2',
         NULL,
         'pass',

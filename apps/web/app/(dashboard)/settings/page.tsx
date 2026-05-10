@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
+import { instanceSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { SettingsClient } from './settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
@@ -13,11 +13,11 @@ export const metadata: Metadata = {
 
 export default async function SettingsPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId
+  const instanceId = session.user.instanceId
 
-  const org = orgId
-    ? await db.query.organisations.findFirst({
-        where: eq(organisations.id, orgId),
+  const org = instanceId
+    ? await db.query.instanceSettings.findFirst({
+        where: eq(instanceSettings.id, instanceId),
       })
     : null
 
@@ -53,7 +53,7 @@ export default async function SettingsPage() {
       <SettingsClient
         org={org}
         isAdmin={isAdmin}
-        sections={['organisation']}
+        sections={['instance']}
         title="Instance"
         description="Manage your instance profile."
       />

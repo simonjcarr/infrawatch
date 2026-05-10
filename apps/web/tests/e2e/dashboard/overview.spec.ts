@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -13,29 +13,29 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   return rows[0]!.id
 }
 
-test('overview aggregates agent, certificate, and alert counts for the organisation', async ({ authenticatedPage: page }) => {
+test('overview aggregates agent, certificate, and alert counts for the instance', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
-    INSERT INTO agents (id, organisation_id, hostname, public_key, status, os, arch)
+    INSERT INTO agents (id, instance_id, hostname, public_key, status, os, arch)
     VALUES
-      ('agent-online', ${orgId}, 'agent-online', 'pk-online', 'active', 'Ubuntu 24.04', 'x86_64'),
-      ('agent-offline', ${orgId}, 'agent-offline', 'pk-offline', 'offline', 'Ubuntu 24.04', 'x86_64')
+      ('agent-online', ${instanceId}, 'agent-online', 'pk-online', 'active', 'Ubuntu 24.04', 'x86_64'),
+      ('agent-offline', ${instanceId}, 'agent-offline', 'pk-offline', 'offline', 'Ubuntu 24.04', 'x86_64')
   `
 
   await sql`
-    INSERT INTO hosts (id, organisation_id, agent_id, hostname, display_name, os, arch, ip_addresses, status)
+    INSERT INTO hosts (id, instance_id, agent_id, hostname, display_name, os, arch, ip_addresses, status)
     VALUES
-      ('host-alert', ${orgId}, 'agent-online', 'host-alert', 'Alert Host', 'Ubuntu 24.04', 'x86_64', '["10.20.0.10"]'::jsonb, 'online')
+      ('host-alert', ${instanceId}, 'agent-online', 'host-alert', 'Alert Host', 'Ubuntu 24.04', 'x86_64', '["10.20.0.10"]'::jsonb, 'online')
   `
 
   await sql`
-    INSERT INTO alert_rules (id, organisation_id, host_id, name, condition_type, config, severity)
+    INSERT INTO alert_rules (id, instance_id, host_id, name, condition_type, config, severity)
     VALUES
       (
         'alert-rule-cpu',
-        ${orgId},
+        ${instanceId},
         'host-alert',
         'High CPU',
         'metric_threshold',
@@ -45,16 +45,16 @@ test('overview aggregates agent, certificate, and alert counts for the organisat
   `
 
   await sql`
-    INSERT INTO alert_instances (id, rule_id, host_id, organisation_id, status, message, triggered_at)
+    INSERT INTO alert_instances (id, rule_id, host_id, instance_id, status, message, triggered_at)
     VALUES
-      ('alert-firing', 'alert-rule-cpu', 'host-alert', ${orgId}, 'firing', 'CPU over threshold', NOW()),
-      ('alert-ack', 'alert-rule-cpu', 'host-alert', ${orgId}, 'acknowledged', 'Investigating CPU', NOW())
+      ('alert-firing', 'alert-rule-cpu', 'host-alert', ${instanceId}, 'firing', 'CPU over threshold', NOW()),
+      ('alert-ack', 'alert-rule-cpu', 'host-alert', ${instanceId}, 'acknowledged', 'Investigating CPU', NOW())
   `
 
   await sql`
     INSERT INTO certificates (
       id,
-      organisation_id,
+      instance_id,
       source,
       host,
       port,
@@ -71,7 +71,7 @@ test('overview aggregates agent, certificate, and alert counts for the organisat
     VALUES
       (
         'cert-valid',
-        ${orgId},
+        ${instanceId},
         'discovered',
         'valid.example.com',
         443,
@@ -87,7 +87,7 @@ test('overview aggregates agent, certificate, and alert counts for the organisat
       ),
       (
         'cert-expiring',
-        ${orgId},
+        ${instanceId},
         'discovered',
         'expiring.example.com',
         443,
@@ -103,7 +103,7 @@ test('overview aggregates agent, certificate, and alert counts for the organisat
       ),
       (
         'cert-expired',
-        ${orgId},
+        ${instanceId},
         'discovered',
         'expired.example.com',
         443,

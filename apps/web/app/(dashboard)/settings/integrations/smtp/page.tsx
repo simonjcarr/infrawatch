@@ -4,7 +4,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { SettingsClient } from '../../settings-client'
 import { hasRole } from '@/lib/auth/guards'
-import { getCurrentOrganisationSettingsRecord } from '@/lib/actions/settings'
+import { getCurrentInstanceSettingsRecord } from '@/lib/actions/settings'
 
 export const metadata: Metadata = {
   title: 'SMTP Relay Settings',
@@ -15,7 +15,7 @@ export default async function SmtpRelaySettingsPage() {
   const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
-  const org = await getCurrentOrganisationSettingsRecord()
+  const org = await getCurrentInstanceSettingsRecord()
 
   if (!org) {
     return (

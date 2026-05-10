@@ -37,14 +37,14 @@ test('profile self-service actions derive the target user from the authenticated
   }
 })
 
-test('notification preference action derives user and organisation from the authenticated session', () => {
+test('notification preference action derives user and instance from the authenticated session', () => {
   const segment = getActionSegment('updateNotificationPreference')
   const signature = segment.slice(0, segment.indexOf('): Promise'))
 
   assert.doesNotMatch(
     signature,
-    /\b(?:userId|orgId)\s*:/,
-    'updateNotificationPreference must not accept caller-controlled userId or orgId',
+    /\b(?:userId|instanceId)\s*:/,
+    'updateNotificationPreference must not accept caller-controlled userId or instanceId',
   )
   assert.match(
     segment,
@@ -58,7 +58,7 @@ test('notification preference action derives user and organisation from the auth
   )
   assert.match(
     segment,
-    /session\.user\.organisationId/,
-    'updateNotificationPreference must read organisation policy from the authenticated session organisation',
+    /session\.user\.instanceId/,
+    'updateNotificationPreference must read instance policy from the authenticated session instance',
   )
 })

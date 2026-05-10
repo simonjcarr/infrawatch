@@ -5,7 +5,7 @@ import { systemConfig } from '../../db/schema/index.ts'
 
 export interface CtCveConnectionStatus {
   contractVersion: '2026-04-30'
-  orgId: string
+  instanceId: string
   configured: boolean
   enabled: boolean
   lastInventoryPushAt: string | null
@@ -16,21 +16,21 @@ export interface CtCveConnectionStatus {
 }
 
 export interface CtCveConnectionStatusRepository {
-  get(orgId: string): Promise<CtCveConnectionStatus | null>
+  get(instanceId: string): Promise<CtCveConnectionStatus | null>
   save(status: CtCveConnectionStatus): Promise<void>
 }
 
 const CONTRACT_VERSION = '2026-04-30'
 const CONFIG_KEY_PREFIX = 'ct_cve_connection_status:'
 
-function configKey(orgId: string) {
-  return `${CONFIG_KEY_PREFIX}${orgId}`
+function configKey(instanceId: string) {
+  return `${CONFIG_KEY_PREFIX}${instanceId}`
 }
 
-function emptyStatus(orgId: string, configured = true): CtCveConnectionStatus {
+function emptyStatus(instanceId: string, configured = true): CtCveConnectionStatus {
   return {
     contractVersion: CONTRACT_VERSION,
-    orgId,
+    instanceId,
     configured,
     enabled: true,
     lastInventoryPushAt: null,
@@ -41,18 +41,18 @@ function emptyStatus(orgId: string, configured = true): CtCveConnectionStatus {
   }
 }
 
-function parseStoredStatus(orgId: string, value: string): CtCveConnectionStatus | null {
+function parseStoredStatus(instanceId: string, value: string): CtCveConnectionStatus | null {
   try {
     const parsed = JSON.parse(value) as Partial<CtCveConnectionStatus>
-    if (!parsed || parsed.contractVersion !== CONTRACT_VERSION || parsed.orgId !== orgId) {
+    if (!parsed || parsed.contractVersion !== CONTRACT_VERSION || parsed.instanceId !== instanceId) {
       return null
     }
 
     return {
-      ...emptyStatus(orgId, parsed.configured ?? true),
+      ...emptyStatus(instanceId, parsed.configured ?? true),
       ...parsed,
       contractVersion: CONTRACT_VERSION,
-      orgId,
+      instanceId,
       configured: parsed.configured ?? true,
       enabled: parsed.enabled ?? true,
     }
@@ -70,23 +70,23 @@ async function repository(options?: { repository?: CtCveConnectionStatusReposito
 }
 
 export async function getCtCveConnectionStatus(
-  orgId: string,
+  instanceId: string,
   options: { configured?: boolean; repository?: CtCveConnectionStatusRepository } = {},
 ): Promise<CtCveConnectionStatus> {
   const repo = await repository(options)
-  const stored = await repo.get(orgId)
+  const stored = await repo.get(instanceId)
   return {
-    ...(stored ?? emptyStatus(orgId, options.configured ?? true)),
+    ...(stored ?? emptyStatus(instanceId, options.configured ?? true)),
     configured: options.configured ?? stored?.configured ?? true,
   }
 }
 
 export async function recordCtCveConnectionHealth(
-  orgId: string,
+  instanceId: string,
   options: { now?: Date; repository?: CtCveConnectionStatusRepository } = {},
 ): Promise<CtCveConnectionStatus> {
   const repo = await repository(options)
-  const current = await getCtCveConnectionStatus(orgId, { repository: repo })
+  const current = await getCtCveConnectionStatus(instanceId, { repository: repo })
   const next = {
     ...current,
     configured: true,
@@ -98,11 +98,11 @@ export async function recordCtCveConnectionHealth(
 }
 
 export async function recordCtCveFindingIngest(
-  orgId: string,
+  instanceId: string,
   options: { now?: Date; repository?: CtCveConnectionStatusRepository } = {},
 ): Promise<CtCveConnectionStatus> {
   const repo = await repository(options)
-  const current = await getCtCveConnectionStatus(orgId, { repository: repo })
+  const current = await getCtCveConnectionStatus(instanceId, { repository: repo })
   const next = {
     ...current,
     configured: true,
@@ -116,11 +116,11 @@ export async function recordCtCveFindingIngest(
 }
 
 export async function recordCtCveInventoryPush(
-  orgId: string,
+  instanceId: string,
   options: { now?: Date; repository?: CtCveConnectionStatusRepository } = {},
 ): Promise<CtCveConnectionStatus> {
   const repo = await repository(options)
-  const current = await getCtCveConnectionStatus(orgId, { repository: repo })
+  const current = await getCtCveConnectionStatus(instanceId, { repository: repo })
   const next = {
     ...current,
     configured: true,
@@ -134,12 +134,12 @@ export async function recordCtCveInventoryPush(
 }
 
 export async function recordCtCveConnectionError(
-  orgId: string,
+  instanceId: string,
   errorCode: string,
   options: { now?: Date; repository?: CtCveConnectionStatusRepository } = {},
 ): Promise<CtCveConnectionStatus> {
   const repo = await repository(options)
-  const current = await getCtCveConnectionStatus(orgId, { repository: repo })
+  const current = await getCtCveConnectionStatus(instanceId, { repository: repo })
   const next = {
     ...current,
     configured: true,
@@ -158,18 +158,18 @@ async function getDefaultRepository(): Promise<CtCveConnectionStatusRepository> 
 
 export function createSystemConfigCtCveConnectionStatusRepository(database: Database): CtCveConnectionStatusRepository {
   return {
-    async get(orgId) {
+    async get(instanceId) {
       const row = await database.query.systemConfig.findFirst({
-        where: eq(systemConfig.key, configKey(orgId)),
+        where: eq(systemConfig.key, configKey(instanceId)),
         columns: { value: true },
       })
-      return row ? parseStoredStatus(orgId, row.value) : null
+      return row ? parseStoredStatus(instanceId, row.value) : null
     },
     async save(status) {
       await database
         .insert(systemConfig)
         .values({
-          key: configKey(status.orgId),
+          key: configKey(status.instanceId),
           value: JSON.stringify(status),
           updatedAt: new Date(),
         })

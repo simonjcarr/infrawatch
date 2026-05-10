@@ -4,7 +4,7 @@ import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
@@ -12,7 +12,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can create, edit, toggle, and delete an LDAP configuration', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await page.goto('/settings/integrations')
 
@@ -38,7 +38,7 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
   }>>`
     SELECT id, host, port, allow_login, enabled, deleted_at
     FROM ldap_configurations
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND name = 'Corporate AD'
     LIMIT 1
   `

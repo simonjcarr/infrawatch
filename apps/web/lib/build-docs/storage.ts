@@ -8,7 +8,7 @@ import type { StoredBuildDocAsset } from './types'
 
 export interface BuildDocAssetStorage {
   put(input: {
-    organisationId: string
+    instanceId: string
     buildDocId: string
     filename: string
     contentType: string
@@ -33,16 +33,16 @@ function safeExtension(filename: string, contentType: string): string {
   return fallback[contentType] ?? '.img'
 }
 
-function createStorageKey(input: { organisationId: string; buildDocId: string; filename: string; contentType: string }): string {
+function createStorageKey(input: { instanceId: string; buildDocId: string; filename: string; contentType: string }): string {
   const id = crypto.randomUUID()
-  return `${input.organisationId}/${input.buildDocId}/${id}${safeExtension(input.filename, input.contentType)}`
+  return `${input.instanceId}/${input.buildDocId}/${id}${safeExtension(input.filename, input.contentType)}`
 }
 
 export class FilesystemBuildDocAssetStorage implements BuildDocAssetStorage {
   constructor(private readonly rootPath = process.env['BUILD_DOC_ASSET_ROOT'] ?? path.join(process.cwd(), '.build-doc-assets')) {}
 
   async put(input: {
-    organisationId: string
+    instanceId: string
     buildDocId: string
     filename: string
     contentType: string
@@ -99,7 +99,7 @@ export class S3BuildDocAssetStorage implements BuildDocAssetStorage {
   }
 
   async put(input: {
-    organisationId: string
+    instanceId: string
     buildDocId: string
     filename: string
     contentType: string
@@ -112,7 +112,7 @@ export class S3BuildDocAssetStorage implements BuildDocAssetStorage {
       Body: input.bytes,
       ContentType: input.contentType,
       Metadata: {
-        organisationId: input.organisationId,
+        instanceId: input.instanceId,
         buildDocId: input.buildDocId,
         checksumSha256: checksum(input.bytes),
       },

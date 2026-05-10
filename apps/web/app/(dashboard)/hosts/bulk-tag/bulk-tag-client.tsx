@@ -28,7 +28,7 @@ import type { HostFilter } from '@/lib/db/schema'
 import type { HostFilterResult } from '@/lib/hosts/filter'
 
 interface BulkTagClientProps {
-  orgId: string
+  instanceId: string
 }
 
 function splitList(value: string): string[] {
@@ -38,7 +38,7 @@ function splitList(value: string): string[] {
     .filter((s) => s.length > 0)
 }
 
-export function BulkTagClient({ orgId }: BulkTagClientProps) {
+export function BulkTagClient({ instanceId }: BulkTagClientProps) {
   const [hostnameGlob, setHostnameGlob] = useState('')
   const [hostnameContains, setHostnameContains] = useState('')
   const [ipCidrs, setIpCidrs] = useState('')
@@ -70,7 +70,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
   }
 
   const previewMutation = useMutation({
-    mutationFn: async () => previewHostFilter(orgId, buildFilter()),
+    mutationFn: async () => previewHostFilter(instanceId, buildFilter()),
     onSuccess: (rows) => {
       setPreview(rows)
       setMessage(null)
@@ -81,7 +81,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
   const applyMutation = useMutation({
     mutationFn: async () =>
       bulkAssignTags(
-        orgId,
+        instanceId,
         buildFilter(),
         tags.map((t) => ({ key: t.key, value: t.value })),
       ),

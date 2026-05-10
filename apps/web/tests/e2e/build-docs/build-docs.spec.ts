@@ -5,17 +5,17 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
-  return { orgId: rows[0]!.org_id, userId: rows[0]!.user_id }
+  return { instanceId: rows[0]!.instance_id, userId: rows[0]!.user_id }
 }
 
 async function fillMarkdownSource(editor: Locator, markdown: string) {
@@ -32,7 +32,7 @@ test('admin can create and export a build document from a template and snippet',
   })
 
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getOrgAndUserIds(sql)
 
   await page.goto('/build-docs')
   await expect(page.getByTestId('build-docs-heading')).toBeVisible()
@@ -120,7 +120,7 @@ test('admin can create and export a build document from a template and snippet',
     FROM build_docs d
     LEFT JOIN build_doc_sections s ON s.build_doc_id = d.id
     LEFT JOIN build_doc_assets a ON a.build_doc_id = d.id
-    WHERE d.organisation_id = ${orgId}
+    WHERE d.instance_id = ${instanceId}
       AND d.title = 'E2E production VM build'
   `
   expect(docs[0]).toEqual({ doc_count: 1, section_count: 2, asset_count: 1 })

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 
 /**
  * Serials of revoked agent client certificates.
@@ -11,12 +11,12 @@ import { organisations } from './organisations.ts'
  */
 export const revokedCertificates = pgTable('revoked_certificates', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   serial: text('serial').notNull().unique(),
   reason: text('reason'),
   revokedAt: timestamp('revoked_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index('revoked_certs_org_idx').on(t.organisationId),
+  index('revoked_certs_instance_idx').on(t.instanceId),
 ])
 
 export type RevokedCertificate = typeof revokedCertificates.$inferSelect

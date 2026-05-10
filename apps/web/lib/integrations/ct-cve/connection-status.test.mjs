@@ -13,12 +13,12 @@ function repo(initial = null) {
   let stored = initial
   return {
     repository: {
-      async get(orgId) {
-        assert.equal(orgId, 'org_1')
+      async get(instanceId) {
+        assert.equal(instanceId, 'org_1')
         return stored
       },
       async save(status) {
-        assert.equal(status.orgId, 'org_1')
+        assert.equal(status.instanceId, 'org_1')
         stored = status
       },
     },
@@ -33,7 +33,7 @@ test('returns default CT-CVE connection status when no durable row exists', asyn
 
   assert.deepEqual(status, {
     contractVersion: '2026-04-30',
-    orgId: 'org_1',
+    instanceId: 'org_1',
     configured: false,
     enabled: true,
     lastInventoryPushAt: null,
@@ -66,7 +66,7 @@ test('records health, finding ingest, inventory push, and clears stale errors on
 
   assert.deepEqual(stored(), {
     contractVersion: '2026-04-30',
-    orgId: 'org_1',
+    instanceId: 'org_1',
     configured: true,
     enabled: true,
     lastInventoryPushAt: '2026-04-30T11:03:00.000Z',

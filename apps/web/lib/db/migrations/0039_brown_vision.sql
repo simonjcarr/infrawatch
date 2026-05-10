@@ -1,1 +1,0 @@
-CREATE INDEX "host_metrics_org_host_time_idx" ON "host_metrics" USING btree ("organisation_id","host_id","recorded_at");

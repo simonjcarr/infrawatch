@@ -1,13 +1,13 @@
 import { pgTable, text, timestamp, jsonb, boolean, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 
 export const networks = pgTable('networks', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   name: text('name').notNull(),
   cidr: text('cidr').notNull(),
   description: text('description'),
@@ -21,9 +21,9 @@ export const hostNetworkMemberships = pgTable(
   'host_network_memberships',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     networkId: text('network_id')
       .notNull()
       .references(() => networks.id),

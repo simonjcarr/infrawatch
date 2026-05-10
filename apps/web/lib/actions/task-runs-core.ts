@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAdminAccess, requireInstanceToolingAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import {
@@ -42,7 +42,7 @@ async function createTaskRun(
       const [run] = await tx
         .insert(taskRuns)
         .values({
-          organisationId: currentScope,
+          instanceId: currentScope,
           triggeredBy: userId,
           targetType,
           targetId,
@@ -56,13 +56,13 @@ async function createTaskRun(
 
       const hostRows: (typeof taskRunHosts.$inferInsert)[] = [
         ...pendingHostIds.map((hostId) => ({
-          organisationId: currentScope,
+          instanceId: currentScope,
           taskRunId: run.id,
           hostId,
           status: 'pending' as const,
         })),
         ...skipHosts.map(({ hostId, reason }) => ({
-          organisationId: currentScope,
+          instanceId: currentScope,
           taskRunId: run.id,
           hostId,
           status: 'skipped' as const,
@@ -86,11 +86,11 @@ export async function getTaskRun(
   currentScope: string,
   taskRunId: string,
 ): Promise<TaskRunWithHosts | null> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   const run = await db.query.taskRuns.findFirst({
     where: and(
       eq(taskRuns.id, taskRunId),
-      eq(taskRuns.organisationId, currentScope),
+      eq(taskRuns.instanceId, currentScope),
       isNull(taskRuns.deletedAt),
     ),
   })
@@ -99,7 +99,7 @@ export async function getTaskRun(
   const hostRows = await db.query.taskRunHosts.findMany({
     where: and(
       eq(taskRunHosts.taskRunId, taskRunId),
-      eq(taskRunHosts.organisationId, currentScope),
+      eq(taskRunHosts.instanceId, currentScope),
       isNull(taskRunHosts.deletedAt),
     ),
   })
@@ -110,7 +110,7 @@ export async function getTaskRun(
       ? await db.query.hosts.findMany({
           where: and(
             inArray(hosts.id, hostIds),
-            eq(hosts.organisationId, currentScope),
+            eq(hosts.instanceId, currentScope),
           ),
         })
       : []
@@ -131,11 +131,11 @@ export async function listTaskRunsForHost(
   hostId: string,
   taskType?: string,
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   const hostRunRows = await db.query.taskRunHosts.findMany({
     where: and(
       eq(taskRunHosts.hostId, hostId),
-      eq(taskRunHosts.organisationId, currentScope),
+      eq(taskRunHosts.instanceId, currentScope),
       isNull(taskRunHosts.deletedAt),
     ),
     columns: { taskRunId: true },
@@ -148,7 +148,7 @@ export async function listTaskRunsForHost(
   const runs = await db.query.taskRuns.findMany({
     where: and(
       inArray(taskRuns.id, runIds),
-      eq(taskRuns.organisationId, currentScope),
+      eq(taskRuns.instanceId, currentScope),
       isNull(taskRuns.deletedAt),
       isNotNull(taskRuns.triggeredBy),
       ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
@@ -165,11 +165,11 @@ export async function listAutomatedRunsForHost(
   hostId: string,
   taskType?: string,
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   const hostRunRows = await db.query.taskRunHosts.findMany({
     where: and(
       eq(taskRunHosts.hostId, hostId),
-      eq(taskRunHosts.organisationId, currentScope),
+      eq(taskRunHosts.instanceId, currentScope),
       isNull(taskRunHosts.deletedAt),
     ),
     columns: { taskRunId: true },
@@ -182,7 +182,7 @@ export async function listAutomatedRunsForHost(
   const runs = await db.query.taskRuns.findMany({
     where: and(
       inArray(taskRuns.id, runIds),
-      eq(taskRuns.organisationId, currentScope),
+      eq(taskRuns.instanceId, currentScope),
       isNull(taskRuns.deletedAt),
       isNull(taskRuns.triggeredBy),
       ...(taskType ? [eq(taskRuns.taskType, taskType as TaskType)] : []),
@@ -199,10 +199,10 @@ export async function listTaskRunsForGroup(
   groupId: string,
   taskType?: string,
 ): Promise<TaskRunWithHosts[]> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   const runs = await db.query.taskRuns.findMany({
     where: and(
-      eq(taskRuns.organisationId, currentScope),
+      eq(taskRuns.instanceId, currentScope),
       eq(taskRuns.targetType, 'group'),
       eq(taskRuns.targetId, groupId),
       isNull(taskRuns.deletedAt),
@@ -219,13 +219,13 @@ export async function cancelTaskRun(
   currentScope: string,
   taskRunId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   try {
     return await db.transaction(async (tx) => {
       const run = await tx.query.taskRuns.findFirst({
         where: and(
           eq(taskRuns.id, taskRunId),
-          eq(taskRuns.organisationId, currentScope),
+          eq(taskRuns.instanceId, currentScope),
           isNull(taskRuns.deletedAt),
         ),
       })
@@ -242,7 +242,7 @@ export async function cancelTaskRun(
         .where(
           and(
             eq(taskRunHosts.taskRunId, taskRunId),
-            eq(taskRunHosts.organisationId, currentScope),
+            eq(taskRunHosts.instanceId, currentScope),
             eq(taskRunHosts.status, 'pending'),
             isNull(taskRunHosts.deletedAt),
           ),
@@ -254,7 +254,7 @@ export async function cancelTaskRun(
         .where(
           and(
             eq(taskRunHosts.taskRunId, taskRunId),
-            eq(taskRunHosts.organisationId, currentScope),
+            eq(taskRunHosts.instanceId, currentScope),
             eq(taskRunHosts.status, 'running'),
             isNull(taskRunHosts.deletedAt),
           ),
@@ -286,13 +286,13 @@ export async function triggerCustomScriptRun(
   interpreter: 'sh' | 'bash' | 'python3',
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
     return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
   }
 
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
   })
   if (!host) return { error: 'Host not found' }
 
@@ -308,14 +308,14 @@ export async function triggerGroupCustomScriptRun(
   maxParallel: number,
   timeoutSeconds?: number,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   if (script.length > MAX_SCRIPT_LENGTH[interpreter]) {
     return { error: `Script exceeds the ${MAX_SCRIPT_LENGTH[interpreter] / 1024} KB size limit for ${interpreter}` }
   }
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),
-      eq(hostGroupMembers.organisationId, currentScope),
+      eq(hostGroupMembers.instanceId, currentScope),
       isNull(hostGroupMembers.deletedAt),
     ),
     columns: { hostId: true },
@@ -333,9 +333,9 @@ export async function triggerServiceAction(
   serviceName: string,
   action: 'start' | 'stop' | 'restart' | 'status',
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
   })
   if (!host) return { error: 'Host not found' }
   if (host.os?.toLowerCase() !== 'linux') {
@@ -355,11 +355,11 @@ export async function triggerGroupServiceAction(
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),
-      eq(hostGroupMembers.organisationId, currentScope),
+      eq(hostGroupMembers.instanceId, currentScope),
       isNull(hostGroupMembers.deletedAt),
     ),
     columns: { hostId: true },
@@ -370,7 +370,7 @@ export async function triggerGroupServiceAction(
   const groupHosts = await db.query.hosts.findMany({
     where: and(
       inArray(hosts.id, hostIds),
-      eq(hosts.organisationId, currentScope),
+      eq(hosts.instanceId, currentScope),
       isNull(hosts.deletedAt),
     ),
   })
@@ -412,9 +412,9 @@ export async function triggerAgentUninstall(
   currentScope: string,
   hostId: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
   })
   if (!host) return { error: 'Host not found' }
 
@@ -426,7 +426,7 @@ export async function deleteTaskRuns(
   currentScope: string,
   taskRunIds: string[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgToolingAccess(currentScope)
+  await requireInstanceToolingAccess(currentScope)
   if (taskRunIds.length === 0) return { success: true }
   try {
     const now = new Date()
@@ -437,7 +437,7 @@ export async function deleteTaskRuns(
         .where(
           and(
             inArray(taskRunHosts.taskRunId, taskRunIds),
-            eq(taskRunHosts.organisationId, currentScope),
+            eq(taskRunHosts.instanceId, currentScope),
             isNull(taskRunHosts.deletedAt),
           ),
         )
@@ -447,7 +447,7 @@ export async function deleteTaskRuns(
         .where(
           and(
             inArray(taskRuns.id, taskRunIds),
-            eq(taskRuns.organisationId, currentScope),
+            eq(taskRuns.instanceId, currentScope),
             isNull(taskRuns.deletedAt),
           ),
         )
@@ -464,11 +464,11 @@ export async function triggerPatchRun(
   hostId: string,
   mode: 'security' | 'all',
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   const host = await db.query.hosts.findFirst({
     where: and(
       eq(hosts.id, hostId),
-      eq(hosts.organisationId, currentScope),
+      eq(hosts.instanceId, currentScope),
       isNull(hosts.deletedAt),
     ),
   })
@@ -489,11 +489,11 @@ export async function triggerGroupPatchRun(
 ): Promise<
   { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
 > {
-  const session = await requireOrgAdminAccess(currentScope)
+  const session = await requireInstanceAdminAccess(currentScope)
   const members = await db.query.hostGroupMembers.findMany({
     where: and(
       eq(hostGroupMembers.groupId, groupId),
-      eq(hostGroupMembers.organisationId, currentScope),
+      eq(hostGroupMembers.instanceId, currentScope),
       isNull(hostGroupMembers.deletedAt),
     ),
     columns: { hostId: true },
@@ -507,7 +507,7 @@ export async function triggerGroupPatchRun(
   const groupHosts = await db.query.hosts.findMany({
     where: and(
       inArray(hosts.id, hostIds),
-      eq(hosts.organisationId, currentScope),
+      eq(hosts.instanceId, currentScope),
       isNull(hosts.deletedAt),
     ),
   })

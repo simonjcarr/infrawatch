@@ -3,24 +3,24 @@ import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
-  const rows = await sql<Array<{ org_id: string }>>`
-    SELECT id AS org_id
-    FROM organisations
+  const rows = await sql<Array<{ instance_id: string }>>`
+    SELECT id AS instance_id
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
-  return rows[0]!.org_id
+  return rows[0]!.instance_id
 }
 
 test('admin can run, disable, and delete a saved tag rule', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -32,7 +32,7 @@ test('admin can run, disable, and delete a saved tag rule', async ({ authenticat
     VALUES
       (
         'tag-rule-host-match',
-        ${orgId},
+        ${instanceId},
         'web-01',
         'Web 01',
         'Ubuntu 24.04',
@@ -43,7 +43,7 @@ test('admin can run, disable, and delete a saved tag rule', async ({ authenticat
       ),
       (
         'tag-rule-host-ignore',
-        ${orgId},
+        ${instanceId},
         'db-01',
         'DB 01',
         'Ubuntu 24.04',
@@ -57,7 +57,7 @@ test('admin can run, disable, and delete a saved tag rule', async ({ authenticat
   await sql`
     INSERT INTO tag_rules (
       id,
-      organisation_id,
+      instance_id,
       name,
       filter,
       tags,
@@ -65,7 +65,7 @@ test('admin can run, disable, and delete a saved tag rule', async ({ authenticat
     )
     VALUES (
       'tag-rule-e2e-1',
-      ${orgId},
+      ${instanceId},
       'Production web hosts',
       '{"hostnameContains":"web","status":["online"]}'::jsonb,
       '[{"key":"env","value":"prod"}]'::jsonb,

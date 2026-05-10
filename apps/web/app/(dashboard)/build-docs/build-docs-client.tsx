@@ -311,7 +311,7 @@ export function BuildDocsClient({
         {canAdmin && (
           <TabsContent value="templates" className="space-y-4">
             <Card>
-              <CardHeader><CardTitle className="text-base">New organisation template</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">New instance template</CardTitle></CardHeader>
               <CardContent>
                 <form action={submitTemplate} className="grid gap-4">
                   <Input name="name" placeholder="Standard VM build" required />

@@ -27,7 +27,7 @@ test('normalizePasswordManagerUiError maps expected API statuses to safe states 
     normalizePasswordManagerUiError(new PasswordManagerApiError(403, 'forbidden'), 'fallback'),
     {
       kind: 'shell-view',
-      message: 'Your current session cannot access Password Manager. Relaunch or switch organisation access.',
+      message: 'Your current session cannot access Password Manager. Relaunch or switch instance access.',
       view: 'access-denied',
     },
   )

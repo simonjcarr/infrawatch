@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
-import { organisations, parseOrgMetadata, users } from '@/lib/db/schema'
+import { instanceSettings, parseInstanceMetadata, users } from '@/lib/db/schema'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { SettingsClient } from '../settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
@@ -16,9 +16,9 @@ export const metadata: Metadata = {
 
 export default async function LicenceSettingsPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId
+  const instanceId = session.user.instanceId
 
-  if (!orgId) {
+  if (!instanceId) {
     const effectiveLicence = createCommunityLicence()
     return (
       <div className="space-y-6">
@@ -46,16 +46,16 @@ export default async function LicenceSettingsPage() {
   }
 
   const [org, activeUsers, effectiveLicence, seatUsage] = await Promise.all([
-    db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
     }),
     db.query.users.findMany({
-      where: and(eq(users.organisationId, orgId), eq(users.isActive, true), isNull(users.deletedAt)),
+      where: and(eq(users.instanceId, instanceId), eq(users.isActive, true), isNull(users.deletedAt)),
       columns: { id: true, name: true, email: true, role: true, roles: true },
       orderBy: [asc(users.createdAt), asc(users.email)],
     }),
-    getEffectiveLicence(orgId),
-    getOrgSeatUsage(orgId),
+    getEffectiveLicence(instanceId),
+    getOrgSeatUsage(instanceId),
   ])
 
   if (!org) return null
@@ -84,7 +84,7 @@ export default async function LicenceSettingsPage() {
         seatUsage={seatUsage}
         freeSeatUsers={{
           users: activeUsers,
-          selectedUserIds: parseOrgMetadata(org.metadata).freeSeatUserIds ?? [],
+          selectedUserIds: parseInstanceMetadata(org.metadata).freeSeatUserIds ?? [],
         }}
       />
     </div>

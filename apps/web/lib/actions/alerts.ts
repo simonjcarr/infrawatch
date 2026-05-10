@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { createHmac } from 'crypto'
@@ -9,7 +9,7 @@ import { assertPublicHost, assertPublicUrl } from '@/lib/net/ssrf-guard'
 import { validateStoredNotificationChannelConfig } from '@/lib/actions/alerts-notification-security'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { decrypt } from '@/lib/crypto/encrypt'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import { sendSmtpMessage } from '@/lib/notifications/smtp-send'
 
 const testNotificationLimiter = createRateLimiter({
@@ -33,7 +33,7 @@ import type {
   TelegramChannelConfig,
   AlertSilence,
 } from '@/lib/db/schema'
-import { organisations } from '@/lib/db/schema'
+import { instanceSettings } from '@/lib/db/schema'
 import type { SmtpEncryption } from '@/lib/notifications/smtp-settings'
 import { getRequiredSession } from '@/lib/auth/session'
 import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
@@ -131,11 +131,11 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
 // ─── Alert Rules ──────────────────────────────────────────────────────────────
 
 export async function getAlertRules(hostId?: string): Promise<AlertRule[]> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceAccess(instanceId)
   return db.query.alertRules.findMany({
     where: and(
-      eq(alertRules.organisationId, orgId),
+      eq(alertRules.instanceId, instanceId),
       isNull(alertRules.deletedAt),
       eq(alertRules.isGlobalDefault, false),
       hostId != null ? eq(alertRules.hostId, hostId) : undefined,
@@ -145,12 +145,12 @@ export async function getAlertRules(hostId?: string): Promise<AlertRule[]> {
 }
 
 export async function getGlobalAlertDefaults(): Promise<AlertRule[]> {
-  const orgId = await resolveOptionalAlertScope()
-  if (!orgId) return []
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveOptionalAlertScope()
+  if (!instanceId) return []
+  await requireInstanceAccess(instanceId)
   return db.query.alertRules.findMany({
     where: and(
-      eq(alertRules.organisationId, orgId),
+      eq(alertRules.instanceId, instanceId),
       isNull(alertRules.deletedAt),
       eq(alertRules.isGlobalDefault, true),
     ),
@@ -167,8 +167,8 @@ const createGlobalAlertDefaultSchema = z.object({
 export async function createGlobalAlertDefault(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceAdminAccess(instanceId)
   const parsed = createGlobalAlertDefaultSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -179,7 +179,7 @@ export async function createGlobalAlertDefault(
     const [row] = await db
       .insert(alertRules)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         hostId: null,
         name: data.name,
         conditionType: 'metric_threshold',
@@ -199,12 +199,12 @@ export async function createGlobalAlertDefault(
 export async function deleteGlobalAlertDefault(
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgAdminAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceAdminAccess(instanceId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
-      eq(alertRules.organisationId, orgId),
+      eq(alertRules.instanceId, instanceId),
       eq(alertRules.isGlobalDefault, true),
       isNull(alertRules.deletedAt),
     ),
@@ -214,10 +214,10 @@ export async function deleteGlobalAlertDefault(
   await db
     .update(alertRules)
     .set({ deletedAt: new Date() })
-    .where(and(eq(alertRules.id, ruleId), eq(alertRules.organisationId, orgId)))
+    .where(and(eq(alertRules.id, ruleId), eq(alertRules.instanceId, instanceId)))
 
   await writeAuditEvent(db, {
-    organisationId: orgId,
+    instanceId: instanceId,
     actorUserId: session.user.id,
     action: 'alert_rule.deleted',
     targetType: 'alert_rule',
@@ -235,13 +235,13 @@ export async function deleteGlobalAlertDefault(
 }
 
 export async function applyGlobalDefaultsToHost(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<void> {
-  await requireOrgAdminAccess(orgId)
+  await requireInstanceAdminAccess(instanceId)
   const defaults = await db.query.alertRules.findMany({
     where: and(
-      eq(alertRules.organisationId, orgId),
+      eq(alertRules.instanceId, instanceId),
       isNull(alertRules.deletedAt),
       eq(alertRules.isGlobalDefault, true),
     ),
@@ -251,7 +251,7 @@ export async function applyGlobalDefaultsToHost(
 
   await db.insert(alertRules).values(
     defaults.map((rule) => ({
-      organisationId: orgId,
+      instanceId: instanceId,
       hostId,
       name: rule.name,
       conditionType: rule.conditionType,
@@ -266,8 +266,8 @@ export async function applyGlobalDefaultsToHost(
 export async function createAlertRule(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgWriteAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceWriteAccess(instanceId)
   const parsed = createAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -278,7 +278,7 @@ export async function createAlertRule(
     const [row] = await db
       .insert(alertRules)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         hostId: data.hostId ?? null,
         name: data.name,
         conditionType: data.conditionType,
@@ -298,8 +298,8 @@ export async function updateAlertRule(
   ruleId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgWriteAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceWriteAccess(instanceId)
   const parsed = updateAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -309,7 +309,7 @@ export async function updateAlertRule(
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
-      eq(alertRules.organisationId, orgId),
+      eq(alertRules.instanceId, instanceId),
       isNull(alertRules.deletedAt),
     ),
   })
@@ -324,7 +324,7 @@ export async function updateAlertRule(
       ...(data.config !== undefined && { config: data.config as AlertRuleConfig }),
       updatedAt: new Date(),
     })
-    .where(and(eq(alertRules.id, ruleId), eq(alertRules.organisationId, orgId)))
+    .where(and(eq(alertRules.id, ruleId), eq(alertRules.instanceId, instanceId)))
 
   return { success: true }
 }
@@ -332,12 +332,12 @@ export async function updateAlertRule(
 export async function deleteAlertRule(
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgWriteAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceWriteAccess(instanceId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
       eq(alertRules.id, ruleId),
-      eq(alertRules.organisationId, orgId),
+      eq(alertRules.instanceId, instanceId),
       isNull(alertRules.deletedAt),
     ),
   })
@@ -346,10 +346,10 @@ export async function deleteAlertRule(
   await db
     .update(alertRules)
     .set({ deletedAt: new Date() })
-    .where(and(eq(alertRules.id, ruleId), eq(alertRules.organisationId, orgId)))
+    .where(and(eq(alertRules.id, ruleId), eq(alertRules.instanceId, instanceId)))
 
   await writeAuditEvent(db, {
-    organisationId: orgId,
+    instanceId: instanceId,
     actorUserId: session.user.id,
     action: 'alert_rule.deleted',
     targetType: 'alert_rule',
@@ -381,9 +381,9 @@ export type AlertHistoryFilters = {
 export async function getAlertInstances(
   filters: AlertHistoryFilters = {},
 ): Promise<AlertInstanceWithRule[]> {
-  const orgId = await resolveOptionalAlertScope()
-  if (!orgId) return []
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveOptionalAlertScope()
+  if (!instanceId) return []
+  await requireInstanceAccess(instanceId)
   const limit = filters.limit ?? 50
   const offset = filters.offset ?? 0
 
@@ -392,7 +392,7 @@ export async function getAlertInstances(
       id: alertInstances.id,
       ruleId: alertInstances.ruleId,
       hostId: alertInstances.hostId,
-      organisationId: alertInstances.organisationId,
+      instanceId: alertInstances.instanceId,
       status: alertInstances.status,
       message: alertInstances.message,
       triggeredAt: alertInstances.triggeredAt,
@@ -409,7 +409,7 @@ export async function getAlertInstances(
     .innerJoin(hosts, eq(alertInstances.hostId, hosts.id))
     .where(
       and(
-        eq(alertInstances.organisationId, orgId),
+        eq(alertInstances.instanceId, instanceId),
         filters.status != null ? eq(alertInstances.status, filters.status) : undefined,
         filters.hostId != null ? eq(alertInstances.hostId, filters.hostId) : undefined,
         filters.severity != null ? eq(alertRules.severity, filters.severity) : undefined,
@@ -432,15 +432,15 @@ export async function getAlertInstances(
 export async function getAlertInstanceCount(
   filters: Omit<AlertHistoryFilters, 'limit' | 'offset'> = {},
 ): Promise<number> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceAccess(instanceId)
   const rows = await db
     .select({ total: count() })
     .from(alertInstances)
     .innerJoin(alertRules, eq(alertInstances.ruleId, alertRules.id))
     .where(
       and(
-        eq(alertInstances.organisationId, orgId),
+        eq(alertInstances.instanceId, instanceId),
         filters.status != null ? eq(alertInstances.status, filters.status) : undefined,
         filters.hostId != null ? eq(alertInstances.hostId, filters.hostId) : undefined,
         filters.severity != null ? eq(alertRules.severity, filters.severity) : undefined,
@@ -455,12 +455,12 @@ export async function getAlertInstanceCount(
 export async function acknowledgeAlert(
   instanceId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgWriteAccess(orgId)
+  const currentScope = await resolveCurrentAlertScope()
+  const session = await requireInstanceWriteAccess(currentScope)
   const existing = await db.query.alertInstances.findFirst({
     where: and(
       eq(alertInstances.id, instanceId),
-      eq(alertInstances.organisationId, orgId),
+      eq(alertInstances.instanceId, currentScope),
       eq(alertInstances.status, 'firing'),
     ),
   })
@@ -473,7 +473,7 @@ export async function acknowledgeAlert(
       acknowledgedAt: new Date(),
       acknowledgedBy: session.user.id,
     })
-    .where(and(eq(alertInstances.id, instanceId), eq(alertInstances.organisationId, orgId)))
+    .where(and(eq(alertInstances.id, instanceId), eq(alertInstances.instanceId, currentScope)))
 
   return { success: true }
 }
@@ -482,7 +482,7 @@ export async function getActiveAlertCountsForHosts(
   hostIds: string[],
 ): Promise<Record<string, number>> {
   const currentScope = await resolveCurrentAlertScope()
-  await requireOrgAccess(currentScope)
+  await requireInstanceAccess(currentScope)
   if (hostIds.length === 0) return {}
 
   const rows = await db
@@ -493,7 +493,7 @@ export async function getActiveAlertCountsForHosts(
     .from(alertInstances)
     .where(
       and(
-        eq(alertInstances.organisationId, currentScope),
+        eq(alertInstances.instanceId, currentScope),
         eq(alertInstances.status, 'firing'),
         inArray(alertInstances.hostId, hostIds),
       ),
@@ -529,12 +529,12 @@ function normaliseSmtpConfig(raw: unknown): SmtpChannelConfig {
 }
 
 export async function getNotificationChannels(): Promise<NotificationChannelSafe[]> {
-  const orgId = await resolveOptionalAlertScope()
-  if (!orgId) return []
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveOptionalAlertScope()
+  if (!instanceId) return []
+  await requireInstanceAccess(instanceId)
   const rows = await db.query.notificationChannels.findMany({
     where: and(
-      eq(notificationChannels.organisationId, orgId),
+      eq(notificationChannels.instanceId, instanceId),
       isNull(notificationChannels.deletedAt),
     ),
     orderBy: notificationChannels.createdAt,
@@ -582,8 +582,8 @@ export async function getNotificationChannels(): Promise<NotificationChannelSafe
 export async function createNotificationChannel(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgAdminAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceAdminAccess(instanceId)
   const parsed = createNotificationChannelSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -596,7 +596,7 @@ export async function createNotificationChannel(
     const [row] = await db
       .insert(notificationChannels)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         name: data.name,
         type: data.type,
         config: data.config as WebhookChannelConfig | SmtpChannelConfig | SlackChannelConfig | TelegramChannelConfig,
@@ -605,7 +605,7 @@ export async function createNotificationChannel(
 
     if (!row) return { error: 'Insert failed' }
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'notification_channel.created',
       targetType: 'notification_channel',
@@ -625,12 +625,12 @@ export async function createNotificationChannel(
 export async function deleteNotificationChannel(
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgAdminAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceAdminAccess(instanceId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
-      eq(notificationChannels.organisationId, orgId),
+      eq(notificationChannels.instanceId, instanceId),
       isNull(notificationChannels.deletedAt),
     ),
   })
@@ -640,11 +640,11 @@ export async function deleteNotificationChannel(
     .update(notificationChannels)
     .set({ deletedAt: new Date() })
     .where(
-      and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)),
+      and(eq(notificationChannels.id, channelId), eq(notificationChannels.instanceId, instanceId)),
     )
 
   await writeAuditEvent(db, {
-    organisationId: orgId,
+    instanceId: instanceId,
     actorUserId: session.user.id,
     action: 'notification_channel.deleted',
     targetType: 'notification_channel',
@@ -688,12 +688,12 @@ export async function updateNotificationChannel(
   channelId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgAdminAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceAdminAccess(instanceId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
-      eq(notificationChannels.organisationId, orgId),
+      eq(notificationChannels.instanceId, instanceId),
       isNull(notificationChannels.deletedAt),
     ),
   })
@@ -716,7 +716,7 @@ export async function updateNotificationChannel(
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
-        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
+        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.instanceId, instanceId)))
     } else if (existing.type === 'smtp') {
       const parsed = updateSmtpChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -729,7 +729,7 @@ export async function updateNotificationChannel(
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
-        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
+        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.instanceId, instanceId)))
     } else if (existing.type === 'slack') {
       const parsed = updateSlackChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -741,7 +741,7 @@ export async function updateNotificationChannel(
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
-        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
+        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.instanceId, instanceId)))
     } else if (existing.type === 'telegram') {
       const parsed = updateTelegramChannelSchema.safeParse(input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -756,11 +756,11 @@ export async function updateNotificationChannel(
       await db
         .update(notificationChannels)
         .set({ name, config: newConfig, updatedAt: new Date() })
-        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organisationId, orgId)))
+        .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.instanceId, instanceId)))
     }
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'notification_channel.updated',
       targetType: 'notification_channel',
@@ -782,15 +782,15 @@ export async function updateNotificationChannel(
 export async function sendTestNotification(
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgAdminAccess(orgId)
-  if (!await testNotificationLimiter.check(orgId)) {
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceAdminAccess(instanceId)
+  if (!await testNotificationLimiter.check(instanceId)) {
     return { error: 'Too many requests — please wait before sending another test notification.' }
   }
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
       eq(notificationChannels.id, channelId),
-      eq(notificationChannels.organisationId, orgId),
+      eq(notificationChannels.instanceId, instanceId),
       isNull(notificationChannels.deletedAt),
     ),
   })
@@ -834,11 +834,11 @@ export async function sendTestNotification(
     }
   } else if (existing.type === 'smtp') {
     const channelCfg = normaliseSmtpConfig(existing.config)
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     })
-    const relay = parseOrgMetadata(org?.metadata).notificationSettings?.smtpRelay
+    const relay = parseInstanceMetadata(org?.metadata).notificationSettings?.smtpRelay
     if (!relay?.enabled) return { error: 'Central SMTP relay is not enabled' }
     await assertPublicHost(relay.host)
     let password = ''
@@ -938,13 +938,13 @@ const createSilenceSchema = z.object({
 })
 
 export async function getSilences(): Promise<AlertSilenceWithHost[]> {
-  const orgId = await resolveOptionalAlertScope()
-  if (!orgId) return []
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveOptionalAlertScope()
+  if (!instanceId) return []
+  await requireInstanceAccess(instanceId)
   const rows = await db
     .select({
       id: alertSilences.id,
-      organisationId: alertSilences.organisationId,
+      instanceId: alertSilences.instanceId,
       hostId: alertSilences.hostId,
       ruleId: alertSilences.ruleId,
       reason: alertSilences.reason,
@@ -961,7 +961,7 @@ export async function getSilences(): Promise<AlertSilenceWithHost[]> {
     .leftJoin(hosts, eq(alertSilences.hostId, hosts.id))
     .where(
       and(
-        eq(alertSilences.organisationId, orgId),
+        eq(alertSilences.instanceId, instanceId),
         isNull(alertSilences.deletedAt),
       ),
     )
@@ -973,12 +973,12 @@ export async function getSilences(): Promise<AlertSilenceWithHost[]> {
 export async function getActiveSilencesForHost(
   hostId: string,
 ): Promise<AlertSilence[]> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceAccess(instanceId)
   const now = new Date()
   return db.query.alertSilences.findMany({
     where: and(
-      eq(alertSilences.organisationId, orgId),
+      eq(alertSilences.instanceId, instanceId),
       isNull(alertSilences.deletedAt),
       lte(alertSilences.startsAt, now),
       gte(alertSilences.endsAt, now),
@@ -992,8 +992,8 @@ export async function getActiveSilencesForHost(
 export async function createSilence(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  const session = await requireOrgWriteAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceWriteAccess(instanceId)
   const parsed = createSilenceSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -1004,7 +1004,7 @@ export async function createSilence(
     const [row] = await db
       .insert(alertSilences)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         hostId: data.hostId ?? null,
         ruleId: data.ruleId ?? null,
         reason: data.reason,
@@ -1016,7 +1016,7 @@ export async function createSilence(
 
     if (!row) return { error: 'Insert failed' }
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'alert_silence.created',
       targetType: 'alert_silence',
@@ -1039,12 +1039,12 @@ export async function createSilence(
 export async function deleteSilence(
   silenceId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await resolveCurrentAlertScope()
-  await requireOrgWriteAccess(orgId)
+  const instanceId = await resolveCurrentAlertScope()
+  await requireInstanceWriteAccess(instanceId)
   const existing = await db.query.alertSilences.findFirst({
     where: and(
       eq(alertSilences.id, silenceId),
-      eq(alertSilences.organisationId, orgId),
+      eq(alertSilences.instanceId, instanceId),
       isNull(alertSilences.deletedAt),
     ),
   })
@@ -1053,7 +1053,7 @@ export async function deleteSilence(
   await db
     .update(alertSilences)
     .set({ deletedAt: new Date() })
-    .where(and(eq(alertSilences.id, silenceId), eq(alertSilences.organisationId, orgId)))
+    .where(and(eq(alertSilences.id, silenceId), eq(alertSilences.instanceId, instanceId)))
 
   return { success: true }
 }

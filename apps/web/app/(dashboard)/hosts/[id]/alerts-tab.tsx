@@ -702,9 +702,9 @@ export function AlertsTab({ scopeId, hostId }: Props) {
       <Card>
         <CardHeader>
           <div>
-            <CardTitle className="text-base">Organisation-wide Default Rules</CardTitle>
+            <CardTitle className="text-base">Instance-wide Default Rules</CardTitle>
             <CardDescription className="mt-1">
-              These rules apply to <strong>all hosts</strong> in your organisation and are
+              These rules apply to <strong>all hosts</strong> in your instance and are
               evaluated in addition to the host-specific rules above.{' '}
               <a href="/settings/monitoring" className="underline underline-offset-2">
                 Manage in Administration → Monitoring
@@ -716,7 +716,7 @@ export function AlertsTab({ scopeId, hostId }: Props) {
         <CardContent>
           {globalDefaults.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No organisation-wide default rules configured.
+              No instance-wide default rules configured.
             </p>
           ) : (
             <Table>

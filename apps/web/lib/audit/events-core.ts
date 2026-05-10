@@ -2,7 +2,7 @@ type AuditScalar = string | number | boolean | null
 export type AuditJson = AuditScalar | AuditJson[] | { [key: string]: AuditJson }
 
 export interface AuditEventInput {
-  organisationId: string
+  instanceId: string
   actorUserId: string
   action: string
   targetType: string
@@ -51,7 +51,7 @@ export function serialiseAuditMetadata(metadata: unknown): AuditJson | undefined
 
 export function buildAuditEventValues(input: AuditEventInput) {
   return {
-    organisationId: input.organisationId,
+    instanceId: input.instanceId,
     actorUserId: input.actorUserId,
     action: input.action,
     targetType: input.targetType,

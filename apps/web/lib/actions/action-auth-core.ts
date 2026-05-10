@@ -1,23 +1,23 @@
-import { requireOrgAdmin, requireOrgWriteAccess as requireWriteAccess, requireSameOrg } from '../auth/guards.ts'
+import { requireInstanceAdmin, requireInstanceWriteAccess as requireWriteAccess, requireSameInstance } from '../auth/guards.ts'
 
-export type OrgScopedUser = {
-  organisationId: string | null
+export type InstanceScopedUser = {
+  instanceId: string | null
   isActive: boolean
   deletedAt: Date | null
 }
 
-export type OrgAdminScopedUser = OrgScopedUser & {
+export type InstanceAdminScopedUser = InstanceScopedUser & {
   role: string
 }
 
-export function assertOrgAccess(user: OrgScopedUser, orgId: string): void {
-  requireSameOrg(user, orgId)
+export function assertInstanceAccess(user: InstanceScopedUser, instanceId: string): void {
+  requireSameInstance(user, instanceId)
 }
 
-export function assertOrgAdminAccess(user: OrgAdminScopedUser, orgId: string): void {
-  requireOrgAdmin(user, orgId)
+export function assertInstanceAdminAccess(user: InstanceAdminScopedUser, instanceId: string): void {
+  requireInstanceAdmin(user, instanceId)
 }
 
-export function assertOrgWriteAccess(user: OrgAdminScopedUser, orgId: string): void {
-  requireWriteAccess(user, orgId)
+export function assertInstanceWriteAccess(user: InstanceAdminScopedUser, instanceId: string): void {
+  requireWriteAccess(user, instanceId)
 }

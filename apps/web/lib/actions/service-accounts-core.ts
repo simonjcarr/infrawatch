@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { serviceAccounts, sshKeys, identityEvents, hosts } from '@/lib/db/schema'
@@ -45,10 +45,10 @@ export type ServiceAccountWithHost = ServiceAccount & {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getServiceAccounts(
-  orgId: string,
+  instanceId: string,
   filters: ServiceAccountListFilters = {},
 ): Promise<ServiceAccountWithHost[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const {
     accountType,
     status,
@@ -61,7 +61,7 @@ export async function getServiceAccounts(
   } = filters
 
   const conditions = [
-    eq(serviceAccounts.organisationId, orgId),
+    eq(serviceAccounts.instanceId, instanceId),
     isNull(serviceAccounts.deletedAt),
     ...(accountType != null ? [eq(serviceAccounts.accountType, accountType)] : []),
     ...(status != null ? [eq(serviceAccounts.status, status)] : []),
@@ -96,7 +96,7 @@ export async function getServiceAccounts(
   const hostRows = await db.query.hosts.findMany({
     where: and(
       sql`${hosts.id} IN (${sql.join(hostIds.map((id) => sql`${id}`), sql`, `)})`,
-      eq(hosts.organisationId, orgId),
+      eq(hosts.instanceId, instanceId),
     ),
     columns: { id: true, hostname: true },
   })
@@ -128,7 +128,7 @@ export async function getServiceAccounts(
 }
 
 export async function getServiceAccount(
-  orgId: string,
+  instanceId: string,
   accountId: string,
   hostId?: string,
 ): Promise<{
@@ -137,11 +137,11 @@ export async function getServiceAccount(
   events: IdentityEvent[]
   host: Host | null
 } | null> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const account = await db.query.serviceAccounts.findFirst({
     where: and(
       eq(serviceAccounts.id, accountId),
-      eq(serviceAccounts.organisationId, orgId),
+      eq(serviceAccounts.instanceId, instanceId),
       isNull(serviceAccounts.deletedAt),
       ...(hostId != null && hostId !== '' ? [eq(serviceAccounts.hostId, hostId)] : []),
     ),
@@ -159,7 +159,7 @@ export async function getServiceAccount(
     db.query.identityEvents.findMany({
       where: and(
         eq(identityEvents.serviceAccountId, accountId),
-        eq(identityEvents.organisationId, orgId),
+        eq(identityEvents.instanceId, instanceId),
       ),
       orderBy: desc(identityEvents.occurredAt),
       limit: 50,
@@ -167,7 +167,7 @@ export async function getServiceAccount(
     db.query.hosts.findFirst({
       where: and(
         eq(hosts.id, account.hostId),
-        eq(hosts.organisationId, orgId),
+        eq(hosts.instanceId, instanceId),
       ),
     }),
   ])
@@ -176,9 +176,9 @@ export async function getServiceAccount(
 }
 
 export async function getServiceAccountCounts(
-  orgId: string,
+  instanceId: string,
 ): Promise<ServiceAccountCounts> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const [typeRows, statusRows] = await Promise.all([
     db
       .select({
@@ -186,7 +186,7 @@ export async function getServiceAccountCounts(
         count: sql<number>`cast(count(*) as int)`,
       })
       .from(serviceAccounts)
-      .where(and(eq(serviceAccounts.organisationId, orgId), isNull(serviceAccounts.deletedAt)))
+      .where(and(eq(serviceAccounts.instanceId, instanceId), isNull(serviceAccounts.deletedAt)))
       .groupBy(serviceAccounts.accountType),
     db
       .select({
@@ -194,7 +194,7 @@ export async function getServiceAccountCounts(
         count: sql<number>`cast(count(*) as int)`,
       })
       .from(serviceAccounts)
-      .where(and(eq(serviceAccounts.organisationId, orgId), isNull(serviceAccounts.deletedAt)))
+      .where(and(eq(serviceAccounts.instanceId, instanceId), isNull(serviceAccounts.deletedAt)))
       .groupBy(serviceAccounts.status),
   ])
 
@@ -223,13 +223,13 @@ export async function getServiceAccountCounts(
 }
 
 export async function getSshKeysByFingerprint(
-  orgId: string,
+  instanceId: string,
   fingerprint: string,
 ): Promise<(SshKey & { hostHostname?: string })[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const keys = await db.query.sshKeys.findMany({
     where: and(
-      eq(sshKeys.organisationId, orgId),
+      eq(sshKeys.instanceId, instanceId),
       eq(sshKeys.fingerprintSha256, fingerprint),
       isNull(sshKeys.deletedAt),
     ),
@@ -242,7 +242,7 @@ export async function getSshKeysByFingerprint(
   const hostRows = await db.query.hosts.findMany({
     where: and(
       sql`${hosts.id} IN (${sql.join(hostIds.map((id) => sql`${id}`), sql`, `)})`,
-      eq(hosts.organisationId, orgId),
+      eq(hosts.instanceId, instanceId),
     ),
     columns: { id: true, hostname: true },
   })

@@ -18,7 +18,7 @@ const migrationsFolder = path.join(webDir, 'lib', 'db', 'migrations')
 const TOKEN = {
   id: 'ctcve_db_nonce_token',
   secret: Buffer.from('ct-cve database nonce test signing key').toString('base64url'),
-  orgId: 'org_db_nonce',
+  instanceId: 'org_db_nonce',
   scopes: ['findings:write'],
 }
 
@@ -65,7 +65,7 @@ test('default CT-CVE nonce store rejects replays across verifier instances', asy
 
     process.env.DATABASE_URL = databaseUrl
 
-    const body = JSON.stringify({ orgId: TOKEN.orgId })
+    const body = JSON.stringify({ instanceId: TOKEN.instanceId })
     const timestamp = '2026-04-30T09:20:00.000Z'
     const request = {
       method: 'POST',
@@ -73,7 +73,7 @@ test('default CT-CVE nonce store rejects replays across verifier instances', asy
       body,
       headers: signedHeaders({ body, timestamp, nonce: 'shared_nonce' }),
       requiredScope: 'findings:write',
-      orgId: TOKEN.orgId,
+      instanceId: TOKEN.instanceId,
       now: new Date('2026-04-30T09:20:30.000Z'),
       tokens: [TOKEN],
     }

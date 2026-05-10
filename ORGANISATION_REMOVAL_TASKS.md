@@ -866,19 +866,48 @@ volume operational paths are converted.
 
 ## Task 13 - Web Reporting, Integrations, And Schema Baseline Cleanup
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
 PR:
 
-Summary:
+Summary: Built the Task 13 residue map, converted the remaining web app
+schema and action internals from organisation scope to standalone instance
+scope, replaced the historical migration chain with a fresh single baseline,
+deleted the database RLS/session-scope helper path, and rewrote the remaining
+UI/tests/copy so the web app no longer exposes organisation identity. Initial
+residue map categories before cleanup: schema/migrations/RLS `131` files,
+server actions/APIs `59`, tests/fixtures `49`, UI/routes `13`, docs/copy `2`,
+other helpers `39`.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`, `apps/web/lib/db/{schema,index}`,
+`apps/web/lib/db/migrations`, `apps/web/lib/actions/**/*`,
+`apps/web/lib/{auth,integrations,password-manager,seat-admission,build-docs,hosts}`,
+`apps/web/app/{(dashboard),(auth),api}/**/*`, `apps/web/tests/e2e/**/*`
 
-Validation:
+Validation: Initial residue map command:
+`rg -n "orgId|organisationId|organisation_id|org_id|organisations|requireOrg|SameOrg|withOrgDatabaseScope|runWithOrgDatabaseScope|app\\.organisation_id|tenant" apps/web`
+with categorized file counts `schema=131`, `actions=59`, `tests=49`, `ui=13`,
+`docs=2`, `other=39`; `DATABASE_URL=postgres://postgres:postgres@localhost:5432/ct_ops pnpm --dir apps/web db:generate`
+(passes and regenerates a single baseline migration);
+`DATABASE_URL=postgres://postgres:postgres@localhost:5432/ct_ops pnpm --dir apps/web db:validate`
+(passes); `pnpm --dir apps/web type-check` (passes); `pnpm --dir apps/web lint`
+(passes with warnings only); `pnpm --dir apps/web test:unit` (301/302 pass;
+fails only `lib/integrations/ct-cve/db-nonce-store.test.mjs` because no
+working container runtime strategy is available here); `pnpm --dir apps/web
+exec playwright test --list` (passes); final Task 13 grep returns only the
+historical changelog entries documented below.
 
-Follow-up:
+Follow-up: Start Task 14 next. The only documented allowed Task 13 grep
+matches are historical release-note references in `apps/web/CHANGELOG.md`;
+local browser smoke runs were not attempted in this worktree.
+
+### Remaining Allowed Matches
+
+- `apps/web/CHANGELOG.md`: historical release notes still mention `tenant`.
+  This file is retained as immutable shipped history and is not active code,
+  schema, migration, or runtime copy.
 
 ### Required work
 

@@ -4,7 +4,7 @@ import { hosts, agentQueries } from '@/lib/db/schema'
 import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
-import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiInstanceSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,7 @@ export async function POST(
 
   let session
   try {
-    session = await getApiOrgSession()
+    session = await getApiInstanceSession()
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return Response.json({ error: err.message }, { status: err.status })
@@ -53,7 +53,7 @@ export async function POST(
   const host = await db.query.hosts.findFirst({
     where: and(
       eq(hosts.id, hostId),
-      eq(hosts.organisationId, user.organisationId),
+      eq(hosts.instanceId, user.instanceId),
       isNull(hosts.deletedAt),
     ),
   })
@@ -66,7 +66,7 @@ export async function POST(
   const inserted = await db
     .insert(agentQueries)
     .values({
-      organisationId: user.organisationId,
+      instanceId: user.instanceId,
       hostId,
       queryType: parsed.data.queryType,
       status: 'pending',

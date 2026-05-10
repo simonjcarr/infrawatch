@@ -14,7 +14,7 @@ export interface CtCveInventoryPushTarget {
   token: {
     id: string
     secret: string
-    orgId: string
+    instanceId: string
     scopes: string[]
   }
 }
@@ -33,7 +33,7 @@ export interface CtCveInventoryPushJobResult {
 }
 
 interface BuildSnapshotOptions {
-  orgId: string
+  instanceId: string
   cursor?: string
   snapshotType: 'full'
 }
@@ -116,10 +116,10 @@ export function parseCtCveInventoryPushTargets(value: string | undefined): CtCve
       typeof tokenRecord.id !== 'string' ||
       !tokenRecord.id.trim() ||
       typeof tokenRecord.secret !== 'string' ||
-      typeof tokenRecord.orgId !== 'string' ||
-      !tokenRecord.orgId.trim()
+      typeof tokenRecord.instanceId !== 'string' ||
+      !tokenRecord.instanceId.trim()
     ) {
-      throw new Error(`${path} is missing name, baseUrl, token.id, token.secret, or token.orgId`)
+      throw new Error(`${path} is missing name, baseUrl, token.id, token.secret, or token.instanceId`)
     }
     if (!secretHasEnoughEntropy(tokenRecord.secret)) {
       throw new Error(`${path}.token.secret must contain at least 32 bytes of entropy`)
@@ -135,7 +135,7 @@ export function parseCtCveInventoryPushTargets(value: string | undefined): CtCve
       token: {
         id: tokenRecord.id.trim(),
         secret: tokenRecord.secret,
-        orgId: tokenRecord.orgId.trim(),
+        instanceId: tokenRecord.instanceId.trim(),
         scopes,
       },
     }
@@ -196,7 +196,7 @@ export async function runCtCveInventoryPushes(options: {
         }
 
         const snapshot = await buildSnapshot({
-          orgId: target.token.orgId,
+          instanceId: target.token.instanceId,
           cursor,
           snapshotType: 'full',
         })

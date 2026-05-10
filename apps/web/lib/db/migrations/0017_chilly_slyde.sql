@@ -1,1 +1,0 @@
-ALTER TABLE "ldap_configurations" ADD COLUMN "tls_certificate" text;

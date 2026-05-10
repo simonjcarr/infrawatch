@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 import { createRateLimiter } from '@/lib/rate-limit'
 import {
   deriveHostVulnerabilityAssessmentStatus,
@@ -100,16 +100,16 @@ const filtersSchema = z.object({
 }).strip()
 
 export async function getVulnerabilityReport(
-  orgId: string,
+  instanceId: string,
   filters: VulnerabilityReportFilters = {},
 ): Promise<VulnerabilityReport> {
-  await requireOrgAccess(orgId)
-  if (!await reportLimiter.check(orgId)) {
+  await requireInstanceAccess(instanceId)
+  if (!await reportLimiter.check(instanceId)) {
     throw new Error('Too many vulnerability report requests. Please wait before trying again.')
   }
 
   const parsed = filtersSchema.parse(filters)
-  const conditions = vulnerabilityWhere(orgId, parsed)
+  const conditions = vulnerabilityWhere(instanceId, parsed)
   const where = sql.join(conditions, sql` AND `)
 
   const findings = (await db.execute(sql`
@@ -170,10 +170,10 @@ export async function getVulnerabilityReport(
 }
 
 export async function getHostVulnerabilities(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<VulnerabilityFindingRow[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
 
   return (await db.execute(sql`
     SELECT
@@ -203,7 +203,7 @@ export async function getHostVulnerabilities(
     JOIN hosts h ON h.id = hvf.host_id AND h.deleted_at IS NULL
     JOIN software_packages sp ON sp.id = hvf.software_package_id
     LEFT JOIN vulnerability_cves vc ON vc.cve_id = hvf.cve_id
-    WHERE hvf.organisation_id = ${orgId}
+    WHERE hvf.instance_id = ${instanceId}
       AND hvf.host_id = ${hostId}
       AND hvf.status = 'open'
       AND hvf.confidence = 'confirmed'
@@ -222,17 +222,17 @@ export async function getHostVulnerabilities(
 }
 
 export async function getHostVulnerabilityAssessment(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<HostVulnerabilityAssessment> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
 
   const [hostRowsRaw, findingRowsRaw, scanRowsRaw, connectionStatus] = await Promise.all([
     db.execute(sql`
       SELECT metadata
       FROM hosts
       WHERE id = ${hostId}
-        AND organisation_id = ${orgId}
+        AND instance_id = ${instanceId}
         AND deleted_at IS NULL
       LIMIT 1
     `),
@@ -245,7 +245,7 @@ export async function getHostVulnerabilityAssessment(
         cast(count(*) FILTER (WHERE fixed_version IS NOT NULL) as int) AS "fixAvailableCount",
         max(last_seen_at) AS "lastFindingSeenAt"
       FROM host_vulnerability_findings
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND host_id = ${hostId}
         AND status = 'open'
         AND confidence = 'confirmed'
@@ -253,13 +253,13 @@ export async function getHostVulnerabilityAssessment(
     db.execute(sql`
       SELECT completed_at AS "completedAt"
       FROM software_scans
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND host_id = ${hostId}
         AND status = 'success'
       ORDER BY completed_at DESC NULLS LAST, created_at DESC
       LIMIT 1
     `),
-    getCtCveConnectionStatus(orgId, { configured: false }),
+    getCtCveConnectionStatus(instanceId, { configured: false }),
   ])
 
   const hostRows = hostRowsRaw as unknown as Array<{ metadata: unknown }>
@@ -308,9 +308,9 @@ export async function getHostVulnerabilityAssessment(
   }
 }
 
-function vulnerabilityWhere(orgId: string, filters: z.infer<typeof filtersSchema>) {
+function vulnerabilityWhere(instanceId: string, filters: z.infer<typeof filtersSchema>) {
   const conditions = [
-    sql`hvf.organisation_id = ${orgId}`,
+    sql`hvf.instance_id = ${instanceId}`,
     sql`hvf.status = 'open'`,
   ]
   if (!filters.confidence || filters.confidence === 'confirmed') {
@@ -344,7 +344,7 @@ function vulnerabilityWhere(orgId: string, filters: z.infer<typeof filtersSchema
       SELECT 1
       FROM host_group_members hgm
       WHERE hgm.host_id = hvf.host_id
-        AND hgm.organisation_id = hvf.organisation_id
+        AND hgm.instance_id = hvf.instance_id
         AND hgm.group_id = ${filters.hostGroupId}
         AND hgm.deleted_at IS NULL
     )`)

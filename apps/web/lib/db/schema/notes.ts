@@ -10,7 +10,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { users } from './auth.ts'
 
 export const NOTE_CATEGORIES = [
@@ -55,9 +55,9 @@ export const notes = pgTable(
   'notes',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     authorId: text('author_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -75,7 +75,7 @@ export const notes = pgTable(
     metadata: jsonb('metadata').$type<NoteMetadata>(),
   },
   (t) => [
-    index('notes_org_active_updated_idx').on(t.organisationId, t.deletedAt, t.updatedAt),
+    index('notes_org_active_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
     index('notes_author_idx').on(t.authorId),
     index('notes_search_vector_idx').using('gin', t.searchVector),
   ],
@@ -90,9 +90,9 @@ export const noteTargets = pgTable(
   'note_targets',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     noteId: text('note_id')
       .notNull()
       .references(() => notes.id, { onDelete: 'cascade' }),
@@ -118,9 +118,9 @@ export const noteRevisions = pgTable(
   'note_revisions',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     noteId: text('note_id')
       .notNull()
       .references(() => notes.id, { onDelete: 'cascade' }),
@@ -143,9 +143,9 @@ export const noteReactions = pgTable(
   'note_reactions',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     noteId: text('note_id')
       .notNull()
       .references(() => notes.id, { onDelete: 'cascade' }),

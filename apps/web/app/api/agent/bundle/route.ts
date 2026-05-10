@@ -16,7 +16,7 @@ import { getAgentPublicOrigin } from '@/lib/agent/public-origin'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
 import { readFile } from 'node:fs/promises'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
-import { ApiAuthError, getApiOrgAdminSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiInstanceAdminSession } from '@/lib/auth/session'
 
 const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/server.crt'
 const WEB_TLS_CERT_PATH = process.env['WEB_TLS_CERT'] ?? '/var/lib/ct-ops/server-tls/server.crt'
@@ -63,7 +63,7 @@ const requestSchema = z.object({
  * and embeds a single-use, short-lived enrolment token — this is recorded
  * in the `agent_enrolment_tokens` table (the audit trail).
  *
- * Gated on org_admin / super_admin. Scoped by organisationId.
+ * Gated on org_admin / super_admin. Scoped by instanceId.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   let session
   try {
-    session = await getApiOrgAdminSession(request.headers)
+    session = await getApiInstanceAdminSession(request.headers)
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status })
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const orgId = user.organisationId
+  const instanceId = user.instanceId
 
   // Resolve the enrolment token to embed (if any).
   let embeddedToken: string | undefined
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     const existing = await db.query.agentEnrolmentTokens.findFirst({
       where: and(
         eq(agentEnrolmentTokens.id, tokenId),
-        eq(agentEnrolmentTokens.organisationId, orgId),
+        eq(agentEnrolmentTokens.instanceId, instanceId),
         isNull(agentEnrolmentTokens.deletedAt),
       ),
     })
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     const [record] = await db
       .insert(agentEnrolmentTokens)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         label: createToken.label,
         createdById: user.id,
         autoApprove: createToken.autoApprove,

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { checks } from './checks.ts'
 
@@ -34,7 +34,7 @@ export type CertificateEventType =
 
 export const certificates = pgTable('certificates', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   discoveredByHostId: text('discovered_by_host_id').references(() => hosts.id),
   checkId: text('check_id').references(() => checks.id),
   source: text('source').notNull().$type<CertificateSource>().default('discovered'),
@@ -60,17 +60,17 @@ export const certificates = pgTable('certificates', {
   metadata: jsonb('metadata'),
 }, (t) => [
   uniqueIndex('certificates_identity_idx').on(
-    t.organisationId, t.host, t.port, t.serverName, t.fingerprintSha256,
+    t.instanceId, t.host, t.port, t.serverName, t.fingerprintSha256,
   ),
-  index('certificates_org_expiry_idx').on(t.organisationId, t.notAfter),
-  index('certificates_org_status_idx').on(t.organisationId, t.status),
-  index('certificates_org_host_idx').on(t.organisationId, t.discoveredByHostId),
+  index('certificates_org_expiry_idx').on(t.instanceId, t.notAfter),
+  index('certificates_org_status_idx').on(t.instanceId, t.status),
+  index('certificates_org_host_idx').on(t.instanceId, t.discoveredByHostId),
   index('certificates_refresh_due_idx').on(t.trackedUrl, t.lastRefreshedAt),
 ])
 
 export const certificateEvents = pgTable('certificate_events', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   certificateId: text('certificate_id').notNull().references(() => certificates.id),
   eventType: text('event_type').notNull().$type<CertificateEventType>(),
   previousStatus: text('previous_status').$type<CertificateStatus>(),
@@ -80,7 +80,7 @@ export const certificateEvents = pgTable('certificate_events', {
   metadata: jsonb('metadata'),
 }, (t) => [
   index('cert_events_cert_time_idx').on(t.certificateId, t.occurredAt),
-  index('cert_events_org_time_idx').on(t.organisationId, t.occurredAt),
+  index('cert_events_org_time_idx').on(t.instanceId, t.occurredAt),
 ])
 
 export type Certificate = typeof certificates.$inferSelect

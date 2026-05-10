@@ -513,7 +513,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="domain-organisation">Domain integration</Label>
+                  <Label htmlFor="domain-instance">Domain integration</Label>
                   <Select
                     value={selectedLdapIntegrationId}
                     onValueChange={(value) => {
@@ -527,7 +527,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
                       })
                     }}
                   >
-                    <SelectTrigger id="domain-organisation" data-testid="domain-login-organisation">
+                    <SelectTrigger id="domain-instance" data-testid="domain-login-instance">
                       <SelectValue placeholder="Select an integration" />
                     </SelectTrigger>
                     <SelectContent>

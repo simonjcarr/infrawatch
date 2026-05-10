@@ -1,14 +1,14 @@
 import { pgTable, text, timestamp, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 
 export type DomainAccountStatus = 'active' | 'disabled' | 'locked' | 'expired'
 
 export const domainAccounts = pgTable('domain_accounts', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   username: text('username').notNull(),
   displayName: text('display_name'),
   email: text('email'),
@@ -19,8 +19,8 @@ export const domainAccounts = pgTable('domain_accounts', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (t) => [
-  uniqueIndex('domain_accounts_org_username_idx').on(t.organisationId, t.username),
-  index('domain_accounts_org_status_idx').on(t.organisationId, t.status),
+  uniqueIndex('domain_accounts_org_username_idx').on(t.instanceId, t.username),
+  index('domain_accounts_org_status_idx').on(t.instanceId, t.status),
 ])
 
 export type DomainAccount = typeof domainAccounts.$inferSelect

@@ -23,7 +23,7 @@ import {
   type BuildDocTemplateLayout,
   type BuildDocTemplateVersion,
 } from '@/lib/db/schema'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { canManageBuildDocAdministration, canReadBuildDocs, canWriteBuildDocs } from '@/lib/build-docs/permissions'
@@ -107,9 +107,9 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`)
 }
 
-async function getAssetStorageConfig(orgId: string): Promise<BuildDocStorageSettingsConfig | null> {
+async function getAssetStorageConfig(instanceId: string): Promise<BuildDocStorageSettingsConfig | null> {
   const settings = await db.query.buildDocAssetStorageSettings.findFirst({
-    where: eq(buildDocAssetStorageSettings.organisationId, orgId),
+    where: eq(buildDocAssetStorageSettings.instanceId, instanceId),
   })
   return settings?.config ?? null
 }
@@ -117,7 +117,7 @@ async function getAssetStorageConfig(orgId: string): Promise<BuildDocStorageSett
 type BuildDocTx = Pick<typeof db, 'insert' | 'query' | 'update'>
 
 async function writeAudit(tx: Pick<typeof db, 'insert'>, input: {
-  organisationId: string
+  instanceId: string
   actorUserId: string
   action: string
   targetType: string
@@ -128,25 +128,25 @@ async function writeAudit(tx: Pick<typeof db, 'insert'>, input: {
   await tx.insert(auditEvents).values(input)
 }
 
-async function getDocForWrite(orgId: string, docId: string) {
+async function getDocForWrite(instanceId: string, docId: string) {
   return db.query.buildDocs.findFirst({
-    where: and(eq(buildDocs.id, docId), eq(buildDocs.organisationId, orgId), isNull(buildDocs.deletedAt)),
+    where: and(eq(buildDocs.id, docId), eq(buildDocs.instanceId, instanceId), isNull(buildDocs.deletedAt)),
   })
 }
 
-async function writeDocRevision(tx: BuildDocTx, orgId: string, docId: string, editorId: string) {
+async function writeDocRevision(tx: BuildDocTx, instanceId: string, docId: string, editorId: string) {
   const [doc, sections] = await Promise.all([
     tx.query.buildDocs.findFirst({
-      where: and(eq(buildDocs.id, docId), eq(buildDocs.organisationId, orgId)),
+      where: and(eq(buildDocs.id, docId), eq(buildDocs.instanceId, instanceId)),
     }),
     tx.query.buildDocSections.findMany({
-      where: and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.organisationId, orgId), isNull(buildDocSections.deletedAt)),
+      where: and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.instanceId, instanceId), isNull(buildDocSections.deletedAt)),
       orderBy: asc(buildDocSections.position),
     }),
   ])
   if (!doc) return
   await tx.insert(buildDocRevisions).values({
-    organisationId: orgId,
+    instanceId: instanceId,
     buildDocId: docId,
     editorId,
     snapshot: {
@@ -164,12 +164,12 @@ async function writeDocRevision(tx: BuildDocTx, orgId: string, docId: string, ed
   })
 }
 
-export async function listBuildDocTemplates(orgId: string): Promise<BuildDocTemplateWithVersion[]> {
-  const session = await requireOrgAccess(orgId)
+export async function listBuildDocTemplates(instanceId: string): Promise<BuildDocTemplateWithVersion[]> {
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return []
 
   const templates = await db.query.buildDocTemplates.findMany({
-    where: and(eq(buildDocTemplates.organisationId, orgId), isNull(buildDocTemplates.deletedAt)),
+    where: and(eq(buildDocTemplates.instanceId, instanceId), isNull(buildDocTemplates.deletedAt)),
     orderBy: [desc(buildDocTemplates.isDefault), asc(buildDocTemplates.name)],
   })
   const versions = templates.length
@@ -184,10 +184,10 @@ export async function listBuildDocTemplates(orgId: string): Promise<BuildDocTemp
 }
 
 export async function createBuildDocTemplate(
-  orgId: string,
+  instanceId: string,
   input: z.input<typeof templateInputSchema>,
 ): Promise<ActionResult<BuildDocTemplateWithVersion>> {
-  const session = await requireOrgAdminAccess(orgId)
+  const session = await requireInstanceAdminAccess(instanceId)
   if (!canManageBuildDocAdministration(session.user)) return { error: 'You do not have permission to perform this action' }
 
   try {
@@ -198,10 +198,10 @@ export async function createBuildDocTemplate(
         await tx
           .update(buildDocTemplates)
           .set({ isDefault: false, updatedAt: new Date() })
-          .where(and(eq(buildDocTemplates.organisationId, orgId), eq(buildDocTemplates.isDefault, true)))
+          .where(and(eq(buildDocTemplates.instanceId, instanceId), eq(buildDocTemplates.isDefault, true)))
       }
       const [template] = await tx.insert(buildDocTemplates).values({
-        organisationId: orgId,
+        instanceId: instanceId,
         createdById: session.user.id,
         name: parsed.name,
         description: parsed.description,
@@ -211,7 +211,7 @@ export async function createBuildDocTemplate(
       }).returning()
       if (!template) throw new Error('Failed to create template')
       const [version] = await tx.insert(buildDocTemplateVersions).values({
-        organisationId: orgId,
+        instanceId: instanceId,
         templateId: template.id,
         version: 1,
         name: template.name,
@@ -222,7 +222,7 @@ export async function createBuildDocTemplate(
       }).returning()
       if (!version) throw new Error('Failed to create template version')
       await writeAudit(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'build_doc_template.create',
         targetType: 'build_doc_template',
@@ -238,25 +238,25 @@ export async function createBuildDocTemplate(
   }
 }
 
-export async function listBuildDocSnippets(orgId: string): Promise<BuildDocSnippet[]> {
-  const session = await requireOrgAccess(orgId)
+export async function listBuildDocSnippets(instanceId: string): Promise<BuildDocSnippet[]> {
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return []
   return db.query.buildDocSnippets.findMany({
-    where: and(eq(buildDocSnippets.organisationId, orgId), isNull(buildDocSnippets.deletedAt)),
+    where: and(eq(buildDocSnippets.instanceId, instanceId), isNull(buildDocSnippets.deletedAt)),
     orderBy: [desc(buildDocSnippets.updatedAt)],
     limit: 500,
   })
 }
 
 export async function createBuildDocSnippet(
-  orgId: string,
+  instanceId: string,
   input: z.input<typeof snippetInputSchema>,
 ): Promise<ActionResult<BuildDocSnippet>> {
-  const session = await requireOrgAdminAccess(orgId)
+  const session = await requireInstanceAdminAccess(instanceId)
   try {
     const parsed = snippetInputSchema.parse(input)
     const [snippet] = await db.insert(buildDocSnippets).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       createdById: session.user.id,
       title: parsed.title,
       body: parsed.body,
@@ -266,7 +266,7 @@ export async function createBuildDocSnippet(
     }).returning()
     if (!snippet) return { error: 'Failed to create snippet' }
     await db.insert(auditEvents).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'build_doc_snippet.create',
       targetType: 'build_doc_snippet',
@@ -280,16 +280,16 @@ export async function createBuildDocSnippet(
   }
 }
 
-export async function searchBuildDocSnippets(orgId: string, q: string): Promise<BuildDocSnippet[]> {
-  const session = await requireOrgAccess(orgId)
+export async function searchBuildDocSnippets(instanceId: string, q: string): Promise<BuildDocSnippet[]> {
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return []
   const trimmed = q.trim()
-  if (!trimmed) return listBuildDocSnippets(orgId)
+  if (!trimmed) return listBuildDocSnippets(instanceId)
   try {
     const rows = await db.execute(sql`
       SELECT *
       FROM build_doc_snippets
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND deleted_at IS NULL
         AND search_vector @@ websearch_to_tsquery('english', ${trimmed})
       ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${trimmed})) DESC,
@@ -302,7 +302,7 @@ export async function searchBuildDocSnippets(orgId: string, q: string): Promise<
     const rows = await db.execute(sql`
       SELECT *
       FROM build_doc_snippets
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND deleted_at IS NULL
         AND (title ILIKE ${like} ESCAPE '\\' OR body ILIKE ${like} ESCAPE '\\')
       ORDER BY updated_at DESC
@@ -312,15 +312,15 @@ export async function searchBuildDocSnippets(orgId: string, q: string): Promise<
   }
 }
 
-export async function listBuildDocs(orgId: string): Promise<BuildDocListItem[]> {
-  const session = await requireOrgAccess(orgId)
+export async function listBuildDocs(instanceId: string): Promise<BuildDocListItem[]> {
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return []
   const rows = await db.execute(sql`
     SELECT d.*, tv.name AS template_name, cast(count(s.id) AS int) AS section_count
     FROM build_docs d
     JOIN build_doc_template_versions tv ON tv.id = d.template_version_id
     LEFT JOIN build_doc_sections s ON s.build_doc_id = d.id AND s.deleted_at IS NULL
-    WHERE d.organisation_id = ${orgId}
+    WHERE d.instance_id = ${instanceId}
       AND d.deleted_at IS NULL
     GROUP BY d.id, tv.name
     ORDER BY d.updated_at DESC
@@ -330,14 +330,14 @@ export async function listBuildDocs(orgId: string): Promise<BuildDocListItem[]> 
 }
 
 export async function searchBuildDocs(
-  orgId: string,
+  instanceId: string,
   q: string,
   filter: { docId?: string; templateVersionId?: string } = {},
 ): Promise<BuildDocListItem[]> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return []
   const trimmed = q.trim()
-  if (!trimmed && !filter.docId && !filter.templateVersionId) return listBuildDocs(orgId)
+  if (!trimmed && !filter.docId && !filter.templateVersionId) return listBuildDocs(instanceId)
   const query = trimmed || '*'
   try {
     const rows = await db.execute(sql`
@@ -345,7 +345,7 @@ export async function searchBuildDocs(
       FROM build_docs d
       JOIN build_doc_template_versions tv ON tv.id = d.template_version_id
       LEFT JOIN build_doc_sections s ON s.build_doc_id = d.id AND s.deleted_at IS NULL
-      WHERE d.organisation_id = ${orgId}
+      WHERE d.instance_id = ${instanceId}
         AND d.deleted_at IS NULL
         AND (${filter.docId ?? null}::text IS NULL OR d.id = ${filter.docId ?? null})
         AND (${filter.templateVersionId ?? null}::text IS NULL OR d.template_version_id = ${filter.templateVersionId ?? null})
@@ -366,7 +366,7 @@ export async function searchBuildDocs(
       FROM build_docs d
       JOIN build_doc_template_versions tv ON tv.id = d.template_version_id
       LEFT JOIN build_doc_sections s ON s.build_doc_id = d.id AND s.deleted_at IS NULL
-      WHERE d.organisation_id = ${orgId}
+      WHERE d.instance_id = ${instanceId}
         AND d.deleted_at IS NULL
         AND (${filter.docId ?? null}::text IS NULL OR d.id = ${filter.docId ?? null})
         AND (${filter.templateVersionId ?? null}::text IS NULL OR d.template_version_id = ${filter.templateVersionId ?? null})
@@ -380,16 +380,16 @@ export async function searchBuildDocs(
 }
 
 export async function createBuildDoc(
-  orgId: string,
+  instanceId: string,
   input: z.input<typeof docInputSchema>,
 ): Promise<ActionResult<BuildDoc>> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
 
   try {
     const parsed = docInputSchema.parse(input)
     const templateVersion = await db.query.buildDocTemplateVersions.findFirst({
-      where: and(eq(buildDocTemplateVersions.id, parsed.templateVersionId), eq(buildDocTemplateVersions.organisationId, orgId)),
+      where: and(eq(buildDocTemplateVersions.id, parsed.templateVersionId), eq(buildDocTemplateVersions.instanceId, instanceId)),
     })
     if (!templateVersion) return { error: 'Template not found' }
     const fieldResult = validateTemplateFieldValues(templateVersion.fields, parsed.fieldValues)
@@ -397,7 +397,7 @@ export async function createBuildDoc(
 
     const created = await db.transaction(async (tx) => {
       const [doc] = await tx.insert(buildDocs).values({
-        organisationId: orgId,
+        instanceId: instanceId,
         templateVersionId: templateVersion.id,
         authorId: session.user.id,
         title: parsed.title,
@@ -407,7 +407,7 @@ export async function createBuildDoc(
         fieldValues: fieldResult.values,
       }).returning()
       if (!doc) throw new Error('Failed to create build doc')
-      await writeDocRevision(tx, orgId, doc.id, session.user.id)
+      await writeDocRevision(tx, instanceId, doc.id, session.user.id)
       return doc
     })
     return { success: true, data: created }
@@ -417,23 +417,23 @@ export async function createBuildDoc(
   }
 }
 
-export async function getBuildDoc(orgId: string, docId: string): Promise<BuildDocDetail | null> {
-  const session = await requireOrgAccess(orgId)
+export async function getBuildDoc(instanceId: string, docId: string): Promise<BuildDocDetail | null> {
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return null
   const doc = await db.query.buildDocs.findFirst({
-    where: and(eq(buildDocs.id, docId), eq(buildDocs.organisationId, orgId), isNull(buildDocs.deletedAt)),
+    where: and(eq(buildDocs.id, docId), eq(buildDocs.instanceId, instanceId), isNull(buildDocs.deletedAt)),
   })
   if (!doc) return null
   const [templateVersion, sections, assets] = await Promise.all([
     db.query.buildDocTemplateVersions.findFirst({
-      where: and(eq(buildDocTemplateVersions.id, doc.templateVersionId), eq(buildDocTemplateVersions.organisationId, orgId)),
+      where: and(eq(buildDocTemplateVersions.id, doc.templateVersionId), eq(buildDocTemplateVersions.instanceId, instanceId)),
     }),
     db.query.buildDocSections.findMany({
-      where: and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.organisationId, orgId), isNull(buildDocSections.deletedAt)),
+      where: and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.instanceId, instanceId), isNull(buildDocSections.deletedAt)),
       orderBy: asc(buildDocSections.position),
     }),
     db.query.buildDocAssets.findMany({
-      where: and(eq(buildDocAssets.buildDocId, docId), eq(buildDocAssets.organisationId, orgId), isNull(buildDocAssets.deletedAt)),
+      where: and(eq(buildDocAssets.buildDocId, docId), eq(buildDocAssets.instanceId, instanceId), isNull(buildDocAssets.deletedAt)),
       orderBy: asc(buildDocAssets.createdAt),
     }),
   ])
@@ -442,15 +442,15 @@ export async function getBuildDoc(orgId: string, docId: string): Promise<BuildDo
 }
 
 export async function updateBuildDoc(
-  orgId: string,
+  instanceId: string,
   docId: string,
   input: z.input<typeof docUpdateSchema>,
 ): Promise<ActionResult<BuildDoc>> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
   try {
     const parsed = docUpdateSchema.parse(input)
-    const existing = await getDocForWrite(orgId, docId)
+    const existing = await getDocForWrite(instanceId, docId)
     if (!existing) return { error: 'Build doc not found' }
     const templateVersion = await db.query.buildDocTemplateVersions.findFirst({
       where: eq(buildDocTemplateVersions.id, existing.templateVersionId),
@@ -473,9 +473,9 @@ export async function updateBuildDoc(
         fieldValues: nextFieldValues,
         lastEditedById: session.user.id,
         updatedAt: new Date(),
-      }).where(and(eq(buildDocs.id, docId), eq(buildDocs.organisationId, orgId))).returning()
+      }).where(and(eq(buildDocs.id, docId), eq(buildDocs.instanceId, instanceId))).returning()
       if (!row) throw new Error('Build doc not found')
-      await writeDocRevision(tx, orgId, docId, session.user.id)
+      await writeDocRevision(tx, instanceId, docId, session.user.id)
       return row
     })
     return { success: true, data: updated }
@@ -486,23 +486,23 @@ export async function updateBuildDoc(
 }
 
 export async function createBuildDocSection(
-  orgId: string,
+  instanceId: string,
   docId: string,
   input: z.input<typeof sectionInputSchema>,
 ): Promise<ActionResult<BuildDocSection>> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
   try {
     const parsed = sectionInputSchema.parse(input)
-    const doc = await getDocForWrite(orgId, docId)
+    const doc = await getDocForWrite(instanceId, docId)
     if (!doc) return { error: 'Build doc not found' }
     const maxRows = await db.select({ max: sql<number>`coalesce(max(${buildDocSections.position}), 0)` })
       .from(buildDocSections)
-      .where(and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.organisationId, orgId), isNull(buildDocSections.deletedAt)))
+      .where(and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.instanceId, instanceId), isNull(buildDocSections.deletedAt)))
     const position = (maxRows[0]?.max ?? 0) + 1000
     const created = await db.transaction(async (tx) => {
       const [section] = await tx.insert(buildDocSections).values({
-        organisationId: orgId,
+        instanceId: instanceId,
         buildDocId: docId,
         title: parsed.title,
         body: parsed.body,
@@ -511,7 +511,7 @@ export async function createBuildDocSection(
       }).returning()
       if (!section) throw new Error('Failed to create section')
       await tx.update(buildDocs).set({ updatedAt: new Date(), lastEditedById: session.user.id }).where(eq(buildDocs.id, docId))
-      await writeDocRevision(tx, orgId, docId, session.user.id)
+      await writeDocRevision(tx, instanceId, docId, session.user.id)
       return section
     })
     return { success: true, data: created }
@@ -522,16 +522,16 @@ export async function createBuildDocSection(
 }
 
 export async function updateBuildDocSection(
-  orgId: string,
+  instanceId: string,
   sectionId: string,
   input: z.input<typeof sectionInputSchema>,
 ): Promise<ActionResult<BuildDocSection>> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
   try {
     const parsed = sectionInputSchema.parse(input)
     const existing = await db.query.buildDocSections.findFirst({
-      where: and(eq(buildDocSections.id, sectionId), eq(buildDocSections.organisationId, orgId), isNull(buildDocSections.deletedAt)),
+      where: and(eq(buildDocSections.id, sectionId), eq(buildDocSections.instanceId, instanceId), isNull(buildDocSections.deletedAt)),
     })
     if (!existing) return { error: 'Section not found' }
     const updated = await db.transaction(async (tx) => {
@@ -540,10 +540,10 @@ export async function updateBuildDocSection(
         body: parsed.body,
         fieldValues: parsed.fieldValues,
         updatedAt: new Date(),
-      }).where(and(eq(buildDocSections.id, sectionId), eq(buildDocSections.organisationId, orgId))).returning()
+      }).where(and(eq(buildDocSections.id, sectionId), eq(buildDocSections.instanceId, instanceId))).returning()
       if (!section) throw new Error('Section not found')
       await tx.update(buildDocs).set({ updatedAt: new Date(), lastEditedById: session.user.id }).where(eq(buildDocs.id, existing.buildDocId))
-      await writeDocRevision(tx, orgId, existing.buildDocId, session.user.id)
+      await writeDocRevision(tx, instanceId, existing.buildDocId, session.user.id)
       return section
     })
     return { success: true, data: updated }
@@ -554,17 +554,17 @@ export async function updateBuildDocSection(
 }
 
 export async function reorderBuildDocSections(
-  orgId: string,
+  instanceId: string,
   docId: string,
   orderedSectionIds: string[],
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
   try {
-    const doc = await getDocForWrite(orgId, docId)
+    const doc = await getDocForWrite(instanceId, docId)
     if (!doc) return { error: 'Build doc not found' }
     const sections = await db.query.buildDocSections.findMany({
-      where: and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.organisationId, orgId), isNull(buildDocSections.deletedAt)),
+      where: and(eq(buildDocSections.buildDocId, docId), eq(buildDocSections.instanceId, instanceId), isNull(buildDocSections.deletedAt)),
       columns: { id: true },
     })
     const existingIds = new Set(sections.map((section) => section.id))
@@ -576,7 +576,7 @@ export async function reorderBuildDocSections(
         await tx.update(buildDocSections).set({ position: item.position, updatedAt: new Date() }).where(eq(buildDocSections.id, item.id))
       }
       await tx.update(buildDocs).set({ updatedAt: new Date(), lastEditedById: session.user.id }).where(eq(buildDocs.id, docId))
-      await writeDocRevision(tx, orgId, docId, session.user.id)
+      await writeDocRevision(tx, instanceId, docId, session.user.id)
     })
     return { success: true }
   } catch (err) {
@@ -586,23 +586,23 @@ export async function reorderBuildDocSections(
 }
 
 export async function insertBuildDocSnippetAsSection(
-  orgId: string,
+  instanceId: string,
   docId: string,
   snippetId: string,
 ): Promise<ActionResult<BuildDocSection>> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
   try {
     const [doc, snippet] = await Promise.all([
-      getDocForWrite(orgId, docId),
+      getDocForWrite(instanceId, docId),
       db.query.buildDocSnippets.findFirst({
-        where: and(eq(buildDocSnippets.id, snippetId), eq(buildDocSnippets.organisationId, orgId), isNull(buildDocSnippets.deletedAt)),
+        where: and(eq(buildDocSnippets.id, snippetId), eq(buildDocSnippets.instanceId, instanceId), isNull(buildDocSnippets.deletedAt)),
       }),
     ])
     if (!doc) return { error: 'Build doc not found' }
     if (!snippet) return { error: 'Snippet not found' }
     const snapshot = createSnippetSnapshot(snippet)
-    return createBuildDocSection(orgId, docId, {
+    return createBuildDocSection(instanceId, docId, {
       title: snapshot.title,
       body: snapshot.body,
       fieldValues: {},
@@ -621,19 +621,19 @@ export async function insertBuildDocSnippetAsSection(
 }
 
 export async function uploadBuildDocAsset(
-  orgId: string,
+  instanceId: string,
   docId: string,
   sectionId: string | null,
   formData: FormData,
 ): Promise<ActionResult<BuildDocAsset>> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canWriteBuildDocs(session.user)) return { error: 'You do not have permission to perform this action' }
   try {
-    const doc = await getDocForWrite(orgId, docId)
+    const doc = await getDocForWrite(instanceId, docId)
     if (!doc) return { error: 'Build doc not found' }
     if (sectionId) {
       const section = await db.query.buildDocSections.findFirst({
-        where: and(eq(buildDocSections.id, sectionId), eq(buildDocSections.buildDocId, docId), eq(buildDocSections.organisationId, orgId), isNull(buildDocSections.deletedAt)),
+        where: and(eq(buildDocSections.id, sectionId), eq(buildDocSections.buildDocId, docId), eq(buildDocSections.instanceId, instanceId), isNull(buildDocSections.deletedAt)),
       })
       if (!section) return { error: 'Section not found' }
     }
@@ -642,17 +642,17 @@ export async function uploadBuildDocAsset(
     const bytes = Buffer.from(await file.arrayBuffer())
     const validation = validateAssetUpload({ contentType: file.type, size: bytes.length })
     if (!validation.success) return { error: validation.error }
-    const settings = await getAssetStorageConfig(orgId)
+    const settings = await getAssetStorageConfig(instanceId)
     const storage = createBuildDocAssetStorage(settings)
     const stored = await storage.put({
-      organisationId: orgId,
+      instanceId: instanceId,
       buildDocId: docId,
       filename: file.name,
       contentType: file.type,
       bytes,
     })
     const [asset] = await db.insert(buildDocAssets).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       buildDocId: docId,
       sectionId,
       uploadedById: session.user.id,
@@ -671,21 +671,21 @@ export async function uploadBuildDocAsset(
   }
 }
 
-export async function getBuildDocAssetBytes(orgId: string, assetId: string): Promise<{ asset: BuildDocAsset; bytes: Buffer } | null> {
-  const session = await requireOrgAccess(orgId)
+export async function getBuildDocAssetBytes(instanceId: string, assetId: string): Promise<{ asset: BuildDocAsset; bytes: Buffer } | null> {
+  const session = await requireInstanceAccess(instanceId)
   if (!canReadBuildDocs(session.user)) return null
   const asset = await db.query.buildDocAssets.findFirst({
-    where: and(eq(buildDocAssets.id, assetId), eq(buildDocAssets.organisationId, orgId), isNull(buildDocAssets.deletedAt)),
+    where: and(eq(buildDocAssets.id, assetId), eq(buildDocAssets.instanceId, instanceId), isNull(buildDocAssets.deletedAt)),
   })
   if (!asset) return null
-  const settings = await getAssetStorageConfig(orgId)
+  const settings = await getAssetStorageConfig(instanceId)
   const storage = createBuildDocAssetStorage(settings)
   const bytes = await storage.get(asset.storageKey)
   return { asset, bytes }
 }
 
-export async function getBuildDocRenderModel(orgId: string, docId: string): Promise<BuildDocRenderModel | null> {
-  const detail = await getBuildDoc(orgId, docId)
+export async function getBuildDocRenderModel(instanceId: string, docId: string): Promise<BuildDocRenderModel | null> {
+  const detail = await getBuildDoc(instanceId, docId)
   if (!detail) return null
   return buildRenderModel({
     doc: detail.doc,
@@ -702,32 +702,32 @@ export async function getBuildDocRenderModel(orgId: string, docId: string): Prom
       sectionId: asset.sectionId,
       filename: asset.filename,
       contentType: asset.contentType,
-      url: `/api/build-docs/assets/${asset.id}?orgId=${encodeURIComponent(orgId)}`,
+      url: `/api/build-docs/assets/${asset.id}?instanceId=${encodeURIComponent(instanceId)}`,
     })),
   })
 }
 
-export async function getBuildDocAssetStorageSettings(orgId: string): Promise<BuildDocAssetStorageSettings | null> {
-  await requireOrgAdminAccess(orgId)
+export async function getBuildDocAssetStorageSettings(instanceId: string): Promise<BuildDocAssetStorageSettings | null> {
+  await requireInstanceAdminAccess(instanceId)
   return (await db.query.buildDocAssetStorageSettings.findFirst({
-    where: eq(buildDocAssetStorageSettings.organisationId, orgId),
+    where: eq(buildDocAssetStorageSettings.instanceId, instanceId),
   })) ?? null
 }
 
 export async function saveBuildDocAssetStorageSettings(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<ActionResult<BuildDocAssetStorageSettings>> {
-  const session = await requireOrgAdminAccess(orgId)
+  const session = await requireInstanceAdminAccess(instanceId)
   try {
     const config = parseStorageSettings(input)
     const [settings] = await db.insert(buildDocAssetStorageSettings).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       updatedById: session.user.id,
       provider: config.provider,
       config,
     }).onConflictDoUpdate({
-      target: buildDocAssetStorageSettings.organisationId,
+      target: buildDocAssetStorageSettings.instanceId,
       set: {
         updatedById: session.user.id,
         provider: config.provider,
@@ -737,7 +737,7 @@ export async function saveBuildDocAssetStorageSettings(
     }).returning()
     if (!settings) return { error: 'Failed to save storage settings' }
     await db.insert(auditEvents).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'build_doc_asset_storage.update',
       targetType: 'build_doc_asset_storage_settings',
@@ -755,7 +755,7 @@ export async function saveBuildDocAssetStorageSettings(
 function rowsToSnippets(rows: unknown): BuildDocSnippet[] {
   return (rows as Array<Record<string, unknown>>).map((row) => ({
     id: row.id as string,
-    organisationId: row.organisation_id as string,
+    instanceId: row.instance_id as string,
     createdById: row.created_by_id as string,
     lastEditedById: (row.last_edited_by_id as string | null) ?? null,
     title: row.title as string,
@@ -774,7 +774,7 @@ function rowsToSnippets(rows: unknown): BuildDocSnippet[] {
 function rowsToBuildDocListItems(rows: unknown): BuildDocListItem[] {
   return (rows as Array<Record<string, unknown>>).map((row) => ({
     id: row.id as string,
-    organisationId: row.organisation_id as string,
+    instanceId: row.instance_id as string,
     templateVersionId: row.template_version_id as string,
     authorId: row.author_id as string,
     lastEditedById: (row.last_edited_by_id as string | null) ?? null,

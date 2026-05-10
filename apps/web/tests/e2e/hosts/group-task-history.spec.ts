@@ -7,7 +7,7 @@ test('authenticated user can bulk delete task history from a host group', async 
   const { instanceId, userId } = await getSeededTestUserContext()
 
   await sql`
-    INSERT INTO host_groups (id, organisation_id, name, description)
+    INSERT INTO host_groups (id, instance_id, name, description)
     VALUES (
       'group-task-history',
       ${instanceId},
@@ -19,7 +19,7 @@ test('authenticated user can bulk delete task history from a host group', async 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -42,7 +42,7 @@ test('authenticated user can bulk delete task history from a host group', async 
   `
 
   await sql`
-    INSERT INTO host_group_members (id, organisation_id, group_id, host_id)
+    INSERT INTO host_group_members (id, instance_id, group_id, host_id)
     VALUES (
       'group-task-history-member',
       ${instanceId},
@@ -54,7 +54,7 @@ test('authenticated user can bulk delete task history from a host group', async 
   await sql`
     INSERT INTO task_runs (
       id,
-      organisation_id,
+      instance_id,
       triggered_by,
       target_type,
       target_id,
@@ -97,7 +97,7 @@ test('authenticated user can bulk delete task history from a host group', async 
   await sql`
     INSERT INTO task_run_hosts (
       id,
-      organisation_id,
+      instance_id,
       task_run_id,
       host_id,
       status,

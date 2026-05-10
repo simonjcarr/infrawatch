@@ -13,7 +13,7 @@ import {
 } from './connector-settings.ts'
 
 interface BuildOverviewOptions {
-  orgId: string
+  instanceId: string
   settingsRepository?: CtCveConnectorSettingsRepository
   statusRepository?: CtCveConnectionStatusRepository
 }
@@ -70,19 +70,19 @@ function summariseInventoryPushTargets(
 }
 
 export async function buildCtCveConnectorSetupOverview({
-  orgId,
+  instanceId,
   settingsRepository,
   statusRepository,
 }: BuildOverviewOptions): Promise<CtCveConnectorSetupOverview> {
   const repository = settingsRepository ?? {
     getSummary: getCtCveConnectorSettingsSummary,
   }
-  const settings = await repository.getSummary(orgId)
+  const settings = await repository.getSummary(instanceId)
   const inbound = summariseInboundTokens(settings)
   const inventoryPush = summariseInventoryPushTargets(settings)
   const configured = Boolean(settings)
   const enabled = Boolean(settings?.enabled)
-  const storedStatus = await getCtCveConnectionStatus(orgId, {
+  const storedStatus = await getCtCveConnectionStatus(instanceId, {
     configured,
     repository: statusRepository,
   })

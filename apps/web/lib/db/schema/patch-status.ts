@@ -1,6 +1,6 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { checks } from './checks.ts'
 
@@ -11,7 +11,7 @@ export const hostPatchStatuses = pgTable(
   'host_patch_statuses',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     hostId: text('host_id').notNull().references(() => hosts.id),
     checkId: text('check_id').references(() => checks.id),
     status: text('status').notNull().$type<PatchHealthStatus>(),
@@ -30,7 +30,7 @@ export const hostPatchStatuses = pgTable(
   },
   (t) => [
     uniqueIndex('host_patch_statuses_check_uniq').on(t.checkId),
-    index('host_patch_statuses_org_status_idx').on(t.organisationId, t.status),
+    index('host_patch_statuses_org_status_idx').on(t.instanceId, t.status),
     index('host_patch_statuses_host_checked_idx').on(t.hostId, t.checkedAt),
   ],
 )
@@ -39,7 +39,7 @@ export const hostPackageUpdates = pgTable(
   'host_package_updates',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id').notNull().references(() => organisations.id),
+    instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
     hostId: text('host_id').notNull().references(() => hosts.id),
     name: text('name').notNull(),
     currentVersion: text('current_version'),
@@ -56,7 +56,7 @@ export const hostPackageUpdates = pgTable(
   },
   (t) => [
     uniqueIndex('host_package_updates_current_uniq').on(
-      t.organisationId,
+      t.instanceId,
       t.hostId,
       t.name,
       t.currentVersion,
@@ -64,7 +64,7 @@ export const hostPackageUpdates = pgTable(
       t.architecture,
       t.packageManager,
     ),
-    index('host_package_updates_org_status_idx').on(t.organisationId, t.status),
+    index('host_package_updates_org_status_idx').on(t.instanceId, t.status),
     index('host_package_updates_host_status_idx').on(t.hostId, t.status),
   ],
 )

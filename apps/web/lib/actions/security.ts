@@ -6,7 +6,7 @@ import { createPublicKey, X509Certificate } from 'node:crypto'
 import { z } from 'zod'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { certificateAuthorities, organisations } from '@/lib/db/schema'
+import { certificateAuthorities, instanceSettings } from '@/lib/db/schema'
 import { encrypt } from '@/lib/crypto/encrypt'
 import { getRequiredSession } from '@/lib/auth/session'
 import { ADMIN_ROLES } from '@/lib/auth/roles'
@@ -14,7 +14,7 @@ import { requireRole } from '@/lib/auth/guards'
 import { assertAgentCAManagementAccess } from './security-auth'
 import type { SecurityOverview } from './security-types'
 import { isTwoFactorRequired } from '@/lib/auth/two-factor-policy'
-import { parseOrgMetadata, type OrgSecuritySettings } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata, type InstanceSecuritySettings } from '@/lib/db/schema/instance-settings'
 
 async function requireAdmin() {
   const session = await getRequiredSession()
@@ -32,16 +32,16 @@ const SERVER_TLS_CERT_PATH = process.env['INGEST_TLS_CERT'] ?? '/etc/ct-ops/tls/
 export async function getSecurityOverview(): Promise<SecurityOverview | { error: string }> {
   try {
     const session = await requireAdmin()
-    const organisationId = session.user.organisationId
+    const instanceId = session.user.instanceId
 
     let accountAuth: SecurityOverview['accountAuth'] = { requireTwoFactor: false }
-    if (organisationId) {
-      const org = await db.query.organisations.findFirst({
-        where: eq(organisations.id, organisationId),
+    if (instanceId) {
+      const org = await db.query.instanceSettings.findFirst({
+        where: eq(instanceSettings.id, instanceId),
         columns: { metadata: true },
       })
       accountAuth = {
-        requireTwoFactor: isTwoFactorRequired(parseOrgMetadata(org?.metadata)),
+        requireTwoFactor: isTwoFactorRequired(parseInstanceMetadata(org?.metadata)),
       }
     }
 
@@ -100,24 +100,24 @@ export async function updateAccountAuthenticationSettings(
 ): Promise<{ success: true } | { error: string }> {
   try {
     const session = await requireAdmin()
-    const organisationId = session.user.organisationId
-    if (!organisationId) return { error: 'Organisation not found' }
+    const instanceId = session.user.instanceId
+    if (!instanceId) return { error: 'Instance not found' }
 
     const parsed = updateAccountAuthSchema.parse(input)
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, organisationId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     })
-    if (!org) return { error: 'Organisation not found' }
+    if (!org) return { error: 'Instance not found' }
 
-    const metadata = parseOrgMetadata(org.metadata)
-    const securitySettings: OrgSecuritySettings = {
+    const metadata = parseInstanceMetadata(org.metadata)
+    const securitySettings: InstanceSecuritySettings = {
       ...metadata.securitySettings,
       requireTwoFactor: parsed.requireTwoFactor,
     }
 
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({
         metadata: {
           ...metadata,
@@ -125,7 +125,7 @@ export async function updateAccountAuthenticationSettings(
         },
         updatedAt: new Date(),
       })
-      .where(eq(organisations.id, organisationId))
+      .where(eq(instanceSettings.id, instanceId))
 
     return { success: true }
   } catch (err) {

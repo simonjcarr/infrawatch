@@ -29,7 +29,7 @@ sNone70z9cF/
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -247,7 +247,7 @@ test('authenticated user can analyse an uploaded certificate file with a matchin
 
 test('authenticated user can track an uploaded certificate after analysis', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await page.route('**/api/tools/certificate-checker', async (route) => {
     await route.fulfill({
       status: 200,
@@ -330,7 +330,7 @@ test('authenticated user can track an uploaded certificate after analysis', asyn
       }>>`
         SELECT host, port, server_name, common_name, tracked_url
         FROM certificates
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND host = 'tracker.example.com'
           AND deleted_at IS NULL
         LIMIT 1

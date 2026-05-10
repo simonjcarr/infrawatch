@@ -30,13 +30,13 @@ function serviceError(error: CtCveServiceAuthError) {
 }
 
 export async function GET(request: NextRequest) {
-  const orgId = request.nextUrl.searchParams.get('orgId')?.trim()
-  if (!orgId) {
+  const instanceId = request.nextUrl.searchParams.get('instanceId')?.trim()
+  if (!instanceId) {
     return NextResponse.json(
       {
         error: {
-          code: 'missing_org_id',
-          message: 'orgId query parameter is required.',
+          code: 'missing_instance_id',
+          message: 'instanceId query parameter is required.',
           retryable: false,
         },
       },
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const tokens = await getCtCveServiceTokensForOrg(orgId)
+  const tokens = await getCtCveServiceTokensForOrg(instanceId)
   if (tokens.length === 0) {
     return NextResponse.json(
       {
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     body: '',
     headers: request.headers,
     requiredScope: 'connection:read',
-    orgId,
+    instanceId,
     tokens,
   })
 
@@ -88,6 +88,6 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const status = await recordCtCveConnectionHealth(auth.token.orgId)
+  const status = await recordCtCveConnectionHealth(auth.token.instanceId)
   return NextResponse.json(status)
 }

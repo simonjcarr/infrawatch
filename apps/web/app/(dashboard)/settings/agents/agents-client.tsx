@@ -173,7 +173,7 @@ export function AgentsSettingsClient({
       <div>
         <h1 className="text-2xl font-semibold text-foreground" data-testid="agent-enrolment-heading">Agent Enrolment</h1>
         <p className="text-muted-foreground mt-1">
-          Manage enrolment tokens used to register new agents with your organisation.
+          Manage enrolment tokens used to register new agents with your instance.
         </p>
       </div>
 
@@ -332,7 +332,7 @@ export function AgentsSettingsClient({
           <DialogHeader>
             <DialogTitle>Create Enrolment Token</DialogTitle>
             <DialogDescription>
-              Agents use this token to register with your organisation. You&apos;ll get a
+              Agents use this token to register with your instance. You&apos;ll get a
               ready-to-run install command.
             </DialogDescription>
           </DialogHeader>

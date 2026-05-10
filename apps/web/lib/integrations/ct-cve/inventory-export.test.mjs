@@ -11,18 +11,18 @@ const generatedAt = new Date('2026-04-30T10:15:00.000Z')
 const token = {
   id: 'ctops_inventory_token',
   secret: Buffer.from('ct-ops outbound inventory signing key only').toString('base64url'),
-  orgId: 'org_1',
+  instanceId: 'org_1',
   scopes: ['inventory:write'],
 }
 
 function repo() {
   return {
-    async getOrganisation(orgId) {
-      assert.equal(orgId, 'org_1')
+    async getInstance(instanceId) {
+      assert.equal(instanceId, 'org_1')
       return { id: 'org_1', slug: 'acme' }
     },
-    async listInventoryHosts(orgId, options) {
-      assert.equal(orgId, 'org_1')
+    async listInventoryHosts(instanceId, options) {
+      assert.equal(instanceId, 'org_1')
       assert.equal(options.limit, 500)
       return [
         {
@@ -51,8 +51,8 @@ function repo() {
         },
       ]
     },
-    async listInventoryPackages(orgId, options) {
-      assert.equal(orgId, 'org_1')
+    async listInventoryPackages(instanceId, options) {
+      assert.equal(instanceId, 'org_1')
       assert.equal(options.limit, 25_000)
       return [
         {
@@ -108,12 +108,12 @@ function statusRepo() {
   let stored = null
   return {
     repository: {
-      async get(orgId) {
-        assert.equal(orgId, 'org_1')
+      async get(instanceId) {
+        assert.equal(instanceId, 'org_1')
         return stored
       },
       async save(status) {
-        assert.equal(status.orgId, 'org_1')
+        assert.equal(status.instanceId, 'org_1')
         stored = status
       },
     },
@@ -123,13 +123,13 @@ function statusRepo() {
 
 test('builds an org-scoped CT-CVE inventory snapshot without deleted or removed rows', async () => {
   const snapshot = await buildCtCveInventorySnapshot({
-    orgId: 'org_1',
+    instanceId: 'org_1',
     repository: repo(),
     generatedAt,
   })
 
   assert.equal(snapshot.contractVersion, '2026-04-30')
-  assert.equal(snapshot.orgId, 'org_1')
+  assert.equal(snapshot.instanceId, 'org_1')
   assert.equal(snapshot.orgSlug, 'acme')
   assert.equal(snapshot.snapshotType, 'full')
   assert.equal(snapshot.generatedAt, generatedAt.toISOString())
@@ -144,7 +144,7 @@ test('builds an org-scoped CT-CVE inventory snapshot without deleted or removed 
 test('adds an opaque cursor when either inventory page reaches its limit', async () => {
   const repository = repo()
   const snapshot = await buildCtCveInventorySnapshot({
-    orgId: 'org_1',
+    instanceId: 'org_1',
     repository: {
       ...repository,
       async listInventoryHosts() {
@@ -157,7 +157,7 @@ test('adds an opaque cursor when either inventory page reaches its limit', async
 
   assert.match(snapshot.cursor ?? '', /^[A-Za-z0-9_-]+$/)
   const next = await buildCtCveInventorySnapshot({
-    orgId: 'org_1',
+    instanceId: 'org_1',
     repository,
     cursor: snapshot.cursor ?? undefined,
     generatedAt,
@@ -168,7 +168,7 @@ test('adds an opaque cursor when either inventory page reaches its limit', async
 
 test('pushes a snapshot to CT-CVE with the inventory service-token signature', async () => {
   const snapshot = await buildCtCveInventorySnapshot({
-    orgId: 'org_1',
+    instanceId: 'org_1',
     repository: repo(),
     generatedAt,
   })
@@ -217,7 +217,7 @@ test('pushes a snapshot to CT-CVE with the inventory service-token signature', a
 
 test('records a CT-CVE inventory connection error when the push fails', async () => {
   const snapshot = await buildCtCveInventorySnapshot({
-    orgId: 'org_1',
+    instanceId: 'org_1',
     repository: repo(),
     generatedAt,
   })

@@ -30,7 +30,7 @@ interface PasswordManagerMockState {
       }
     | null
   currentUserId: string
-  currentOrganisationId: string
+  currentInstanceId: string
   failNextRefresh: boolean
   requests: PasswordManagerMockRequest[]
   vaults: Map<
@@ -48,7 +48,7 @@ interface PasswordManagerMockState {
 export interface PasswordManagerMockController {
   getMemberEnvelope(userId: string): PasswordManagerMemberEnvelope
   failNextRefreshWithSessionExpiry(): void
-  switchAuthenticatedOrganisation(): Promise<void>
+  switchAuthenticatedInstance(): Promise<void>
   launchAssertions(): string[]
   requestsFor(method: string, path: string): PasswordManagerMockRequest[]
   auditRequests(): PasswordManagerMockRequest[]
@@ -165,28 +165,28 @@ function createMemberEnvelope(): PasswordManagerMemberEnvelope {
 
 async function getCurrentUserState() {
   const sql = getTestDb()
-  const rows = await sql<Array<{ user_id: string; organisation_id: string }>>`
-    SELECT id AS user_id, organisation_id
+  const rows = await sql<Array<{ user_id: string; instance_id: string }>>`
+    SELECT id AS user_id, instance_id
     FROM "user"
     WHERE email = ${TEST_USER.email}
     LIMIT 1
   `
-  if (rows.length !== 1 || !rows[0]?.organisation_id) {
-    throw new Error('expected seeded test user with organisation')
+  if (rows.length !== 1 || !rows[0]?.instance_id) {
+    throw new Error('expected seeded test user with instance')
   }
   return rows[0]
 }
 
 async function getPasswordManagerMemberState() {
   const sql = getTestDb()
-  const rows = await sql<Array<{ user_id: string; organisation_id: string }>>`
-    SELECT id AS user_id, organisation_id
+  const rows = await sql<Array<{ user_id: string; instance_id: string }>>`
+    SELECT id AS user_id, instance_id
     FROM "user"
     WHERE email = ${TEST_PASSWORD_MANAGER_MEMBER.email}
     LIMIT 1
   `
-  if (rows.length !== 1 || !rows[0]?.organisation_id) {
-    throw new Error('expected seeded Password Manager member with organisation')
+  if (rows.length !== 1 || !rows[0]?.instance_id) {
+    throw new Error('expected seeded Password Manager member with instance')
   }
   return rows[0]
 }
@@ -220,7 +220,7 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
     launchAssertions: [],
     userKey: null,
     currentUserId: currentUser.user_id,
-    currentOrganisationId: currentUser.organisation_id,
+    currentInstanceId: currentUser.instance_id,
     failNextRefresh: false,
     requests: [],
     vaults: new Map(),
@@ -263,7 +263,7 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
       const payload = decodeJwtPayload(assertion)
       state.launchAssertions.push(assertion)
       state.currentUserId = payload.ct_ops_user_id || state.currentUserId
-      state.currentOrganisationId = payload.ct_ops_organization_id || state.currentOrganisationId
+      state.currentInstanceId = payload.ct_ops_organization_id || state.currentInstanceId
       state.sessionToken = randomUUID()
 
       await fulfillEmpty(route, 204, {
@@ -612,19 +612,19 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
     failNextRefreshWithSessionExpiry() {
       state.failNextRefresh = true
     },
-    async switchAuthenticatedOrganisation() {
+    async switchAuthenticatedInstance() {
       const sql = getTestDb()
-      const orgId = `org-switched-${Date.now()}`
+      const instanceId = `org-switched-${Date.now()}`
       await sql`
-        INSERT INTO organisations (id, name, slug)
-        VALUES (${orgId}, ${'Switched Org'}, ${`switched-org-${Date.now()}`})
+        INSERT INTO instance_settings (id, name, slug)
+        VALUES (${instanceId}, ${'Switched Org'}, ${`switched-org-${Date.now()}`})
       `
       await sql`
         UPDATE "user"
-        SET organisation_id = ${orgId}, updated_at = NOW()
+        SET instance_id = ${instanceId}, updated_at = NOW()
         WHERE email = ${TEST_USER.email}
       `
-      state.currentOrganisationId = orgId
+      state.currentInstanceId = instanceId
       state.sessionToken = null
       state.userKey = null
       state.vaults.clear()

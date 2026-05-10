@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 import { getRequiredSession } from '@/lib/auth/session'
 import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 
@@ -14,12 +14,12 @@ export async function getNotifications(
   offset = 0,
 ): Promise<Notification[]> {
   const authSession = await getRequiredSession()
-  const orgId = resolveOptionalActionScope(authSession)
-  if (!orgId) return []
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveOptionalActionScope(authSession)
+  if (!instanceId) return []
+  const session = await requireInstanceAccess(instanceId)
   return db.query.notifications.findMany({
     where: and(
-      eq(notifications.organisationId, orgId),
+      eq(notifications.instanceId, instanceId),
       eq(notifications.userId, session.user.id),
       isNull(notifications.deletedAt),
     ),
@@ -31,15 +31,15 @@ export async function getNotifications(
 
 export async function getUnreadCount(): Promise<number> {
   const authSession = await getRequiredSession()
-  const orgId = resolveOptionalActionScope(authSession)
-  if (!orgId) return 0
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveOptionalActionScope(authSession)
+  if (!instanceId) return 0
+  const session = await requireInstanceAccess(instanceId)
   const [result] = await db
     .select({ value: count() })
     .from(notifications)
     .where(
       and(
-        eq(notifications.organisationId, orgId),
+        eq(notifications.instanceId, instanceId),
         eq(notifications.userId, session.user.id),
         eq(notifications.read, false),
         isNull(notifications.deletedAt),
@@ -52,8 +52,8 @@ export async function markAsRead(
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   try {
     await db
       .update(notifications)
@@ -61,7 +61,7 @@ export async function markAsRead(
       .where(
         and(
           eq(notifications.id, notificationId),
-          eq(notifications.organisationId, orgId),
+          eq(notifications.instanceId, instanceId),
           eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
@@ -74,15 +74,15 @@ export async function markAsRead(
 
 export async function markAllAsRead(): Promise<{ success: true } | { error: string }> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   try {
     await db
       .update(notifications)
       .set({ read: true })
       .where(
         and(
-          eq(notifications.organisationId, orgId),
+          eq(notifications.instanceId, instanceId),
           eq(notifications.userId, session.user.id),
           eq(notifications.read, false),
           isNull(notifications.deletedAt),
@@ -98,8 +98,8 @@ export async function deleteNotification(
   notificationId: string,
 ): Promise<{ success: true } | { error: string }> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   try {
     await db
       .update(notifications)
@@ -107,7 +107,7 @@ export async function deleteNotification(
       .where(
         and(
           eq(notifications.id, notificationId),
-          eq(notifications.organisationId, orgId),
+          eq(notifications.instanceId, instanceId),
           eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
@@ -122,8 +122,8 @@ export async function deleteNotifications(
   ids: string[],
 ): Promise<{ success: true } | { error: string }> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -132,7 +132,7 @@ export async function deleteNotifications(
       .where(
         and(
           inArray(notifications.id, ids),
-          eq(notifications.organisationId, orgId),
+          eq(notifications.instanceId, instanceId),
           eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
@@ -148,8 +148,8 @@ export async function markBatchReadStatus(
   read: boolean,
 ): Promise<{ success: true } | { error: string }> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   if (ids.length === 0) return { success: true }
   try {
     await db
@@ -158,7 +158,7 @@ export async function markBatchReadStatus(
       .where(
         and(
           inArray(notifications.id, ids),
-          eq(notifications.organisationId, orgId),
+          eq(notifications.instanceId, instanceId),
           eq(notifications.userId, session.user.id),
           isNull(notifications.deletedAt),
         ),
@@ -178,8 +178,8 @@ export async function getNotificationStats(
   hostId?: string,
 ): Promise<NotificationSeverityStat[]> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   const results = await db
     .select({
       severity: notifications.severity,
@@ -188,7 +188,7 @@ export async function getNotificationStats(
     .from(notifications)
     .where(
       and(
-        eq(notifications.organisationId, orgId),
+        eq(notifications.instanceId, instanceId),
         eq(notifications.userId, session.user.id),
         isNull(notifications.deletedAt),
         hostId ? eq(notifications.resourceType, 'host') : undefined,
@@ -223,8 +223,8 @@ export async function getNotificationsOverTime(
   hostId?: string,
 ): Promise<NotificationTimeSeriesPoint[]> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
-  const session = await requireOrgAccess(orgId)
+  const instanceId = resolveCurrentActionScope(authSession)
+  const session = await requireInstanceAccess(instanceId)
   // Intentionally does NOT filter on deletedAt so that deleting notifications
   // from the inbox does not affect the historical trend.
   const config = TREND_RANGE_CONFIG[range]
@@ -247,7 +247,7 @@ export async function getNotificationsOverTime(
     .from(notifications)
     .where(
       and(
-        eq(notifications.organisationId, orgId),
+        eq(notifications.instanceId, instanceId),
         eq(notifications.userId, session.user.id),
         gte(notifications.createdAt, cutoff),
         hostId ? eq(notifications.resourceType, 'host') : undefined,

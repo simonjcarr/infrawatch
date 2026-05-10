@@ -1,15 +1,15 @@
 import { pgTable, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { tags } from './tags.ts'
 
 export const resourceTags = pgTable(
   'resource_tags',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     resourceId: text('resource_id').notNull(),
     resourceType: text('resource_type').notNull(),
     tagId: text('tag_id')

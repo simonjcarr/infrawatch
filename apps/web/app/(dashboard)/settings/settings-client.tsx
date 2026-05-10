@@ -21,10 +21,10 @@ import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivatio
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
 import {
-  getOrgNotificationSettings,
+  getInstanceNotificationSettings,
   getOrgSmtpRelaySettings,
   sendTestSmtpRelaySettings,
-  updateOrgNotificationSettings,
+  updateInstanceNotificationSettings,
   updateOrgSmtpRelaySettings,
 } from '@/lib/actions/notification-settings'
 import { getSoftwareInventorySettings, updateSoftwareInventorySettings } from '@/lib/actions/software-inventory'
@@ -32,8 +32,8 @@ import { getOrgDefaultTags, updateOrgDefaultTags } from '@/lib/actions/tags'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import type { TagPair } from '@/lib/db/schema'
 import type { OrgTerminalSettings } from '@/lib/actions/terminal-core'
-import type { OrgNotificationSettingsFull, OrgSmtpRelaySettingsInput, SmtpRelayTestLogEntry } from '@/lib/actions/notification-settings'
-import type { Organisation, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
+import type { InstanceNotificationSettingsFull, InstanceSmtpRelaySettingsInput, SmtpRelayTestLogEntry } from '@/lib/actions/notification-settings'
+import type { Instance, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 import type { LicenceTier } from '@/lib/features'
 import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
@@ -56,7 +56,7 @@ const licenceSchema = z.object({
 type LicenceValues = z.infer<typeof licenceSchema>
 
 export type SettingsSection =
-  | 'organisation'
+  | 'instance'
   | 'licence'
   | 'retention'
   | 'collection'
@@ -67,7 +67,7 @@ export type SettingsSection =
   | 'software'
 
 interface SettingsClientProps {
-  org: Organisation
+  org: Instance
   isAdmin: boolean
   sections?: SettingsSection[]
   title?: string
@@ -163,7 +163,7 @@ const SMTP_ENCRYPTION_OPTIONS = [
   { value: 'tls', label: 'SSL/TLS' },
 ] as const
 
-const EMPTY_SMTP_RELAY_SETTINGS: OrgSmtpRelaySettingsInput = {
+const EMPTY_SMTP_RELAY_SETTINGS: InstanceSmtpRelaySettingsInput = {
   enabled: false,
   host: '',
   port: 587,
@@ -179,7 +179,7 @@ export function SettingsClient({
   isAdmin,
   sections,
   title = 'Settings',
-  description = 'Manage your organisation settings',
+  description = 'Manage your instance settings',
   effectiveLicence,
   seatUsage,
   freeSeatUsers,
@@ -189,7 +189,7 @@ export function SettingsClient({
   const tier = effectiveLicence?.tier ?? (org.licenceTier as LicenceTier)
   const visibleSections = new Set<SettingsSection>(
     sections ?? [
-      'organisation',
+      'instance',
       'retention',
       'collection',
       'tags',
@@ -392,9 +392,9 @@ export function SettingsClient({
   const [notificationSaveSuccess, setNotificationSaveSuccess] = useState(false)
   const { data: notificationDefaults } = useQuery({
     queryKey: ['org-notification-settings', org.id],
-    queryFn: () => getOrgNotificationSettings(org.id),
+    queryFn: () => getInstanceNotificationSettings(org.id),
   })
-  const [localNotificationSettings, setLocalNotificationSettings] = useState<OrgNotificationSettingsFull | null>(null)
+  const [localNotificationSettings, setLocalNotificationSettings] = useState<InstanceNotificationSettingsFull | null>(null)
   const currentNotificationSettings = localNotificationSettings ?? notificationDefaults ?? {
     inAppEnabled: true,
     inAppRoles: ['super_admin', 'org_admin', 'engineer'],
@@ -403,7 +403,7 @@ export function SettingsClient({
   const notificationDirty = localNotificationSettings !== null
 
   const notificationMutation = useMutation({
-    mutationFn: (settings: OrgNotificationSettingsFull) => updateOrgNotificationSettings(org.id, settings),
+    mutationFn: (settings: InstanceNotificationSettingsFull) => updateInstanceNotificationSettings(org.id, settings),
     onSuccess: (result) => {
       if ('error' in result) return
       setLocalNotificationSettings(null)
@@ -427,7 +427,7 @@ export function SettingsClient({
     queryKey: ['org-smtp-relay-settings', org.id],
     queryFn: () => getOrgSmtpRelaySettings(org.id),
   })
-  const [localSmtpRelaySettings, setLocalSmtpRelaySettings] = useState<OrgSmtpRelaySettingsInput | null>(null)
+  const [localSmtpRelaySettings, setLocalSmtpRelaySettings] = useState<InstanceSmtpRelaySettingsInput | null>(null)
   const currentSmtpRelaySettings = localSmtpRelaySettings ?? {
     ...EMPTY_SMTP_RELAY_SETTINGS,
     ...(smtpRelayDefaults ?? {}),
@@ -436,7 +436,7 @@ export function SettingsClient({
   const smtpDirty = localSmtpRelaySettings !== null
 
   const smtpMutation = useMutation({
-    mutationFn: (settings: OrgSmtpRelaySettingsInput) => updateOrgSmtpRelaySettings(org.id, settings),
+    mutationFn: (settings: InstanceSmtpRelaySettingsInput) => updateOrgSmtpRelaySettings(org.id, settings),
     onSuccess: (result) => {
       if ('error' in result) {
         setSmtpError(result.error)
@@ -468,7 +468,7 @@ export function SettingsClient({
     smtpTestMutation.mutate(smtpTestEmail)
   }
 
-  function updateSmtpRelaySetting(patch: Partial<OrgSmtpRelaySettingsInput>) {
+  function updateSmtpRelaySetting(patch: Partial<InstanceSmtpRelaySettingsInput>) {
     setLocalSmtpRelaySettings({ ...currentSmtpRelaySettings, ...patch })
     setSmtpError(null)
     setSmtpTestResult(null)
@@ -510,19 +510,19 @@ export function SettingsClient({
       {!isAdmin && (
         <div className="flex items-start gap-3 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
           <Info className="size-4 mt-0.5 shrink-0" />
-          <span>These settings can only be edited by an organisation admin.</span>
+          <span>These settings can only be edited by an instance admin.</span>
         </div>
       )}
 
-      {/* Organisation section */}
-      {visibleSections.has('organisation') && (
+      {/* Instance section */}
+      {visibleSections.has('instance') && (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Organisation</CardTitle>
+          <CardTitle className="text-base">Instance</CardTitle>
           <CardDescription>
             {isAdmin
-              ? "Update your organisation's display name"
-              : "Your organisation's display name"}
+              ? "Update your instance's display name"
+              : "Your instance's display name"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -532,7 +532,7 @@ export function SettingsClient({
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <Label htmlFor="org-name">Organisation name</Label>
+                <Label htmlFor="org-name">Instance name</Label>
                 <Input
                   id="org-name"
                   data-testid="settings-org-name-input"
@@ -1389,7 +1389,7 @@ export function SettingsClient({
           <CardDescription>
             {isAdmin
               ? 'Manage user seats, expiry, and Enterprise capabilities'
-              : 'Your organisation licence'}
+              : 'Your instance licence'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -83,7 +83,7 @@ const administrationPages = [
 test('dashboard shell falls back to community licence without org-backed scope', () => {
   assert.match(
     dashboardLayoutSource,
-    /getInstanceEffectiveLicence\(session\.user\.organisationId\)/,
+    /getInstanceEffectiveLicence\(session\.user\.instanceId\)/,
   )
   assert.doesNotMatch(dashboardLayoutSource, /throw new Error\('Instance scope is not configured'\)/)
   assert.match(licenceGuardSource, /if \(!scopeId\) return getCommunityLicence\(\)/)
@@ -91,11 +91,11 @@ test('dashboard shell falls back to community licence without org-backed scope',
 
 test('overview API returns empty counts for a fresh standalone instance', () => {
   assert.match(overviewRouteSource, /getApiSession\(\)/)
-  assert.doesNotMatch(overviewRouteSource, /getApiOrgSession\(\)/)
-  assert.match(overviewRouteSource, /if \(!orgId\) \{\s*return Response\.json\(emptyOverview\)\s*\}/)
+  assert.doesNotMatch(overviewRouteSource, /getApiInstanceSession\(\)/)
+  assert.match(overviewRouteSource, /if \(!instanceId\) \{\s*return Response\.json\(emptyOverview\)\s*\}/)
 })
 
-test('sidebar-linked pages do not force an organisation-backed action scope', () => {
+test('sidebar-linked pages do not force an instance-backed action scope', () => {
   for (const relativePath of sidebarLinkedPages) {
     const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')
     assert.doesNotMatch(
@@ -105,8 +105,8 @@ test('sidebar-linked pages do not force an organisation-backed action scope', ()
     )
     assert.doesNotMatch(
       source,
-      /session\.user\.organisationId!/,
-      `${relativePath} should not assert an organisation id during initial render`,
+      /session\.user\.instanceId!/,
+      `${relativePath} should not assert an instance id during initial render`,
     )
   }
 })

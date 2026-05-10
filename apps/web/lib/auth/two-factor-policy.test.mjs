@@ -5,7 +5,7 @@ import {
   isTwoFactorRequired,
 } from './two-factor-policy.ts'
 
-test('isTwoFactorRequired reads the organisation security metadata flag', () => {
+test('isTwoFactorRequired reads the instance security metadata flag', () => {
   assert.equal(isTwoFactorRequired({}), false)
   assert.equal(isTwoFactorRequired({ securitySettings: {} }), false)
   assert.equal(

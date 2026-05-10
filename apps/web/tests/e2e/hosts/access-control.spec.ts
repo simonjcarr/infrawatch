@@ -2,30 +2,30 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('read-only users cannot delete hosts from the host detail page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -36,7 +36,7 @@ test('read-only users cannot delete hosts from the host detail page', async ({ a
     )
     VALUES (
       'read-only-host-1',
-      ${orgId},
+      ${instanceId},
       'readonly-node',
       'Read Only Node',
       'Ubuntu 24.04',
@@ -60,7 +60,7 @@ test('read-only users cannot delete hosts from the host detail page', async ({ a
           SELECT deleted_at
           FROM hosts
           WHERE id = 'read-only-host-1'
-            AND organisation_id = ${orgId}
+            AND instance_id = ${instanceId}
           LIMIT 1
         `
         return rows[0]?.deleted_at ?? 'present'

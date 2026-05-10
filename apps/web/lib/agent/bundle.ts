@@ -292,7 +292,7 @@ function renderReadme(opts: BundleOptions): string {
 ${
   opts.tokenExpiresAt
     ? `It expires at **${opts.tokenExpiresAt.toISOString()}** and can only be used once — treat this bundle as sensitive.`
-    : 'Treat this bundle as sensitive; the token grants enrolment rights to your organisation.'
+    : 'Treat this bundle as sensitive; the token grants enrolment rights to your instance.'
 }`
     : `This bundle does **not** contain an enrolment token. Before running the install script:
 

@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
@@ -13,24 +13,24 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can view ingest status, agent errors, and upgrade counts', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const agentId = createId()
   const hostId = createId()
 
   await sql`
     INSERT INTO agents (
-      id, organisation_id, hostname, public_key, status, version, last_heartbeat_at
+      id, instance_id, hostname, public_key, status, version, last_heartbeat_at
     )
     VALUES (
-      ${agentId}, ${orgId}, 'ops-agent-01', 'public-key-system-health', 'active', 'v0.1.0', NOW()
+      ${agentId}, ${instanceId}, 'ops-agent-01', 'public-key-system-health', 'active', 'v0.1.0', NOW()
     )
   `
   await sql`
     INSERT INTO hosts (
-      id, organisation_id, agent_id, hostname, os, status, last_seen_at
+      id, instance_id, agent_id, hostname, os, status, last_seen_at
     )
     VALUES (
-      ${hostId}, ${orgId}, ${agentId}, 'ops-agent-01', 'linux', 'online', NOW()
+      ${hostId}, ${instanceId}, ${agentId}, 'ops-agent-01', 'linux', 'online', NOW()
     )
   `
   await sql`
@@ -46,31 +46,31 @@ test('admin can view ingest status, agent errors, and upgrade counts', async ({ 
   `
   await sql`
     INSERT INTO agent_queries (
-      id, organisation_id, host_id, query_type, status, error, requested_at, completed_at, expires_at
+      id, instance_id, host_id, query_type, status, error, requested_at, completed_at, expires_at
     )
     VALUES (
-      ${createId()}, ${orgId}, ${hostId}, 'list_services', 'error', 'service inventory timed out', NOW() - INTERVAL '1 minute', NOW(), NOW() + INTERVAL '1 hour'
+      ${createId()}, ${instanceId}, ${hostId}, 'list_services', 'error', 'service inventory timed out', NOW() - INTERVAL '1 minute', NOW(), NOW() + INTERVAL '1 hour'
     )
   `
   const taskRunId = createId()
   const taskRunHostId = createId()
   await sql`
     INSERT INTO task_runs (
-      id, organisation_id, triggered_by, target_type, target_id,
+      id, instance_id, triggered_by, target_type, target_id,
       task_type, config, max_parallel, status, created_at, updated_at
     )
     VALUES (
-      ${taskRunId}, ${orgId}, NULL, 'host', ${hostId},
+      ${taskRunId}, ${instanceId}, NULL, 'host', ${hostId},
       'software_inventory', '{}', 1, 'failed', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '2 minutes'
     )
   `
   await sql`
     INSERT INTO task_run_hosts (
-      id, organisation_id, task_run_id, host_id, status, exit_code,
+      id, instance_id, task_run_id, host_id, status, exit_code,
       raw_output, error_message, started_at, completed_at, created_at, updated_at
     )
     VALUES (
-      ${taskRunHostId}, ${orgId}, ${taskRunId}, ${hostId}, 'failed', -1,
+      ${taskRunHostId}, ${instanceId}, ${taskRunId}, ${hostId}, 'failed', -1,
       'collecting installed packages... collected 690 packages (source: dpkg), streaming to server... chunk 0 sent (500 packages) chunk 1 sent (190 packages)',
       'streaming packages: closing stream: rpc error: code = Unauthenticated desc = invalid token',
       NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '2 minutes'

@@ -1,12 +1,12 @@
 import { pgTable, text, timestamp, jsonb, integer, boolean } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 
 export const ldapConfigurations = pgTable('ldap_configurations', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   name: text('name').notNull(),
   host: text('host').notNull(),
   port: integer('port').notNull().default(389),

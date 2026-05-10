@@ -1,6 +1,6 @@
 import { boolean, index, jsonb, pgTable, real, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { softwarePackages } from './software.ts'
 
@@ -33,7 +33,7 @@ export const vulnerabilityCves = pgTable('vulnerability_cves', {
 
 export const hostVulnerabilityFindings = pgTable('host_vulnerability_findings', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
   softwarePackageId: text('software_package_id').notNull().references(() => softwarePackages.id),
   cveId: text('cve_id').notNull().references(() => vulnerabilityCves.cveId),
@@ -54,11 +54,11 @@ export const hostVulnerabilityFindings = pgTable('host_vulnerability_findings', 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  uniqueIndex('host_vuln_findings_uniq').on(t.organisationId, t.hostId, t.softwarePackageId, t.cveId),
-  index('host_vuln_findings_org_status_idx').on(t.organisationId, t.status, t.severity),
+  uniqueIndex('host_vuln_findings_uniq').on(t.instanceId, t.hostId, t.softwarePackageId, t.cveId),
+  index('host_vuln_findings_org_status_idx').on(t.instanceId, t.status, t.severity),
   index('host_vuln_findings_host_status_idx').on(t.hostId, t.status),
   index('host_vuln_findings_cve_idx').on(t.cveId),
-  index('host_vuln_findings_confidence_idx').on(t.organisationId, t.status, t.confidence),
+  index('host_vuln_findings_confidence_idx').on(t.instanceId, t.status, t.confidence),
 ])
 
 export type VulnerabilityCve = typeof vulnerabilityCves.$inferSelect

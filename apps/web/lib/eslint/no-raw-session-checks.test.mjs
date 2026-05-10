@@ -34,19 +34,19 @@ test('no-raw-session-checks allows helper-based checks', () => {
   assert.deepEqual(
     lint(`
       async function run() {
-        const session = await requireOrgAccess(orgId)
+        const session = await requireInstanceAccess(instanceId)
         if (!hasRole(session.user, ADMIN_ROLES)) return { error: 'forbidden' }
-        if (!isSameOrg(session.user, note)) return []
+        if (!isSameInstance(session.user, note)) return []
       }
     `),
     [],
   )
 })
 
-test('no-raw-session-checks flags direct organisation and role comparisons', () => {
+test('no-raw-session-checks flags direct instance and role comparisons', () => {
   const messages = lint(`
     async function run() {
-      if (session.user.organisationId !== orgId) return { error: 'Organisation mismatch' }
+      if (session.user.instanceId !== instanceId) return { error: 'Instance mismatch' }
       if (session.user.role === 'read_only') return { error: 'Insufficient permissions' }
       if (!ADMIN_ROLES.includes(session.user.role)) return { error: 'forbidden' }
     }

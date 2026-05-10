@@ -15,7 +15,7 @@ function getActionSegment(action) {
 }
 
 test('calendar mutations require write access but list requires org access', () => {
-  assert.match(getActionSegment('listCalendarEvents'), /await requireOrgAccess\(orgId\)/)
+  assert.match(getActionSegment('listCalendarEvents'), /await requireInstanceAccess\(instanceId\)/)
 
   for (const action of [
     'createCalendarEvent',
@@ -25,7 +25,7 @@ test('calendar mutations require write access but list requires org access', () 
   ]) {
     assert.match(
       getActionSegment(action),
-      /await requireOrgWriteAccess\(orgId\)/,
+      /await requireInstanceWriteAccess\(instanceId\)/,
       `${action} must allow engineers and admins while blocking read-only users`,
     )
   }
@@ -35,7 +35,7 @@ test('calendar create is idempotent and guarded by a mutation rate limiter', () 
   const segment = getActionSegment('createCalendarEvent')
 
   assert.match(segment, /clientRequestId/)
-  assert.match(segment, /checkMutationLimit\(orgId, session\.user\.id\)/)
+  assert.match(segment, /checkMutationLimit\(instanceId, session\.user\.id\)/)
   assert.match(segment, /existingIdempotentEvent/)
 })
 

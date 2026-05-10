@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.7](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.6...ingest/v0.9.7) (2026-05-10)
+
+
+### Bug Fixes
+
+* **ingest:** remove org-scoped agent identity ([#1248](https://github.com/carrtech-dev/ct-ops/issues/1248)) ([3be0471](https://github.com/carrtech-dev/ct-ops/commit/3be047199c6e96c3fe1bd6f5320f8911991dbc35))
+
 ## [0.9.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.5...ingest/v0.9.6) (2026-05-09)
 
 

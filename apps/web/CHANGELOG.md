@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.130.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.3...web/v0.130.0) (2026-05-10)
+
+
+### Features
+
+* **web:** remove org inputs from reporting surfaces ([bb0e67f](https://github.com/carrtech-dev/ct-ops/commit/bb0e67ffcb00ca05fbdca4fbed09cc22456ea210))
+* **web:** remove org inputs from reporting surfaces ([98fa687](https://github.com/carrtech-dev/ct-ops/commit/98fa68711c0b272fc2b9d7fe035cb15093031539))
+
 ## [0.129.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.2...web/v0.129.3) (2026-05-10)
 
 

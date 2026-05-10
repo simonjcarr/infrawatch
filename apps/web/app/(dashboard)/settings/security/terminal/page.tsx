@@ -18,7 +18,9 @@ export default async function TerminalAccessSettingsPage() {
     redirect('/settings')
   }
 
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
+  if (!orgId) return null
+
   const org = await db.query.organisations.findFirst({
     where: eq(organisations.id, orgId),
   })

@@ -2,7 +2,7 @@
 
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 import { getRequiredSession } from '@/lib/auth/session'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 
 import { db } from '@/lib/db'
 import { notifications } from '@/lib/db/schema'
@@ -14,7 +14,8 @@ export async function getNotifications(
   offset = 0,
 ): Promise<Notification[]> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
+  const orgId = resolveOptionalActionScope(authSession)
+  if (!orgId) return []
   const session = await requireOrgAccess(orgId)
   return db.query.notifications.findMany({
     where: and(
@@ -30,7 +31,8 @@ export async function getNotifications(
 
 export async function getUnreadCount(): Promise<number> {
   const authSession = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(authSession)
+  const orgId = resolveOptionalActionScope(authSession)
+  if (!orgId) return 0
   const session = await requireOrgAccess(orgId)
   const [result] = await db
     .select({ value: count() })

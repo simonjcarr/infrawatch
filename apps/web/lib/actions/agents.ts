@@ -26,11 +26,27 @@ import {
   type HostWithAgent,
   type MetricsQuery,
 } from './agents-core'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
+
+const EMPTY_HOST_PAGE: HostListResult = { hosts: [], total: 0 }
+const EMPTY_HOST_INVENTORY_STATS: HostInventoryStats = {
+  total: 0,
+  online: 0,
+  offline: 0,
+  unknown: 0,
+  pending: 0,
+  staleHosts: 0,
+  highCpu: 0,
+  highMemory: 0,
+  highDisk: 0,
+  hostsWithFiringAlerts: 0,
+  osBreakdown: [],
+}
 
 export async function listPendingAgents(...args: [] | [string]): Promise<Agent[]> {
   const session = await getRequiredSession()
-  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  const currentScope = args[0] ?? resolveOptionalActionScope(session)
+  if (!currentScope) return []
   return listPendingAgentsCore(currentScope)
 }
 
@@ -54,7 +70,8 @@ export async function rejectAgent(
 
 export async function listHosts(...args: [] | [string]): Promise<HostWithAgent[]> {
   const session = await getRequiredSession()
-  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  const currentScope = args[0] ?? resolveOptionalActionScope(session)
+  if (!currentScope) return []
   return listHostsCore(currentScope)
 }
 
@@ -62,7 +79,8 @@ export async function listHostsPaginated(
   ...args: [HostListParams?] | [string, HostListParams?]
 ): Promise<HostListResult> {
   const session = await getRequiredSession()
-  const currentScope = args.length === 2 ? args[0] : resolveCurrentActionScope(session)
+  const currentScope = args.length === 2 ? args[0] : resolveOptionalActionScope(session)
+  if (!currentScope) return EMPTY_HOST_PAGE
   const params: HostListParams | undefined =
     args.length === 2 ? args[1] : args[0] as HostListParams | undefined
   return listHostsPaginatedCore(currentScope, params)
@@ -70,13 +88,15 @@ export async function listHostsPaginated(
 
 export async function getHostInventoryStats(...args: [] | [string]): Promise<HostInventoryStats> {
   const session = await getRequiredSession()
-  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  const currentScope = args[0] ?? resolveOptionalActionScope(session)
+  if (!currentScope) return EMPTY_HOST_INVENTORY_STATS
   return getHostInventoryStatsCore(currentScope)
 }
 
 export async function listDistinctHostOses(...args: [] | [string]): Promise<string[]> {
   const session = await getRequiredSession()
-  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  const currentScope = args[0] ?? resolveOptionalActionScope(session)
+  if (!currentScope) return []
   return listDistinctHostOsesCore(currentScope)
 }
 
@@ -96,7 +116,9 @@ export async function createEnrolmentToken(
 
 export async function listEnrolmentTokens(): Promise<EnrolmentTokenSafe[]> {
   const session = await getRequiredSession()
-  return listEnrolmentTokensCore(resolveCurrentActionScope(session))
+  const currentScope = resolveOptionalActionScope(session)
+  if (!currentScope) return []
+  return listEnrolmentTokensCore(currentScope)
 }
 
 export async function revokeEnrolmentToken(

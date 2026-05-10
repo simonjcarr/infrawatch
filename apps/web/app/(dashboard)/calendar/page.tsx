@@ -11,8 +11,24 @@ export const metadata: Metadata = {
 
 export default async function OperationsCalendarPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
   const canEdit = hasRole(session.user, MEMBERSHIP_ROLES)
+
+  if (!orgId) {
+    return (
+      <OperationsCalendarClient
+        orgId=""
+        canEdit={canEdit}
+        initialHosts={[]}
+        initialUsers={[{
+          id: session.user.id,
+          name: session.user.name,
+          email: session.user.email,
+          role: session.user.role,
+        }]}
+      />
+    )
+  }
 
   const [hostResult, userResult] = await Promise.all([
     searchCalendarHosts(orgId, { limit: 100 }),

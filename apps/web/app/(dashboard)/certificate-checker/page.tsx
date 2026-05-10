@@ -11,6 +11,6 @@ export const metadata: Metadata = {
 export default async function CertificateCheckerPage() {
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId ?? ''
   return <CertificateCheckerClient orgId={orgId} />
 }

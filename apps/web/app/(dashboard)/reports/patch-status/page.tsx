@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
 import { getPatchManagementReport } from '@/lib/actions/patch-status'
+import { createEmptyPatchManagementReport } from '@/lib/standalone-empty-state'
 import { PatchStatusReportClient } from './patch-status-report-client'
 
 export const metadata: Metadata = {
@@ -9,8 +10,8 @@ export const metadata: Metadata = {
 
 export default async function PatchStatusReportPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
 
-  const report = await getPatchManagementReport(orgId)
+  const report = orgId ? await getPatchManagementReport(orgId) : createEmptyPatchManagementReport()
   return <PatchStatusReportClient report={report} />
 }

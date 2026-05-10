@@ -85,7 +85,8 @@ const updateLdapConfigSchema = z.object({
 
 export async function getLdapConfigurations(
 ): Promise<LdapConfigurationSafe[]> {
-  const orgId = await getInstanceOrganisationId()
+  const orgId = await getDefaultOrganisationId()
+  if (!orgId) return []
   await requireOrgAdminAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(

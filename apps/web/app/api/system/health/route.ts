@@ -9,7 +9,8 @@ import {
   type IngestSnapshotSummaryRow,
 } from '@/lib/system/health'
 import pkg from '../../../../package.json'
-import { ApiAuthError, getApiOrgAdminSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiSession } from '@/lib/auth/session'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,15 +23,39 @@ function summariseAgentError(message: string) {
 export async function GET() {
   let session
   try {
-    session = await getApiOrgAdminSession()
+    session = await getApiSession()
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return Response.json({ error: err.message }, { status: err.status })
     }
     throw err
   }
+  if (!ADMIN_ROLES.includes(session.user.role)) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const orgId = session.user.organisationId
+  if (!orgId) {
+    const ingestSummary = calculateIngestHealthSummary([], [])
+    const agentUpgradeSummary = calculateAgentUpgradeSummary([], REQUIRED_AGENT_VERSION)
+    return Response.json({
+      version: pkg.version,
+      licenceTier: 'community',
+      metricRetentionDays: 30,
+      database: { connected: true },
+      agents: {
+        online: 0,
+        offline: 0,
+        total: 0,
+        upgrades: agentUpgradeSummary,
+        errors: [],
+      },
+      ingest: {
+        ...ingestSummary,
+        servers: [],
+      },
+    })
+  }
 
   const [agentRows, org, agentVersionRows, ingestLatestRows, ingestHistoryRows, agentErrorRows] = await Promise.all([
     db

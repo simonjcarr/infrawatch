@@ -11,7 +11,11 @@ export const metadata: Metadata = {
 
 export default async function VulnerabilityReportPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
+
+  if (!orgId) {
+    return <VulnerabilityReportClient orgId="" hostGroups={[]} />
+  }
 
   const groups = await db.query.hostGroups.findMany({
     where: and(eq(hostGroups.organisationId, orgId), isNull(hostGroups.deletedAt)),

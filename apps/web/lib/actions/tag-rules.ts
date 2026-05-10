@@ -11,7 +11,7 @@ import type { HostFilter, TagRule, TagPair } from '@/lib/db/schema'
 import { and, eq, isNull } from 'drizzle-orm'
 import { buildHostFilterWhere, isEmptyFilter, type HostFilterResult } from '@/lib/hosts/filter'
 import { assignTagsToResource } from '@/lib/actions/tags'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 
 const tagPairSchema = z.object({
   key: z.string().min(1).max(100),
@@ -98,7 +98,8 @@ export async function bulkAssignTags(
 
 export async function listTagRules(): Promise<TagRule[]> {
   const session = await getRequiredSession()
-  const orgId = resolveCurrentActionScope(session)
+  const orgId = resolveOptionalActionScope(session)
+  if (!orgId) return []
   await requireOrgAccess(orgId)
   return db.query.tagRules.findMany({
     where: and(eq(tagRules.organisationId, orgId), isNull(tagRules.deletedAt)),

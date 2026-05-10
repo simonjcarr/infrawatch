@@ -13,7 +13,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { writeAuditEvent } from '@/lib/audit/events'
 import { ASSIGNED_ROLES, INVITABLE_ROLES, getPrimaryRole, normalizeAssignedRoles } from '@/lib/auth/roles'
 import { assertCanReserveUserSeat, toSeatLimitErrorMessage } from '@/lib/actions/seat-enforcement'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -34,7 +34,8 @@ function hasSuperAdminRole(role: string | null | undefined, roles: readonly stri
 
 export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
   const session = await getRequiredSession()
-  const currentScope = resolveCurrentActionScope(session)
+  const currentScope = resolveOptionalActionScope(session)
+  if (!currentScope) return { members: [session.user], pendingInvites: [] }
   await requireOrgAccess(currentScope)
 
   const [members, pendingInvites] = await Promise.all([

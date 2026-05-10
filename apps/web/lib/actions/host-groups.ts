@@ -1,7 +1,7 @@
 'use server'
 
 import { getRequiredSession } from '@/lib/auth/session'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 import {
   addHostToGroup as addHostToGroupCore,
   createGroup as createGroupCore,
@@ -49,7 +49,8 @@ export async function listGroups(
   ...args: [] | [string]
 ): Promise<HostGroupWithCount[]> {
   const session = await getRequiredSession()
-  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  const currentScope = args[0] ?? resolveOptionalActionScope(session)
+  if (!currentScope) return []
   return listGroupsCore(currentScope)
 }
 

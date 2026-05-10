@@ -1,7 +1,7 @@
 'use server'
 
 import { getRequiredSession } from '@/lib/auth/session'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 import {
   createSchedule as createScheduleCore,
   deleteSchedule as deleteScheduleCore,
@@ -20,7 +20,8 @@ export async function listSchedules(
   ...args: [] | [string]
 ): Promise<ScheduleWithTargetName[]> {
   const session = await getRequiredSession()
-  const currentScope = args[0] ?? resolveCurrentActionScope(session)
+  const currentScope = args[0] ?? resolveOptionalActionScope(session)
+  if (!currentScope) return []
   return listSchedulesCore(currentScope)
 }
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.129.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.1...web/v0.129.2) (2026-05-10)
+
+
+### Bug Fixes
+
+* **web:** allow standalone sidebar routes ([c77d54b](https://github.com/carrtech-dev/ct-ops/commit/c77d54b8cc3b2d91adc0a7c55d05663c0823d2f6))
+
 ## [0.129.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.0...web/v0.129.1) (2026-05-10)
 
 

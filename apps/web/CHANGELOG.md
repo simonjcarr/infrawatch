@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.2...web/v0.131.3) (2026-05-10)
+
+
+### Bug Fixes
+
+* **password-manager:** fetch rotation public keys ([f2a9acf](https://github.com/carrtech-dev/ct-ops/commit/f2a9acff5993201b5860a7942a2fa9bc8688df2d))
+
 ## [0.131.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.1...web/v0.131.2) (2026-05-10)
 
 

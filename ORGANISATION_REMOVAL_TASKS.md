@@ -986,7 +986,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1250](https://github.com/carrtech-dev/ct-ops/pull/1250)
 
 Summary: Removed organisation-scoped identity from the agent, ingest, and
 registration protobuf paths by renaming the public registration token to

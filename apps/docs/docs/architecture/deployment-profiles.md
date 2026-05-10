@@ -9,7 +9,7 @@ CT-Ops ships with three deployment profiles, each targeting a different scale. A
 | Profile | Queue | Ingest instances | Database | Suitable for |
 |---|---|---|---|---|
 | `single` | In-process (channels + WAL) | 1 | PostgreSQL (single node) | < 50 hosts, homelab, trial |
-| `standard` | Redpanda (single node) | 1 | PostgreSQL (single node) | Most organisations |
+| `standard` | Redpanda (single node) | 1 | PostgreSQL (single node) | Most production instances |
 | `ha` | Redpanda cluster | Multiple (behind HAProxy) | PostgreSQL primary + replica | High availability required |
 
 ---

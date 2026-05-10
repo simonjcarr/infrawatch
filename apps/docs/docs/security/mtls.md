@@ -71,7 +71,7 @@ downtime. The UI shows the overlap window.
 1. Agent boots, loads its Ed25519 keypair from `${DATA_DIR}/agent_key.pem`
    (generated on first ever start).
 2. Agent builds a DER-encoded PKCS#10 CSR signed with that key.
-3. Agent calls `Register(RegisterRequest{ csr_der, public_key, org_token, … })`.
+3. Agent calls `Register(RegisterRequest{ csr_der, public_key, enrolment_token, … })`.
 4. Ingest validates the CSR signature, stashes it in
    `pending_cert_signings`, and returns `status = pending` until an admin
    approves the agent (auto-approve tokens short-circuit this: the sign

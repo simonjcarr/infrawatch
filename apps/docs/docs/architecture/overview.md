@@ -40,7 +40,7 @@ The queue is abstracted behind an interface, allowing the implementation to be s
 | Profile | Queue type | When to use |
 |---|---|---|
 | `small` | In-process (Go channels + WAL) | < 50 hosts |
-| `standard` | Redpanda single node | Most organisations |
+| `standard` | Redpanda single node | Most production instances |
 | `ha` | Redpanda cluster | High availability required |
 
 ### Consumers

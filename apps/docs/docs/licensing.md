@@ -94,7 +94,7 @@ application. Validation does not require an outbound network connection.
 
 Every CT-Ops key can encode:
 
-- Install organisation (`sub`)
+- Installation identifier (`sub`)
 - Tier (`community` or `enterprise`)
 - User-seat limit (`maxUsers`)
 - Expiry (`exp`)
@@ -115,7 +115,7 @@ but CT-Ops commercial licensing uses user-seat capacity.
 
 The activation token binds the issued licence to the specific CT-Ops install.
 The server validates the licence signature, issuer, audience, expiry, and
-organisation binding locally before saving the key.
+installation binding locally before saving the key.
 
 For air-gapped installs, generate the activation token inside the air-gapped
 network, transfer it out to complete checkout, then transfer the returned

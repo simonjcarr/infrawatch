@@ -20,7 +20,7 @@ paired plugin instance, expose derived entitlement status to the plugin, and
 gate CT Ops-owned launch surfaces.
 
 This phase is especially important because some external plugin products may
-need to stay invisible in CT Ops unless the organization has a valid
+need to stay invisible in CT Ops unless the installation has a valid
 entitlement. No plugin nav item, settings card, search result, route teaser, or
 launch action should appear based only on frontend state or a
 customer-managed flag when the product policy requires backend-hidden
@@ -28,8 +28,8 @@ visibility.
 
 ## Goals
 
-- Keep plugin entitlements bound to the paired CT Ops installation, organization,
-  product, and plugin instance.
+- Keep plugin entitlements bound to the paired CT Ops installation, product,
+  and plugin instance.
 - Reuse one entitlement model for CT-CVE and future first-party plugins.
 - Ensure CT Ops-owned launch and visibility checks are enforceable server-side.
 - Let plugins fetch derived subscription status without learning licence secrets.
@@ -54,9 +54,9 @@ an imported CT Portal-issued licence artifact.
 
 | Object | Owned by | Responsibility |
 | --- | --- | --- |
-| Plugin request token | CT Ops + plugin | Proves a paired installation is requesting a plugin licence for a specific product, org, and instance. |
+| Plugin request token | CT Ops + plugin | Proves a paired installation is requesting a plugin licence for a specific product and plugin instance. |
 | Imported plugin licence artifact | CT Ops | Stores the signed CT Portal response needed for revalidation and audit. |
-| Derived entitlement record | CT Ops | Stores normalized product/org/instance binding, current status, and visibility decisions. |
+| Derived entitlement record | CT Ops | Stores normalized product/installation/instance binding, current status, and visibility decisions. |
 | Entitlement audit events | CT Ops | Records import, replacement, validation failure, revocation, expiry, and visibility transitions. |
 
 ### Suggested Entitlement Record Fields
@@ -65,7 +65,6 @@ Required normalized fields:
 
 - `pluginEntitlementId`
 - `product`, for example `ct-cve`
-- `organisationId`
 - `ctOpsInstallationId`
 - `pluginInstanceId`
 - `pluginKeyFingerprint`
@@ -134,7 +133,7 @@ Required request-token fields:
 | --- | --- |
 | `product` | Plugin product identifier. |
 | `ctOpsInstallationId` | Stable CT Ops installation identity from the broker. |
-| `orgId` | Organization that will own the entitlement. |
+| `ctOpsInstallationId` | CT Ops installation that will own the entitlement. |
 | `pluginInstanceId` | Paired plugin instance audience. |
 | `pluginKeyFingerprint` | Fingerprint of the paired plugin trust material. |
 | `visibilityPolicy` | Product gating policy expected by CT Ops. |
@@ -151,7 +150,7 @@ Request-token rules:
   CT Portal contract. Dual signing is preferred when practical because it proves
   both the CT Ops installation and the paired plugin instance agree on the
   request.
-- CT Portal must reject tokens whose `product`, `orgId`, `pluginInstanceId`, or
+- CT Portal must reject tokens whose `product`, `ctOpsInstallationId`, `pluginInstanceId`, or
   `pluginKeyFingerprint` do not match the paired installation contract.
 - CT Ops must log request-token creation without logging the raw token value.
 - Request tokens must be single use within their validity window.
@@ -165,7 +164,6 @@ Required binding claims:
 
 - `product`
 - `ctOpsInstallationId`
-- `organisationId`
 - `pluginInstanceId`
 - `pluginKeyFingerprint`
 - `plan`
@@ -180,14 +178,14 @@ Validation rules:
 
 - CT Ops must verify the licence signature against a pinned CT Portal verifier
   key set.
-- CT Ops must reject a licence whose installation, organization, product,
+- CT Ops must reject a licence whose installation, product,
   instance, or plugin-key fingerprint does not exactly match the paired plugin
   record.
 - Replaced or superseded licences must keep audit history but only one
   entitlement record may be authoritative for a given
-  `product + organisationId + pluginInstanceId`.
+  `product + ctOpsInstallationId + pluginInstanceId`.
 - Import failures must return machine-readable error codes such as
-  `invalid_signature`, `wrong_installation`, `wrong_organisation`,
+  `invalid_signature`, `wrong_installation`,
   `wrong_product`, `wrong_plugin_instance`, `wrong_plugin_key`,
   `expired_licence`, or `revoked_licence`.
 
@@ -195,13 +193,13 @@ Validation rules:
 
 1. An admin uses a generic CT Ops plugin-licence import path or installer
    workflow.
-2. CT Ops authenticates the admin, checks organization scope, and requires an
+2. CT Ops authenticates the admin, checks installation scope, and requires an
    existing paired plugin instance for the target product.
-3. CT Ops validates the CT Portal signature and exact installation/org/product/
+3. CT Ops validates the CT Portal signature and exact installation/product/
    instance binding.
 4. CT Ops stores the raw licence artifact encrypted at rest, writes the
    normalized entitlement row, and emits an audit event.
-5. CT Ops recalculates visibility for the product and organization.
+5. CT Ops recalculates visibility for the product and installation.
 6. CT Ops exposes only derived status to plugin or UI consumers.
 
 Periodic revalidation:
@@ -222,14 +220,14 @@ licence artifact.
 Suggested generic endpoint:
 
 ```text
-GET /api/plugins/v1/subscription-status?product=<product>&orgId=<orgId>&pluginInstanceId=<instanceId>
+GET /api/plugins/v1/subscription-status?product=<product>&ctOpsInstallationId=<ctOpsInstallationId>&pluginInstanceId=<instanceId>
 ```
 
 Required checks:
 
 - Service-to-service authentication using the signed token or mTLS contract
   already required for plugin integrations.
-- Organization binding.
+- Installation binding.
 - Product binding.
 - Plugin-instance binding.
 - Per-token rate limits and replay protection.
@@ -239,7 +237,7 @@ Suggested response:
 ```json
 {
   "product": "ct-cve",
-  "orgId": "org_123",
+  "ctOpsInstallationId": "ctops_inst_123",
   "pluginInstanceId": "ctcve_inst_123",
   "configured": true,
   "licensed": true,
@@ -300,7 +298,7 @@ Audit events should exist for:
 - plugin visibility enabled
 - plugin visibility disabled
 
-Audit rows must include actor, organization, product, plugin instance, status
+Audit rows must include actor, installation, product, plugin instance, status
 transition, and normalized error code, but never raw licence values.
 
 ## Security Considerations

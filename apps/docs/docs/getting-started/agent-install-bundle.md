@@ -16,7 +16,7 @@ Each zip contains everything needed to install the agent on one OS / architectur
 
 ## Who can generate a bundle
 
-Bundle generation is gated to **`super_admin`** and **`org_admin`** roles. Every bundle is scoped to the organisation of the requesting user.
+Bundle generation is gated to **`super_admin`** and **`org_admin`** roles. Every bundle is scoped to the CT-Ops instance of the requesting user.
 
 ## Generate and download
 
@@ -27,16 +27,16 @@ Bundle generation is gated to **`super_admin`** and **`org_admin`** roles. Every
 5. Choose how the enrolment token is handled:
    - **Create a new single-use token** (recommended). A fresh token is generated, limited to one use, and expires in the number of days you choose (default 7). The token is embedded in `agent.toml` and the install script.
    - **Embed an existing token**. Pick one of your active tokens — useful when you have a long-lived token shared across a rollout batch.
-   - **No token**. The bundle ships without a token. The operator exports `CT_OPS_ORG_TOKEN` on the target host before running the install script.
+  - **No token**. The bundle ships without a token. The operator exports `CT_OPS_ENROLMENT_TOKEN` on the target host before running the install script.
 6. Optionally override the **ingest address** (defaults to `<this-server>:9443`).
 7. Optionally add **tags** as `key:value` pairs. These are baked into
    `agent.toml` and passed as `--tag` flags by the install script, so every
    host installed from the bundle registers with those tags. See
-   [Tags](../features/tags.md) for how tags are merged with org defaults and
+   [Tags](../features/tags.md) for how tags are merged with instance defaults and
    CLI flags.
 8. Click **Download**. The browser downloads `ct-ops-agent-<os>-<arch>.zip`.
 
-> **Heads up — token sensitivity.** When a token is embedded, treat the zip as sensitive: anyone with the file can register an agent against your organisation until the token is used, expired, or revoked. Single-use + short-expiry defaults limit the blast radius if the file leaks.
+> **Heads up — token sensitivity.** When a token is embedded, treat the zip as sensitive: anyone with the file can register an agent against your CT-Ops instance until the token is used, expired, or revoked. Single-use + short-expiry defaults limit the blast radius if the file leaks.
 
 ## Install on Linux / macOS
 
@@ -51,7 +51,7 @@ sudo ./install.sh
 If the bundle does **not** contain a token:
 
 ```sh
-export CT_OPS_ORG_TOKEN="<token-from-ui>"
+export CT_OPS_ENROLMENT_TOKEN="<token-from-ui>"
 sudo -E ./install.sh
 ```
 
@@ -68,7 +68,7 @@ From an elevated PowerShell session in the extracted bundle directory:
 If the bundle does **not** contain a token:
 
 ```powershell
-$env:CT_OPS_ORG_TOKEN = "<token-from-ui>"
+$env:CT_OPS_ENROLMENT_TOKEN = "<token-from-ui>"
 .\install.ps1
 ```
 

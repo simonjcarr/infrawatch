@@ -103,7 +103,7 @@ address = "ingest.corp.example.com:9443"
 ca_cert_file = "/etc/ct-ops/ca.crt"
 
 [agent]
-org_token = "tok_..."          # or CT_OPS_ORG_TOKEN env var
+enrolment_token = "tok_..."    # or CT_OPS_ENROLMENT_TOKEN env var
 data_dir  = "/var/lib/ct-ops/agent"
 version   = "0.1.0"
 heartbeat_interval_secs = 30
@@ -115,7 +115,7 @@ heartbeat_interval_secs = 30
 |---|---|
 | `CT_OPS_INGEST_ADDRESS` | `ingest.address` |
 | `CT_OPS_INGEST_CA_CERT` | `ingest.ca_cert_file` |
-| `CT_OPS_ORG_TOKEN` | `agent.org_token` |
+| `CT_OPS_ENROLMENT_TOKEN` | `agent.enrolment_token` |
 | `CT_OPS_DATA_DIR` | `agent.data_dir` |
 
 ---

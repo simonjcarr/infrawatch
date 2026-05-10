@@ -986,7 +986,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1250](https://github.com/carrtech-dev/ct-ops/pull/1250)
 
 Summary: Removed organisation-scoped identity from the agent, ingest, and
 registration protobuf paths by renaming the public registration token to
@@ -1042,19 +1042,31 @@ worktree that already has `apps/web/node_modules` available.
 
 ## Task 15 - Docs, Deploy, And External Contracts
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
 PR:
 
-Summary:
+Summary: Updated the public setup, licensing, deployment, and CT-CVE/plugin
+contract docs to describe CT-Ops as a standalone installation, replaced the
+old public `org_token` naming with `enrolment_token`, and removed the customer
+bundle's direct `organisations` query in favor of instance settings.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`, `README.md`,
+`.env.example`, `apps/web/.env.example`, `docs/{getting-started,agent,enrolment-tokens,ct-cve-migration-plan,ct-ops-ct-cve-api-contract,ct-ops-licensing-and-ct-cve-product-decision,ct-ops-plugin-entitlement-storage,ct-ops-plugin-identity-broker}.md`,
+`apps/docs/docs/{architecture,deployment,development,features,getting-started,licensing,security}`,
+`deploy/customer-bundle/{README.md,start.sh}`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile` (passes);
+`pnpm --dir apps/docs build` (passes after installing workspace deps in this
+fresh worktree); `rg -n "organisation|organization|orgId|organisationId|organisation_id|org_id|tenant|organisations" README.md docs apps/docs deploy .env.example apps/web/.env.example`
+(no matches); `rg -n "org_token|CT_OPS_ORG_TOKEN|agent\\.org_token" docs apps/docs deploy README.md .env.example apps/web/.env.example`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 16 next. A broader repository residue sweep still needs
+to cover code, tests, migrations, and non-doc paths outside the Task 15 doc
+and deploy validation scope.
 
 ### Required work
 

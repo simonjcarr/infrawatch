@@ -17,7 +17,7 @@ The **Service Accounts** page holds a manually-curated list of the service or do
 
 | Field | Description |
 |---|---|
-| **Username** | Unique within the organisation |
+| **Username** | Unique within the CT-Ops instance |
 | **Display Name** | Friendly label |
 | **Email** | Optional contact address |
 | **Status** | `active`, `disabled`, `locked`, or `expired` |

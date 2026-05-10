@@ -45,4 +45,4 @@ Deleting or editing the whole series affects the parent recurring event.
 | `engineer` | ✅ | ✅ |
 | `read_only` | ✅ | ❌ |
 
-All writes are validated on the server, scoped to the user's organisation, rate-limited, and recorded in the audit log.
+All writes are validated on the server, scoped to the user's CT-Ops instance, rate-limited, and recorded in the audit log.

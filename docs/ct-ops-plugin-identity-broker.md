@@ -13,7 +13,7 @@ Related:
 ## Context
 
 CT-CVE and future external CT Ops plugins need CT Ops to remain the
-installation entry point, identity provider, and organization authority without
+installation entry point, identity provider, and installation authority without
 forcing each plugin to run its own user database. The existing product
 decision record and CT-CVE API contract already define that direction, but
 they stop short of a concrete shared broker design for pairing, trust storage,
@@ -51,7 +51,7 @@ That missing broker detail now blocks multiple follow-on tasks:
 | Component | Owned by | Responsibility |
 | --- | --- | --- |
 | Installation identity | CT Ops | Stable installation identifier plus signing keys for plugin launch assertions. |
-| Plugin instance registry | CT Ops | Tracks paired plugin instances, allowed origins/URLs, product, org scope, keys, and revocation state. |
+| Plugin instance registry | CT Ops | Tracks paired plugin instances, allowed origins/URLs, product, installation scope, keys, and revocation state. |
 | Pairing endpoint | Plugin + CT Ops | Exchanges trust material and registers an instance relationship. |
 | Launch service | CT Ops | Issues short-lived signed user assertions for a specific plugin instance. |
 | Plugin verifier | Plugin | Verifies CT Ops assertions against pinned CT Ops trust material. |
@@ -91,7 +91,7 @@ Required registry fields:
 
 - `pluginInstanceId`
 - `product`, for example `ct-cve`
-- `organisationId`
+- `ctOpsInstallationId`
 - `displayName`
 - `launchUrl`
 - `allowedOrigins`
@@ -108,7 +108,7 @@ Registry invariants:
 - Every launch target must be explicitly registered; CT Ops must never redirect
   users to an arbitrary plugin URL.
 - The `product` claim and the registered plugin instance must agree.
-- A plugin instance belongs to exactly one CT Ops organization scope.
+- A plugin instance belongs to exactly one CT Ops installation scope.
 - Revoked or disabled instances cannot receive fresh user assertions.
 - Trust material changes are auditable and require org-admin or super-admin
   authority.
@@ -122,7 +122,7 @@ Minimum pairing flow:
 
 1. An administrator creates or starts plugin registration inside CT Ops.
 2. CT Ops generates a one-time pairing challenge bound to the installation,
-   organization, product, and intended plugin origin.
+   product, and intended plugin origin.
 3. The plugin receives the challenge through a plugin-owned pairing endpoint and
    returns its `pluginInstanceId`, product identifier, public verification key,
    canonical launch URL, and allowed browser origins.
@@ -137,13 +137,13 @@ Pairing rules:
 - CT Ops must reject a plugin response whose product or origin does not match
   the admin-approved target.
 - Plugins must pin the CT Ops installation identity and reject assertions from
-  any other issuer, even if usernames and org IDs look plausible.
+  any other issuer, even if usernames and installation IDs look plausible.
 - Re-pairing rotates trust material but must preserve an auditable history.
 
 ## Launch Assertions
 
-CT Ops launches a plugin by minting a compact signed assertion for one user, one
-organization, one plugin instance, and one product.
+CT Ops launches a plugin by minting a compact signed assertion for one user,
+one installation, one plugin instance, and one product.
 
 Format:
 
@@ -158,8 +158,8 @@ Required claims:
 | `iss` | CT Ops issuer for the paired installation. |
 | `aud` | Exact `pluginInstanceId`. |
 | `sub` | CT Ops user identifier. |
-| `orgId` | CT Ops organization identifier. |
-| `orgSlug` | Optional human-readable diagnostics only. |
+| `ctOpsInstallationId` | CT Ops installation identifier. |
+| `instanceSlug` | Optional human-readable diagnostics only. |
 | `product` | Plugin product identifier such as `ct-cve`. |
 | `roles` | CT Ops roles available to the plugin. |
 | `permissions` | Optional derived permissions for plugin launch decisions. |
@@ -172,10 +172,10 @@ Assertion rules:
 - Assertions must not contain secrets, licence keys, API tokens, plugin config,
   customer data, product-owned credentials, or other sensitive payloads.
 - CT Ops issues assertions only after backend checks confirm the user session is
-  active, the user still belongs to the organization, seat admission has not
-  blocked the user, and the plugin instance is active for that product/org.
+  active, the user still belongs to the installation, seat admission has not
+  blocked the user, and the plugin instance is active for that product.
 - Assertions are audience-bound to one plugin instance and cannot be reused for
-  another plugin or another organization.
+  another plugin or another installation.
 - Assertions are delivered by redirect, iframe bootstrap, or CT Ops-hosted
   proxy launch, but they are never written to logs or durable analytics.
 
@@ -202,7 +202,7 @@ After launch, the plugin verifies the assertion before creating a local session.
 Verification requirements:
 
 - Check signature against the pinned CT Ops public key set.
-- Check `iss`, `aud`, `product`, `orgId`, `exp`, and `jti`.
+- Check `iss`, `aud`, `product`, `ctOpsInstallationId`, `exp`, and `jti`.
 - Reject replayed `jti` values during the assertion lifetime.
 - Reject assertions for disabled or revoked plugin instances.
 
@@ -214,7 +214,7 @@ Plugin-local session rules:
   embedding genuinely requires it, plus CSRF protections on plugin mutations.
 - Keep plugin sessions short lived. Default policy is a 15-minute idle timeout
   and a bounded absolute lifetime; higher-risk plugins may shorten further.
-- Store the source `jti`, user ID, org ID, product, and plugin instance ID on
+- Store the source `jti`, user ID, installation ID, product, and plugin instance ID on
   the session row so later checks can invalidate the session precisely.
 
 ## Revocation And Session Status
@@ -223,7 +223,7 @@ Revocation has to cover more than assertion expiry. The broker therefore uses
 three layers:
 
 1. CT Ops stops issuing new assertions immediately when the user loses access,
-   the organization mapping changes, or the plugin instance is disabled.
+   the installation mapping changes, or the plugin instance is disabled.
 2. Plugins keep local sessions short lived so stale access naturally expires on
    a bounded timeline.
 3. Plugins can call a CT Ops session-status endpoint on sensitive or periodic
@@ -242,7 +242,7 @@ Request body:
 {
   "pluginInstanceId": "plugin_inst_123",
   "product": "ct-cve",
-  "orgId": "org_123",
+  "ctOpsInstallationId": "ctops_inst_123",
   "userId": "user_123",
   "sid": "sess_123"
 }
@@ -256,7 +256,7 @@ Response shape:
   "reason": "ok",
   "userStillAuthorized": true,
   "pluginInstanceActive": true,
-  "organisationMatch": true
+  "installationMatch": true
 }
 ```
 
@@ -274,10 +274,10 @@ Rules:
 CT Ops backend checks before issuing a launch assertion:
 
 - Authenticated CT Ops user session exists and is not revoked.
-- User belongs to the requested organization.
+- User belongs to the requested installation.
 - User is still admitted under CT Ops seat rules.
 - Plugin instance is active, paired, and registered for the requested product
-  and organization.
+  and installation.
 - The launch route is authorized for the user role.
 
 Plugin backend checks after launch:
@@ -296,7 +296,7 @@ Plugin backend checks after launch:
 
 ### CT-CVE
 
-- CT-CVE uses the broker only for operator identity and organization scope.
+- CT-CVE uses the broker only for operator identity and installation scope.
 - CT-CVE still owns feed credentials, source configuration, and vulnerability
   processing in its own service and database.
 

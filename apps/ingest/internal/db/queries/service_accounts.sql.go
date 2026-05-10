@@ -24,12 +24,12 @@ type ServiceAccountRow struct {
 }
 
 // UpsertServiceAccount inserts or updates a service account by the natural key
-// (organisation_id, host_id, username). Returns the ID, whether it was an insert,
+// (instance_id, host_id, username). Returns the ID, whether it was an insert,
 // and the previous row (nil on insert).
 func UpsertServiceAccount(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID string,
+	instanceID, hostID string,
 	username string, uid, gid int,
 	homeDir, shell, accountType string,
 	hasLogin, hasProcs, accountLocked bool,
@@ -40,14 +40,14 @@ func UpsertServiceAccount(
 		SELECT id, username, uid, gid, home_directory, shell, account_type,
 		       has_login_capability, has_running_processes, status
 		FROM service_accounts
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host_id = $2
 		  AND username = $3
 		  AND deleted_at IS NULL
 		LIMIT 1
 	`
 	var existing ServiceAccountRow
-	rowErr := pool.QueryRow(ctx, selectQ, orgID, hostID, username).Scan(
+	rowErr := pool.QueryRow(ctx, selectQ, instanceID, hostID, username).Scan(
 		&existing.ID, &existing.Username, &existing.UID, &existing.GID,
 		&existing.HomeDirectory, &existing.Shell, &existing.AccountType,
 		&existing.HasLoginCapability, &existing.HasRunningProcesses, &existing.Status,
@@ -60,7 +60,7 @@ func UpsertServiceAccount(
 	if errors.Is(rowErr, pgx.ErrNoRows) {
 		const insertQ = `
 			INSERT INTO service_accounts (
-				id, organisation_id, host_id, username,
+				id, instance_id, host_id, username,
 				uid, gid, home_directory, shell, account_type,
 				has_login_capability, has_running_processes,
 				account_locked, password_expires_at, password_last_changed_at,
@@ -79,7 +79,7 @@ func UpsertServiceAccount(
 		newID := newCUID()
 		var returnedID string
 		err = pool.QueryRow(ctx, insertQ,
-			newID, orgID, hostID, username,
+			newID, instanceID, hostID, username,
 			uid, gid, homeDir, shell, accountType,
 			hasLogin, hasProcs,
 			accountLocked, passwordExpiresAt, passwordLastChangedAt,
@@ -124,17 +124,17 @@ func UpsertServiceAccount(
 func GetServiceAccountsForHost(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID string,
+	instanceID, hostID string,
 ) ([]ServiceAccountRow, error) {
 	const q = `
 		SELECT id, username, uid, gid, home_directory, shell, account_type,
 		       has_login_capability, has_running_processes, status
 		FROM service_accounts
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host_id = $2
 		  AND deleted_at IS NULL
 	`
-	rows, err := pool.Query(ctx, q, orgID, hostID)
+	rows, err := pool.Query(ctx, q, instanceID, hostID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,14 +170,14 @@ func UpdateServiceAccountStatus(
 func InsertIdentityEvent(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID string,
+	instanceID, hostID string,
 	serviceAccountID, sshKeyID *string,
 	eventType, message string,
 	metadataJSON []byte,
 ) error {
 	const q = `
 		INSERT INTO identity_events (
-			id, organisation_id, service_account_id, ssh_key_id, host_id,
+			id, instance_id, service_account_id, ssh_key_id, host_id,
 			event_type, message, occurred_at, metadata
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
 	`
@@ -186,7 +186,7 @@ func InsertIdentityEvent(
 		metaPtr = &metadataJSON
 	}
 	_, err := pool.Exec(ctx, q,
-		newCUID(), orgID, serviceAccountID, sshKeyID, hostID,
+		newCUID(), instanceID, serviceAccountID, sshKeyID, hostID,
 		eventType, message, metaPtr,
 	)
 	return err
@@ -196,15 +196,15 @@ func InsertIdentityEvent(
 func GetServiceAccountByUsername(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, username string,
+	instanceID, hostID, username string,
 ) (string, error) {
 	const q = `
 		SELECT id FROM service_accounts
-		WHERE organisation_id = $1 AND host_id = $2 AND username = $3 AND deleted_at IS NULL
+		WHERE instance_id = $1 AND host_id = $2 AND username = $3 AND deleted_at IS NULL
 		LIMIT 1
 	`
 	var id string
-	err := pool.QueryRow(ctx, q, orgID, hostID, username).Scan(&id)
+	err := pool.QueryRow(ctx, q, instanceID, hostID, username).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}

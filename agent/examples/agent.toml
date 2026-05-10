@@ -17,8 +17,8 @@ tls_skip_verify = false
 
 [agent]
 # Enrolment token from the CT-Ops UI (Administration → Agents → Enrolment)
-# Can also be set via CT_OPS_ORG_TOKEN environment variable.
-org_token = ""
+# Can also be set via CT_OPS_ENROLMENT_TOKEN environment variable.
+enrolment_token = ""
 
 # Directory where the agent stores its identity keypair and state.
 # Must be writable by the user running the agent.

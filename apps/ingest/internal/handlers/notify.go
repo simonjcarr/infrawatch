@@ -499,10 +499,10 @@ func dispatchTelegram(ctx context.Context, channels []queries.TelegramChannelRow
 
 // dispatchInApp creates an in-app notification row for each eligible user in the org.
 // alertInstanceID may be empty (cert alerts use a different instance query).
-func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, orgID, alertInstanceID, resourceType, resourceID string, event AlertEvent) {
-	settings, err := queries.GetOrgNotificationSettings(ctx, pool, orgID)
+func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, instanceID, alertInstanceID, resourceType, resourceID string, event AlertEvent) {
+	settings, err := queries.GetOrgNotificationSettings(ctx, pool, instanceID)
 	if err != nil {
-		slog.Warn("dispatchInApp: fetching org notification settings", "org_id", orgID, "err", err)
+		slog.Warn("dispatchInApp: fetching org notification settings", "instance_id", instanceID, "err", err)
 		// Proceed with defaults (already set by the query function on error)
 	}
 
@@ -510,9 +510,9 @@ func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, orgID, alertInstance
 		return
 	}
 
-	userIDs, err := queries.GetAlertTargetUsers(ctx, pool, orgID, settings.InAppRoles, settings.AllowUserOptOut)
+	userIDs, err := queries.GetAlertTargetUsers(ctx, pool, instanceID, settings.InAppRoles, settings.AllowUserOptOut)
 	if err != nil {
-		slog.Warn("dispatchInApp: fetching target users", "org_id", orgID, "err", err)
+		slog.Warn("dispatchInApp: fetching target users", "instance_id", instanceID, "err", err)
 		return
 	}
 	if len(userIDs) == 0 {
@@ -532,7 +532,7 @@ func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, orgID, alertInstance
 	rows := make([]queries.NotificationInsert, 0, len(userIDs))
 	for _, uid := range userIDs {
 		rows = append(rows, queries.NotificationInsert{
-			OrgID:           orgID,
+			InstanceID:      instanceID,
 			UserID:          uid,
 			AlertInstanceID: alertInstanceID,
 			Subject:         subject,
@@ -544,6 +544,6 @@ func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, orgID, alertInstance
 	}
 
 	if err := queries.InsertNotificationBatch(ctx, pool, rows); err != nil {
-		slog.Warn("dispatchInApp: inserting notifications", "org_id", orgID, "err", err)
+		slog.Warn("dispatchInApp: inserting notifications", "instance_id", instanceID, "err", err)
 	}
 }

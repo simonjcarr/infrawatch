@@ -98,11 +98,10 @@ func marshalKeyToPEM(key *rsa.PrivateKey) string {
 }
 
 // IssueAgentToken creates a signed JWT for an active agent.
-func (j *JWTIssuer) IssueAgentToken(agentID, orgID string) (string, error) {
+func (j *JWTIssuer) IssueAgentToken(agentID string) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		"sub": agentID,
-		"org": orgID,
 		"iss": j.issuer,
 		"iat": now.Unix(),
 		"exp": now.Add(j.tokenTTL).Unix(),
@@ -113,7 +112,7 @@ func (j *JWTIssuer) IssueAgentToken(agentID, orgID string) (string, error) {
 
 // ValidateAgentToken parses and validates an agent JWT.
 // Returns the agentID claim on success.
-func (j *JWTIssuer) ValidateAgentToken(tokenStr string) (agentID, orgID string, err error) {
+func (j *JWTIssuer) ValidateAgentToken(tokenStr string) (agentID string, err error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -122,27 +121,26 @@ func (j *JWTIssuer) ValidateAgentToken(tokenStr string) (agentID, orgID string, 
 	}, jwt.WithIssuedAt(), jwt.WithIssuer(j.issuer))
 
 	if err != nil {
-		return "", "", fmt.Errorf("invalid token: %w", err)
+		return "", fmt.Errorf("invalid token: %w", err)
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return "", "", fmt.Errorf("invalid token claims")
+		return "", fmt.Errorf("invalid token claims")
 	}
 
 	agentID, _ = claims["sub"].(string)
-	orgID, _ = claims["org"].(string)
 	if agentID == "" {
-		return "", "", fmt.Errorf("token missing sub claim")
+		return "", fmt.Errorf("token missing sub claim")
 	}
-	return agentID, orgID, nil
+	return agentID, nil
 }
 
 // ValidateAgentTokenAllowExpired parses an agent JWT, verifying the signature
 // and issuer but tolerating an expired token. This is used for the Terminal
 // gRPC handler where the agent may hold a JWT that outlived its TTL — the
 // agent identity is still trustworthy because the signature is valid.
-func (j *JWTIssuer) ValidateAgentTokenAllowExpired(tokenStr string) (agentID, orgID string, err error) {
+func (j *JWTIssuer) ValidateAgentTokenAllowExpired(tokenStr string) (agentID string, err error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -153,20 +151,19 @@ func (j *JWTIssuer) ValidateAgentTokenAllowExpired(tokenStr string) (agentID, or
 		jwt.WithLeeway(100*365*24*time.Hour))
 
 	if err != nil {
-		return "", "", fmt.Errorf("invalid token: %w", err)
+		return "", fmt.Errorf("invalid token: %w", err)
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return "", "", fmt.Errorf("invalid token claims")
+		return "", fmt.Errorf("invalid token claims")
 	}
 
 	agentID, _ = claims["sub"].(string)
-	orgID, _ = claims["org"].(string)
 	if agentID == "" {
-		return "", "", fmt.Errorf("token missing sub claim")
+		return "", fmt.Errorf("token missing sub claim")
 	}
-	return agentID, orgID, nil
+	return agentID, nil
 }
 
 // JWKSHandler returns an HTTP handler that serves the public key as JWKS.

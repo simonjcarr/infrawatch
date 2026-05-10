@@ -70,7 +70,7 @@ func fireSchedule(ctx context.Context, pool *pgxpool.Pool, s queries.DueSchedule
 		return
 	}
 
-	hostIDs, err := queries.ResolveScheduleTargetHosts(ctx, pool, s.OrgID, s.TargetType, s.TargetID, s.TaskType)
+	hostIDs, err := queries.ResolveScheduleTargetHosts(ctx, pool, s.InstanceID, s.TargetType, s.TargetID, s.TaskType)
 	if err != nil {
 		slog.Warn("schedule sweeper: resolving target hosts", "schedule_id", s.ID, "err", err)
 		return
@@ -86,7 +86,7 @@ func fireSchedule(ctx context.Context, pool *pgxpool.Pool, s queries.DueSchedule
 	}
 
 	taskRunID, err := queries.InsertScheduledTaskRun(
-		ctx, pool, s.ID, s.OrgID, s.TargetType, s.TargetID, s.TaskType, s.ConfigJSON, s.MaxParallel, hostIDs,
+		ctx, pool, s.ID, s.InstanceID, s.TargetType, s.TargetID, s.TaskType, s.ConfigJSON, s.MaxParallel, hostIDs,
 	)
 	if err != nil {
 		slog.Warn("schedule sweeper: inserting task run", "schedule_id", s.ID, "err", err)

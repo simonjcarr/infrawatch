@@ -30,12 +30,12 @@ type HostCollision struct {
 // An "online" match means a host is still heartbeating under a different
 // keypair, so the new registration must be rejected. An "offline" or "unknown"
 // match is a suspicious identity claim and must not mutate the existing row.
-func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname string, ips []string) (*HostCollision, error) {
+func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, instanceID, hostname string, ips []string) (*HostCollision, error) {
 	const q = `
 		SELECT h.id, COALESCE(h.agent_id, ''), h.hostname, h.status, COALESCE(a.status, '')
 		FROM hosts h
 		LEFT JOIN agents a ON a.id = h.agent_id
-		WHERE h.organisation_id = $1
+		WHERE h.instance_id = $1
 		  AND h.deleted_at IS NULL
 		  AND (
 		    h.hostname = $2
@@ -50,7 +50,7 @@ func FindHostCollision(ctx context.Context, pool *pgxpool.Pool, orgID, hostname 
 		ips = []string{}
 	}
 	ips = FilterHostIdentityIPs(ips)
-	row := pool.QueryRow(ctx, q, orgID, hostname, ips)
+	row := pool.QueryRow(ctx, q, instanceID, hostname, ips)
 	var c HostCollision
 	if err := row.Scan(&c.HostID, &c.AgentID, &c.Hostname, &c.HostStatus, &c.AgentStatus); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -128,9 +128,9 @@ func ReattachHostToAgent(ctx context.Context, pool *pgxpool.Pool, hostID, agentI
 // approveAgent (TS) can drain and apply them once the operator approves the
 // agent. The ingest auto-approve path applies tags directly via
 // AssignTagsToResource and passes nil/empty here.
-func InsertHost(ctx context.Context, pool *pgxpool.Pool, orgID, agentID, hostname, agentOS, agentArch string, pendingTags []TagPair) (string, error) {
+func InsertHost(ctx context.Context, pool *pgxpool.Pool, instanceID, agentID, hostname, agentOS, agentArch string, pendingTags []TagPair) (string, error) {
 	const q = `
-		INSERT INTO hosts (id, organisation_id, agent_id, hostname, os, arch, status, metadata)
+		INSERT INTO hosts (id, instance_id, agent_id, hostname, os, arch, status, metadata)
 		VALUES ($1, $2, $3, $4, NULLIF($5, ''), NULLIF($6, ''), 'unknown', $7::jsonb)
 		RETURNING id
 	`
@@ -144,7 +144,7 @@ func InsertHost(ctx context.Context, pool *pgxpool.Pool, orgID, agentID, hostnam
 		}
 		metaJSON = string(b)
 	}
-	err := pool.QueryRow(ctx, q, id, orgID, agentID, hostname, agentOS, agentArch, metaJSON).Scan(&returnedID)
+	err := pool.QueryRow(ctx, q, id, instanceID, agentID, hostname, agentOS, agentArch, metaJSON).Scan(&returnedID)
 	return returnedID, err
 }
 

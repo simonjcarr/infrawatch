@@ -90,7 +90,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 		}
 		if newStatus != row.Status && row.Status != "" {
 			if evErr := queries.InsertCertificateEvent(ctx, pool,
-				row.ID, row.OrgID,
+				row.ID, row.InstanceID,
 				newStatus, row.Status, newStatus,
 				fmt.Sprintf("Certificate status changed from %s to %s", row.Status, newStatus),
 				nil,
@@ -98,7 +98,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 				slog.Warn("cert refresh: insert status-change event", "err", evErr)
 			}
 		}
-		evaluateCertExpiryForCert(ctx, pool, row.OrgID, row.ID,
+		evaluateCertExpiryForCert(ctx, pool, row.InstanceID, row.ID,
 			leaf.Subject.CommonName, leaf.Issuer.CommonName,
 			row.Host, row.Port, leaf.NotAfter, newStatus)
 		return
@@ -119,7 +119,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 
 	newCertID, err := queries.InsertRenewedTrackedCert(
 		ctx, pool,
-		row.ID, row.OrgID,
+		row.ID, row.InstanceID,
 		row.Host, row.Port, row.ServerName,
 		commonName, issuer,
 		sans,
@@ -135,7 +135,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 
 	meta, _ := json.Marshal(map[string]string{"newCertificateId": newCertID})
 	if evErr := queries.InsertCertificateEvent(ctx, pool,
-		row.ID, row.OrgID,
+		row.ID, row.InstanceID,
 		"renewed", row.Status, "",
 		fmt.Sprintf("Certificate renewed: replaced by new fingerprint on %s:%d", row.Host, row.Port),
 		meta,
@@ -144,7 +144,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 	}
 
 	if evErr := queries.InsertCertificateEvent(ctx, pool,
-		newCertID, row.OrgID,
+		newCertID, row.InstanceID,
 		"renewed", "", newStatus,
 		fmt.Sprintf("Certificate renewed on %s:%d (CN: %s)", row.Host, row.Port, commonName),
 		nil,
@@ -154,7 +154,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 
 	if newStatus == "expiring_soon" || newStatus == "expired" {
 		if evErr := queries.InsertCertificateEvent(ctx, pool,
-			newCertID, row.OrgID,
+			newCertID, row.InstanceID,
 			newStatus, "", newStatus,
 			fmt.Sprintf("Certificate %s: expires %s", newStatus, leaf.NotAfter.Format("2006-01-02")),
 			nil,
@@ -163,7 +163,7 @@ func refreshTrackedCert(ctx context.Context, pool *pgxpool.Pool, row queries.Tra
 		}
 	}
 
-	evaluateCertExpiryForCert(ctx, pool, row.OrgID, newCertID,
+	evaluateCertExpiryForCert(ctx, pool, row.InstanceID, newCertID,
 		commonName, issuer, row.Host, row.Port, leaf.NotAfter, newStatus)
 
 	slog.Info("cert refresh: renewed",

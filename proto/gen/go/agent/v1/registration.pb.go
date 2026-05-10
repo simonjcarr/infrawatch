@@ -74,12 +74,12 @@ func (x *Tag) GetValue() string {
 }
 
 type RegisterRequest struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	OrgToken     string                 `protobuf:"bytes,1,opt,name=org_token,json=orgToken,proto3" json:"org_token,omitempty"`    // enrolment token from UI
-	PublicKey    string                 `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // PEM-encoded Ed25519 public key
-	PlatformInfo *PlatformInfo          `protobuf:"bytes,3,opt,name=platform_info,json=platformInfo,proto3" json:"platform_info,omitempty"`
-	AgentInfo    *AgentInfo             `protobuf:"bytes,4,opt,name=agent_info,json=agentInfo,proto3" json:"agent_info,omitempty"`
-	Tags         []*Tag                 `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"` // tags applied at registration (CLI + config merged)
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	EnrolmentToken string                 `protobuf:"bytes,1,opt,name=enrolment_token,json=enrolmentToken,proto3" json:"enrolment_token,omitempty"` // enrolment token from UI
+	PublicKey      string                 `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`                // PEM-encoded Ed25519 public key
+	PlatformInfo   *PlatformInfo          `protobuf:"bytes,3,opt,name=platform_info,json=platformInfo,proto3" json:"platform_info,omitempty"`
+	AgentInfo      *AgentInfo             `protobuf:"bytes,4,opt,name=agent_info,json=agentInfo,proto3" json:"agent_info,omitempty"`
+	Tags           []*Tag                 `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"` // tags applied at registration (CLI + config merged)
 	// DER-encoded PKCS#10 CSR signed with the agent's Ed25519 private key.
 	// Used by the ingest to mint a client cert for mTLS on subsequent calls.
 	// Empty for legacy agents — server will request one via HeartbeatResponse.
@@ -118,9 +118,9 @@ func (*RegisterRequest) Descriptor() ([]byte, []int) {
 	return file_agent_v1_registration_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RegisterRequest) GetOrgToken() string {
+func (x *RegisterRequest) GetEnrolmentToken() string {
 	if x != nil {
-		return x.OrgToken
+		return x.EnrolmentToken
 	}
 	return ""
 }
@@ -263,9 +263,9 @@ const file_agent_v1_registration_proto_rawDesc = "" +
 	"\x1bagent/v1/registration.proto\x12\bagent.v1\x1a\x14agent/v1/agent.proto\"-\n" +
 	"\x03Tag\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\xfa\x01\n" +
-	"\x0fRegisterRequest\x12\x1b\n" +
-	"\torg_token\x18\x01 \x01(\tR\borgToken\x12\x1d\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\x86\x02\n" +
+	"\x0fRegisterRequest\x12'\n" +
+	"\x0fenrolment_token\x18\x01 \x01(\tR\x0eenrolmentToken\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x02 \x01(\tR\tpublicKey\x12;\n" +
 	"\rplatform_info\x18\x03 \x01(\v2\x16.agent.v1.PlatformInfoR\fplatformInfo\x122\n" +

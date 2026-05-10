@@ -17,18 +17,18 @@ type SshKeyRow struct {
 	BitLength          int
 	Comment            string
 	KeySource          string
-	AssociatedUsername  string
+	AssociatedUsername string
 	ServiceAccountID   *string
 	Status             string
 	KeyAgeSeconds      *int
 }
 
 // UpsertSshKey inserts or updates an SSH key by the natural key
-// (organisation_id, host_id, fingerprint_sha256, file_path).
+// (instance_id, host_id, fingerprint_sha256, file_path).
 func UpsertSshKey(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID string,
+	instanceID, hostID string,
 	fingerprint, filePath string,
 	keyType string, bitLength int,
 	comment, keySource, associatedUsername string,
@@ -38,7 +38,7 @@ func UpsertSshKey(
 	const selectQ = `
 		SELECT id, status
 		FROM ssh_keys
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host_id = $2
 		  AND fingerprint_sha256 = $3
 		  AND file_path = $4
@@ -46,7 +46,7 @@ func UpsertSshKey(
 		LIMIT 1
 	`
 	var existingID, existingStatus string
-	rowErr := pool.QueryRow(ctx, selectQ, orgID, hostID, fingerprint, filePath).
+	rowErr := pool.QueryRow(ctx, selectQ, instanceID, hostID, fingerprint, filePath).
 		Scan(&existingID, &existingStatus)
 
 	if rowErr != nil && !errors.Is(rowErr, pgx.ErrNoRows) {
@@ -56,7 +56,7 @@ func UpsertSshKey(
 	if errors.Is(rowErr, pgx.ErrNoRows) {
 		const insertQ = `
 			INSERT INTO ssh_keys (
-				id, organisation_id, host_id, service_account_id,
+				id, instance_id, host_id, service_account_id,
 				key_type, bit_length, fingerprint_sha256, comment,
 				file_path, key_source, associated_username, status,
 				key_age_seconds, first_seen_at, last_seen_at, created_at, updated_at
@@ -71,7 +71,7 @@ func UpsertSshKey(
 		newID := newCUID()
 		var returnedID string
 		err = pool.QueryRow(ctx, insertQ,
-			newID, orgID, hostID, serviceAccountID,
+			newID, instanceID, hostID, serviceAccountID,
 			keyType, bitLength, fingerprint, comment,
 			filePath, keySource, associatedUsername,
 			keyAgeSeconds,
@@ -118,18 +118,18 @@ func UpsertSshKey(
 func GetSshKeysForHost(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID string,
+	instanceID, hostID string,
 ) ([]SshKeyRow, error) {
 	const q = `
 		SELECT id, fingerprint_sha256, file_path, key_type, bit_length,
 		       comment, key_source, associated_username, service_account_id,
 		       status, key_age_seconds
 		FROM ssh_keys
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host_id = $2
 		  AND deleted_at IS NULL
 	`
-	rows, err := pool.Query(ctx, q, orgID, hostID)
+	rows, err := pool.Query(ctx, q, instanceID, hostID)
 	if err != nil {
 		return nil, err
 	}

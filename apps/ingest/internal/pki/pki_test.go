@@ -51,7 +51,7 @@ func TestSignProducesVerifiableLeaf(t *testing.T) {
 	ca := newTestCA(t)
 	csrDER := buildEd25519CSR(t)
 
-	leaf, err := ca.Sign(csrDER, "agent-123", "org-abc")
+	leaf, err := ca.Sign(csrDER, "agent-123")
 	if err != nil {
 		t.Fatalf("sign: %v", err)
 	}
@@ -72,12 +72,12 @@ func TestSignProducesVerifiableLeaf(t *testing.T) {
 		t.Fatal("expected at least one verified chain")
 	}
 
-	orgID, agentID, err := SpiffeURIFromCert(cert)
+	agentID, err := SpiffeURIFromCert(cert)
 	if err != nil {
 		t.Fatalf("extracting SPIFFE: %v", err)
 	}
-	if orgID != "org-abc" || agentID != "agent-123" {
-		t.Fatalf("wrong SPIFFE identity: got org=%s agent=%s", orgID, agentID)
+	if agentID != "agent-123" {
+		t.Fatalf("wrong SPIFFE identity: got agent=%s", agentID)
 	}
 
 	if leaf.Serial == "" {
@@ -92,50 +92,47 @@ func TestSignRejectsEmptyIDs(t *testing.T) {
 	ca := newTestCA(t)
 	csrDER := buildEd25519CSR(t)
 
-	if _, err := ca.Sign(csrDER, "", "org"); err == nil {
+	if _, err := ca.Sign(csrDER, ""); err == nil {
 		t.Fatal("expected error with empty agentID")
-	}
-	if _, err := ca.Sign(csrDER, "agent", ""); err == nil {
-		t.Fatal("expected error with empty orgID")
 	}
 }
 
 func TestSignRejectsMalformedCSR(t *testing.T) {
 	ca := newTestCA(t)
-	if _, err := ca.Sign([]byte("not a csr"), "agent", "org"); err == nil {
+	if _, err := ca.Sign([]byte("not a csr"), "agent"); err == nil {
 		t.Fatal("expected error on malformed CSR")
 	}
 }
 
 func TestVerifyLeafDetectsRevocation(t *testing.T) {
 	ca := newTestCA(t)
-	leaf, err := ca.Sign(buildEd25519CSR(t), "agent-xyz", "org-xyz")
+	leaf, err := ca.Sign(buildEd25519CSR(t), "agent-xyz")
 	if err != nil {
 		t.Fatalf("sign: %v", err)
 	}
 	cert := parseLeafPEM(t, leaf.PEM)
 
 	rev := &Revocation{set: map[string]struct{}{leaf.Serial: {}}}
-	if _, _, err := VerifyLeaf([][]*x509.Certificate{{cert}}, rev); err == nil {
+	if _, err := VerifyLeaf([][]*x509.Certificate{{cert}}, rev); err == nil {
 		t.Fatal("expected revocation rejection")
 	}
 }
 
 func TestVerifyLeafWithoutRevocationPasses(t *testing.T) {
 	ca := newTestCA(t)
-	leaf, err := ca.Sign(buildEd25519CSR(t), "agent-ok", "org-ok")
+	leaf, err := ca.Sign(buildEd25519CSR(t), "agent-ok")
 	if err != nil {
 		t.Fatalf("sign: %v", err)
 	}
 	cert := parseLeafPEM(t, leaf.PEM)
 
 	rev := &Revocation{set: map[string]struct{}{}}
-	orgID, agentID, err := VerifyLeaf([][]*x509.Certificate{{cert}}, rev)
+	agentID, err := VerifyLeaf([][]*x509.Certificate{{cert}}, rev)
 	if err != nil {
 		t.Fatalf("verify: %v", err)
 	}
-	if orgID != "org-ok" || agentID != "agent-ok" {
-		t.Fatalf("wrong identity returned: got org=%s agent=%s", orgID, agentID)
+	if agentID != "agent-ok" {
+		t.Fatalf("wrong identity returned: got agent=%s", agentID)
 	}
 }
 
@@ -146,7 +143,7 @@ func TestTrustPoolIncludesPreviousCAs(t *testing.T) {
 
 	pool := ca2.TrustPool()
 	// Sign a leaf with ca1 and verify against ca2's overlap pool.
-	leaf, err := ca1.Sign(buildEd25519CSR(t), "a", "o")
+	leaf, err := ca1.Sign(buildEd25519CSR(t), "a")
 	if err != nil {
 		t.Fatalf("sign: %v", err)
 	}

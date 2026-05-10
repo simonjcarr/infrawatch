@@ -12,7 +12,7 @@ message Tag {
 }
 
 message RegisterRequest {
-  string org_token = 1;    // enrolment token from UI
+  string enrolment_token = 1;  // enrolment token from UI
   string public_key = 2;   // PEM-encoded Ed25519 public key
   PlatformInfo platform_info = 3;
   AgentInfo agent_info = 4;

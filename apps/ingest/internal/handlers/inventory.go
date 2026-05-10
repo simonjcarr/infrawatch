@@ -86,7 +86,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 
 	// ── Create software_scans row ─────────────────────────────────────────────
 	startedAt := time.Now()
-	softwareScanID, err := queries.InsertSoftwareScan(ctx, h.pool, hostOrg.OrgID, hostOrg.HostID, scanID, source, startedAt)
+	softwareScanID, err := queries.InsertSoftwareScan(ctx, h.pool, hostOrg.InstanceID, hostOrg.HostID, scanID, source, startedAt)
 	if err != nil {
 		slog.Error("inventory: creating software scan", "err", err)
 		return status.Error(codes.Internal, "could not create scan record")
@@ -143,7 +143,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 
 		added, err := queries.UpsertSoftwarePackagesBatch(
 			ctx, h.pool,
-			hostOrg.OrgID, hostOrg.HostID, source,
+			hostOrg.InstanceID, hostOrg.HostID, source,
 			names, versions, archs, publishers,
 			distroIDs, distroVersionIDs, distroCodenames, distroIDLikes,
 			sourceNames, sourceVersions, packageEpochs, packageReleases,
@@ -278,7 +278,7 @@ func (h *InventoryHandler) authenticateStream(stream agentv1.IngestService_Submi
 	if len(token) > 7 && strings.EqualFold(token[:7], "bearer ") {
 		token = token[7:]
 	}
-	agentID, orgID, err := h.issuer.ValidateAgentToken(token)
+	agentID, err := h.issuer.ValidateAgentToken(token)
 	if err != nil {
 		return "", status.Error(codes.Unauthenticated, "invalid token")
 	}
@@ -286,7 +286,7 @@ func (h *InventoryHandler) authenticateStream(stream agentv1.IngestService_Submi
 	if !ok || id == nil {
 		return "", status.Error(codes.Unauthenticated, "missing client identity")
 	}
-	if id.AgentID != agentID || id.OrgID != orgID {
+	if id.AgentID != agentID {
 		return "", status.Error(codes.Unauthenticated, "client identity mismatch")
 	}
 	return agentID, nil

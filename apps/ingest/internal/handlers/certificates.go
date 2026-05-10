@@ -14,22 +14,22 @@ import (
 
 // certificateReport matches the JSON produced by the agent's certificate check.
 type certificateReport struct {
-	Host              string            `json:"host"`
-	Port              int               `json:"port"`
-	ServerName        string            `json:"server_name"`
-	CommonName        string            `json:"common_name"`
-	Subject           string            `json:"subject"`
-	Issuer            string            `json:"issuer"`
-	SANs              []string          `json:"sans"`
-	NotBefore         time.Time         `json:"not_before"`
-	NotAfter          time.Time         `json:"not_after"`
-	FingerprintSHA256 string            `json:"fingerprint_sha256"`
-	SerialNumber      string            `json:"serial_number"`
-	SignatureAlgo     string            `json:"signature_algorithm"`
-	KeyAlgo           string            `json:"key_algorithm"`
-	IsSelfSigned      bool              `json:"is_self_signed"`
-	Chain             []certChainEntry  `json:"chain"`
-	Error             string            `json:"error,omitempty"`
+	Host              string           `json:"host"`
+	Port              int              `json:"port"`
+	ServerName        string           `json:"server_name"`
+	CommonName        string           `json:"common_name"`
+	Subject           string           `json:"subject"`
+	Issuer            string           `json:"issuer"`
+	SANs              []string         `json:"sans"`
+	NotBefore         time.Time        `json:"not_before"`
+	NotAfter          time.Time        `json:"not_after"`
+	FingerprintSHA256 string           `json:"fingerprint_sha256"`
+	SerialNumber      string           `json:"serial_number"`
+	SignatureAlgo     string           `json:"signature_algorithm"`
+	KeyAlgo           string           `json:"key_algorithm"`
+	IsSelfSigned      bool             `json:"is_self_signed"`
+	Chain             []certChainEntry `json:"chain"`
+	Error             string           `json:"error,omitempty"`
 }
 
 type certChainEntry struct {
@@ -42,13 +42,13 @@ type certChainEntry struct {
 
 // certDetails is the JSONB stored in certificates.details.
 type certDetails struct {
-	Subject            string            `json:"subject"`
-	Issuer             string            `json:"issuer"`
-	SerialNumber       string            `json:"serialNumber"`
-	SignatureAlgorithm string            `json:"signatureAlgorithm"`
-	KeyAlgorithm       string            `json:"keyAlgorithm"`
-	IsSelfSigned       bool              `json:"isSelfSigned"`
-	Chain              []certChainEntry  `json:"chain"`
+	Subject            string           `json:"subject"`
+	Issuer             string           `json:"issuer"`
+	SerialNumber       string           `json:"serialNumber"`
+	SignatureAlgorithm string           `json:"signatureAlgorithm"`
+	KeyAlgorithm       string           `json:"keyAlgorithm"`
+	IsSelfSigned       bool             `json:"isSelfSigned"`
+	Chain              []certChainEntry `json:"chain"`
 }
 
 // computeCertStatus derives the certificate status from its expiry and a warning window.
@@ -68,7 +68,7 @@ func computeCertStatus(notAfter time.Time, warnDays int) string {
 func persistCertificateResult(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, checkID, output string,
+	instanceID, hostID, checkID, output string,
 ) {
 	var report certificateReport
 	if err := json.Unmarshal([]byte(output), &report); err != nil {
@@ -97,14 +97,14 @@ func persistCertificateResult(
 	detailsJSON, _ := json.Marshal(details)
 
 	// Detect renewal: find existing certs for same endpoint that have a DIFFERENT fingerprint.
-	existingCerts, err := queries.FindCertsForEndpoint(ctx, pool, orgID, report.Host, report.Port, report.ServerName)
+	existingCerts, err := queries.FindCertsForEndpoint(ctx, pool, instanceID, report.Host, report.Port, report.ServerName)
 	if err != nil {
 		slog.Warn("cert: finding existing certs for endpoint", "err", err)
 	}
 
 	certID, previousStatus, wasInsert, err := queries.UpsertCertificate(
 		ctx, pool,
-		orgID, hostID, checkID,
+		instanceID, hostID, checkID,
 		report.Host, report.Port, report.ServerName,
 		report.CommonName, report.Issuer,
 		report.SANs,
@@ -128,7 +128,7 @@ func persistCertificateResult(
 				// Emit a renewed event on the OLD cert.
 				meta, _ := json.Marshal(map[string]string{"newCertificateId": certID})
 				if evErr := queries.InsertCertificateEvent(ctx, pool,
-					existing.ID, orgID,
+					existing.ID, instanceID,
 					"renewed", existing.Status, "",
 					fmt.Sprintf("Certificate renewed: replaced by new fingerprint on %s:%d", report.Host, report.Port),
 					meta,
@@ -146,7 +146,7 @@ func persistCertificateResult(
 			message = fmt.Sprintf("Certificate renewed on %s:%d (CN: %s)", report.Host, report.Port, report.CommonName)
 		}
 		if evErr := queries.InsertCertificateEvent(ctx, pool,
-			certID, orgID,
+			certID, instanceID,
 			eventType, "", status,
 			message, nil,
 		); evErr != nil {
@@ -156,7 +156,7 @@ func persistCertificateResult(
 		// Emit expiring/expired event immediately if the newly discovered cert is already in bad shape.
 		if status == "expiring_soon" || status == "expired" {
 			if evErr := queries.InsertCertificateEvent(ctx, pool,
-				certID, orgID,
+				certID, instanceID,
 				status, "", status,
 				fmt.Sprintf("Certificate %s: expires %s", status, report.NotAfter.Format("2006-01-02")),
 				nil,
@@ -169,7 +169,7 @@ func persistCertificateResult(
 		// Existing cert — check for status transition.
 		if previousStatus != status && previousStatus != "" {
 			if evErr := queries.InsertCertificateEvent(ctx, pool,
-				certID, orgID,
+				certID, instanceID,
 				status, previousStatus, status,
 				fmt.Sprintf("Certificate status changed from %s to %s", previousStatus, status),
 				nil,
@@ -181,5 +181,5 @@ func persistCertificateResult(
 	}
 
 	// Immediately evaluate cert_expiry alert rules for this freshly-observed cert.
-	evaluateCertExpiryForCert(ctx, pool, orgID, certID, report.CommonName, report.Issuer, report.Host, report.Port, report.NotAfter, status)
+	evaluateCertExpiryForCert(ctx, pool, instanceID, certID, report.CommonName, report.Issuer, report.Host, report.Port, report.NotAfter, status)
 }

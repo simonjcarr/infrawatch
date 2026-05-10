@@ -870,7 +870,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1248](https://github.com/carrtech-dev/ct-ops/pull/1248)
 
 Summary: Built the Task 13 residue map, converted the remaining web app
 schema and action internals from organisation scope to standalone instance
@@ -982,19 +982,35 @@ and migration residue after the earlier slices have converted the live paths.
 
 ## Task 14 - Ingest And Agent Single-Instance Conversion
 
-Status: Not started
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
 PR:
 
-Summary:
+Summary: Removed organisation-scoped identity from the agent, ingest, and
+registration protobuf paths by renaming the public registration token to
+`enrolment_token`, switching ingest SQL and handlers to `instance_id`,
+making host-collision and enrolment-token consumption instance-wide, and
+dropping the org claim from agent JWTs and mTLS SPIFFE identities so runtime
+auth now binds only to the agent identity inside a single CT-Ops instance.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`, `agent/{cmd,examples,internal}`,
+`apps/ingest/{cmd,internal}`, `proto/agent/v1/registration.proto`,
+`proto/gen/go/agent/v1/registration.pb.go`
 
-Validation:
+Validation: `PATH="$PATH:$(go env GOPATH)/bin" make proto` (passes and
+regenerates Go protobuf bindings for `enrolment_token`);
+`gofmt -w $(git diff --name-only -- '*.go')` (passes);
+`go test ./agent/... ./apps/ingest/... ./proto/gen/go/...` (passes);
+`pnpm --dir apps/web type-check` fails in this worktree because
+`apps/web/node_modules` is absent and `tsc` is not installed locally;
+`rg -n "organisation|organization|orgID|orgId|org_id|organisation_id|OrgToken|org_token|tenant" apps/ingest agent proto`
+returns no matches.
 
-Follow-up:
+Follow-up: Start Task 15 next. Before re-running the web validation from this
+task, install the web workspace dependencies in the Task 14 worktree or use a
+worktree that already has `apps/web/node_modules` available.
 
 ### Required work
 

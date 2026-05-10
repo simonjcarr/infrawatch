@@ -25,8 +25,8 @@ type IngestConfig struct {
 }
 
 type AgentConfig struct {
-	// OrgToken is the enrolment token from the CT-Ops UI.
-	OrgToken string `toml:"org_token"`
+	// EnrolmentToken is the enrolment token from the CT-Ops UI.
+	EnrolmentToken string `toml:"enrolment_token"`
 	// DataDir is where the agent stores its keypair and state.
 	DataDir string `toml:"data_dir"`
 	// HeartbeatIntervalSecs is how often the agent sends a heartbeat.
@@ -88,13 +88,13 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("CT_OPS_INGEST_CA_CERT"); v != "" {
 		cfg.Ingest.CACertFile = v
 	}
-	if v := os.Getenv("CT_OPS_ORG_TOKEN"); v != "" {
-		cfg.Agent.OrgToken = v
+	if v := os.Getenv("CT_OPS_ENROLMENT_TOKEN"); v != "" {
+		cfg.Agent.EnrolmentToken = v
 	}
 	if v := os.Getenv("CT_OPS_DATA_DIR"); v != "" {
 		cfg.Agent.DataDir = v
 	}
 	// Trim accidental whitespace from tokens/addresses
-	cfg.Agent.OrgToken = strings.TrimSpace(cfg.Agent.OrgToken)
+	cfg.Agent.EnrolmentToken = strings.TrimSpace(cfg.Agent.EnrolmentToken)
 	cfg.Ingest.Address = strings.TrimSpace(cfg.Ingest.Address)
 }

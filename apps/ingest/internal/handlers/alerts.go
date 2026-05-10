@@ -51,12 +51,12 @@ type notifChannels struct {
 func evaluateAlerts(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, hostname string,
+	instanceID, hostID, hostname string,
 	checkStatuses map[string]string,
 	metrics heartbeatMetrics,
 ) {
 	// Skip evaluation entirely if the host is currently silenced.
-	silenced, err := queries.IsHostSilenced(ctx, pool, orgID, hostID)
+	silenced, err := queries.IsHostSilenced(ctx, pool, instanceID, hostID)
 	if err != nil {
 		slog.Warn("evaluateAlerts: checking silence", "host_id", hostID, "err", err)
 	} else if silenced {
@@ -64,7 +64,7 @@ func evaluateAlerts(
 		return
 	}
 
-	rules, err := queries.GetAlertRulesForHost(ctx, pool, orgID, hostID)
+	rules, err := queries.GetAlertRulesForHost(ctx, pool, instanceID, hostID)
 	if err != nil {
 		slog.Warn("evaluateAlerts: fetching rules", "host_id", hostID, "err", err)
 		return
@@ -75,30 +75,30 @@ func evaluateAlerts(
 
 	var channels notifChannels
 
-	webhooks, err := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
+	webhooks, err := queries.GetEnabledWebhookChannels(ctx, pool, instanceID)
 	if err != nil {
-		slog.Warn("evaluateAlerts: fetching webhook channels", "org_id", orgID, "err", err)
+		slog.Warn("evaluateAlerts: fetching webhook channels", "instance_id", instanceID, "err", err)
 	} else {
 		channels.webhooks = webhooks
 	}
 
-	smtpChs, err := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
+	smtpChs, err := queries.GetEnabledSmtpChannels(ctx, pool, instanceID)
 	if err != nil {
-		slog.Warn("evaluateAlerts: fetching smtp channels", "org_id", orgID, "err", err)
+		slog.Warn("evaluateAlerts: fetching smtp channels", "instance_id", instanceID, "err", err)
 	} else {
 		channels.smtp = smtpChs
 	}
 
-	slackChs, err := queries.GetEnabledSlackChannels(ctx, pool, orgID)
+	slackChs, err := queries.GetEnabledSlackChannels(ctx, pool, instanceID)
 	if err != nil {
-		slog.Warn("evaluateAlerts: fetching slack channels", "org_id", orgID, "err", err)
+		slog.Warn("evaluateAlerts: fetching slack channels", "instance_id", instanceID, "err", err)
 	} else {
 		channels.slack = slackChs
 	}
 
-	telegramChs, err := queries.GetEnabledTelegramChannels(ctx, pool, orgID)
+	telegramChs, err := queries.GetEnabledTelegramChannels(ctx, pool, instanceID)
 	if err != nil {
-		slog.Warn("evaluateAlerts: fetching telegram channels", "org_id", orgID, "err", err)
+		slog.Warn("evaluateAlerts: fetching telegram channels", "instance_id", instanceID, "err", err)
 	} else {
 		channels.telegram = telegramChs
 	}
@@ -160,7 +160,7 @@ func evaluateCheckStatusRule(
 	if allFailing && existing == nil {
 		// Fire a new alert.
 		message := fmt.Sprintf("Check failed %d consecutive time(s) on host %s", cfg.FailureThreshold, hostname)
-		id, err := queries.InsertAlertInstance(ctx, pool, rule.ID, hostID, rule.OrgID, rule.Severity, message, time.Now())
+		id, err := queries.InsertAlertInstance(ctx, pool, rule.ID, hostID, rule.InstanceID, rule.Severity, message, time.Now())
 		if err != nil {
 			slog.Warn("evaluateAlerts: inserting alert instance", "rule_id", rule.ID, "err", err)
 			return
@@ -178,7 +178,7 @@ func evaluateCheckStatusRule(
 		dispatchSmtp(channels.smtp, ev)
 		dispatchSlack(ctx, channels.slack, ev)
 		dispatchTelegram(ctx, channels.telegram, ev)
-		dispatchInApp(ctx, pool, rule.OrgID, id, "host", hostID, ev)
+		dispatchInApp(ctx, pool, rule.InstanceID, id, "host", hostID, ev)
 		return
 	}
 
@@ -201,7 +201,7 @@ func evaluateCheckStatusRule(
 		dispatchSmtp(channels.smtp, ev)
 		dispatchSlack(ctx, channels.slack, ev)
 		dispatchTelegram(ctx, channels.telegram, ev)
-		dispatchInApp(ctx, pool, rule.OrgID, existing.ID, "host", hostID, ev)
+		dispatchInApp(ctx, pool, rule.InstanceID, existing.ID, "host", hostID, ev)
 	}
 }
 
@@ -247,7 +247,7 @@ func evaluateMetricThresholdRule(
 		}
 		message := fmt.Sprintf("%s %s %.1f%% (current: %.1f%%) on host %s",
 			cfg.Metric, operatorLabel, cfg.Threshold, currentValue, hostname)
-		id, err := queries.InsertAlertInstance(ctx, pool, rule.ID, hostID, rule.OrgID, rule.Severity, message, time.Now())
+		id, err := queries.InsertAlertInstance(ctx, pool, rule.ID, hostID, rule.InstanceID, rule.Severity, message, time.Now())
 		if err != nil {
 			slog.Warn("evaluateAlerts: inserting alert instance", "rule_id", rule.ID, "err", err)
 			return
@@ -265,7 +265,7 @@ func evaluateMetricThresholdRule(
 		dispatchSmtp(channels.smtp, ev)
 		dispatchSlack(ctx, channels.slack, ev)
 		dispatchTelegram(ctx, channels.telegram, ev)
-		dispatchInApp(ctx, pool, rule.OrgID, id, "host", hostID, ev)
+		dispatchInApp(ctx, pool, rule.InstanceID, id, "host", hostID, ev)
 		return
 	}
 
@@ -287,7 +287,7 @@ func evaluateMetricThresholdRule(
 		dispatchSmtp(channels.smtp, ev)
 		dispatchSlack(ctx, channels.slack, ev)
 		dispatchTelegram(ctx, channels.telegram, ev)
-		dispatchInApp(ctx, pool, rule.OrgID, existing.ID, "host", hostID, ev)
+		dispatchInApp(ctx, pool, rule.InstanceID, existing.ID, "host", hostID, ev)
 	}
 }
 
@@ -304,22 +304,22 @@ type certExpiryConfig struct {
 func evaluateCertExpiryForCert(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, certID, commonName, issuer, host string, port int,
+	instanceID, certID, commonName, issuer, host string, port int,
 	notAfter time.Time, status string,
 ) {
-	rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, orgID)
+	rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, instanceID)
 	if err != nil {
-		slog.Warn("evaluateCertExpiry: fetching rules", "org_id", orgID, "err", err)
+		slog.Warn("evaluateCertExpiry: fetching rules", "instance_id", instanceID, "err", err)
 		return
 	}
 	if len(rules) == 0 {
 		return
 	}
 
-	webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
-	smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
-	slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, orgID)
-	telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, orgID)
+	webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, instanceID)
+	smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, instanceID)
+	slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, instanceID)
+	telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, instanceID)
 	channels := notifChannels{webhooks: webhooks, smtp: smtpChs, slack: slackChs, telegram: telegramChs}
 
 	cert := queries.CertSummary{
@@ -333,7 +333,7 @@ func evaluateCertExpiryForCert(
 	}
 
 	for _, rule := range rules {
-		evaluateCertExpiryRule(ctx, pool, orgID, rule, cert, channels)
+		evaluateCertExpiryRule(ctx, pool, instanceID, rule, cert, channels)
 	}
 }
 
@@ -341,7 +341,7 @@ func evaluateCertExpiryForCert(
 func evaluateCertExpiryRule(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID string,
+	instanceID string,
 	rule queries.AlertRuleRow,
 	cert queries.CertSummary,
 	channels notifChannels,
@@ -388,7 +388,7 @@ func evaluateCertExpiryRule(
 				cert.CommonName, cert.Issuer, cert.Host, cert.Port, daysLeft)
 		}
 
-		id, err := queries.InsertCertAlertInstance(ctx, pool, rule.ID, hostID, orgID, rule.Severity, message, cert.ID, time.Now())
+		id, err := queries.InsertCertAlertInstance(ctx, pool, rule.ID, hostID, instanceID, rule.Severity, message, cert.ID, time.Now())
 		if err != nil {
 			slog.Warn("evaluateCertExpiryRule: inserting alert instance", "rule_id", rule.ID, "err", err)
 			return
@@ -406,7 +406,7 @@ func evaluateCertExpiryRule(
 		dispatchSmtp(channels.smtp, ev)
 		dispatchSlack(ctx, channels.slack, ev)
 		dispatchTelegram(ctx, channels.telegram, ev)
-		dispatchInApp(ctx, pool, orgID, id, "certificate", cert.ID, ev)
+		dispatchInApp(ctx, pool, instanceID, id, "certificate", cert.ID, ev)
 		return
 	}
 
@@ -429,7 +429,7 @@ func evaluateCertExpiryRule(
 		dispatchSmtp(channels.smtp, ev)
 		dispatchSlack(ctx, channels.slack, ev)
 		dispatchTelegram(ctx, channels.telegram, ev)
-		dispatchInApp(ctx, pool, orgID, existing.ID, "certificate", cert.ID, ev)
+		dispatchInApp(ctx, pool, instanceID, existing.ID, "certificate", cert.ID, ev)
 	}
 }
 
@@ -455,23 +455,23 @@ func RunCertExpirySweeper(ctx context.Context, pool *pgxpool.Pool, interval time
 }
 
 func runCertExpirySweep(ctx context.Context, pool *pgxpool.Pool) {
-	orgIDs, err := queries.GetAllOrgsWithCertExpiryRules(ctx, pool)
+	instanceIDs, err := queries.GetAllOrgsWithCertExpiryRules(ctx, pool)
 	if err != nil {
 		slog.Warn("cert sweeper: fetching orgs", "err", err)
 		return
 	}
 
-	for _, orgID := range orgIDs {
-		rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, orgID)
+	for _, instanceID := range instanceIDs {
+		rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, instanceID)
 		if err != nil {
-			slog.Warn("cert sweeper: fetching rules", "org_id", orgID, "err", err)
+			slog.Warn("cert sweeper: fetching rules", "instance_id", instanceID, "err", err)
 			continue
 		}
 
-		webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, orgID)
-		smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, orgID)
-		slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, orgID)
-		telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, orgID)
+		webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, instanceID)
+		smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, instanceID)
+		slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, instanceID)
+		telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, instanceID)
 		channels := notifChannels{webhooks: webhooks, smtp: smtpChs, slack: slackChs, telegram: telegramChs}
 
 		for _, rule := range rules {
@@ -482,25 +482,25 @@ func runCertExpirySweep(ctx context.Context, pool *pgxpool.Pool) {
 
 			var certs []queries.CertSummary
 			if cfg.Scope == "specific" && cfg.CertificateID != "" {
-				cert, err := queries.GetCertificateByID(ctx, pool, orgID, cfg.CertificateID)
+				cert, err := queries.GetCertificateByID(ctx, pool, instanceID, cfg.CertificateID)
 				if err != nil || cert == nil {
 					continue
 				}
 				certs = []queries.CertSummary{*cert}
 			} else {
-				certs, err = queries.ListCertificatesExpiringWithin(ctx, pool, orgID, cfg.DaysBeforeExpiry+1)
+				certs, err = queries.ListCertificatesExpiringWithin(ctx, pool, instanceID, cfg.DaysBeforeExpiry+1)
 				if err != nil {
-					slog.Warn("cert sweeper: fetching certs", "org_id", orgID, "err", err)
+					slog.Warn("cert sweeper: fetching certs", "instance_id", instanceID, "err", err)
 					continue
 				}
 			}
 
 			for _, cert := range certs {
-				evaluateCertExpiryRule(ctx, pool, orgID, rule, cert, channels)
+				evaluateCertExpiryRule(ctx, pool, instanceID, rule, cert, channels)
 			}
 		}
 	}
-	slog.Debug("cert expiry sweep complete", "orgs_checked", len(orgIDs))
+	slog.Debug("cert expiry sweep complete", "orgs_checked", len(instanceIDs))
 }
 
 // dispatchWebhooks fans out an AlertEvent to all configured webhook channels.

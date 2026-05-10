@@ -20,24 +20,24 @@ type serviceAccountReport struct {
 }
 
 type accountEntry struct {
-	Username             string `json:"username"`
-	UID                  int    `json:"uid"`
-	GID                  int    `json:"gid"`
-	HomeDirectory        string `json:"home_directory"`
-	Shell                string `json:"shell"`
-	AccountType          string `json:"account_type"`
-	HasLoginCapability   bool   `json:"has_login_capability"`
-	HasRunningProcesses  bool   `json:"has_running_processes"`
-	AccountLocked        bool   `json:"account_locked"`
-	PasswordExpiresAt    string `json:"password_expires_at,omitempty"`
-	PasswordLastChanged  string `json:"password_last_changed,omitempty"`
+	Username            string `json:"username"`
+	UID                 int    `json:"uid"`
+	GID                 int    `json:"gid"`
+	HomeDirectory       string `json:"home_directory"`
+	Shell               string `json:"shell"`
+	AccountType         string `json:"account_type"`
+	HasLoginCapability  bool   `json:"has_login_capability"`
+	HasRunningProcesses bool   `json:"has_running_processes"`
+	AccountLocked       bool   `json:"account_locked"`
+	PasswordExpiresAt   string `json:"password_expires_at,omitempty"`
+	PasswordLastChanged string `json:"password_last_changed,omitempty"`
 }
 
 // persistServiceAccountResult upserts service accounts from a scan result and emits events.
 func persistServiceAccountResult(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, checkID, output string,
+	instanceID, hostID, checkID, output string,
 ) {
 	var report serviceAccountReport
 	if err := json.Unmarshal([]byte(output), &report); err != nil {
@@ -51,7 +51,7 @@ func persistServiceAccountResult(
 	}
 
 	// Load existing accounts for this host to detect missing accounts.
-	existingAccounts, err := queries.GetServiceAccountsForHost(ctx, pool, orgID, hostID)
+	existingAccounts, err := queries.GetServiceAccountsForHost(ctx, pool, instanceID, hostID)
 	if err != nil {
 		slog.Warn("svc-account: loading existing accounts", "host_id", hostID, "err", err)
 	}
@@ -82,7 +82,7 @@ func persistServiceAccountResult(
 		}
 
 		id, wasInsert, previous, err := queries.UpsertServiceAccount(
-			ctx, pool, orgID, hostID,
+			ctx, pool, instanceID, hostID,
 			acct.Username, acct.UID, acct.GID,
 			acct.HomeDirectory, acct.Shell, acct.AccountType,
 			acct.HasLoginCapability, acct.HasRunningProcesses,
@@ -97,7 +97,7 @@ func persistServiceAccountResult(
 		if wasInsert && previous == nil {
 			// Brand new account discovered.
 			if evErr := queries.InsertIdentityEvent(ctx, pool,
-				orgID, hostID, &id, nil,
+				instanceID, hostID, &id, nil,
 				"account_discovered",
 				fmt.Sprintf("Account '%s' discovered (UID %d, type: %s)", acct.Username, acct.UID, acct.AccountType),
 				nil,
@@ -113,7 +113,7 @@ func persistServiceAccountResult(
 			if previous.Status == "missing" {
 				// Account was missing, now restored.
 				if evErr := queries.InsertIdentityEvent(ctx, pool,
-					orgID, hostID, &id, nil,
+					instanceID, hostID, &id, nil,
 					"account_restored",
 					fmt.Sprintf("Account '%s' restored (was missing)", acct.Username),
 					nil,
@@ -128,7 +128,7 @@ func persistServiceAccountResult(
 			if len(changes) > 0 {
 				meta, _ := json.Marshal(changes)
 				if evErr := queries.InsertIdentityEvent(ctx, pool,
-					orgID, hostID, &id, nil,
+					instanceID, hostID, &id, nil,
 					"account_changed",
 					fmt.Sprintf("Account '%s' changed: %s", acct.Username, summarizeChanges(changes)),
 					meta,
@@ -150,7 +150,7 @@ func persistServiceAccountResult(
 		}
 		id := existing.ID
 		if evErr := queries.InsertIdentityEvent(ctx, pool,
-			orgID, hostID, &id, nil,
+			instanceID, hostID, &id, nil,
 			"account_missing",
 			fmt.Sprintf("Account '%s' no longer present on host", existing.Username),
 			nil,

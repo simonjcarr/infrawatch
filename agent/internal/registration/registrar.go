@@ -19,12 +19,12 @@ const pollInterval = 30 * time.Second
 
 // Registrar handles the agent registration lifecycle.
 type Registrar struct {
-	client   agentv1.IngestServiceClient
-	keypair  *identity.Keypair
-	orgToken string
-	version  string
-	tags     []*agentv1.Tag
-	dataDir  string
+	client         agentv1.IngestServiceClient
+	keypair        *identity.Keypair
+	enrolmentToken string
+	version        string
+	tags           []*agentv1.Tag
+	dataDir        string
 
 	// Optional overrides. When hostnameOverride is non-empty it replaces
 	// os.Hostname(). When ipsOverride is non-nil it replaces localIPs() —
@@ -38,14 +38,14 @@ type Registrar struct {
 // New creates a new Registrar. Tags are applied at registration; merged order
 // (config → CLI) is resolved by the caller. dataDir is where the agent
 // persists any client cert / CA bundle it receives from the server.
-func New(client agentv1.IngestServiceClient, keypair *identity.Keypair, orgToken, version string, tags []*agentv1.Tag, dataDir string) *Registrar {
+func New(client agentv1.IngestServiceClient, keypair *identity.Keypair, enrolmentToken, version string, tags []*agentv1.Tag, dataDir string) *Registrar {
 	return &Registrar{
-		client:   client,
-		keypair:  keypair,
-		orgToken: orgToken,
-		version:  version,
-		tags:     tags,
-		dataDir:  dataDir,
+		client:         client,
+		keypair:        keypair,
+		enrolmentToken: enrolmentToken,
+		version:        version,
+		tags:           tags,
+		dataDir:        dataDir,
 	}
 }
 
@@ -91,9 +91,9 @@ func (r *Registrar) Register(ctx context.Context, existingAgentID string) (*iden
 	}
 
 	req := &agentv1.RegisterRequest{
-		OrgToken:  r.orgToken,
-		PublicKey: r.keypair.PublicKeyPEM,
-		CsrDer:    csrDER,
+		EnrolmentToken: r.enrolmentToken,
+		PublicKey:      r.keypair.PublicKeyPEM,
+		CsrDer:         csrDER,
 		PlatformInfo: &agentv1.PlatformInfo{
 			Os:          runtime.GOOS,
 			Arch:        runtime.GOARCH,

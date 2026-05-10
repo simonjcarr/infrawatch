@@ -12,20 +12,20 @@ import (
 func InsertHostMetricByAgentID(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, agentID string,
+	instanceID, agentID string,
 	recordedAt time.Time,
 	cpu, memory, disk float32,
 	uptime int64,
 ) error {
 	const q = `
-		INSERT INTO host_metrics (id, organisation_id, host_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds)
+		INSERT INTO host_metrics (id, instance_id, host_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds)
 		SELECT $1, $2, h.id, $3, $4, $5, $6, $7
 		FROM hosts h
 		WHERE h.agent_id = $8 AND h.deleted_at IS NULL
 		LIMIT 1
 	`
 	_, err := pool.Exec(ctx, q,
-		newCUID(), orgID, recordedAt,
+		newCUID(), instanceID, recordedAt,
 		cpu, memory, disk, uptime,
 		agentID,
 	)

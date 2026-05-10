@@ -12,7 +12,7 @@ func TestLoadRejectsGroupReadableConfig(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "agent.toml")
-	if err := os.WriteFile(path, []byte("[agent]\norg_token = \"secret\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("[agent]\nenrolment_token = \"secret\"\n"), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
@@ -30,7 +30,7 @@ func TestLoadReadsSecureConfig(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "agent.toml")
-	if err := os.WriteFile(path, []byte("[ingest]\naddress = \"ingest.example:9443\"\n\n[agent]\norg_token = \"secret\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("[ingest]\naddress = \"ingest.example:9443\"\n\n[agent]\nenrolment_token = \"secret\"\n"), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
@@ -41,7 +41,7 @@ func TestLoadReadsSecureConfig(t *testing.T) {
 	if cfg.Ingest.Address != "ingest.example:9443" {
 		t.Fatalf("unexpected ingest address: %q", cfg.Ingest.Address)
 	}
-	if cfg.Agent.OrgToken != "secret" {
-		t.Fatalf("unexpected org token: %q", cfg.Agent.OrgToken)
+	if cfg.Agent.EnrolmentToken != "secret" {
+		t.Fatalf("unexpected enrolment token: %q", cfg.Agent.EnrolmentToken)
 	}
 }

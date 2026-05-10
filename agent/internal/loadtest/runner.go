@@ -177,7 +177,7 @@ func (r *Runner) preflight(ctx context.Context) error {
 
 	probe, err := NewVirtualAgent(-1, &Config{
 		Address:           r.cfg.Address,
-		OrgToken:          r.cfg.OrgToken,
+		EnrolmentToken:    r.cfg.EnrolmentToken,
 		CACertFile:        r.cfg.CACertFile,
 		TLSSkipVerify:     r.cfg.TLSSkipVerify,
 		HostnamePrefix:    r.cfg.HostnamePrefix,

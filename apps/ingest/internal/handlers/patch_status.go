@@ -28,7 +28,7 @@ type patchStatusCheckReport struct {
 func persistPatchStatusResult(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, checkID string,
+	instanceID, hostID, checkID string,
 	ranAt time.Time,
 	output string,
 ) {
@@ -54,7 +54,7 @@ func persistPatchStatusResult(
 	if err := queries.UpsertHostPatchStatus(
 		ctx,
 		pool,
-		orgID,
+		instanceID,
 		hostID,
 		checkID,
 		report.Status,
@@ -74,7 +74,7 @@ func persistPatchStatusResult(
 	}
 
 	if report.UpdatesSupported {
-		if err := queries.ReplaceCurrentPackageUpdates(ctx, pool, orgID, hostID, report.PackageManager, report.Updates, ranAt); err != nil {
+		if err := queries.ReplaceCurrentPackageUpdates(ctx, pool, instanceID, hostID, report.PackageManager, report.Updates, ranAt); err != nil {
 			slog.Warn("patch_status: replace package updates", "check_id", checkID, "err", err)
 		}
 	}

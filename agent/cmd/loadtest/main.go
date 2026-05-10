@@ -62,7 +62,7 @@ func runCmd(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	cfg := &loadtest.Config{}
 	fs.StringVar(&cfg.Address, "address", "", "ingest gRPC host:port (required)")
-	fs.StringVar(&cfg.OrgToken, "token", "", "enrolment token with auto_approve=true (required)")
+	fs.StringVar(&cfg.EnrolmentToken, "token", "", "enrolment token with auto_approve=true (required)")
 	fs.StringVar(&cfg.CACertFile, "ca-cert", "", "path to server CA cert (optional)")
 	fs.BoolVar(&cfg.TLSSkipVerify, "tls-skip-verify", false, "skip TLS server verification (dev only)")
 	fs.IntVar(&cfg.Agents, "agents", 100, "total virtual agents")

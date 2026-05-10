@@ -29,7 +29,7 @@ type CertSummary struct {
 }
 
 // UpsertCertificate inserts or updates a certificate row identified by the
-// natural key (organisation_id, host, port, server_name, fingerprint_sha256).
+// natural key (instance_id, host, port, server_name, fingerprint_sha256).
 //
 // Returns:
 //   - certID: the ID of the inserted/updated row
@@ -38,7 +38,7 @@ type CertSummary struct {
 func UpsertCertificate(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, discoveredByHostID, checkID string,
+	instanceID, discoveredByHostID, checkID string,
 	host string, port int, serverName string,
 	commonName, issuer string,
 	sans []string,
@@ -50,7 +50,7 @@ func UpsertCertificate(
 	const selectQ = `
 		SELECT id, status
 		FROM certificates
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host = $2
 		  AND port = $3
 		  AND server_name = $4
@@ -59,7 +59,7 @@ func UpsertCertificate(
 		LIMIT 1
 	`
 	var existing CertRow
-	rowErr := pool.QueryRow(ctx, selectQ, orgID, host, port, serverName, fingerprint).
+	rowErr := pool.QueryRow(ctx, selectQ, instanceID, host, port, serverName, fingerprint).
 		Scan(&existing.ID, &existing.Status)
 
 	if rowErr != nil && !errors.Is(rowErr, pgx.ErrNoRows) {
@@ -72,7 +72,7 @@ func UpsertCertificate(
 		// Insert new row.
 		const insertQ = `
 			INSERT INTO certificates (
-				id, organisation_id, discovered_by_host_id, check_id,
+				id, instance_id, discovered_by_host_id, check_id,
 				source, host, port, server_name,
 				common_name, issuer, sans,
 				not_before, not_after, fingerprint_sha256, status,
@@ -89,7 +89,7 @@ func UpsertCertificate(
 		id := newCUID()
 		var returnedID string
 		err = pool.QueryRow(ctx, insertQ,
-			id, orgID, discoveredByHostID, checkID,
+			id, instanceID, discoveredByHostID, checkID,
 			host, port, serverName,
 			commonName, issuer, sansJSON,
 			notBefore, notAfter, fingerprint, status,
@@ -130,18 +130,18 @@ func UpsertCertificate(
 func FindCertsForEndpoint(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, host string, port int, serverName string,
+	instanceID, host string, port int, serverName string,
 ) ([]CertRow, error) {
 	const q = `
 		SELECT id, status
 		FROM certificates
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host = $2
 		  AND port = $3
 		  AND server_name = $4
 		  AND deleted_at IS NULL
 	`
-	rows, err := pool.Query(ctx, q, orgID, host, port, serverName)
+	rows, err := pool.Query(ctx, q, instanceID, host, port, serverName)
 	if err != nil {
 		return nil, err
 	}
@@ -162,12 +162,12 @@ func FindCertsForEndpoint(
 func InsertCertificateEvent(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	certID, orgID, eventType, previousStatus, newStatus, message string,
+	certID, instanceID, eventType, previousStatus, newStatus, message string,
 	metadataJSON []byte,
 ) error {
 	const q = `
 		INSERT INTO certificate_events (
-			id, organisation_id, certificate_id,
+			id, instance_id, certificate_id,
 			event_type, previous_status, new_status, message, occurred_at, metadata
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
 	`
@@ -179,7 +179,7 @@ func InsertCertificateEvent(
 		newPtr = &newStatus
 	}
 	_, err := pool.Exec(ctx, q,
-		newCUID(), orgID, certID,
+		newCUID(), instanceID, certID,
 		eventType, prevPtr, newPtr, message, metadataJSON,
 	)
 	return err
@@ -217,32 +217,32 @@ func GetActiveCertAlertInstance(
 func InsertCertAlertInstance(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	ruleID, hostID, orgID, severity, message, certID string,
+	ruleID, hostID, instanceID, severity, message, certID string,
 	triggeredAt time.Time,
 ) (string, error) {
 	meta, _ := json.Marshal(map[string]string{"certificateId": certID})
 	const q = `
-		INSERT INTO alert_instances (id, rule_id, host_id, organisation_id, status, message, triggered_at, metadata)
+		INSERT INTO alert_instances (id, rule_id, host_id, instance_id, status, message, triggered_at, metadata)
 		VALUES ($1, $2, $3, $4, 'firing', $5, $6, $7)
 		RETURNING id
 	`
 	id := newCUID()
 	var returnedID string
-	err := pool.QueryRow(ctx, q, id, ruleID, hostID, orgID, message, triggeredAt, meta).Scan(&returnedID)
+	err := pool.QueryRow(ctx, q, id, ruleID, hostID, instanceID, message, triggeredAt, meta).Scan(&returnedID)
 	return returnedID, err
 }
 
 // GetCertExpiryRulesForOrg returns all enabled cert_expiry alert rules for an org.
-func GetCertExpiryRulesForOrg(ctx context.Context, pool *pgxpool.Pool, orgID string) ([]AlertRuleRow, error) {
+func GetCertExpiryRulesForOrg(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]AlertRuleRow, error) {
 	const q = `
-		SELECT id, host_id, organisation_id, name, condition_type, config::text, severity
+		SELECT id, host_id, instance_id, name, condition_type, config::text, severity
 		FROM alert_rules
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND condition_type = 'cert_expiry'
 		  AND enabled = true
 		  AND deleted_at IS NULL
 	`
-	rows, err := pool.Query(ctx, q, orgID)
+	rows, err := pool.Query(ctx, q, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func GetCertExpiryRulesForOrg(ctx context.Context, pool *pgxpool.Pool, orgID str
 	var result []AlertRuleRow
 	for rows.Next() {
 		var r AlertRuleRow
-		if err := rows.Scan(&r.ID, &r.HostID, &r.OrgID, &r.Name, &r.ConditionType, &r.ConfigJSON, &r.Severity); err != nil {
+		if err := rows.Scan(&r.ID, &r.HostID, &r.InstanceID, &r.Name, &r.ConditionType, &r.ConfigJSON, &r.Severity); err != nil {
 			return nil, err
 		}
 		result = append(result, r)
@@ -263,7 +263,7 @@ func GetCertExpiryRulesForOrg(ctx context.Context, pool *pgxpool.Pool, orgID str
 // enabled cert_expiry rule — used by the sweeper.
 func GetAllOrgsWithCertExpiryRules(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
 	const q = `
-		SELECT DISTINCT organisation_id
+		SELECT DISTINCT instance_id
 		FROM alert_rules
 		WHERE condition_type = 'cert_expiry'
 		  AND enabled = true
@@ -289,7 +289,7 @@ func GetAllOrgsWithCertExpiryRules(ctx context.Context, pool *pgxpool.Pool) ([]s
 // TrackedCertRow represents a row needed by the URL refresh sweeper.
 type TrackedCertRow struct {
 	ID                     string
-	OrgID                  string
+	InstanceID             string
 	Host                   string
 	Port                   int
 	ServerName             string
@@ -309,7 +309,7 @@ func ListCertsDueForUrlRefresh(
 	limit int,
 ) ([]TrackedCertRow, error) {
 	const q = `
-		SELECT id, organisation_id, host, port, server_name,
+		SELECT id, instance_id, host, port, server_name,
 		       tracked_url, COALESCE(refresh_interval_seconds, 3600),
 		       COALESCE((metadata->>'tlsSkipVerify')::boolean, false),
 		       fingerprint_sha256, not_after, status
@@ -333,7 +333,7 @@ func ListCertsDueForUrlRefresh(
 	for rows.Next() {
 		var r TrackedCertRow
 		if err := rows.Scan(
-			&r.ID, &r.OrgID, &r.Host, &r.Port, &r.ServerName,
+			&r.ID, &r.InstanceID, &r.Host, &r.Port, &r.ServerName,
 			&r.TrackedURL, &r.RefreshIntervalSeconds,
 			&r.TLSSkipVerify,
 			&r.FingerprintSHA256, &r.NotAfter, &r.Status,
@@ -389,7 +389,7 @@ func MarkCertRefreshFailed(
 func InsertRenewedTrackedCert(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	previousCertID, orgID string,
+	previousCertID, instanceID string,
 	host string, port int, serverName string,
 	commonName, issuer string,
 	sans []string,
@@ -408,7 +408,7 @@ func InsertRenewedTrackedCert(
 
 	const insertQ = `
 		INSERT INTO certificates (
-			id, organisation_id,
+			id, instance_id,
 			source, host, port, server_name,
 			common_name, issuer, sans,
 			not_before, not_after, fingerprint_sha256, status,
@@ -428,7 +428,7 @@ func InsertRenewedTrackedCert(
 	`
 	id := newCUID()
 	err = tx.QueryRow(ctx, insertQ,
-		id, orgID,
+		id, instanceID,
 		host, port, serverName,
 		commonName, issuer, sansJSON,
 		notBefore, notAfter, fingerprint, status,
@@ -463,17 +463,17 @@ func InsertRenewedTrackedCert(
 func ListCertificatesExpiringWithin(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID string,
+	instanceID string,
 	days int,
 ) ([]CertSummary, error) {
 	const q = `
 		SELECT id, common_name, issuer, host, port, not_after, status, COALESCE(discovered_by_host_id, '')
 		FROM certificates
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND deleted_at IS NULL
 		  AND not_after <= NOW() + ($2 || ' days')::interval
 	`
-	rows, err := pool.Query(ctx, q, orgID, days)
+	rows, err := pool.Query(ctx, q, instanceID, days)
 	if err != nil {
 		return nil, err
 	}
@@ -494,18 +494,18 @@ func ListCertificatesExpiringWithin(
 func GetCertificateByID(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, certID string,
+	instanceID, certID string,
 ) (*CertSummary, error) {
 	const q = `
 		SELECT id, common_name, issuer, host, port, not_after, status, COALESCE(discovered_by_host_id, '')
 		FROM certificates
 		WHERE id = $1
-		  AND organisation_id = $2
+		  AND instance_id = $2
 		  AND deleted_at IS NULL
 		LIMIT 1
 	`
 	var r CertSummary
-	err := pool.QueryRow(ctx, q, certID, orgID).
+	err := pool.QueryRow(ctx, q, certID, instanceID).
 		Scan(&r.ID, &r.CommonName, &r.Issuer, &r.Host, &r.Port, &r.NotAfter, &r.Status, &r.DiscoveredByHostID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

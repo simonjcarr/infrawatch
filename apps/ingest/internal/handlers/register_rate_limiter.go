@@ -60,14 +60,14 @@ func NewDefaultRegistrationLimiter() *RegistrationLimiter {
 	return NewRegistrationLimiter(RegistrationLimiterConfig{})
 }
 
-func (l *RegistrationLimiter) Allow(ctx context.Context, orgToken string) error {
+func (l *RegistrationLimiter) Allow(ctx context.Context, enrolmentToken string) error {
 	if l == nil {
 		return nil
 	}
 
 	now := l.config.Now()
 	sourceKey := "source:" + registrationSource(ctx)
-	sourceTokenKey := sourceKey + ":token:" + tokenHashPrefix(orgToken)
+	sourceTokenKey := sourceKey + ":token:" + tokenHashPrefix(enrolmentToken)
 
 	l.mu.Lock()
 	defer l.mu.Unlock()

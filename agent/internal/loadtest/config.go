@@ -9,26 +9,26 @@ import (
 
 // Config is the fully-validated configuration for a load-test run.
 type Config struct {
-	Address               string
-	OrgToken              string
-	CACertFile            string
-	TLSSkipVerify         bool
-	Agents                int
-	Ramp                  time.Duration
-	Duration              time.Duration
-	HeartbeatInterval     time.Duration
-	RunID                 string
-	HostnamePrefix        string
-	ConnFanout            int
-	StatsInterval         time.Duration
-	RegistrationConc      int
-	MetricsJitter         float64
-	OutputJSON            string
-	SimulateTasks         bool
-	SimulateChecks        bool
-	SimulateTerminal      bool
-	SimulateInventory     bool
-	CheckFailureRate      float64
+	Address           string
+	EnrolmentToken    string
+	CACertFile        string
+	TLSSkipVerify     bool
+	Agents            int
+	Ramp              time.Duration
+	Duration          time.Duration
+	HeartbeatInterval time.Duration
+	RunID             string
+	HostnamePrefix    string
+	ConnFanout        int
+	StatsInterval     time.Duration
+	RegistrationConc  int
+	MetricsJitter     float64
+	OutputJSON        string
+	SimulateTasks     bool
+	SimulateChecks    bool
+	SimulateTerminal  bool
+	SimulateInventory bool
+	CheckFailureRate  float64
 }
 
 // Validate returns an error if the configuration is missing required fields
@@ -37,7 +37,7 @@ func (c *Config) Validate() error {
 	if c.Address == "" {
 		return fmt.Errorf("--address is required")
 	}
-	if c.OrgToken == "" {
+	if c.EnrolmentToken == "" {
 		return fmt.Errorf("--token is required")
 	}
 	if c.Agents < 1 {

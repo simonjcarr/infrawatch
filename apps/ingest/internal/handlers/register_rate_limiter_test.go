@@ -97,8 +97,8 @@ func TestRegisterThrottlesBeforeTokenLookup(t *testing.T) {
 
 	handler := &RegisterHandler{registrationLimiter: limiter}
 	_, err := handler.Register(ctx, &agentv1.RegisterRequest{
-		OrgToken:  "enrolment-token-a",
-		PublicKey: "agent-public-key",
+		EnrolmentToken: "enrolment-token-a",
+		PublicKey:      "agent-public-key",
 	})
 	if status.Code(err) != codes.ResourceExhausted {
 		t.Fatalf("Register() error code = %v, want %v (err=%v)", status.Code(err), codes.ResourceExhausted, err)

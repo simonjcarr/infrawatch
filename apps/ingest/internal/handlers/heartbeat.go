@@ -65,7 +65,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 	}
 
 	// Validate the JWT and bind it to the verified mTLS client identity.
-	agentID, _, err := h.authenticateFirstHeartbeat(ctx, first.AgentId)
+	agentID, err := h.authenticateFirstHeartbeat(ctx, first.AgentId)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 		if err := queries.SetAgentStatus(ctx, h.pool, agentID, "active"); err != nil {
 			slog.Warn("reactivating offline agent", "err", err)
 		}
-		if err := queries.InsertAgentStatusHistory(ctx, h.pool, agentID, agent.OrganisationID, "active", nil, "agent reconnected"); err != nil {
+		if err := queries.InsertAgentStatusHistory(ctx, h.pool, agentID, agent.InstanceID, "active", nil, "agent reconnected"); err != nil {
 			slog.Warn("inserting reconnect status history", "err", err)
 		}
 		agent.Status = "active"
@@ -103,7 +103,7 @@ func (h *HeartbeatHandler) Heartbeat(stream agentv1.IngestService_HeartbeatServe
 	slog.Info("heartbeat stream started", "agent_id", agentID)
 
 	// Process first message
-	if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, hostID, agent.Hostname, first); err != nil {
+	if err := h.processHeartbeat(ctx, stream, agentID, agent.InstanceID, hostID, agent.Hostname, first); err != nil {
 		return err
 	}
 
@@ -168,7 +168,7 @@ loop:
 					slog.Info("resolved host after retry", "agent_id", agentID, "host_id", hostID)
 				}
 			}
-			if err := h.processHeartbeat(ctx, stream, agentID, agent.OrganisationID, hostID, agent.Hostname, req); err != nil {
+			if err := h.processHeartbeat(ctx, stream, agentID, agent.InstanceID, hostID, agent.Hostname, req); err != nil {
 				return err
 			}
 
@@ -269,7 +269,7 @@ loop:
 	if err := queries.SetHostOffline(context.Background(), h.pool, agentID); err != nil {
 		slog.Warn("setting host offline", "err", err)
 	}
-	if err := queries.InsertAgentStatusHistory(context.Background(), h.pool, agentID, agent.OrganisationID, "offline", nil, "heartbeat stream closed"); err != nil {
+	if err := queries.InsertAgentStatusHistory(context.Background(), h.pool, agentID, agent.InstanceID, "offline", nil, "heartbeat stream closed"); err != nil {
 		slog.Warn("inserting offline status history", "err", err)
 	}
 
@@ -277,25 +277,25 @@ loop:
 	return nil
 }
 
-func (h *HeartbeatHandler) authenticateFirstHeartbeat(ctx context.Context, token string) (agentID string, orgID string, err error) {
-	agentID, orgID, err = h.issuer.ValidateAgentToken(token)
+func (h *HeartbeatHandler) authenticateFirstHeartbeat(ctx context.Context, token string) (agentID string, err error) {
+	agentID, err = h.issuer.ValidateAgentToken(token)
 	if err != nil {
-		return "", "", status.Error(codes.Unauthenticated, "invalid or missing JWT")
+		return "", status.Error(codes.Unauthenticated, "invalid or missing JWT")
 	}
 	id, ok := pki.IdentityFromContext(ctx)
 	if !ok || id == nil {
-		return "", "", status.Error(codes.Unauthenticated, "missing client identity")
+		return "", status.Error(codes.Unauthenticated, "missing client identity")
 	}
-	if id.AgentID != agentID || id.OrgID != orgID {
-		return "", "", status.Error(codes.Unauthenticated, "client identity mismatch")
+	if id.AgentID != agentID {
+		return "", status.Error(codes.Unauthenticated, "client identity mismatch")
 	}
-	return agentID, orgID, nil
+	return agentID, nil
 }
 
 func (h *HeartbeatHandler) processHeartbeat(
 	ctx context.Context,
 	stream agentv1.IngestService_HeartbeatServer,
-	agentID, orgID, hostID, hostname string,
+	agentID, instanceID, hostID, hostname string,
 	req *agentv1.HeartbeatRequest,
 ) error {
 	now := time.Now()
@@ -340,13 +340,13 @@ func (h *HeartbeatHandler) processHeartbeat(
 
 	// Sync host↔network memberships based on current IP addresses.
 	if hostID != "" && len(ipAddresses) > 0 {
-		if err := queries.SyncHostNetworks(ctx, h.pool, orgID, hostID, ipAddresses); err != nil {
+		if err := queries.SyncHostNetworks(ctx, h.pool, instanceID, hostID, ipAddresses); err != nil {
 			slog.Warn("syncing host network memberships", "host_id", hostID, "err", err)
 		}
 	}
 
 	// Persist metric history row
-	if err := queries.InsertHostMetricByAgentID(ctx, h.pool, orgID, agentID, now,
+	if err := queries.InsertHostMetricByAgentID(ctx, h.pool, instanceID, agentID, now,
 		req.CpuPercent, req.MemoryPercent, req.DiskPercent, req.UptimeSeconds,
 	); err != nil {
 		slog.Warn("inserting host metric", "err", err)
@@ -356,7 +356,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 	if hostID != "" {
 		// Build a checkID → checkType map once per heartbeat to route cert results.
 		checkTypeMap := make(map[string]string)
-		if hostChecks, err := queries.GetChecksForHost(ctx, h.pool, hostID, orgID); err == nil {
+		if hostChecks, err := queries.GetChecksForHost(ctx, h.pool, hostID, instanceID); err == nil {
 			for _, c := range hostChecks {
 				checkTypeMap[c.ID] = c.CheckType
 			}
@@ -367,7 +367,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 		for _, result := range req.CheckResults {
 			ranAt := time.Unix(result.RanAtUnix, 0)
 			if err := queries.InsertCheckResult(ctx, h.pool,
-				result.CheckId, hostID, orgID,
+				result.CheckId, hostID, instanceID,
 				result.Status, result.Output,
 				result.DurationMs, ranAt,
 			); err != nil {
@@ -378,19 +378,19 @@ func (h *HeartbeatHandler) processHeartbeat(
 			switch checkTypeMap[result.CheckId] {
 			case "certificate":
 				if result.Output != "" {
-					persistCertificateResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+					persistCertificateResult(ctx, h.pool, instanceID, hostID, result.CheckId, result.Output)
 				}
 			case "service_account":
 				if result.Output != "" {
-					persistServiceAccountResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+					persistServiceAccountResult(ctx, h.pool, instanceID, hostID, result.CheckId, result.Output)
 				}
 			case "ssh_key_scan":
 				if result.Output != "" {
-					persistSshKeyResult(ctx, h.pool, orgID, hostID, result.CheckId, result.Output)
+					persistSshKeyResult(ctx, h.pool, instanceID, hostID, result.CheckId, result.Output)
 				}
 			case "patch_status":
 				if result.Output != "" {
-					persistPatchStatusResult(ctx, h.pool, orgID, hostID, result.CheckId, ranAt, result.Output)
+					persistPatchStatusResult(ctx, h.pool, instanceID, hostID, result.CheckId, ranAt, result.Output)
 				}
 			}
 		}
@@ -400,7 +400,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 		for _, result := range req.CheckResults {
 			checkStatuses[result.CheckId] = result.Status
 		}
-		evaluateAlerts(ctx, h.pool, orgID, hostID, hostname, checkStatuses, heartbeatMetrics{
+		evaluateAlerts(ctx, h.pool, instanceID, hostID, hostname, checkStatuses, heartbeatMetrics{
 			CPU:    req.CpuPercent,
 			Memory: req.MemoryPercent,
 			Disk:   req.DiskPercent,
@@ -454,7 +454,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 	// Publish to queue (for consumers/metrics in standard/ha deployments)
 	payload, _ := json.Marshal(map[string]interface{}{
 		"agent_id":      agentID,
-		"org_id":        orgID,
+		"instance_id":   instanceID,
 		"timestamp":     now.Unix(),
 		"cpu":           req.CpuPercent,
 		"memory":        req.MemoryPercent,
@@ -500,7 +500,7 @@ func (h *HeartbeatHandler) processHeartbeat(
 
 	// Push active check definitions to the agent
 	if hostID != "" {
-		checkRows, err := queries.GetChecksForHost(ctx, h.pool, hostID, orgID)
+		checkRows, err := queries.GetChecksForHost(ctx, h.pool, hostID, instanceID)
 		if err != nil {
 			slog.Warn("fetching checks for host", "host_id", hostID, "err", err)
 		} else {

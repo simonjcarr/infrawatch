@@ -8,18 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// HostOrgForTaskRunHost returns the host_id and organisation_id for a given
+// HostOrgForTaskRunHost returns the host_id and instance_id for a given
 // task_run_hosts row, also checking that the row belongs to the given agent.
 type HostOrgForTask struct {
-	HostID string
-	OrgID  string
+	HostID     string
+	InstanceID string
 }
 
 // GetHostOrgForTaskRunHost looks up the host and org for a task_run_hosts row,
 // validating that the host's agent matches the caller.
 func GetHostOrgForTaskRunHost(ctx context.Context, pool *pgxpool.Pool, taskRunHostID, agentID string) (*HostOrgForTask, error) {
 	const q = `
-		SELECT h.id, h.organisation_id
+		SELECT h.id, h.instance_id
 		FROM task_run_hosts trh
 		JOIN hosts h ON h.id = trh.host_id
 		WHERE trh.id       = $1
@@ -29,20 +29,20 @@ func GetHostOrgForTaskRunHost(ctx context.Context, pool *pgxpool.Pool, taskRunHo
 		LIMIT 1
 	`
 	var r HostOrgForTask
-	err := pool.QueryRow(ctx, q, taskRunHostID, agentID).Scan(&r.HostID, &r.OrgID)
+	err := pool.QueryRow(ctx, q, taskRunHostID, agentID).Scan(&r.HostID, &r.InstanceID)
 	return &r, err
 }
 
 // InsertSoftwareScan inserts a new software_scans row with status='running' and
 // returns the generated scan ID.
-func InsertSoftwareScan(ctx context.Context, pool *pgxpool.Pool, orgID, hostID, taskRunHostID, source string, startedAt time.Time) (string, error) {
+func InsertSoftwareScan(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID, taskRunHostID, source string, startedAt time.Time) (string, error) {
 	id := newCUID()
 	const q = `
 		INSERT INTO software_scans
-		  (id, organisation_id, host_id, task_run_host_id, status, source, started_at, created_at)
+		  (id, instance_id, host_id, task_run_host_id, status, source, started_at, created_at)
 		VALUES ($1, $2, $3, $4, 'running', $5, $6, NOW())
 	`
-	_, err := pool.Exec(ctx, q, id, orgID, hostID, nullableString(taskRunHostID), nullableString(source), startedAt)
+	_, err := pool.Exec(ctx, q, id, instanceID, hostID, nullableString(taskRunHostID), nullableString(source), startedAt)
 	return id, err
 }
 
@@ -51,7 +51,7 @@ func InsertSoftwareScan(ctx context.Context, pool *pgxpool.Pool, orgID, hostID, 
 func UpsertSoftwarePackagesBatch(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, source string,
+	instanceID, hostID, source string,
 	names, versions, archs, publishers []string,
 	distroIDs, distroVersionIDs, distroCodenames []string,
 	distroIDLikes [][]string,
@@ -83,7 +83,7 @@ func UpsertSoftwarePackagesBatch(
 	const q = `
 		WITH ins AS (
 		  INSERT INTO software_packages
-		    (id, organisation_id, host_id, name, version, architecture, publisher, source,
+		    (id, instance_id, host_id, name, version, architecture, publisher, source,
 		     distro_id, distro_version_id, distro_codename, distro_id_like,
 		     source_name, source_version, package_epoch, package_release, repository, origin,
 		     install_date, first_seen_at, last_seen_at, created_at, updated_at)
@@ -107,7 +107,7 @@ func UpsertSoftwarePackagesBatch(
 		    NULLIF(unnest($18::text[]), ''),
 		    unnest($19::timestamptz[]),
 		    $20, $20, $20, $20
-		  ON CONFLICT (organisation_id, host_id, name, version, architecture)
+		  ON CONFLICT (instance_id, host_id, name, version, architecture)
 		  DO UPDATE SET
 		    last_seen_at = EXCLUDED.last_seen_at,
 		    publisher    = COALESCE(EXCLUDED.publisher, software_packages.publisher),
@@ -129,7 +129,7 @@ func UpsertSoftwarePackagesBatch(
 	`
 
 	err = pool.QueryRow(ctx, q,
-		ids, orgID, hostID,
+		ids, instanceID, hostID,
 		names, versions, archs, publishers,
 		source,
 		nullableStrings(distroIDs),
@@ -244,22 +244,22 @@ func UpdateHostLastSoftwareScanAt(ctx context.Context, pool *pgxpool.Pool, hostI
 
 // SoftwareSweeperHost is a minimal host row returned by the sweeper query.
 type SoftwareSweeperHost struct {
-	ID    string
-	OrgID string
+	ID         string
+	InstanceID string
 }
 
-// GetHostsDueForSoftwareScan returns hosts belonging to organisations that have
+// GetHostsDueForSoftwareScan returns hosts belonging to instances that have
 // software inventory enabled and whose last scan is older than the configured
 // interval (or who have never been scanned).
 func GetHostsDueForSoftwareScan(ctx context.Context, pool *pgxpool.Pool) ([]SoftwareSweeperHost, error) {
 	const q = `
-		SELECT h.id, h.organisation_id
+		SELECT h.id, h.instance_id
 		FROM hosts h
-		JOIN organisations o ON o.id = h.organisation_id
+		JOIN instances o ON o.id = h.instance_id
 		WHERE h.deleted_at IS NULL
 		  AND o.deleted_at IS NULL
 		  AND h.status     = 'online'
-		  -- Organisation must have software inventory enabled
+		  -- Instance must have software inventory enabled
 		  AND (o.metadata->'softwareInventorySettings'->>'enabled')::boolean = true
 		  -- Host is overdue: never scanned OR last scan older than intervalHours
 		  AND (
@@ -294,7 +294,7 @@ func GetHostsDueForSoftwareScan(ctx context.Context, pool *pgxpool.Pool) ([]Soft
 	var hosts []SoftwareSweeperHost
 	for rows.Next() {
 		var h SoftwareSweeperHost
-		if err := rows.Scan(&h.ID, &h.OrgID); err != nil {
+		if err := rows.Scan(&h.ID, &h.InstanceID); err != nil {
 			return nil, err
 		}
 		hosts = append(hosts, h)
@@ -304,25 +304,25 @@ func GetHostsDueForSoftwareScan(ctx context.Context, pool *pgxpool.Pool) ([]Soft
 
 // InsertSoftwareInventoryTask creates a task_runs row and a single
 // task_run_hosts row for an automated software inventory scan.
-func InsertSoftwareInventoryTask(ctx context.Context, pool *pgxpool.Pool, orgID, hostID string) (taskRunHostID string, err error) {
+func InsertSoftwareInventoryTask(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string) (taskRunHostID string, err error) {
 	taskRunID := newCUID()
 	taskRunHostID = newCUID()
 
 	const qRun = `
 		INSERT INTO task_runs
-		  (id, organisation_id, triggered_by, target_type, target_id,
+		  (id, instance_id, triggered_by, target_type, target_id,
 		   task_type, config, max_parallel, status, created_at, updated_at)
 		VALUES ($1, $2, NULL, 'host', $3, 'software_inventory', '{}', 1, 'pending', NOW(), NOW())
 	`
-	if _, err = pool.Exec(ctx, qRun, taskRunID, orgID, hostID); err != nil {
+	if _, err = pool.Exec(ctx, qRun, taskRunID, instanceID, hostID); err != nil {
 		return "", err
 	}
 
 	const qHost = `
 		INSERT INTO task_run_hosts
-		  (id, organisation_id, task_run_id, host_id, status, raw_output, created_at, updated_at)
+		  (id, instance_id, task_run_id, host_id, status, raw_output, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'pending', '', NOW(), NOW())
 	`
-	_, err = pool.Exec(ctx, qHost, taskRunHostID, orgID, taskRunID, hostID)
+	_, err = pool.Exec(ctx, qHost, taskRunHostID, instanceID, taskRunID, hostID)
 	return taskRunHostID, err
 }

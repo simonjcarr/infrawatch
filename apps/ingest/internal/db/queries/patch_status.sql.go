@@ -19,7 +19,7 @@ type PatchUpdateInput struct {
 func UpsertHostPatchStatus(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, checkID, status string,
+	instanceID, hostID, checkID, status string,
 	lastPatchedAt *time.Time,
 	patchAgeDays *int,
 	maxAgeDays int,
@@ -33,7 +33,7 @@ func UpsertHostPatchStatus(
 ) error {
 	const q = `
 		INSERT INTO host_patch_statuses (
-			id, organisation_id, host_id, check_id, status, last_patched_at,
+			id, instance_id, host_id, check_id, status, last_patched_at,
 			patch_age_days, max_age_days, package_manager, updates_supported,
 			updates_count, updates_truncated, warnings, error, checked_at,
 			created_at, updated_at
@@ -55,7 +55,7 @@ func UpsertHostPatchStatus(
 			updated_at = NOW()
 	`
 	_, err := pool.Exec(ctx, q,
-		newCUID(), orgID, hostID, nullableString(checkID), status, lastPatchedAt,
+		newCUID(), instanceID, hostID, nullableString(checkID), status, lastPatchedAt,
 		patchAgeDays, maxAgeDays, nullableString(packageManager), updatesSupported,
 		updatesCount, updatesTruncated, string(warningsJSON), nullableString(errorMessage), checkedAt,
 	)
@@ -65,7 +65,7 @@ func UpsertHostPatchStatus(
 func ReplaceCurrentPackageUpdates(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, packageManager string,
+	instanceID, hostID, packageManager string,
 	updates []PatchUpdateInput,
 	seenAt time.Time,
 ) error {
@@ -80,17 +80,17 @@ func ReplaceCurrentPackageUpdates(
 		SET status = 'resolved',
 		    resolved_at = $4,
 		    updated_at = NOW()
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND host_id = $2
 		  AND COALESCE(package_manager, '') = COALESCE($3, '')
 		  AND status = 'current'
-	`, orgID, hostID, nullableString(packageManager), seenAt); err != nil {
+	`, instanceID, hostID, nullableString(packageManager), seenAt); err != nil {
 		return err
 	}
 
 	const insertQ = `
 		INSERT INTO host_package_updates (
-			id, organisation_id, host_id, name, current_version, available_version,
+			id, instance_id, host_id, name, current_version, available_version,
 			architecture, repository, package_manager, status, first_seen_at,
 			last_seen_at, resolved_at, created_at, updated_at
 		)
@@ -107,7 +107,7 @@ func ReplaceCurrentPackageUpdates(
 			    resolved_at = NULL,
 			    repository = $7,
 			    updated_at = NOW()
-			WHERE organisation_id = $1
+			WHERE instance_id = $1
 			  AND host_id = $2
 			  AND name = $3
 			  AND current_version IS NOT DISTINCT FROM $4
@@ -115,7 +115,7 @@ func ReplaceCurrentPackageUpdates(
 			  AND architecture IS NOT DISTINCT FROM $6
 			  AND package_manager IS NOT DISTINCT FROM $8
 		`,
-			orgID, hostID, update.Name,
+			instanceID, hostID, update.Name,
 			nullableString(update.CurrentVersion),
 			nullableString(update.AvailableVersion),
 			nullableString(update.Architecture),
@@ -131,7 +131,7 @@ func ReplaceCurrentPackageUpdates(
 		}
 
 		if _, err := tx.Exec(ctx, insertQ,
-			newCUID(), orgID, hostID, update.Name,
+			newCUID(), instanceID, hostID, update.Name,
 			nullableString(update.CurrentVersion),
 			nullableString(update.AvailableVersion),
 			nullableString(update.Architecture),

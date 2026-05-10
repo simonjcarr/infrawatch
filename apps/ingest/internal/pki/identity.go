@@ -5,7 +5,6 @@ import "context"
 // Identity is the SPIFFE-derived wire identity of the agent on the current
 // RPC, populated by the mTLS gRPC interceptor after chain verification.
 type Identity struct {
-	OrgID   string
 	AgentID string
 	Serial  string
 }

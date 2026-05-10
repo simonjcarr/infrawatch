@@ -50,7 +50,7 @@ func (h *RenewCertHandler) Renew(ctx context.Context, req *agentv1.RenewCertific
 		return nil, status.Errorf(codes.PermissionDenied, "agent status is %s", agent.Status)
 	}
 
-	leaf, err := h.ca.Sign(req.CsrDer, req.AgentId, agent.OrganisationID)
+	leaf, err := h.ca.Sign(req.CsrDer, req.AgentId)
 	if err != nil {
 		slog.Error("signing renewal CSR", "agent_id", req.AgentId, "err", err)
 		return nil, status.Error(codes.Internal, "signing failed")

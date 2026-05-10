@@ -52,7 +52,7 @@ func TestConsumeEnrolmentTokenAtomicallyChecksUsageLimit(t *testing.T) {
 	if !strings.Contains(queryer.sql, "FOR UPDATE") {
 		t.Fatalf("query does not lock the candidate token row: %s", queryer.sql)
 	}
-	if !strings.Contains(queryer.sql, "RETURNING id, organisation_id") {
+	if !strings.Contains(queryer.sql, "RETURNING id, instance_id") {
 		t.Fatalf("query does not return the consumed token row: %s", queryer.sql)
 	}
 	if len(queryer.args) != 1 || queryer.args[0] != "token-secret" {

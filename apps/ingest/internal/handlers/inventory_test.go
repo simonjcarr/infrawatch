@@ -84,14 +84,13 @@ func TestInventoryAuthenticateStreamRejectsExpiredJWT(t *testing.T) {
 		t.Fatalf("NewJWTIssuer: %v", err)
 	}
 
-	token, err := issuer.IssueAgentToken("agent-123", "org-123")
+	token, err := issuer.IssueAgentToken("agent-123")
 	if err != nil {
 		t.Fatalf("IssueAgentToken: %v", err)
 	}
 
 	stream := &inventoryAuthTestStream{
 		ctx: pki.WithIdentity(metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+token)), &pki.Identity{
-			OrgID:   "org-123",
 			AgentID: "agent-123",
 		}),
 	}
@@ -110,14 +109,13 @@ func TestInventoryAuthenticateStreamRejectsMTLSJWTMismatch(t *testing.T) {
 		t.Fatalf("NewJWTIssuer: %v", err)
 	}
 
-	token, err := issuer.IssueAgentToken("agent-123", "org-123")
+	token, err := issuer.IssueAgentToken("agent-123")
 	if err != nil {
 		t.Fatalf("IssueAgentToken: %v", err)
 	}
 
 	stream := &inventoryAuthTestStream{
 		ctx: pki.WithIdentity(metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+token)), &pki.Identity{
-			OrgID:   "org-123",
 			AgentID: "agent-999",
 		}),
 	}
@@ -136,14 +134,13 @@ func TestInventoryAuthenticateStreamAcceptsMatchingMTLSIdentity(t *testing.T) {
 		t.Fatalf("NewJWTIssuer: %v", err)
 	}
 
-	token, err := issuer.IssueAgentToken("agent-123", "org-123")
+	token, err := issuer.IssueAgentToken("agent-123")
 	if err != nil {
 		t.Fatalf("IssueAgentToken: %v", err)
 	}
 
 	stream := &inventoryAuthTestStream{
 		ctx: pki.WithIdentity(metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+token)), &pki.Identity{
-			OrgID:   "org-123",
 			AgentID: "agent-123",
 		}),
 	}

@@ -84,7 +84,7 @@ func TestHeartbeatAuthenticateFirstMessageBindsMTLSIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewJWTIssuer: %v", err)
 	}
-	token, err := issuer.IssueAgentToken("agent-123", "org-456")
+	token, err := issuer.IssueAgentToken("agent-123")
 	if err != nil {
 		t.Fatalf("IssueAgentToken: %v", err)
 	}
@@ -104,23 +104,13 @@ func TestHeartbeatAuthenticateFirstMessageBindsMTLSIdentity(t *testing.T) {
 		{
 			name: "mismatched agent",
 			ctx: pki.WithIdentity(context.Background(), &pki.Identity{
-				OrgID:   "org-456",
 				AgentID: "agent-other",
-			}),
-			wantCode: codes.Unauthenticated,
-		},
-		{
-			name: "mismatched organisation",
-			ctx: pki.WithIdentity(context.Background(), &pki.Identity{
-				OrgID:   "org-other",
-				AgentID: "agent-123",
 			}),
 			wantCode: codes.Unauthenticated,
 		},
 		{
 			name: "matching identity",
 			ctx: pki.WithIdentity(context.Background(), &pki.Identity{
-				OrgID:   "org-456",
 				AgentID: "agent-123",
 			}),
 			wantCode: codes.OK,
@@ -129,13 +119,13 @@ func TestHeartbeatAuthenticateFirstMessageBindsMTLSIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			agentID, orgID, err := handler.authenticateFirstHeartbeat(tt.ctx, token)
+			agentID, err := handler.authenticateFirstHeartbeat(tt.ctx, token)
 			if status.Code(err) != tt.wantCode {
 				t.Fatalf("authenticateFirstHeartbeat() code = %v, want %v (err=%v)", status.Code(err), tt.wantCode, err)
 			}
 			if tt.wantCode == codes.OK {
-				if agentID != "agent-123" || orgID != "org-456" {
-					t.Fatalf("authenticateFirstHeartbeat() = (%q, %q), want (agent-123, org-456)", agentID, orgID)
+				if agentID != "agent-123" {
+					t.Fatalf("authenticateFirstHeartbeat() = %q, want %q", agentID, "agent-123")
 				}
 			}
 		})

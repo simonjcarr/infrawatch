@@ -98,7 +98,7 @@ func main() {
 		cfg.TLS.KeyFile,
 		agentCA.TrustPool(),
 		func(chains [][]*x509.Certificate) error {
-			if _, _, err := pki.VerifyLeaf(chains, revocation); err != nil {
+			if _, err := pki.VerifyLeaf(chains, revocation); err != nil {
 				return err
 			}
 			return nil

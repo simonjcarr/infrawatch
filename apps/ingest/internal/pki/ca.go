@@ -34,7 +34,6 @@ import (
 
 const (
 	caCommonName = "ct-ops Agent CA"
-	caOrg        = "ct-ops"
 	caValidity   = 10 * 365 * 24 * time.Hour // 10 years
 )
 
@@ -233,8 +232,7 @@ func generateCA() (*AgentCA, error) {
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName:   caCommonName,
-			Organization: []string{caOrg},
+			CommonName: caCommonName,
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
 		NotAfter:              now.Add(caValidity),

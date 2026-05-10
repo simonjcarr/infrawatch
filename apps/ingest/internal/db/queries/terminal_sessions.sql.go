@@ -19,7 +19,7 @@ import (
 
 // TerminalSessionInfo is returned after validating and activating a terminal session.
 type TerminalSessionInfo struct {
-	OrganisationID string
+	InstanceID     string
 	UserID         string
 	HostID         string
 	Host           string
@@ -41,16 +41,16 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 		SET status     = 'active',
 		    started_at = NOW(),
 		    updated_at = NOW()
-		FROM organisations o, hosts h
+		FROM instances o, hosts h
 		WHERE ts.session_id       = $1
 		  AND ts.websocket_token_hash = $2
 		  AND ts.status           = 'pending'
 		  AND COALESCE(ts.expires_at, ts.created_at + INTERVAL '5 minutes') > NOW()
-		  AND o.id                = ts.organisation_id
+		  AND o.id                = ts.instance_id
 		  AND h.id                = ts.host_id
-		  AND h.organisation_id   = ts.organisation_id
+		  AND h.instance_id   = ts.instance_id
 		  AND h.deleted_at        IS NULL
-			RETURNING ts.organisation_id, ts.host_id,
+			RETURNING ts.instance_id, ts.host_id,
 		          ts.user_id,
 		          COALESCE(NULLIF(h.hostname, ''), h.ip_addresses->>0) AS host,
 		          COALESCE(ts.username, '') AS username,
@@ -58,7 +58,7 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 	`
 	var info TerminalSessionInfo
 	err := pool.QueryRow(ctx, q, sessionID, tokenHash).Scan(
-		&info.OrganisationID,
+		&info.InstanceID,
 		&info.HostID,
 		&info.UserID,
 		&info.Host,
@@ -309,7 +309,7 @@ func pruneTerminalAuthHits(hits []time.Time, now time.Time) []time.Time {
 
 func terminalAuthThrottleKeys(info TerminalSessionInfo, source string) []terminalAuthThrottleKey {
 	username := strings.ToLower(strings.TrimSpace(info.Username))
-	if info.OrganisationID == "" || info.HostID == "" || username == "" {
+	if info.InstanceID == "" || info.HostID == "" || username == "" {
 		return nil
 	}
 
@@ -317,12 +317,12 @@ func terminalAuthThrottleKeys(info TerminalSessionInfo, source string) []termina
 	if info.UserID != "" {
 		keys = append(keys, terminalAuthThrottleKey{
 			scope: "terminal:ssh:user-host-username",
-			key:   terminalAuthThrottleKeyHash(info.OrganisationID, info.UserID, info.HostID, username),
+			key:   terminalAuthThrottleKeyHash(info.InstanceID, info.UserID, info.HostID, username),
 		})
 	}
 	keys = append(keys, terminalAuthThrottleKey{
 		scope: "terminal:ssh:source-host-username",
-		key:   terminalAuthThrottleKeyHash(info.OrganisationID, terminalAuthSource(source), info.HostID, username),
+		key:   terminalAuthThrottleKeyHash(info.InstanceID, terminalAuthSource(source), info.HostID, username),
 	})
 	sort.Slice(keys, func(i, j int) bool {
 		if keys[i].scope == keys[j].scope {

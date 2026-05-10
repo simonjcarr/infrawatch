@@ -10,7 +10,7 @@ import (
 // DueSchedule represents a task_schedules row that is ready to fire.
 type DueSchedule struct {
 	ID             string
-	OrgID          string
+	InstanceID     string
 	Name           string
 	TaskType       string
 	ConfigJSON     string
@@ -26,7 +26,7 @@ type DueSchedule struct {
 // late schedules fire before freshly-due ones.
 func ListSchedulesDue(ctx context.Context, pool *pgxpool.Pool, limit int) ([]DueSchedule, error) {
 	const q = `
-		SELECT id, organisation_id, name, task_type, config::text,
+		SELECT id, instance_id, name, task_type, config::text,
 		       target_type, target_id, max_parallel, cron_expression, timezone
 		FROM task_schedules
 		WHERE enabled      = TRUE
@@ -46,7 +46,7 @@ func ListSchedulesDue(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Due
 	for rows.Next() {
 		var s DueSchedule
 		if err := rows.Scan(
-			&s.ID, &s.OrgID, &s.Name, &s.TaskType, &s.ConfigJSON,
+			&s.ID, &s.InstanceID, &s.Name, &s.TaskType, &s.ConfigJSON,
 			&s.TargetType, &s.TargetID, &s.MaxParallel, &s.CronExpression, &s.Timezone,
 		); err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func ListSchedulesDue(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Due
 func ResolveScheduleTargetHosts(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, targetType, targetID, taskType string,
+	instanceID, targetType, targetID, taskType string,
 ) (hostIDs []string, err error) {
 	linuxOnly := taskType == "patch" || taskType == "service"
 
@@ -73,11 +73,11 @@ func ResolveScheduleTargetHosts(
 			SELECT id
 			FROM hosts
 			WHERE id              = $1
-			  AND organisation_id = $2
+			  AND instance_id = $2
 			  AND deleted_at      IS NULL
 			  AND ($3 = FALSE OR LOWER(COALESCE(os, '')) = 'linux')
 		`
-		rows, err := pool.Query(ctx, q, targetID, orgID, linuxOnly)
+		rows, err := pool.Query(ctx, q, targetID, instanceID, linuxOnly)
 		if err != nil {
 			return nil, err
 		}
@@ -98,12 +98,12 @@ func ResolveScheduleTargetHosts(
 		FROM host_group_members m
 		JOIN hosts h ON h.id = m.host_id
 		WHERE m.group_id        = $1
-		  AND m.organisation_id = $2
+		  AND m.instance_id = $2
 		  AND m.deleted_at      IS NULL
 		  AND h.deleted_at      IS NULL
 		  AND ($3 = FALSE OR LOWER(COALESCE(h.os, '')) = 'linux')
 	`
-	rows, err := pool.Query(ctx, q, targetID, orgID, linuxOnly)
+	rows, err := pool.Query(ctx, q, targetID, instanceID, linuxOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func ResolveScheduleTargetHosts(
 func InsertScheduledTaskRun(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	scheduleID, orgID, targetType, targetID, taskType, configJSON string,
+	scheduleID, instanceID, targetType, targetID, taskType, configJSON string,
 	maxParallel int,
 	hostIDs []string,
 ) (taskRunID string, err error) {
@@ -137,22 +137,22 @@ func InsertScheduledTaskRun(
 
 	const qRun = `
 		INSERT INTO task_runs
-		  (id, organisation_id, triggered_by, scheduled_from_id,
+		  (id, instance_id, triggered_by, scheduled_from_id,
 		   target_type, target_id, task_type, config, max_parallel,
 		   status, created_at, updated_at)
 		VALUES ($1, $2, NULL, $3, $4, $5, $6, $7::jsonb, $8, 'pending', NOW(), NOW())
 	`
-	if _, err = tx.Exec(ctx, qRun, taskRunID, orgID, scheduleID, targetType, targetID, taskType, configJSON, maxParallel); err != nil {
+	if _, err = tx.Exec(ctx, qRun, taskRunID, instanceID, scheduleID, targetType, targetID, taskType, configJSON, maxParallel); err != nil {
 		return "", err
 	}
 
 	const qHost = `
 		INSERT INTO task_run_hosts
-		  (id, organisation_id, task_run_id, host_id, status, raw_output, created_at, updated_at)
+		  (id, instance_id, task_run_id, host_id, status, raw_output, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'pending', '', NOW(), NOW())
 	`
 	for _, hostID := range hostIDs {
-		if _, err = tx.Exec(ctx, qHost, newCUID(), orgID, taskRunID, hostID); err != nil {
+		if _, err = tx.Exec(ctx, qHost, newCUID(), instanceID, taskRunID, hostID); err != nil {
 			return "", err
 		}
 	}

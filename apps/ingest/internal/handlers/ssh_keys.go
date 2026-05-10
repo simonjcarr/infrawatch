@@ -32,7 +32,7 @@ type sshKeyEntry struct {
 func persistSshKeyResult(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	orgID, hostID, checkID, output string,
+	instanceID, hostID, checkID, output string,
 ) {
 	var report sshKeyScanReport
 	if err := json.Unmarshal([]byte(output), &report); err != nil {
@@ -46,7 +46,7 @@ func persistSshKeyResult(
 	}
 
 	// Load existing keys for this host to detect missing keys.
-	existingKeys, err := queries.GetSshKeysForHost(ctx, pool, orgID, hostID)
+	existingKeys, err := queries.GetSshKeysForHost(ctx, pool, instanceID, hostID)
 	if err != nil {
 		slog.Warn("ssh-key: loading existing keys", "host_id", hostID, "err", err)
 	}
@@ -64,7 +64,7 @@ func persistSshKeyResult(
 		// Resolve service account ID from username.
 		var serviceAccountID *string
 		if key.AssociatedUsername != "" {
-			if saID, err := queries.GetServiceAccountByUsername(ctx, pool, orgID, hostID, key.AssociatedUsername); err == nil && saID != "" {
+			if saID, err := queries.GetServiceAccountByUsername(ctx, pool, instanceID, hostID, key.AssociatedUsername); err == nil && saID != "" {
 				serviceAccountID = &saID
 			}
 		}
@@ -76,7 +76,7 @@ func persistSshKeyResult(
 		}
 
 		id, wasInsert, err := queries.UpsertSshKey(
-			ctx, pool, orgID, hostID,
+			ctx, pool, instanceID, hostID,
 			key.FingerprintSHA256, key.FilePath,
 			key.KeyType, key.BitLength,
 			key.Comment, key.KeySource, key.AssociatedUsername,
@@ -105,7 +105,7 @@ func persistSshKeyResult(
 			}
 
 			if evErr := queries.InsertIdentityEvent(ctx, pool,
-				orgID, hostID, nil, &id,
+				instanceID, hostID, nil, &id,
 				eventType, message, nil,
 			); evErr != nil {
 				slog.Warn("ssh-key: insert event", "err", evErr)
@@ -126,7 +126,7 @@ func persistSshKeyResult(
 		}
 		id := existing.ID
 		if evErr := queries.InsertIdentityEvent(ctx, pool,
-			orgID, hostID, nil, &id,
+			instanceID, hostID, nil, &id,
 			"key_missing",
 			fmt.Sprintf("SSH key no longer present: %s %s in %s",
 				existing.KeyType, truncateFingerprint(existing.FingerprintSHA256), existing.FilePath),

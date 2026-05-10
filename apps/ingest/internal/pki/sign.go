@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	LeafValidity    = 90 * 24 * time.Hour  // 90 days
-	RenewalWindow   = 30 * 24 * time.Hour  // renew at 30d remaining (~1/3 of life)
+	LeafValidity    = 90 * 24 * time.Hour // 90 days
+	RenewalWindow   = 30 * 24 * time.Hour // renew at 30d remaining (~1/3 of life)
 	spiffeScheme    = "spiffe"
 	spiffeAuthority = "ct-ops"
 )
@@ -27,10 +27,10 @@ type SignedLeaf struct {
 }
 
 // Sign verifies a PKCS#10 CSR (DER-encoded) and issues a short-lived client
-// cert bound to the given agent and organisation via a SPIFFE-style URI SAN.
-func (a *AgentCA) Sign(csrDER []byte, agentID, orgID string) (*SignedLeaf, error) {
-	if agentID == "" || orgID == "" {
-		return nil, errors.New("agentID and orgID are required")
+// cert bound to the given agent via a SPIFFE-style URI SAN.
+func (a *AgentCA) Sign(csrDER []byte, agentID string) (*SignedLeaf, error) {
+	if agentID == "" {
+		return nil, errors.New("agentID is required")
 	}
 	csr, err := x509.ParseCertificateRequest(csrDER)
 	if err != nil {
@@ -48,15 +48,14 @@ func (a *AgentCA) Sign(csrDER []byte, agentID, orgID string) (*SignedLeaf, error
 	spiffeURI := &url.URL{
 		Scheme: spiffeScheme,
 		Host:   spiffeAuthority,
-		Path:   fmt.Sprintf("/org/%s/agent/%s", orgID, agentID),
+		Path:   fmt.Sprintf("/agent/%s", agentID),
 	}
 
 	now := time.Now().UTC()
 	tmpl := &x509.Certificate{
 		SerialNumber: serialInt,
 		Subject: pkix.Name{
-			CommonName:   agentID,
-			Organization: []string{orgID},
+			CommonName: agentID,
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
 		NotAfter:              now.Add(LeafValidity),
@@ -80,20 +79,20 @@ func (a *AgentCA) Sign(csrDER []byte, agentID, orgID string) (*SignedLeaf, error
 }
 
 // SpiffeURIFromCert extracts the ct-ops SPIFFE URI from a leaf cert, returning
-// the (orgID, agentID) it encodes. Returns an error if the URI is missing or
+// the agent ID it encodes. Returns an error if the URI is missing or
 // malformed.
-func SpiffeURIFromCert(cert *x509.Certificate) (orgID, agentID string, err error) {
+func SpiffeURIFromCert(cert *x509.Certificate) (agentID string, err error) {
 	for _, u := range cert.URIs {
 		if u.Scheme != spiffeScheme || u.Host != spiffeAuthority {
 			continue
 		}
-		// Path looks like /org/{orgID}/agent/{agentID}
+		// Path looks like /agent/{agentID}
 		parts := splitPath(u.Path)
-		if len(parts) == 4 && parts[0] == "org" && parts[2] == "agent" {
-			return parts[1], parts[3], nil
+		if len(parts) == 2 && parts[0] == "agent" {
+			return parts[1], nil
 		}
 	}
-	return "", "", errors.New("no ct-ops SPIFFE URI SAN found in client cert")
+	return "", errors.New("no ct-ops SPIFFE URI SAN found in client cert")
 }
 
 // splitPath splits "/a/b/c/d" into ["a","b","c","d"].

@@ -9,7 +9,7 @@ import (
 func validConfig() *Config {
 	return &Config{
 		Address:           "localhost:9443",
-		OrgToken:          "test-token",
+		EnrolmentToken:    "test-token",
 		Agents:            10,
 		HeartbeatInterval: 30 * time.Second,
 		ConnFanout:        5,
@@ -34,7 +34,7 @@ func TestConfigValidateRejectsMissingFields(t *testing.T) {
 		want   string
 	}{
 		{"no address", func(c *Config) { c.Address = "" }, "--address"},
-		{"no token", func(c *Config) { c.OrgToken = "" }, "--token"},
+		{"no token", func(c *Config) { c.EnrolmentToken = "" }, "--token"},
 		{"zero agents", func(c *Config) { c.Agents = 0 }, "--agents"},
 		{"hb too fast", func(c *Config) { c.HeartbeatInterval = 500 * time.Millisecond }, "--heartbeat-interval"},
 		{"jitter too high", func(c *Config) { c.MetricsJitter = 1.5 }, "--metrics-jitter"},

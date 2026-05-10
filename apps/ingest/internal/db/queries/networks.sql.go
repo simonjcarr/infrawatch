@@ -21,15 +21,15 @@ type HostNetworkMembershipRow struct {
 	AutoAssigned bool
 }
 
-// GetNetworksForOrg returns all active (non-deleted) networks for an organisation.
-func GetNetworksForOrg(ctx context.Context, pool *pgxpool.Pool, orgID string) ([]NetworkRow, error) {
+// GetNetworksForOrg returns all active (non-deleted) networks for an instance.
+func GetNetworksForOrg(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]NetworkRow, error) {
 	const q = `
 		SELECT id, cidr
 		FROM networks
-		WHERE organisation_id = $1
+		WHERE instance_id = $1
 		  AND deleted_at IS NULL
 	`
-	rows, err := pool.Query(ctx, q, orgID)
+	rows, err := pool.Query(ctx, q, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,10 +73,10 @@ func GetHostNetworkMemberships(ctx context.Context, pool *pgxpool.Pool, hostID s
 
 // UpsertHostNetworkMembership inserts a new auto-assigned membership or restores a
 // soft-deleted one. The unique index on (network_id, host_id) drives the conflict.
-func UpsertHostNetworkMembership(ctx context.Context, pool *pgxpool.Pool, orgID, networkID, hostID string) error {
+func UpsertHostNetworkMembership(ctx context.Context, pool *pgxpool.Pool, instanceID, networkID, hostID string) error {
 	const q = `
 		INSERT INTO host_network_memberships
-		    (id, organisation_id, network_id, host_id, auto_assigned)
+		    (id, instance_id, network_id, host_id, auto_assigned)
 		VALUES ($1, $2, $3, $4, true)
 		ON CONFLICT (network_id, host_id)
 		DO UPDATE SET
@@ -84,7 +84,7 @@ func UpsertHostNetworkMembership(ctx context.Context, pool *pgxpool.Pool, orgID,
 		    deleted_at    = NULL,
 		    updated_at    = NOW()
 	`
-	_, err := pool.Exec(ctx, q, newCUID(), orgID, networkID, hostID)
+	_, err := pool.Exec(ctx, q, newCUID(), instanceID, networkID, hostID)
 	return err
 }
 
@@ -104,7 +104,7 @@ func RemoveAutoHostNetworkMembership(ctx context.Context, pool *pgxpool.Pool, me
 }
 
 // SyncHostNetworks compares the host's current IP addresses against all network CIDR
-// definitions for the organisation and keeps auto-assigned memberships in sync.
+// definitions for the instance and keeps auto-assigned memberships in sync.
 //
 // Rules:
 //   - If an IP falls within a network's CIDR and the host has no active membership,
@@ -112,7 +112,7 @@ func RemoveAutoHostNetworkMembership(ctx context.Context, pool *pgxpool.Pool, me
 //   - If an existing auto-assigned membership's network no longer matches any IP, the
 //     membership is soft-deleted.
 //   - Manually assigned memberships (auto_assigned = false) are never touched.
-func SyncHostNetworks(ctx context.Context, pool *pgxpool.Pool, orgID, hostID string, hostIPs []string) error {
+func SyncHostNetworks(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string, hostIPs []string) error {
 	// Parse all host IPs, stripping any prefix length notation (e.g. "192.168.1.5/24").
 	var parsedIPs []net.IP
 	for _, raw := range hostIPs {
@@ -126,7 +126,7 @@ func SyncHostNetworks(ctx context.Context, pool *pgxpool.Pool, orgID, hostID str
 	}
 
 	// Fetch all active networks for the org.
-	networks, err := GetNetworksForOrg(ctx, pool, orgID)
+	networks, err := GetNetworksForOrg(ctx, pool, instanceID)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func SyncHostNetworks(ctx context.Context, pool *pgxpool.Pool, orgID, hostID str
 	// Add missing auto-assigned memberships.
 	for networkID := range matchingNetworkIDs {
 		if _, exists := currentMemberships[networkID]; !exists {
-			if err := UpsertHostNetworkMembership(ctx, pool, orgID, networkID, hostID); err != nil {
+			if err := UpsertHostNetworkMembership(ctx, pool, instanceID, networkID, hostID); err != nil {
 				return err
 			}
 		}

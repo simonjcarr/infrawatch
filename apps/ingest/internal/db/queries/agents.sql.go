@@ -9,19 +9,19 @@ import (
 
 // AgentRow represents a row from the agents table.
 type AgentRow struct {
-	ID             string
-	OrganisationID string
-	Hostname       string
-	PublicKey      string
-	Status         string
-	Version        *string
+	ID               string
+	InstanceID       string
+	Hostname         string
+	PublicKey        string
+	Status           string
+	Version          *string
 	EnrolmentTokenID *string
 }
 
 // GetAgentByPublicKey retrieves an agent by its public key (for idempotent registration).
 func GetAgentByPublicKey(ctx context.Context, pool *pgxpool.Pool, publicKey string) (*AgentRow, error) {
 	const q = `
-		SELECT id, organisation_id, hostname, public_key, status, version, enrolment_token_id
+		SELECT id, instance_id, hostname, public_key, status, version, enrolment_token_id
 		FROM agents
 		WHERE public_key = $1 AND deleted_at IS NULL
 	`
@@ -29,7 +29,7 @@ func GetAgentByPublicKey(ctx context.Context, pool *pgxpool.Pool, publicKey stri
 
 	var a AgentRow
 	if err := row.Scan(
-		&a.ID, &a.OrganisationID, &a.Hostname, &a.PublicKey, &a.Status,
+		&a.ID, &a.InstanceID, &a.Hostname, &a.PublicKey, &a.Status,
 		&a.Version, &a.EnrolmentTokenID,
 	); err != nil {
 		return nil, err
@@ -38,13 +38,13 @@ func GetAgentByPublicKey(ctx context.Context, pool *pgxpool.Pool, publicKey stri
 }
 
 // InsertAgent inserts a new agent row and returns the generated ID.
-func InsertAgent(ctx context.Context, pool *pgxpool.Pool, orgID, hostname, publicKey, status, tokenID, agentOS, agentArch string) (string, error) {
+func InsertAgent(ctx context.Context, pool *pgxpool.Pool, instanceID, hostname, publicKey, status, tokenID, agentOS, agentArch string) (string, error) {
 	const q = `
-		INSERT INTO agents (id, organisation_id, hostname, public_key, status, enrolment_token_id, os, arch)
+		INSERT INTO agents (id, instance_id, hostname, public_key, status, enrolment_token_id, os, arch)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	id := newCUID()
-	_, err := pool.Exec(ctx, q, id, orgID, hostname, publicKey, status, nullableString(tokenID), nullableString(agentOS), nullableString(agentArch))
+	_, err := pool.Exec(ctx, q, id, instanceID, hostname, publicKey, status, nullableString(tokenID), nullableString(agentOS), nullableString(agentArch))
 	return id, err
 }
 
@@ -70,19 +70,19 @@ func UpdateAgentHeartbeat(ctx context.Context, pool *pgxpool.Pool, agentID strin
 }
 
 // InsertAgentStatusHistory appends a status history entry.
-func InsertAgentStatusHistory(ctx context.Context, pool *pgxpool.Pool, agentID, orgID, status string, actorID *string, reason string) error {
+func InsertAgentStatusHistory(ctx context.Context, pool *pgxpool.Pool, agentID, instanceID, status string, actorID *string, reason string) error {
 	const q = `
-		INSERT INTO agent_status_history (id, agent_id, organisation_id, status, actor_id, reason)
+		INSERT INTO agent_status_history (id, agent_id, instance_id, status, actor_id, reason)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
-	_, err := pool.Exec(ctx, q, newCUID(), agentID, orgID, status, actorID, reason)
+	_, err := pool.Exec(ctx, q, newCUID(), agentID, instanceID, status, actorID, reason)
 	return err
 }
 
 // GetAgentByID retrieves an agent by its primary key.
 func GetAgentByID(ctx context.Context, pool *pgxpool.Pool, agentID string) (*AgentRow, error) {
 	const q = `
-		SELECT id, organisation_id, hostname, public_key, status, version, enrolment_token_id
+		SELECT id, instance_id, hostname, public_key, status, version, enrolment_token_id
 		FROM agents
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -90,7 +90,7 @@ func GetAgentByID(ctx context.Context, pool *pgxpool.Pool, agentID string) (*Age
 
 	var a AgentRow
 	if err := row.Scan(
-		&a.ID, &a.OrganisationID, &a.Hostname, &a.PublicKey, &a.Status,
+		&a.ID, &a.InstanceID, &a.Hostname, &a.PublicKey, &a.Status,
 		&a.Version, &a.EnrolmentTokenID,
 	); err != nil {
 		return nil, err

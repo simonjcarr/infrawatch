@@ -50,26 +50,26 @@ func decideHostCollision(collision *queries.HostCollision) (hostCollisionDecisio
 	return hostCollisionCreateSeparatePending, "existing offline or unknown host identity"
 }
 
-func existingAgentBelongsToTokenOrg(existing *queries.AgentRow, tokenOrgID string) bool {
-	return existing != nil && existing.OrganisationID == tokenOrgID
+func existingAgentBelongsToTokenInstance(existing *queries.AgentRow, tokenInstanceID string) bool {
+	return existing != nil && existing.InstanceID == tokenInstanceID
 }
 
 // Register handles agent registration.
 //
 // Flow:
-//  1. Validate org_token → UNAUTHENTICATED if invalid/expired
+//  1. Validate enrolment_token → UNAUTHENTICATED if invalid/expired
 //  2. Check if public_key already registered → return existing state (idempotent)
-//  3. Check for a colliding host (same hostname or overlapping IP) in the org:
+//  3. Check for a colliding host (same hostname or overlapping IP) in the instance:
 //     - Online match → reject with ALREADY_EXISTS (two live hosts can't share identity)
 //     - Offline/unknown linked match → create a separate pending registration
 //  4. Insert agent (status=pending) + host row
 //  5. If auto_approve on token → set active, issue JWT
 //  6. Return RegisterResponse
 func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterRequest) (*agentv1.RegisterResponse, error) {
-	if req.OrgToken == "" || req.PublicKey == "" {
-		return nil, status.Error(codes.InvalidArgument, "org_token and public_key are required")
+	if req.EnrolmentToken == "" || req.PublicKey == "" {
+		return nil, status.Error(codes.InvalidArgument, "enrolment_token and public_key are required")
 	}
-	if err := h.registrationLimiter.Allow(ctx, req.OrgToken); err != nil {
+	if err := h.registrationLimiter.Allow(ctx, req.EnrolmentToken); err != nil {
 		slog.Warn("throttling agent registration attempt", "err", err)
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	}
 
 	// Step 1: Validate enrolment token
-	token, err := queries.GetEnrolmentToken(ctx, h.pool, req.OrgToken)
+	token, err := queries.GetEnrolmentToken(ctx, h.pool, req.EnrolmentToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired enrolment token")
@@ -93,7 +93,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		slog.Error("looking up enrolment token", "err", err)
 		return nil, status.Error(codes.Internal, "internal error")
 	}
-	orgID := token.OrganisationID
+	instanceID := token.InstanceID
 
 	// Step 2: Check for existing registration (idempotent)
 	existing, err := queries.GetAgentByPublicKey(ctx, h.pool, req.PublicKey)
@@ -103,11 +103,11 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	}
 
 	if existing != nil {
-		if !existingAgentBelongsToTokenOrg(existing, orgID) {
-			slog.Warn("rejecting registration for existing public key in different organisation",
+		if !existingAgentBelongsToTokenInstance(existing, instanceID) {
+			slog.Warn("rejecting registration for existing public key in different instance",
 				"agent_id", existing.ID,
-				"agent_org_id", existing.OrganisationID,
-				"token_org_id", orgID,
+				"agent_instance_id", existing.InstanceID,
+				"token_instance_id", instanceID,
 			)
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired enrolment token")
 		}
@@ -120,7 +120,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 			}
 		}
 		if existing.Status == "active" {
-			jwtToken, err := h.issuer.IssueAgentToken(existing.ID, existing.OrganisationID)
+			jwtToken, err := h.issuer.IssueAgentToken(existing.ID)
 			if err != nil {
 				slog.Error("issuing JWT for existing agent", "err", err)
 				return nil, status.Error(codes.Internal, "internal error")
@@ -160,13 +160,13 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	}
 	mergedTags := queries.MergeTagLayers(token.Metadata.Tags, reqTagPairs)
 
-	// Step 3: Check for identity collision with an existing host in the org.
+	// Step 3: Check for identity collision with an existing host in the instance.
 	// Hostname or IP overlap is not sufficient proof that this is the same
 	// physical machine. Existing live identities are rejected; offline/unknown
 	// linked matches become separate pending registrations so an administrator
 	// can review the claim without mutating the existing agent's key material.
 	var collisionRequiringManualApproval *queries.HostCollision
-	collision, err := queries.FindHostCollision(ctx, h.pool, orgID, hostname, reportedIPs)
+	collision, err := queries.FindHostCollision(ctx, h.pool, instanceID, hostname, reportedIPs)
 	if err != nil {
 		slog.Error("checking host collision", "err", err)
 		return nil, status.Error(codes.Internal, "internal error")
@@ -184,7 +184,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 				"reason", reason,
 			)
 			return nil, status.Errorf(codes.AlreadyExists,
-				"a host matching this hostname or IP is already registered in this organisation (%s) — delete the existing host before re-registering",
+				"a host matching this hostname or IP is already registered in this instance (%s) — delete the existing host before re-registering",
 				reason,
 			)
 		case hostCollisionCreateSeparatePending:
@@ -206,7 +206,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	// Step 4: Atomically consume one token use before creating the new agent.
 	// Repeat registration with an existing public key returns above without
 	// consuming another use.
-	token, err = queries.ConsumeEnrolmentToken(ctx, h.pool, req.OrgToken)
+	token, err = queries.ConsumeEnrolmentToken(ctx, h.pool, req.EnrolmentToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired enrolment token")
@@ -214,11 +214,11 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		slog.Error("consuming enrolment token", "err", err)
 		return nil, status.Error(codes.Internal, "internal error")
 	}
-	orgID = token.OrganisationID
+	instanceID = token.InstanceID
 
 	// Step 5: Insert new agent
 	agentStatus := "pending"
-	agentID, err := queries.InsertAgent(ctx, h.pool, orgID, hostname, req.PublicKey, agentStatus, token.ID, agentOS, agentArch)
+	agentID, err := queries.InsertAgent(ctx, h.pool, instanceID, hostname, req.PublicKey, agentStatus, token.ID, agentOS, agentArch)
 	if err != nil {
 		slog.Error("inserting agent", "err", err)
 		return nil, status.Error(codes.Internal, "failed to register agent")
@@ -239,7 +239,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	if !token.AutoApprove || collisionRequiringManualApproval != nil {
 		pendingForInsert = mergedTags
 	}
-	hostID, err := queries.InsertHost(ctx, h.pool, orgID, agentID, hostname, agentOS, agentArch, pendingForInsert)
+	hostID, err := queries.InsertHost(ctx, h.pool, instanceID, agentID, hostname, agentOS, agentArch, pendingForInsert)
 	if err != nil {
 		slog.Warn("inserting host row", "err", err)
 	}
@@ -249,7 +249,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 	if collisionRequiringManualApproval != nil {
 		statusReason = "registration matched an existing host identity; requires explicit admin review before merge or rebind"
 	}
-	if err := queries.InsertAgentStatusHistory(ctx, h.pool, agentID, orgID, "pending", nil, statusReason); err != nil {
+	if err := queries.InsertAgentStatusHistory(ctx, h.pool, agentID, instanceID, "pending", nil, statusReason); err != nil {
 		slog.Warn("inserting status history", "err", err)
 	}
 
@@ -261,28 +261,28 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 			slog.Error("auto-approving agent", "err", err)
 			return nil, status.Error(codes.Internal, "internal error")
 		}
-		if err := queries.InsertAgentStatusHistory(ctx, h.pool, agentID, orgID, "active", nil, "auto-approved by enrolment token"); err != nil {
+		if err := queries.InsertAgentStatusHistory(ctx, h.pool, agentID, instanceID, "active", nil, "auto-approved by enrolment token"); err != nil {
 			slog.Warn("inserting auto-approve history", "err", err)
 		}
 
-		// Apply merged tag layers (org defaults → token → request) to the host
+		// Apply merged tag layers (instance defaults → token → request) to the host
 		// row. There is no TS approval step in the auto-approve path, so tags
 		// must be written here. Saved tag_rules are evaluated later in TS by
 		// a cron/backfill job since they may depend on non-registration state.
 		if hostID != "" {
-			defaults, err := queries.GetOrgDefaultTags(ctx, h.pool, orgID)
+			defaults, err := queries.GetOrgDefaultTags(ctx, h.pool, instanceID)
 			if err != nil {
-				slog.Warn("loading org default tags", "err", err)
+				slog.Warn("loading instance default tags", "err", err)
 			}
 			finalTags := queries.MergeTagLayers(defaults, mergedTags)
 			if len(finalTags) > 0 {
-				if err := queries.AssignTagsToResource(ctx, h.pool, orgID, "host", hostID, finalTags); err != nil {
+				if err := queries.AssignTagsToResource(ctx, h.pool, instanceID, "host", hostID, finalTags); err != nil {
 					slog.Warn("applying tags on auto-approve", "err", err)
 				}
 			}
 		}
 
-		jwtToken, err := h.issuer.IssueAgentToken(agentID, orgID)
+		jwtToken, err := h.issuer.IssueAgentToken(agentID)
 		if err != nil {
 			slog.Error("issuing JWT for auto-approved agent", "err", err)
 			return nil, status.Error(codes.Internal, "internal error")
@@ -299,7 +299,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 			JwtToken: jwtToken,
 		}
 		if len(req.CsrDer) > 0 && h.ca != nil {
-			if err := signAndAttach(ctx, h.pool, h.ca, agentID, orgID, req.CsrDer, resp); err != nil {
+			if err := signAndAttach(ctx, h.pool, h.ca, agentID, req.CsrDer, resp); err != nil {
 				slog.Warn("inline signing CSR on auto-approve", "err", err)
 			}
 		}
@@ -321,8 +321,8 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 
 // signAndAttach signs a CSR immediately, persists the leaf onto the agents
 // row, clears any pending queue entry, and attaches the cert + CA to resp.
-func signAndAttach(ctx context.Context, pool *pgxpool.Pool, ca *pki.AgentCA, agentID, orgID string, csrDER []byte, resp *agentv1.RegisterResponse) error {
-	leaf, err := ca.Sign(csrDER, agentID, orgID)
+func signAndAttach(ctx context.Context, pool *pgxpool.Pool, ca *pki.AgentCA, agentID string, csrDER []byte, resp *agentv1.RegisterResponse) error {
+	leaf, err := ca.Sign(csrDER, agentID)
 	if err != nil {
 		return err
 	}

@@ -13,9 +13,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	agentgrpc "github.com/carrtech-dev/ct-ops/agent/internal/grpc"
 	"github.com/carrtech-dev/ct-ops/agent/internal/checks"
 	"github.com/carrtech-dev/ct-ops/agent/internal/config"
+	agentgrpc "github.com/carrtech-dev/ct-ops/agent/internal/grpc"
 	"github.com/carrtech-dev/ct-ops/agent/internal/heartbeat"
 	"github.com/carrtech-dev/ct-ops/agent/internal/identity"
 	"github.com/carrtech-dev/ct-ops/agent/internal/install"
@@ -83,7 +83,7 @@ func mergeTags(layers ...[]string) []*agentv1.Tag {
 
 func main() {
 	configPath := flag.String("config", "/etc/ct-ops/agent.toml", "Path to agent TOML config file")
-	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and CT_OPS_ORG_TOKEN)")
+	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and CT_OPS_ENROLMENT_TOKEN)")
 	addressFlag := flag.String("address", "", "Ingest address host:port (overrides config file and CT_OPS_INGEST_ADDRESS)")
 	installFlag := flag.Bool("install", false, "Install agent as a system service and exit (requires --token)")
 	uninstallFlag := flag.Bool("uninstall", false, "Stop and remove the agent service, binary, config, and data files")
@@ -107,10 +107,10 @@ func main() {
 	if *installFlag {
 		token := strings.TrimSpace(*tokenFlag)
 		if token == "" {
-			token = strings.TrimSpace(os.Getenv("CT_OPS_ORG_TOKEN"))
+			token = strings.TrimSpace(os.Getenv("CT_OPS_ENROLMENT_TOKEN"))
 		}
 		if token == "" {
-			slog.Error("--token or CT_OPS_ORG_TOKEN is required when using --install")
+			slog.Error("--token or CT_OPS_ENROLMENT_TOKEN is required when using --install")
 			os.Exit(1)
 		}
 		if err := install.Run(token, strings.TrimSpace(*addressFlag), *tlsSkipVerifyFlag, []string(tagFlags)); err != nil {
@@ -137,7 +137,7 @@ func main() {
 	}
 
 	if *tokenFlag != "" {
-		cfg.Agent.OrgToken = strings.TrimSpace(*tokenFlag)
+		cfg.Agent.EnrolmentToken = strings.TrimSpace(*tokenFlag)
 	}
 	if *addressFlag != "" {
 		cfg.Ingest.Address = strings.TrimSpace(*addressFlag)
@@ -146,8 +146,8 @@ func main() {
 		cfg.Ingest.TLSSkipVerify = true
 	}
 
-	if cfg.Agent.OrgToken == "" {
-		slog.Error("org_token is required in config or CT_OPS_ORG_TOKEN environment variable")
+	if cfg.Agent.EnrolmentToken == "" {
+		slog.Error("enrolment_token is required in config or CT_OPS_ENROLMENT_TOKEN environment variable")
 		os.Exit(1)
 	}
 
@@ -205,7 +205,7 @@ func runAgent(ctx context.Context, cfg *config.Config, tags []*agentv1.Tag) erro
 				slog.Error("connecting to ingest service", "err", err, "address", cfg.Ingest.Address)
 				return err
 			}
-			registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.OrgToken, version, tags, cfg.Agent.DataDir)
+			registrar := registration.New(agentv1.NewIngestServiceClient(regConn), keypair, cfg.Agent.EnrolmentToken, version, tags, cfg.Agent.DataDir)
 			newState, err := registrar.Register(ctx, state.AgentID)
 			regConn.Close()
 			if err != nil {

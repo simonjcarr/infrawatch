@@ -14,10 +14,10 @@ const softwareSweeperInterval = 60 * time.Second
 
 // RunSoftwareSweeper ticks every minute and enqueues software_inventory tasks
 // for hosts that are overdue for a scan. A host is overdue when:
-//   - Its organisation has softwareInventorySettings.enabled = true, AND
+//   - Its instance has softwareInventorySettings.enabled = true, AND
 //   - lastSoftwareScanAt IS NULL or older than the configured intervalHours
 //
-// The sweeper does nothing when no organisation has scanning enabled, so it
+// The sweeper does nothing when no instance has scanning enabled, so it
 // adds no overhead for installations that don't use the feature.
 func RunSoftwareSweeper(ctx context.Context, pool *pgxpool.Pool) {
 	ticker := time.NewTicker(softwareSweeperInterval)
@@ -48,11 +48,11 @@ func runSweeperTick(ctx context.Context, pool *pgxpool.Pool) {
 
 	slog.Info("software sweeper: enqueuing scans", "count", len(hosts))
 	for _, h := range hosts {
-		_, err := queries.InsertSoftwareInventoryTask(ctx, pool, h.OrgID, h.ID)
+		_, err := queries.InsertSoftwareInventoryTask(ctx, pool, h.InstanceID, h.ID)
 		if err != nil {
 			slog.Warn("software sweeper: inserting task", "host_id", h.ID, "err", err)
 			continue
 		}
-		slog.Info("software sweeper: enqueued scan", "host_id", h.ID, "org_id", h.OrgID)
+		slog.Info("software sweeper: enqueued scan", "host_id", h.ID, "instance_id", h.InstanceID)
 	}
 }

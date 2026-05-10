@@ -36,7 +36,7 @@ func (f *fakeCheckExecer) Exec(_ context.Context, sql string, args ...any) (pgco
 	return f.tag, f.err
 }
 
-func TestGetChecksForHostScopesByHostAndOrganisation(t *testing.T) {
+func TestGetChecksForHostScopesByHostAndInstance(t *testing.T) {
 	t.Parallel()
 
 	queryErr := errors.New("stop after query capture")
@@ -49,15 +49,15 @@ func TestGetChecksForHostScopesByHostAndOrganisation(t *testing.T) {
 	if !strings.Contains(queryer.sql, "WHERE host_id = $1") {
 		t.Fatalf("query does not filter by host_id: %s", queryer.sql)
 	}
-	if !strings.Contains(queryer.sql, "AND organisation_id = $2") {
-		t.Fatalf("query does not filter by organisation_id: %s", queryer.sql)
+	if !strings.Contains(queryer.sql, "AND instance_id = $2") {
+		t.Fatalf("query does not filter by instance_id: %s", queryer.sql)
 	}
 	if len(queryer.args) != 2 || queryer.args[0] != "host-victim" || queryer.args[1] != "org-victim" {
-		t.Fatalf("args = %#v, want host and organisation", queryer.args)
+		t.Fatalf("args = %#v, want host and instance", queryer.args)
 	}
 }
 
-func TestInsertCheckResultRejectsCrossTenantCheckID(t *testing.T) {
+func TestInsertCheckResultRejectsCrossInstanceCheckID(t *testing.T) {
 	t.Parallel()
 
 	execer := &fakeCheckExecer{tag: pgconn.NewCommandTag("INSERT 0 0")}
@@ -78,7 +78,7 @@ func TestInsertCheckResultRejectsCrossTenantCheckID(t *testing.T) {
 	}
 	if !strings.Contains(execer.sql, "WHERE id = $2") ||
 		!strings.Contains(execer.sql, "AND host_id = $3") ||
-		!strings.Contains(execer.sql, "AND organisation_id = $4") {
+		!strings.Contains(execer.sql, "AND instance_id = $4") {
 		t.Fatalf("insert query does not enforce check ownership: %s", execer.sql)
 	}
 }

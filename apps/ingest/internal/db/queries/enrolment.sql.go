@@ -22,15 +22,15 @@ type EnrolmentTokenMetadata struct {
 
 // EnrolmentToken represents a row from the agent_enrolment_tokens table.
 type EnrolmentToken struct {
-	ID             string
-	OrganisationID string
-	Label          string
-	Token          string
-	AutoApprove    bool
-	MaxUses        *int
-	UsageCount     int
-	ExpiresAt      *time.Time
-	Metadata       EnrolmentTokenMetadata
+	ID          string
+	InstanceID  string
+	Label       string
+	Token       string
+	AutoApprove bool
+	MaxUses     *int
+	UsageCount  int
+	ExpiresAt   *time.Time
+	Metadata    EnrolmentTokenMetadata
 }
 
 type enrolmentQueryer interface {
@@ -46,7 +46,7 @@ type enrolmentQueryer interface {
 // back to a direct plaintext comparison during the migration window.
 func GetEnrolmentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*EnrolmentToken, error) {
 	const q = `
-		SELECT id, organisation_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
+		SELECT id, instance_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
 		FROM agent_enrolment_tokens
 		WHERE (token_hash = encode(sha256($1::bytea), 'hex') OR (token_hash IS NULL AND token = $1::text))
 		  AND deleted_at IS NULL
@@ -58,7 +58,7 @@ func GetEnrolmentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*
 	var t EnrolmentToken
 	var rawMeta []byte
 	if err := row.Scan(
-		&t.ID, &t.OrganisationID, &t.Label, &t.Token,
+		&t.ID, &t.InstanceID, &t.Label, &t.Token,
 		&t.AutoApprove, &t.MaxUses, &t.UsageCount, &t.ExpiresAt, &rawMeta,
 	); err != nil {
 		return nil, err
@@ -92,14 +92,14 @@ func consumeEnrolmentToken(ctx context.Context, queryer enrolmentQueryer, token 
 		UPDATE agent_enrolment_tokens
 		SET usage_count = usage_count + 1, updated_at = NOW()
 		WHERE id = (SELECT id FROM candidate)
-		RETURNING id, organisation_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
+		RETURNING id, instance_id, label, token, auto_approve, max_uses, usage_count, expires_at, metadata
 	`
 	row := queryer.QueryRow(ctx, q, token)
 
 	var t EnrolmentToken
 	var rawMeta []byte
 	if err := row.Scan(
-		&t.ID, &t.OrganisationID, &t.Label, &t.Token,
+		&t.ID, &t.InstanceID, &t.Label, &t.Token,
 		&t.AutoApprove, &t.MaxUses, &t.UsageCount, &t.ExpiresAt, &rawMeta,
 	); err != nil {
 		return nil, err

@@ -67,10 +67,10 @@ func attachIdentity(ctx context.Context) (context.Context, error) {
 	if len(tlsInfo.State.VerifiedChains) == 0 {
 		return ctx, status.Error(codes.Unauthenticated, "client certificate required for this RPC")
 	}
-	orgID, agentID, err := pki.SpiffeURIFromCert(tlsInfo.State.VerifiedChains[0][0])
+	agentID, err := pki.SpiffeURIFromCert(tlsInfo.State.VerifiedChains[0][0])
 	if err != nil {
 		return ctx, status.Errorf(codes.Unauthenticated, "client cert missing SPIFFE identity: %v", err)
 	}
 	serial := tlsInfo.State.VerifiedChains[0][0].SerialNumber.Text(16)
-	return pki.WithIdentity(ctx, &pki.Identity{OrgID: orgID, AgentID: agentID, Serial: serial}), nil
+	return pki.WithIdentity(ctx, &pki.Identity{AgentID: agentID, Serial: serial}), nil
 }

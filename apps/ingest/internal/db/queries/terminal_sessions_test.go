@@ -86,10 +86,10 @@ func TestVerifySSHHostKeyMetadataBlocksWhenPendingChangeExists(t *testing.T) {
 
 func TestTerminalAuthThrottleKeysIncludeUserHostUsernameAndSource(t *testing.T) {
 	info := TerminalSessionInfo{
-		OrganisationID: "org-1",
-		UserID:         "user-1",
-		HostID:         "host-1",
-		Username:       "Admin",
+		InstanceID: "org-1",
+		UserID:     "user-1",
+		HostID:     "host-1",
+		Username:   "Admin",
 	}
 
 	keys := terminalAuthThrottleKeys(info, "203.0.113.10")
@@ -116,10 +116,10 @@ func TestTerminalAuthThrottleKeysIncludeUserHostUsernameAndSource(t *testing.T) 
 
 func TestTerminalAuthThrottleKeyNormalisesUsernameAndSource(t *testing.T) {
 	base := TerminalSessionInfo{
-		OrganisationID: "org-1",
-		UserID:         "user-1",
-		HostID:         "host-1",
-		Username:       "Admin",
+		InstanceID: "org-1",
+		UserID:     "user-1",
+		HostID:     "host-1",
+		Username:   "Admin",
 	}
 	upper := terminalAuthThrottleKeys(base, "203.0.113.10:49152")
 

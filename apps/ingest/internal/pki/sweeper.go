@@ -30,15 +30,15 @@ func RunCSRSweeper(ctx context.Context, pool *pgxpool.Pool, ca *AgentCA, interva
 }
 
 type pendingRow struct {
-	ID      string
-	AgentID string
-	OrgID   string
-	CsrDER  []byte
+	ID         string
+	AgentID    string
+	InstanceID string
+	CsrDER     []byte
 }
 
 func drain(ctx context.Context, pool *pgxpool.Pool, ca *AgentCA) error {
 	rows, err := pool.Query(ctx, `
-		SELECT p.id, p.agent_id, a.organisation_id, p.csr_der
+		SELECT p.id, p.agent_id, a.instance_id, p.csr_der
 		  FROM pending_cert_signings p
 		  JOIN agents a ON a.id = p.agent_id
 		 ORDER BY p.requested_at ASC
@@ -51,7 +51,7 @@ func drain(ctx context.Context, pool *pgxpool.Pool, ca *AgentCA) error {
 	var pending []pendingRow
 	for rows.Next() {
 		var row pendingRow
-		if err := rows.Scan(&row.ID, &row.AgentID, &row.OrgID, &row.CsrDER); err != nil {
+		if err := rows.Scan(&row.ID, &row.AgentID, &row.InstanceID, &row.CsrDER); err != nil {
 			return err
 		}
 		pending = append(pending, row)
@@ -75,7 +75,7 @@ func drain(ctx context.Context, pool *pgxpool.Pool, ca *AgentCA) error {
 }
 
 func signOne(ctx context.Context, pool *pgxpool.Pool, ca *AgentCA, row pendingRow) error {
-	leaf, err := ca.Sign(row.CsrDER, row.AgentID, row.OrgID)
+	leaf, err := ca.Sign(row.CsrDER, row.AgentID)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,6 @@ func signOne(ctx context.Context, pool *pgxpool.Pool, ca *AgentCA, row pendingRo
 	}
 	slog.Info("signed agent client cert",
 		"agent_id", row.AgentID,
-		"org_id", row.OrgID,
 		"serial", leaf.Serial,
 		"not_after", leaf.NotAfter,
 	)

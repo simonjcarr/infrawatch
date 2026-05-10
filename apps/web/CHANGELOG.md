@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.131.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.130.0...web/v0.131.0) (2026-05-10)
+
+
+### Features
+
+* **web:** remove organisation scope from web baseline ([0b41340](https://github.com/carrtech-dev/ct-ops/commit/0b41340e8ee70b6b552a5b21a0f1f361975deda6))
+* **web:** remove organisation scope from web baseline ([c1a8e54](https://github.com/carrtech-dev/ct-ops/commit/c1a8e54f1634dc0310c2493ce0975c1a7cfe7931))
+
 ## [0.130.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.3...web/v0.130.0) (2026-05-10)
 
 

@@ -16,12 +16,32 @@ export default async function SmtpRelaySettingsPage() {
   const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
   if (!isAdmin) redirect('/dashboard')
 
-  const orgId = session.user.organisationId!
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
-  })
+  const orgId = session.user.organisationId
+  const org = orgId
+    ? await db.query.organisations.findFirst({
+        where: eq(organisations.id, orgId),
+      })
+    : null
 
-  if (!org) return null
+  if (!org) {
+    return (
+      <div className="space-y-6">
+        <AdminTabs
+          tabs={[
+            { title: 'LDAP / Directory', href: '/settings/integrations' },
+            { title: 'SMTP relay', href: '/settings/integrations/smtp' },
+            { title: 'CT-CVE', href: '/settings/integrations/ct-cve' },
+          ]}
+        />
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">SMTP Relay</h1>
+          <p className="text-sm text-muted-foreground">
+            SMTP relay settings will be available after instance setup is complete.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

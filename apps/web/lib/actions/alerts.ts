@@ -36,11 +36,16 @@ import type {
 import { organisations } from '@/lib/db/schema'
 import type { SmtpEncryption } from '@/lib/notifications/smtp-settings'
 import { getRequiredSession } from '@/lib/auth/session'
-import { resolveCurrentActionScope } from './action-scope'
+import { resolveCurrentActionScope, resolveOptionalActionScope } from './action-scope'
 
 async function resolveCurrentAlertScope(): Promise<string> {
   const session = await getRequiredSession()
   return resolveCurrentActionScope(session)
+}
+
+async function resolveOptionalAlertScope(): Promise<string | null> {
+  const session = await getRequiredSession()
+  return resolveOptionalActionScope(session)
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -140,7 +145,8 @@ export async function getAlertRules(hostId?: string): Promise<AlertRule[]> {
 }
 
 export async function getGlobalAlertDefaults(): Promise<AlertRule[]> {
-  const orgId = await resolveCurrentAlertScope()
+  const orgId = await resolveOptionalAlertScope()
+  if (!orgId) return []
   await requireOrgAccess(orgId)
   return db.query.alertRules.findMany({
     where: and(
@@ -375,7 +381,8 @@ export type AlertHistoryFilters = {
 export async function getAlertInstances(
   filters: AlertHistoryFilters = {},
 ): Promise<AlertInstanceWithRule[]> {
-  const orgId = await resolveCurrentAlertScope()
+  const orgId = await resolveOptionalAlertScope()
+  if (!orgId) return []
   await requireOrgAccess(orgId)
   const limit = filters.limit ?? 50
   const offset = filters.offset ?? 0
@@ -522,7 +529,8 @@ function normaliseSmtpConfig(raw: unknown): SmtpChannelConfig {
 }
 
 export async function getNotificationChannels(): Promise<NotificationChannelSafe[]> {
-  const orgId = await resolveCurrentAlertScope()
+  const orgId = await resolveOptionalAlertScope()
+  if (!orgId) return []
   await requireOrgAccess(orgId)
   const rows = await db.query.notificationChannels.findMany({
     where: and(
@@ -930,7 +938,8 @@ const createSilenceSchema = z.object({
 })
 
 export async function getSilences(): Promise<AlertSilenceWithHost[]> {
-  const orgId = await resolveCurrentAlertScope()
+  const orgId = await resolveOptionalAlertScope()
+  if (!orgId) return []
   await requireOrgAccess(orgId)
   const rows = await db
     .select({

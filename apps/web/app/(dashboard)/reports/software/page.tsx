@@ -12,7 +12,15 @@ export const metadata: Metadata = {
 
 export default async function SoftwareReportPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
+
+  if (!orgId) {
+    return (
+      <NuqsAdapter>
+        <SoftwareReportClient orgId="" orgName="CT-Ops" hostGroups={[]} />
+      </NuqsAdapter>
+    )
+  }
 
   const [org, groups] = await Promise.all([
     db.query.organisations.findFirst({

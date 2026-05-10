@@ -12,6 +12,7 @@ import {
   getCtCveConnectorSettingsForAdmin,
   getDefaultCtOpsBaseUrl,
 } from '@/lib/integrations/ct-cve/connector-settings'
+import { createEmptyCtCveConnectorSetupOverview } from '@/lib/standalone-empty-state'
 import { CtCveSettingsClient } from './ct-cve-settings-client'
 
 export const metadata: Metadata = {
@@ -31,11 +32,13 @@ export default async function CtCveIntegrationSettingsPage() {
     redirect('/settings')
   }
 
-  const orgId = session.user.organisationId!
-  const [overview, settings] = await Promise.all([
-    buildCtCveConnectorSetupOverview({ orgId }),
-    getCtCveConnectorSettingsForAdmin(orgId),
-  ])
+  const orgId = session.user.organisationId ?? ''
+  const [overview, settings] = orgId
+    ? await Promise.all([
+        buildCtCveConnectorSetupOverview({ orgId }),
+        getCtCveConnectorSettingsForAdmin(orgId),
+      ])
+    : [createEmptyCtCveConnectorSetupOverview(), null] as const
   const ctOpsBaseUrl = getDefaultCtOpsBaseUrl()
   const ctCveConfigJson = settings && ctOpsBaseUrl
     ? buildCtCveCtOpsConnectionJson(settings, ctOpsBaseUrl)

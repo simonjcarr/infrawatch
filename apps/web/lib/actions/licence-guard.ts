@@ -5,7 +5,8 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { requireOrgAccess } from '@/lib/actions/action-auth'
 import { validateLicenceKey } from '@/lib/licence'
-import { featuresForTier, hasFeature, type Feature, type LicenceTier } from '@/lib/features'
+import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
+import { createCommunityLicence } from '@/lib/standalone-empty-state'
 import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
 
 export class LicenceRequiredError extends Error {
@@ -74,7 +75,7 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
 })
 
 function getCommunityLicence(): EffectiveLicence {
-  return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
+  return createCommunityLicence()
 }
 
 export async function getInstanceEffectiveLicence(

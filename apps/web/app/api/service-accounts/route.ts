@@ -3,7 +3,7 @@ import { getServiceAccounts } from '@/lib/actions/service-accounts'
 import type { ServiceAccountListFilters } from '@/lib/actions/service-accounts'
 import type { ServiceAccountStatus, ServiceAccountType } from '@/lib/db/schema'
 import { LicenceRequiredError } from '@/lib/actions/licence-guard'
-import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,13 +11,15 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   let session
   try {
-    session = await getApiOrgSession()
+    session = await getApiSession()
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return Response.json({ error: err.message }, { status: err.status })
     }
     throw err
   }
+  const orgId = session.user.organisationId
+  if (!orgId) return Response.json([])
 
   const { searchParams } = request.nextUrl
   const filters: ServiceAccountListFilters = {
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const accounts = await getServiceAccounts(session.user.organisationId, filters)
+    const accounts = await getServiceAccounts(orgId, filters)
     return Response.json(accounts)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

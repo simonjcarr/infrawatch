@@ -12,13 +12,32 @@ export const metadata: Metadata = {
 
 export default async function SettingsPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
 
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
-  })
+  const org = orgId
+    ? await db.query.organisations.findFirst({
+        where: eq(organisations.id, orgId),
+      })
+    : null
 
-  if (!org) return null
+  if (!org) {
+    return (
+      <div className="space-y-6">
+        <AdminTabs
+          tabs={[
+            { title: 'Profile', href: '/settings' },
+            { title: 'Licence', href: '/settings/licence' },
+          ]}
+        />
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
+          <p className="text-sm text-muted-foreground">
+            Organisation profile settings will be available after instance setup is complete.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
 

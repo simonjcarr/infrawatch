@@ -15,22 +15,24 @@ export default async function PasswordManagerPage() {
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
 
-  const orgId = session.user.organisationId!
+  const orgId = session.user.organisationId
   const currentUserId = session.user.id
-  const organisationUsers = await db.query.users.findMany({
-    where: and(eq(users.organisationId, orgId), eq(users.isActive, true), isNull(users.deletedAt)),
-    orderBy: [asc(users.name), asc(users.email)],
-    columns: {
-      id: true,
-      name: true,
-      email: true,
-    },
-  })
+  const organisationUsers = orgId
+    ? await db.query.users.findMany({
+      where: and(eq(users.organisationId, orgId), eq(users.isActive, true), isNull(users.deletedAt)),
+      orderBy: [asc(users.name), asc(users.email)],
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+    : [{ id: session.user.id, name: session.user.name, email: session.user.email }]
 
   return (
     <PasswordManagerClientShell
-      key={orgId}
-      orgId={orgId}
+      key={orgId ?? 'standalone'}
+      orgId={orgId ?? ''}
       currentUserId={currentUserId}
       organisationUsers={organisationUsers}
     />

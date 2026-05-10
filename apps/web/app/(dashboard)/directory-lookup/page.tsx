@@ -16,8 +16,8 @@ export const metadata: Metadata = {
 export default async function DirectoryLookupPage() {
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
-  const orgId = session.user.organisationId!
-  const configs = await getLookupConfigOptions(orgId)
+  const orgId = session.user.organisationId
+  const configs = orgId ? await getLookupConfigOptions(orgId) : []
 
   if (configs.length === 0) {
     return (
@@ -44,5 +44,5 @@ export default async function DirectoryLookupPage() {
     )
   }
 
-  return <DirectoryLookupClient orgId={orgId} configs={configs} />
+  return <DirectoryLookupClient orgId={orgId ?? ''} configs={configs} />
 }

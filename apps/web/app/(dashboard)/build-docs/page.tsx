@@ -17,17 +17,19 @@ export const metadata: Metadata = {
 export default async function BuildDocsPage() {
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
-  const orgId = session.user.organisationId!
-  const [docs, templates, snippets, storageSettings] = await Promise.all([
-    listBuildDocs(orgId),
-    listBuildDocTemplates(orgId),
-    listBuildDocSnippets(orgId),
-    ['org_admin', 'super_admin'].includes(session.user.role) ? getBuildDocAssetStorageSettings(orgId) : Promise.resolve(null),
-  ])
+  const orgId = session.user.organisationId
+  const [docs, templates, snippets, storageSettings] = orgId
+    ? await Promise.all([
+      listBuildDocs(orgId),
+      listBuildDocTemplates(orgId),
+      listBuildDocSnippets(orgId),
+      ['org_admin', 'super_admin'].includes(session.user.role) ? getBuildDocAssetStorageSettings(orgId) : Promise.resolve(null),
+    ])
+    : [[], [], [], null]
 
   return (
     <BuildDocsClient
-      orgId={orgId}
+      orgId={orgId ?? ''}
       userRole={session.user.role}
       initialDocs={docs}
       initialTemplates={templates}

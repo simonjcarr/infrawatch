@@ -9,3 +9,9 @@ export function resolveCurrentActionScope(
   }
   return currentScope
 }
+
+export function resolveOptionalActionScope(
+  session: Awaited<ReturnType<typeof getRequiredSession>>,
+): string | null {
+  return session.user.organisationId ?? null
+}

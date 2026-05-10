@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.3...web/v0.131.4) (2026-05-10)
+
+
+### Bug Fixes
+
+* **password-manager:** tolerate undecryptable vault records ([da67394](https://github.com/carrtech-dev/ct-ops/commit/da6739479a1c7dc095b03c97b94c5d76f6679ed2))
+
 ## [0.131.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.2...web/v0.131.3) (2026-05-10)
 
 

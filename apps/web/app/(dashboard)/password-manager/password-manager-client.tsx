@@ -1512,65 +1512,72 @@ export function PasswordManagerClientShell({
       return
     }
 
-    if (!request) {
-      if (members.length === 0) {
-        setWorkspaceError('No active members remain to receive the next wrapped vault key.')
+    setWorkspacePending(true)
+    setWorkspaceError(null)
+    setStatusNotice(null)
+    try {
+      if (!request) {
+        if (members.length === 0) {
+          setWorkspaceError('No active members remain to receive the next wrapped vault key.')
+          return
+        }
+
+        const vaultKey = await generateVaultKey()
+        const rotatedMembers: Array<{ userId: string; wrappedVaultKeyEnvelope: PasswordManagerWrappedVaultKeyEnvelope }> = []
+
+        for (const member of members) {
+          let memberPublicKey: CryptoKey
+          if (member.user_id === currentPasswordManagerUserId) {
+            memberPublicKey = state.activeKeyPair.publicKey as CryptoKey
+          } else {
+            const cachedEnvelope = memberPublicKeyEnvelopeCacheRef.current[member.user_id]
+            const pastedEnvelope = memberPublicKeyEnvelopeInputs[member.user_id]?.trim()
+            const envelope = cachedEnvelope ?? (pastedEnvelope ? (JSON.parse(pastedEnvelope) as PasswordManagerPublicKeyEnvelope) : null)
+            if (!envelope) {
+              setWorkspaceError(`Paste the Password Manager public-key envelope for ${member.user_id} before rotating this vault key.`)
+              return
+            }
+            memberPublicKey = await importPublicKeyEnvelope(envelope)
+            memberPublicKeyEnvelopeCacheRef.current = {
+              ...memberPublicKeyEnvelopeCacheRef.current,
+              [member.user_id]: envelope,
+            }
+          }
+
+          rotatedMembers.push({
+            userId: member.user_id,
+            wrappedVaultKeyEnvelope: await wrapVaultKeyForMember(vaultKey, memberPublicKey),
+          })
+        }
+
+        request = {
+          idempotencyKey: createIdempotencyKey(),
+          members: rotatedMembers,
+          vaultId: selectedVault.id,
+          vaultKey,
+        }
+        pendingRotationRef.current = request
+      }
+
+      const rotationRequest = request
+      if (!rotationRequest) {
+        setWorkspaceError('The vault key rotation request could not be prepared safely. Retry after refreshing the session.')
         return
       }
 
-      const vaultKey = await generateVaultKey()
-      const rotatedMembers: Array<{ userId: string; wrappedVaultKeyEnvelope: PasswordManagerWrappedVaultKeyEnvelope }> = []
-
-      for (const member of members) {
-        let memberPublicKey: CryptoKey
-        if (member.user_id === currentPasswordManagerUserId) {
-          memberPublicKey = state.activeKeyPair.publicKey as CryptoKey
-        } else {
-          const cachedEnvelope = memberPublicKeyEnvelopeCacheRef.current[member.user_id]
-          const pastedEnvelope = memberPublicKeyEnvelopeInputs[member.user_id]?.trim()
-          const envelope = cachedEnvelope ?? (pastedEnvelope ? (JSON.parse(pastedEnvelope) as PasswordManagerPublicKeyEnvelope) : null)
-          if (!envelope) {
-            setWorkspaceError(`Paste the Password Manager public-key envelope for ${member.user_id} before rotating this vault key.`)
-            return
-          }
-          memberPublicKey = await importPublicKeyEnvelope(envelope)
-          memberPublicKeyEnvelopeCacheRef.current = {
-            ...memberPublicKeyEnvelopeCacheRef.current,
-            [member.user_id]: envelope,
-          }
-        }
-
-        rotatedMembers.push({
-          userId: member.user_id,
-          wrappedVaultKeyEnvelope: await wrapVaultKeyForMember(vaultKey, memberPublicKey),
-        })
-      }
-
-      request = {
-        idempotencyKey: createIdempotencyKey(),
-        members: rotatedMembers,
-        vaultId: selectedVault.id,
-        vaultKey,
-      }
-      pendingRotationRef.current = request
-    }
-
-    setWorkspacePending(true)
-    setWorkspaceError(null)
-    try {
       const rotated = await client.rotateVaultKeys({
-        vaultId: request.vaultId,
+        vaultId: rotationRequest.vaultId,
         rotationReason: 'membership_revoked',
-        members: request.members.map((member) => ({
+        members: rotationRequest.members.map((member) => ({
           userId: member.userId,
           wrappedVaultKeyEnvelope: toClientPayload(member.wrappedVaultKeyEnvelope) as never,
         })),
-        idempotencyKey: request.idempotencyKey,
+        idempotencyKey: rotationRequest.idempotencyKey,
       })
-      upsertVaultEpochKey(vaultKeyCacheRef.current, request.vaultId, rotated.epoch, request.vaultKey)
+      upsertVaultEpochKey(vaultKeyCacheRef.current, rotationRequest.vaultId, rotated.epoch, rotationRequest.vaultKey)
       setVaults((current) =>
         current.map((vault) =>
-          vault.id === request.vaultId
+          vault.id === rotationRequest.vaultId
             ? {
                 ...vault,
                 currentKeyEpoch: rotated.epoch,
@@ -1582,7 +1589,7 @@ export function PasswordManagerClientShell({
       setMembers((current) =>
         sortMembers(
           current.map((member) =>
-            request!.members.find((candidate) => candidate.userId === member.user_id)
+            rotationRequest.members.find((candidate) => candidate.userId === member.user_id)
               ? { ...member, key_epoch: rotated.epoch, updated_at: rotated.created_at }
               : member,
           ),
@@ -2149,6 +2156,7 @@ export function PasswordManagerClientShell({
           renameVaultName={renameVaultName}
           renameRevealTimeoutSeconds={renameRevealTimeoutSeconds}
           renameClipboardTimeoutSeconds={renameClipboardTimeoutSeconds}
+          statusNotice={statusNotice}
           onRenameRevealTimeoutSecondsChange={setRenameRevealTimeoutSeconds}
           onRenameClipboardTimeoutSecondsChange={setRenameClipboardTimeoutSeconds}
           rotationPrompt={rotationPrompt}
@@ -2686,6 +2694,7 @@ function PasswordManagerWorkspace({
   renameVaultName,
   renameRevealTimeoutSeconds,
   renameClipboardTimeoutSeconds,
+  statusNotice,
   rotationPrompt,
   selectedEntry,
   selectedEntryTemplateId,
@@ -2765,6 +2774,7 @@ function PasswordManagerWorkspace({
   renameVaultName: string
   renameRevealTimeoutSeconds: string
   renameClipboardTimeoutSeconds: string
+  statusNotice: string | null
   rotationPrompt: string | null
   selectedEntry: PasswordManagerEntrySummary | null
   selectedEntryTemplateId: PasswordManagerEntryTemplateId
@@ -2957,6 +2967,13 @@ function PasswordManagerWorkspace({
             {workspaceState.view === 'object-unavailable' ? 'Object unavailable' : 'Workspace status'}
           </AlertTitle>
           <AlertDescription>{workspaceError}</AlertDescription>
+        </Alert>
+      ) : null}
+      {statusNotice ? (
+        <Alert>
+          <RefreshCcw className="size-4" />
+          <AlertTitle>Workspace status</AlertTitle>
+          <AlertDescription>{statusNotice}</AlertDescription>
         </Alert>
       ) : null}
 

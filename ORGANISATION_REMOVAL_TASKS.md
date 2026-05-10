@@ -710,7 +710,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1246](https://github.com/carrtech-dev/ct-ops/pull/1246)
 
 Summary: Removed caller-supplied organisation identity from the Task 11-owned
 alerts, notifications, team management, and agent-enrolment surfaces by

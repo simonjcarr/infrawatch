@@ -41,11 +41,11 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
   })
 
   if (!org) {
-    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
+    return getCommunityLicence()
   }
 
   if (!org.licenceKey) {
-    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
+    return getCommunityLicence()
   }
 
   const result = await validateLicenceKey(org.licenceKey, {
@@ -55,12 +55,12 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
     // Invalid or expired keys silently degrade to community. The licenceTier
     // column still reflects what was last saved; the guard trusts only the
     // validated JWT, not the cached column.
-    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
+    return getCommunityLicence()
   }
 
   if (result.payload.sub !== orgId) {
     // Key belongs to a different organisation — reject it entirely.
-    return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
+    return getCommunityLicence()
   }
 
   return {
@@ -72,6 +72,17 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
     expiresAt: new Date(result.payload.exp * 1000),
   }
 })
+
+function getCommunityLicence(): EffectiveLicence {
+  return { tier: 'community', features: featuresForTier('community'), maxUsers: FREE_INCLUDED_USER_SEATS }
+}
+
+export async function getInstanceEffectiveLicence(
+  scopeId: string | null | undefined,
+): Promise<EffectiveLicence> {
+  if (!scopeId) return getCommunityLicence()
+  return getEffectiveLicence(scopeId)
+}
 
 export async function getEffectiveLicence(orgId: string): Promise<EffectiveLicence> {
   await requireOrgAccess(orgId)

@@ -4,7 +4,7 @@ import { AppSidebar } from '@/components/shared/sidebar'
 import { Topbar } from '@/components/shared/topbar'
 import { CommandPaletteProvider } from '@/components/shared/command-palette'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getEffectiveLicence } from '@/lib/actions/licence-guard'
+import { getInstanceEffectiveLicence } from '@/lib/actions/licence-guard'
 import { TerminalProviderWrapper, TerminalContentWrapper } from '@/components/terminal/terminal-layout-wrapper'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -18,11 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/pending-approval')
   }
 
-  const orgId = session.user.organisationId
-  if (!orgId) {
-    throw new Error('Instance scope is not configured')
-  }
-  const licence = await getEffectiveLicence(orgId)
+  const licence = await getInstanceEffectiveLicence(session.user.organisationId)
 
   return (
     <CommandPaletteProvider userRole={session.user.role}>

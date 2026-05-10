@@ -60,7 +60,6 @@ const createTokenSchema = z.object({
 type CreateTokenForm = z.infer<typeof createTokenSchema>
 
 interface AgentsSettingsClientProps {
-  orgId: string
   initialTokens: EnrolmentTokenSafe[]
   appUrl: string
 }
@@ -99,7 +98,6 @@ function tokenStatus(token: EnrolmentTokenSafe): { label: string; className: str
 }
 
 export function AgentsSettingsClient({
-  orgId,
   initialTokens,
   appUrl,
 }: AgentsSettingsClientProps) {
@@ -112,8 +110,8 @@ export function AgentsSettingsClient({
   const [tokenTags, setTokenTags] = useState<EditorTag[]>([])
 
   const { data: tokens } = useQuery({
-    queryKey: ['enrolment-tokens', orgId],
-    queryFn: () => listEnrolmentTokens(orgId),
+    queryKey: ['enrolment-tokens'],
+    queryFn: () => listEnrolmentTokens(),
     initialData: initialTokens,
   })
 
@@ -140,7 +138,7 @@ export function AgentsSettingsClient({
 
   const createMutation = useMutation({
     mutationFn: (data: CreateTokenForm) =>
-      createEnrolmentToken(orgId, {
+      createEnrolmentToken({
         label: data.label,
         autoApprove: data.autoApprove,
         skipVerify: data.skipVerify,
@@ -151,7 +149,7 @@ export function AgentsSettingsClient({
       }),
     onSuccess: (result, variables) => {
       if ('error' in result) return
-      queryClient.invalidateQueries({ queryKey: ['enrolment-tokens', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['enrolment-tokens'] })
       setNewTokenValue(result.token)
       setNewInstallCommand(
         buildAgentInstallCommand(appUrl || window.location.origin, variables.skipVerify, result.token),
@@ -162,9 +160,9 @@ export function AgentsSettingsClient({
   })
 
   const revokeMutation = useMutation({
-    mutationFn: (tokenId: string) => revokeEnrolmentToken(orgId, tokenId),
+    mutationFn: (tokenId: string) => revokeEnrolmentToken(tokenId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['enrolment-tokens', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['enrolment-tokens'] })
     },
   })
 

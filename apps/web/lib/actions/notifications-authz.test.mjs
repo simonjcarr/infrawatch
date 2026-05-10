@@ -37,8 +37,8 @@ test('notification actions derive the user scope from the authenticated session'
     )
     assert.match(
       segment,
-      /const session = await requireOrgAccess\(orgId\)/,
-      `${action} must load the authenticated session before querying notifications`,
+      /const authSession = await getRequiredSession\(\)[\s\S]*resolveCurrentActionScope\(authSession\)/,
+      `${action} must derive the authenticated session and instance scope before querying notifications`,
     )
     assert.match(
       segment,

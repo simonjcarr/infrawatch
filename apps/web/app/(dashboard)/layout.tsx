@@ -30,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <SidebarProvider className="h-svh overflow-hidden">
           <AppSidebar tier={licence.tier} userRole={session.user.role} />
           <TerminalContentWrapper>
-            <Topbar orgId={orgId} />
+            <Topbar />
             <main className="flex-1 p-6 overflow-auto min-h-0">{children}</main>
           </TerminalContentWrapper>
         </SidebarProvider>

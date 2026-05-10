@@ -15,8 +15,7 @@ export default async function AgentTagRulesPage() {
     session.user.role === 'super_admin' || session.user.role === 'org_admin'
   if (!isAdmin) redirect('/dashboard')
 
-  const orgId = session.user.organisationId!
-  const rules = await listTagRules(orgId)
+  const rules = await listTagRules()
 
   return (
     <div className="space-y-6">
@@ -28,7 +27,7 @@ export default async function AgentTagRulesPage() {
           { title: 'Software inventory', href: '/settings/agents/software' },
         ]}
       />
-      <TagRulesClient orgId={orgId} initialRules={rules} />
+      <TagRulesClient initialRules={rules} />
     </div>
   )
 }

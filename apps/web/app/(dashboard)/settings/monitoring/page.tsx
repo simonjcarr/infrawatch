@@ -14,8 +14,7 @@ export default async function MonitoringSettingsPage() {
   const isAdmin = session.user.role === 'super_admin' || session.user.role === 'org_admin'
   if (!isAdmin) redirect('/dashboard')
 
-  const orgId = session.user.organisationId!
-  const defaults = await getGlobalAlertDefaults(orgId)
+  const defaults = await getGlobalAlertDefaults()
 
   return (
     <div className="space-y-6">
@@ -26,7 +25,7 @@ export default async function MonitoringSettingsPage() {
           { title: 'Metric retention', href: '/settings/monitoring/retention' },
         ]}
       />
-      <GlobalAlertsClient orgId={orgId} initialDefaults={defaults} />
+      <GlobalAlertsClient initialDefaults={defaults} />
     </div>
   )
 }

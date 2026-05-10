@@ -26,11 +26,7 @@ function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-interface TopbarProps {
-  orgId: string
-}
-
-export function Topbar({ orgId }: TopbarProps) {
+export function Topbar() {
   const { data: session } = useSession()
   const router = useRouter()
 
@@ -45,8 +41,8 @@ export function Topbar({ orgId }: TopbarProps) {
       <SidebarTrigger />
       <div className="flex-1" />
       <CommandPaletteTrigger />
-      {session?.user?.id && orgId && (
-        <NotificationBell orgId={orgId} />
+      {session?.user?.id && (
+        <NotificationBell />
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

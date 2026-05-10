@@ -9,12 +9,10 @@ export const metadata: Metadata = {
 
 export default async function TeamPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
-  const { members, pendingInvites } = await getOrgUsers(orgId)
+  const { members, pendingInvites } = await getOrgUsers()
 
   return (
     <TeamClient
-      orgId={orgId}
       currentUserId={session.user.id}
       currentUserRole={session.user.role}
       initialMembers={members}

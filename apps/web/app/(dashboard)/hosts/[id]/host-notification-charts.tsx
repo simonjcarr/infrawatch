@@ -55,22 +55,21 @@ function formatTrendDate(raw: string, range: TrendRange): string {
 }
 
 interface HostNotificationChartsProps {
-  scopeId: string
   hostId: string
 }
 
-export function HostNotificationCharts({ scopeId, hostId }: HostNotificationChartsProps) {
+export function HostNotificationCharts({ hostId }: HostNotificationChartsProps) {
   const [trendRange, setTrendRange] = useState<TrendRange>('30d')
 
   const { data: stats } = useQuery({
-    queryKey: ['notifications-stats', scopeId, hostId],
-    queryFn: () => getNotificationStats(scopeId, hostId),
+    queryKey: ['notifications-stats', hostId],
+    queryFn: () => getNotificationStats(hostId),
     refetchInterval: 60_000,
   })
 
   const { data: timeSeries } = useQuery({
-    queryKey: ['notifications-time-series', scopeId, hostId, trendRange],
-    queryFn: () => getNotificationsOverTime(scopeId, trendRange, hostId),
+    queryKey: ['notifications-time-series', hostId, trendRange],
+    queryFn: () => getNotificationsOverTime(trendRange, hostId),
     refetchInterval: 60_000,
   })
 

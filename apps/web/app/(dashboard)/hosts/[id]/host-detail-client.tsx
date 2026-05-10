@@ -359,7 +359,7 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
 
   const { data: activeAlerts = [] } = useQuery({
     queryKey: ['alerts', scopeId, 'firing', initialHost.id],
-    queryFn: () => getAlertInstances(scopeId, { status: 'firing', hostId: initialHost.id }),
+    queryFn: () => getAlertInstances({ status: 'firing', hostId: initialHost.id }),
     refetchInterval: 30_000,
   })
   const activeAlertCount = activeAlerts.length
@@ -931,7 +931,6 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
               </Card>
 
               <HostNotificationCharts
-                scopeId={scopeId}
                 hostId={initialHost.id}
               />
             </>

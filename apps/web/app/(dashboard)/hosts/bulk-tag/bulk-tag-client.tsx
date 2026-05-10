@@ -97,7 +97,7 @@ export function BulkTagClient({ orgId }: BulkTagClientProps) {
 
   const saveRuleMutation = useMutation({
     mutationFn: async () =>
-      createTagRule(orgId, {
+      createTagRule({
         name: ruleName.trim(),
         filter: buildFilter(),
         tags: tags.map((t) => ({ key: t.key, value: t.value })),

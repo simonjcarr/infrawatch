@@ -1,11 +1,9 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { SettingsClient } from '../../settings-client'
+import { getCurrentOrganisationSettingsRecord } from '@/lib/actions/settings'
 
 export const metadata: Metadata = {
   title: 'Notification Policy Settings',
@@ -16,10 +14,7 @@ export default async function NotificationPolicyPage() {
   const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
   if (!isAdmin) redirect('/dashboard')
 
-  const orgId = session.user.organisationId!
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
-  })
+  const org = await getCurrentOrganisationSettingsRecord()
 
   if (!org) return null
 

@@ -145,7 +145,7 @@ function AddSilenceDialog({
   })
 
   async function onSubmit(values: SilenceFormValues) {
-    const result = await createSilence(scopeId, {
+    const result = await createSilence({
       hostId,
       reason: values.reason,
       startsAt: new Date(values.startsAt).toISOString(),
@@ -246,7 +246,7 @@ function AddRuleDialog({
   })
 
   async function onSubmit(values: RuleFormValues) {
-    let input: Parameters<typeof createAlertRule>[1]
+    let input: Parameters<typeof createAlertRule>[0]
 
     if (values.conditionType === 'check_status') {
       if (!values.checkId) return
@@ -281,7 +281,7 @@ function AddRuleDialog({
       }
     }
 
-    const result = await createAlertRule(scopeId, input)
+    const result = await createAlertRule(input)
     if ('error' in result) return
     reset()
     onSuccess()
@@ -539,25 +539,25 @@ export function AlertsTab({ scopeId, hostId }: Props) {
 
   const { data: allRules = [] } = useQuery({
     queryKey: ['alert-rules', scopeId, hostId],
-    queryFn: () => getAlertRules(scopeId, hostId),
+    queryFn: () => getAlertRules(hostId),
     refetchInterval: 30_000,
   })
 
   const { data: globalDefaults = [] } = useQuery({
     queryKey: ['alert-global-defaults', scopeId],
-    queryFn: () => getGlobalAlertDefaults(scopeId),
+    queryFn: () => getGlobalAlertDefaults(),
     refetchInterval: 60_000,
   })
 
   const { data: activeAlerts = [] } = useQuery({
     queryKey: ['alerts', scopeId, 'firing', hostId],
-    queryFn: () => getAlertInstances(scopeId, { status: 'firing', hostId }),
+    queryFn: () => getAlertInstances({ status: 'firing', hostId }),
     refetchInterval: 30_000,
   })
 
   const { data: activeSilences = [] } = useQuery({
     queryKey: ['silences-active', scopeId, hostId],
-    queryFn: () => getActiveSilencesForHost(scopeId, hostId),
+    queryFn: () => getActiveSilencesForHost(hostId),
     refetchInterval: 60_000,
   })
 
@@ -565,17 +565,17 @@ export function AlertsTab({ scopeId, hostId }: Props) {
 
   const toggleMutation = useMutation({
     mutationFn: ({ ruleId, enabled }: { ruleId: string; enabled: boolean }) =>
-      updateAlertRule(scopeId, ruleId, { enabled }),
+      updateAlertRule(ruleId, { enabled }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] }),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (ruleId: string) => deleteAlertRule(scopeId, ruleId),
+    mutationFn: (ruleId: string) => deleteAlertRule(ruleId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] }),
   })
 
   const deleteSilenceMutation = useMutation({
-    mutationFn: (silenceId: string) => deleteSilence(scopeId, silenceId),
+    mutationFn: (silenceId: string) => deleteSilence(silenceId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['silences-active', scopeId, hostId] }),
   })
 

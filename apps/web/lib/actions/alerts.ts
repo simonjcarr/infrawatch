@@ -36,6 +36,12 @@ import type {
 import { organisations } from '@/lib/db/schema'
 import type { SmtpEncryption } from '@/lib/notifications/smtp-settings'
 import { getRequiredSession } from '@/lib/auth/session'
+import { resolveCurrentActionScope } from './action-scope'
+
+async function resolveCurrentAlertScope(): Promise<string> {
+  const session = await getRequiredSession()
+  return resolveCurrentActionScope(session)
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,7 +125,8 @@ const createNotificationChannelSchema = z.discriminatedUnion('type', [
 
 // ─── Alert Rules ──────────────────────────────────────────────────────────────
 
-export async function getAlertRules(orgId: string, hostId?: string): Promise<AlertRule[]> {
+export async function getAlertRules(hostId?: string): Promise<AlertRule[]> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   return db.query.alertRules.findMany({
     where: and(
@@ -132,7 +139,8 @@ export async function getAlertRules(orgId: string, hostId?: string): Promise<Ale
   })
 }
 
-export async function getGlobalAlertDefaults(orgId: string): Promise<AlertRule[]> {
+export async function getGlobalAlertDefaults(): Promise<AlertRule[]> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   return db.query.alertRules.findMany({
     where: and(
@@ -151,9 +159,9 @@ const createGlobalAlertDefaultSchema = z.object({
 })
 
 export async function createGlobalAlertDefault(
-  orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAdminAccess(orgId)
   const parsed = createGlobalAlertDefaultSchema.safeParse(input)
   if (!parsed.success) {
@@ -183,9 +191,9 @@ export async function createGlobalAlertDefault(
 }
 
 export async function deleteGlobalAlertDefault(
-  orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgAdminAccess(orgId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
@@ -225,7 +233,14 @@ export async function applyGlobalDefaultsToHost(
   hostId: string,
 ): Promise<void> {
   await requireOrgAdminAccess(orgId)
-  const defaults = await getGlobalAlertDefaults(orgId)
+  const defaults = await db.query.alertRules.findMany({
+    where: and(
+      eq(alertRules.organisationId, orgId),
+      isNull(alertRules.deletedAt),
+      eq(alertRules.isGlobalDefault, true),
+    ),
+    orderBy: alertRules.createdAt,
+  })
   if (defaults.length === 0) return
 
   await db.insert(alertRules).values(
@@ -243,9 +258,9 @@ export async function applyGlobalDefaultsToHost(
 }
 
 export async function createAlertRule(
-  orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgWriteAccess(orgId)
   const parsed = createAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
@@ -274,10 +289,10 @@ export async function createAlertRule(
 }
 
 export async function updateAlertRule(
-  orgId: string,
   ruleId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgWriteAccess(orgId)
   const parsed = updateAlertRuleSchema.safeParse(input)
   if (!parsed.success) {
@@ -309,9 +324,9 @@ export async function updateAlertRule(
 }
 
 export async function deleteAlertRule(
-  orgId: string,
   ruleId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgWriteAccess(orgId)
   const existing = await db.query.alertRules.findFirst({
     where: and(
@@ -358,9 +373,9 @@ export type AlertHistoryFilters = {
 }
 
 export async function getAlertInstances(
-  orgId: string,
   filters: AlertHistoryFilters = {},
 ): Promise<AlertInstanceWithRule[]> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   const limit = filters.limit ?? 50
   const offset = filters.offset ?? 0
@@ -408,9 +423,9 @@ export async function getAlertInstances(
 }
 
 export async function getAlertInstanceCount(
-  orgId: string,
   filters: Omit<AlertHistoryFilters, 'limit' | 'offset'> = {},
 ): Promise<number> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   const rows = await db
     .select({ total: count() })
@@ -431,9 +446,9 @@ export async function getAlertInstanceCount(
 }
 
 export async function acknowledgeAlert(
-  orgId: string,
   instanceId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgWriteAccess(orgId)
   const existing = await db.query.alertInstances.findFirst({
     where: and(
@@ -458,24 +473,8 @@ export async function acknowledgeAlert(
 
 export async function getActiveAlertCountsForHosts(
   hostIds: string[],
-): Promise<Record<string, number>>
-export async function getActiveAlertCountsForHosts(
-  orgId: string,
-  hostIds: string[],
-): Promise<Record<string, number>>
-export async function getActiveAlertCountsForHosts(
-  orgIdOrHostIds: string | string[],
-  maybeHostIds?: string[],
 ): Promise<Record<string, number>> {
-  const currentScope = maybeHostIds
-    ? orgIdOrHostIds as string
-    : await (async () => {
-      const session = await getRequiredSession()
-      const orgId = session.user.organisationId
-      if (!orgId) throw new Error('Instance scope is not configured')
-      return orgId
-    })()
-  const hostIds = maybeHostIds ?? orgIdOrHostIds as string[]
+  const currentScope = await resolveCurrentAlertScope()
   await requireOrgAccess(currentScope)
   if (hostIds.length === 0) return {}
 
@@ -522,7 +521,8 @@ function normaliseSmtpConfig(raw: unknown): SmtpChannelConfig {
   return { ...rest, encryption } as unknown as SmtpChannelConfig
 }
 
-export async function getNotificationChannels(orgId: string): Promise<NotificationChannelSafe[]> {
+export async function getNotificationChannels(): Promise<NotificationChannelSafe[]> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   const rows = await db.query.notificationChannels.findMany({
     where: and(
@@ -572,9 +572,9 @@ export async function getNotificationChannels(orgId: string): Promise<Notificati
 }
 
 export async function createNotificationChannel(
-  orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgAdminAccess(orgId)
   const parsed = createNotificationChannelSchema.safeParse(input)
   if (!parsed.success) {
@@ -615,9 +615,9 @@ export async function createNotificationChannel(
 }
 
 export async function deleteNotificationChannel(
-  orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgAdminAccess(orgId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
@@ -677,10 +677,10 @@ const updateTelegramChannelSchema = z.object({
 })
 
 export async function updateNotificationChannel(
-  orgId: string,
   channelId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgAdminAccess(orgId)
   const existing = await db.query.notificationChannels.findFirst({
     where: and(
@@ -772,9 +772,9 @@ export async function updateNotificationChannel(
 }
 
 export async function sendTestNotification(
-  orgId: string,
   channelId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAdminAccess(orgId)
   if (!await testNotificationLimiter.check(orgId)) {
     return { error: 'Too many requests — please wait before sending another test notification.' }
@@ -929,7 +929,8 @@ const createSilenceSchema = z.object({
   path: ['endsAt'],
 })
 
-export async function getSilences(orgId: string): Promise<AlertSilenceWithHost[]> {
+export async function getSilences(): Promise<AlertSilenceWithHost[]> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   const rows = await db
     .select({
@@ -961,9 +962,9 @@ export async function getSilences(orgId: string): Promise<AlertSilenceWithHost[]
 }
 
 export async function getActiveSilencesForHost(
-  orgId: string,
   hostId: string,
 ): Promise<AlertSilence[]> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgAccess(orgId)
   const now = new Date()
   return db.query.alertSilences.findMany({
@@ -980,9 +981,9 @@ export async function getActiveSilencesForHost(
 }
 
 export async function createSilence(
-  orgId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   const session = await requireOrgWriteAccess(orgId)
   const parsed = createSilenceSchema.safeParse(input)
   if (!parsed.success) {
@@ -1027,9 +1028,9 @@ export async function createSilence(
 }
 
 export async function deleteSilence(
-  orgId: string,
   silenceId: string,
 ): Promise<{ success: true } | { error: string }> {
+  const orgId = await resolveCurrentAlertScope()
   await requireOrgWriteAccess(orgId)
   const existing = await db.query.alertSilences.findFirst({
     where: and(

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.129.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.0...web/v0.129.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **web:** allow dashboard without org scope ([#1237](https://github.com/carrtech-dev/ct-ops/issues/1237)) ([8a68af7](https://github.com/carrtech-dev/ct-ops/commit/8a68af764a4f55616959f7f0077770ef79f01bac))
+
 ## [0.129.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.128.0...web/v0.129.0) (2026-05-10)
 
 

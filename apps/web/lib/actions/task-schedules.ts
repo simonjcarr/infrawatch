@@ -11,12 +11,10 @@ import {
   runScheduleNow as runScheduleNowCore,
   setScheduleEnabled as setScheduleEnabledCore,
   updateSchedule as updateScheduleCore,
-  type ScheduleInput,
 } from './task-schedules-core'
 import type { ScheduleWithTargetName } from './task-schedules-types'
 
 export { previewCronRuns }
-export type { ScheduleInput }
 
 export async function listSchedules(
   ...args: [] | [string]

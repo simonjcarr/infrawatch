@@ -15,6 +15,25 @@
 
 ## What Has Been Built
 
+### Session 127 — Password Manager vault load resilience
+
+**Unlocked vault list safety** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/crypto-batch.ts`)
+- Moved Password Manager browser crypto batching into a shared helper and added a
+  settled batch variant for vault list decryption.
+- Updated the unlocked workspace to skip individual vault records whose wrapped
+  key or encrypted metadata cannot be decrypted with the current browser-only
+  unlock profile, instead of failing the whole workspace with the generic vault
+  load error.
+- Cleared skipped vault keys from the in-memory cache and surfaced a targeted
+  workspace warning when vault records are skipped.
+
+**Validation**
+- `node --experimental-strip-types --test apps/web/lib/password-manager/*.test.mjs`
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'lib/password-manager/crypto-batch.ts' 'lib/password-manager/crypto-batch.test.mjs'`
+- `pnpm --dir apps/web exec tsc --noEmit --pretty false`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 126 — Operations Calendar planning
 
 **Shared planning calendar** (`apps/web/app/(dashboard)/calendar`, `apps/web/lib/actions/calendar.ts`, `apps/web/lib/db/schema/calendar.ts`)

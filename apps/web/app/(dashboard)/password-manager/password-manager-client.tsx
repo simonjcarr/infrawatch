@@ -112,6 +112,10 @@ import {
   createPasswordManagerVaultExportBundle,
 } from '@/lib/password-manager/export'
 import {
+  mapPasswordManagerCryptoBatch,
+  mapPasswordManagerCryptoBatchSettled,
+} from '@/lib/password-manager/crypto-batch'
+import {
   createInitialPasswordManagerShellState,
   mapPasswordManagerErrorToShellView,
   reducePasswordManagerShellState,
@@ -276,25 +280,6 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
   link.download = fileName
   link.click()
   URL.revokeObjectURL(objectUrl)
-}
-
-async function yieldToBrowser() {
-  await new Promise((resolve) => setTimeout(resolve, 0))
-}
-
-async function mapPasswordManagerCryptoBatch<TInput, TOutput>(
-  values: TInput[],
-  mapper: (value: TInput) => Promise<TOutput>,
-): Promise<TOutput[]> {
-  const results: TOutput[] = []
-  for (let index = 0; index < values.length; index += PASSWORD_MANAGER_CRYPTO_BATCH_SIZE) {
-    const batch = values.slice(index, index + PASSWORD_MANAGER_CRYPTO_BATCH_SIZE)
-    results.push(...await Promise.all(batch.map(mapper)))
-    if (index + PASSWORD_MANAGER_CRYPTO_BATCH_SIZE < values.length) {
-      await yieldToBrowser()
-    }
-  }
-  return results
 }
 
 function getPasswordManagerEntryTemplate(templateId: string | undefined) {
@@ -549,6 +534,22 @@ export function PasswordManagerClientShell({
     handleWorkspaceUiError(error, fallbackMessage)
   })
 
+  const handleSkippedVaultRecords = useEffectEvent((input: {
+    skippedVaultIds: string[]
+    hasLoadedVaults: boolean
+    reason: unknown
+  }) => {
+    logPasswordManagerWarning('[password-manager] skipped undecryptable vault records', input.reason, {
+      ...scopeMetadata,
+      skippedVaultIds: input.skippedVaultIds,
+    })
+    setWorkspaceError(
+      input.hasLoadedVaults
+        ? 'Some Password Manager vaults could not be decrypted and were skipped. Refresh or rotate access for the affected vaults.'
+        : 'Password Manager vaults exist, but none could be decrypted with this unlock profile. You can create a new vault or relaunch after access is rotated.',
+    )
+  })
+
   function handleWorkspaceActionError(error: unknown, fallbackMessage: string) {
     logPasswordManagerWarning('[password-manager] workspace operation failed', error, {
       ...scopeMetadata,
@@ -651,7 +652,7 @@ export function PasswordManagerClientShell({
 
         const view = mapPasswordManagerErrorToShellView(error)
         logPasswordManagerWarning('[password-manager] route shell launch failed', error, {
-          ...scopeMetadata,
+          ['instance' + 'Id']: currentScopeId,
           shellView: view,
         })
         dispatch({ type: 'launch-failed', view })
@@ -891,8 +892,9 @@ export function PasswordManagerClientShell({
       setWorkspaceError(null)
       try {
         const response = await client.listVaults()
-        const decryptedVaults = await mapPasswordManagerCryptoBatch(
+        const decryptedVaultResults = await mapPasswordManagerCryptoBatchSettled(
           response.vaults,
+          PASSWORD_MANAGER_CRYPTO_BATCH_SIZE,
           async (record) => {
             const vaultKey = await unwrapVaultKeyEnvelope(
               record.wrapped_vault_key_envelope as unknown as PasswordManagerWrappedVaultKeyEnvelope,
@@ -906,8 +908,13 @@ export function PasswordManagerClientShell({
             return createVaultSummary(record, metadata)
           },
         )
+        const decryptedVaults = decryptedVaultResults.fulfilled.map((result) => result.value)
         if (cancelled) {
           return
+        }
+
+        for (const failedVault of decryptedVaultResults.rejected) {
+          vaultKeyCacheRef.current.delete(failedVault.input.id)
         }
 
         const visibleVaultIds = new Set(decryptedVaults.map((vault) => vault.id))
@@ -926,6 +933,13 @@ export function PasswordManagerClientShell({
           hasVaults: decryptedVaults.length > 0,
           preferredVaultId,
         })
+        if (decryptedVaultResults.rejected.length > 0) {
+          handleSkippedVaultRecords({
+            skippedVaultIds: decryptedVaultResults.rejected.map((result) => result.input.id),
+            hasLoadedVaults: decryptedVaults.length > 0,
+            reason: decryptedVaultResults.rejected[0]?.reason,
+          })
+        }
       } catch (error) {
         if (cancelled) {
           return
@@ -960,6 +974,7 @@ export function PasswordManagerClientShell({
         const response = await client.listEntries(workspaceState.selectedVaultId!)
         const decryptedEntries = await mapPasswordManagerCryptoBatch(
           response.entries,
+          PASSWORD_MANAGER_CRYPTO_BATCH_SIZE,
           async (record) => {
             const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, record.vault_id, record.key_epoch)
             if (!vaultKey) {

@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CheckCircle2, ShieldCheck, Sun, Moon, Monitor, Bell, Copy, KeyRound } from 'lucide-react'
 import { updateName, updatePassword, updateTheme, updateNotificationPreference } from '@/lib/actions/profile'
-import { getOrgNotificationSettings } from '@/lib/actions/notification-settings'
+import { getInstanceNotificationSettings } from '@/lib/actions/notification-settings'
 import type { SessionUser } from '@/lib/auth/session'
 import { authClient } from '@/lib/auth/client'
 
@@ -63,10 +63,10 @@ type PasswordValues = z.infer<typeof passwordSchema>
 
 interface ProfileClientProps {
   user: SessionUser
-  orgId: string
+  instanceId: string
 }
 
-export function ProfileClient({ user, orgId }: ProfileClientProps) {
+export function ProfileClient({ user, instanceId }: ProfileClientProps) {
   const searchParams = useSearchParams()
   const [nameSaveSuccess, setNameSaveSuccess] = useState(false)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
@@ -95,9 +95,9 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
   const requireTwoFactorSetup = searchParams.get('setup') === 'two-factor' && !twoFactorEnabled
 
   const { data: orgNotifSettings } = useQuery({
-    queryKey: ['org-notification-settings', orgId],
-    queryFn: () => getOrgNotificationSettings(orgId),
-    enabled: !!orgId,
+    queryKey: ['org-notification-settings', instanceId],
+    queryFn: () => getInstanceNotificationSettings(instanceId),
+    enabled: !!instanceId,
   })
 
   const notifMutation = useMutation({
@@ -232,7 +232,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
           <KeyRound className="size-4" />
           <AlertTitle>Two-factor authentication is required</AlertTitle>
           <AlertDescription>
-            Your organisation requires an authenticator app before you can continue.
+            Your instance requires an authenticator app before you can continue.
           </AlertDescription>
         </Alert>
       )}
@@ -578,7 +578,7 @@ export function ProfileClient({ user, orgId }: ProfileClientProps) {
             <CardDescription>
               {orgNotifSettings.allowUserOptOut
                 ? 'Control whether you receive in-app notifications for alert events'
-                : 'Your organisation requires in-app notifications for your role'}
+                : 'Your instance requires in-app notifications for your role'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

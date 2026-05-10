@@ -16,18 +16,18 @@ interface Props {
 export default async function GroupDetailPage({ params }: Props) {
   const { id } = await params
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId!
+  const instanceId = session.user.instanceId!
 
   const [group, allHosts] = await Promise.all([
-    getGroup(orgId, id),
-    listHosts(orgId),
+    getGroup(instanceId, id),
+    listHosts(instanceId),
   ])
 
   if (!group) notFound()
 
   return (
     <GroupDetailClient
-      scopeId={orgId}
+      scopeId={instanceId}
       userRole={session.user.role}
       initialGroup={group}
       initialAllHosts={allHosts}

@@ -22,8 +22,8 @@ export async function GET() {
     throw err
   }
 
-  const orgId = session.user.organisationId
-  if (!orgId) {
+  const instanceId = session.user.instanceId
+  if (!instanceId) {
     return Response.json(emptyOverview)
   }
 
@@ -31,19 +31,19 @@ export async function GET() {
     db
       .select({ status: agents.status, count: count() })
       .from(agents)
-      .where(and(eq(agents.organisationId, orgId), isNull(agents.deletedAt)))
+      .where(and(eq(agents.instanceId, instanceId), isNull(agents.deletedAt)))
       .groupBy(agents.status),
 
     db
       .select({ status: certificates.status, count: count() })
       .from(certificates)
-      .where(and(eq(certificates.organisationId, orgId), isNull(certificates.deletedAt)))
+      .where(and(eq(certificates.instanceId, instanceId), isNull(certificates.deletedAt)))
       .groupBy(certificates.status),
 
     db
       .select({ status: alertInstances.status, count: count() })
       .from(alertInstances)
-      .where(eq(alertInstances.organisationId, orgId))
+      .where(eq(alertInstances.instanceId, instanceId))
       .groupBy(alertInstances.status),
   ])
 

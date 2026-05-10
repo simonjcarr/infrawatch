@@ -2,7 +2,7 @@ import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import nodemailer from 'nodemailer'
 import { decrypt } from '../crypto/encrypt.ts'
-import type { OrgNotificationSettings } from '../db/schema/organisations.ts'
+import type { InstanceNotificationSettings } from '../db/schema/instance-settings.ts'
 import type { SmtpSendConfig } from '../notifications/smtp-send.ts'
 
 type AuthEmailInput = {
@@ -38,7 +38,7 @@ export function getAuthEmailConfigFromEnv(
 }
 
 export function getAuthEmailConfigFromOrgSettings(
-  notificationSettings: OrgNotificationSettings | undefined,
+  notificationSettings: InstanceNotificationSettings | undefined,
 ): SmtpSendConfig | null {
   const relay = notificationSettings?.smtpRelay
   if (!relay?.enabled) return null

@@ -131,7 +131,7 @@ test('password reset ignores unsafe callback urls and returns to the login notic
 
   await sql`
     UPDATE "user"
-    SET organisation_id = (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+    SET instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
         email_verified = true,
         role = 'org_admin',
         is_active = true

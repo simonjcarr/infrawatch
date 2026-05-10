@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,7 +15,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can change a team member role and manage their lifecycle', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const memberId = 'team-member-managed'
 
   await sql`
@@ -24,7 +24,7 @@ test('admin can change a team member role and manage their lifecycle', async ({ 
       name,
       email,
       email_verified,
-      organisation_id,
+      instance_id,
       role,
       roles,
       is_active
@@ -34,7 +34,7 @@ test('admin can change a team member role and manage their lifecycle', async ({ 
       'Managed Team Member',
       'managed-member@example.com',
       true,
-      ${orgId},
+      ${instanceId},
       'engineer',
       '["engineer"]'::jsonb,
       true

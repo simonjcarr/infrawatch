@@ -3,7 +3,7 @@ import { asc, eq, isNull } from 'drizzle-orm'
 
 import {
   ctCveConnectorSettings,
-  organisations,
+  instanceSettings,
   type CtCveConnectorSettings,
   type NewCtCveConnectorSettings,
 } from '../../db/schema/index.ts'
@@ -36,7 +36,7 @@ export interface CtCveConnectorExistingSecrets {
 }
 
 export interface CtCveConnectorSettingsSummary {
-  organisationId: string
+  instanceId: string
   enabled: boolean
   name: string
   baseUrl: string
@@ -49,7 +49,7 @@ export interface CtCveConnectorSettingsSummary {
 }
 
 export interface CtCveConnectorSettingsFull {
-  organisationId: string
+  instanceId: string
   enabled: boolean
   name: string
   baseUrl: string
@@ -62,12 +62,12 @@ export interface CtCveConnectorSettingsFull {
 }
 
 export interface CtCveConnectorSettingsRepository {
-  getSummary(orgId: string): Promise<CtCveConnectorSettingsSummary | null>
+  getSummary(instanceId: string): Promise<CtCveConnectorSettingsSummary | null>
 }
 
 export interface CtCveCtOpsConnectionConfig {
   name: string
-  orgId: string
+  instanceId: string
   ctOpsBaseUrl: string
   inventoryTokens: Array<{
     id: string
@@ -82,15 +82,15 @@ export interface CtCveCtOpsConnectionConfig {
 }
 
 interface NormaliseForSaveOptions {
-  orgId: string
+  instanceId: string
   input: CtCveConnectorSettingsInput
   existing?: CtCveConnectorExistingSecrets | null
   generateSecret?: () => string
   encryptSecret?: (value: string) => string
 }
 
-export function defaultCtCveConnectorTokenId(prefix: string, orgId: string): string {
-  const suffix = orgId.replace(/[^A-Za-z0-9._:-]/g, '_').replace(/^_+|_+$/g, '') || 'org'
+export function defaultCtCveConnectorTokenId(prefix: string, instanceId: string): string {
+  const suffix = instanceId.replace(/[^A-Za-z0-9._:-]/g, '_').replace(/^_+|_+$/g, '') || 'org'
   return `${prefix}_${suffix}`.slice(0, 128)
 }
 
@@ -169,19 +169,19 @@ function encryptedSecretForSave(options: {
 }
 
 export function normaliseCtCveConnectorSettingsForSave({
-  orgId,
+  instanceId,
   input,
   existing,
   generateSecret = generateCtCveServiceTokenSecret,
   encryptSecret = encrypt,
 }: NormaliseForSaveOptions): NewCtCveConnectorSettings {
-  const organisationId = orgId.trim()
-  if (!organisationId) {
-    throw new Error('Organisation ID is required')
+  const trimmedInstanceId = instanceId.trim()
+  if (!trimmedInstanceId) {
+    throw new Error('Instance ID is required')
   }
 
   return {
-    organisationId,
+    instanceId: trimmedInstanceId,
     enabled: input.enabled,
     name: normaliseName(input.name),
     baseUrl: normaliseCtCveBaseUrl(input.baseUrl),
@@ -206,7 +206,7 @@ export function normaliseCtCveConnectorSettingsForSave({
 
 function rowToSummary(row: CtCveConnectorSettings): CtCveConnectorSettingsSummary {
   return {
-    organisationId: row.organisationId,
+    instanceId: row.instanceId,
     enabled: row.enabled,
     name: row.name,
     baseUrl: row.baseUrl,
@@ -221,7 +221,7 @@ function rowToSummary(row: CtCveConnectorSettings): CtCveConnectorSettingsSummar
 
 function rowToFull(row: CtCveConnectorSettings): CtCveConnectorSettingsFull {
   return {
-    organisationId: row.organisationId,
+    instanceId: row.instanceId,
     enabled: row.enabled,
     name: row.name,
     baseUrl: row.baseUrl,
@@ -234,22 +234,20 @@ function rowToFull(row: CtCveConnectorSettings): CtCveConnectorSettingsFull {
   }
 }
 
-async function getConnectorRowForOrg(orgId: string): Promise<CtCveConnectorSettings | null> {
-  const { withOrgDatabaseScope } = await import('../../db/index.ts')
-  return withOrgDatabaseScope(orgId, async (scopedDb) => {
-    const row = await scopedDb.query.ctCveConnectorSettings.findFirst({
-      where: eq(ctCveConnectorSettings.organisationId, orgId),
-    })
-    return row ?? null
+async function getConnectorRowForOrg(instanceId: string): Promise<CtCveConnectorSettings | null> {
+  const { db } = await import('../../db/index.ts')
+  const row = await db.query.ctCveConnectorSettings.findFirst({
+    where: eq(ctCveConnectorSettings.instanceId, instanceId),
   })
+  return row ?? null
 }
 
-async function listConnectorRowsAcrossOrganisations(): Promise<CtCveConnectorSettings[]> {
+async function listConnectorRowsAcrossInstances(): Promise<CtCveConnectorSettings[]> {
   const { db } = await import('../../db/index.ts')
-  const orgs = await db.query.organisations.findMany({
-    where: isNull(organisations.deletedAt),
+  const orgs = await db.query.instanceSettings.findMany({
+    where: isNull(instanceSettings.deletedAt),
     columns: { id: true },
-    orderBy: [asc(organisations.id)],
+    orderBy: [asc(instanceSettings.id)],
   })
 
   const rows: CtCveConnectorSettings[] = []
@@ -261,69 +259,65 @@ async function listConnectorRowsAcrossOrganisations(): Promise<CtCveConnectorSet
 }
 
 export async function getCtCveConnectorSettingsSummary(
-  orgId: string,
+  instanceId: string,
 ): Promise<CtCveConnectorSettingsSummary | null> {
-  const row = await getConnectorRowForOrg(orgId)
+  const row = await getConnectorRowForOrg(instanceId)
   return row ? rowToSummary(row) : null
 }
 
 export async function getCtCveConnectorSettingsForAdmin(
-  orgId: string,
+  instanceId: string,
 ): Promise<CtCveConnectorSettingsFull | null> {
-  const row = await getConnectorRowForOrg(orgId)
+  const row = await getConnectorRowForOrg(instanceId)
   return row ? rowToFull(row) : null
 }
 
 export async function saveCtCveConnectorSettings(
-  orgId: string,
+  instanceId: string,
   input: CtCveConnectorSettingsInput,
 ): Promise<CtCveConnectorSettingsFull> {
-  const existing = await getConnectorRowForOrg(orgId)
+  const existing = await getConnectorRowForOrg(instanceId)
   const now = new Date()
   const values = normaliseCtCveConnectorSettingsForSave({
-    orgId,
+    instanceId,
     input,
     existing,
   })
 
-  const { withOrgDatabaseScope } = await import('../../db/index.ts')
-  await withOrgDatabaseScope(orgId, async (scopedDb) => {
-    await scopedDb
-      .insert(ctCveConnectorSettings)
-      .values({
-        ...values,
-        createdAt: existing?.createdAt ?? now,
+  const { db } = await import('../../db/index.ts')
+  await db
+    .insert(ctCveConnectorSettings)
+    .values({
+      ...values,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: ctCveConnectorSettings.instanceId,
+      set: {
+        enabled: values.enabled,
+        name: values.name,
+        baseUrl: values.baseUrl,
+        inventoryTokenId: values.inventoryTokenId,
+        inventoryTokenSecretEncrypted: values.inventoryTokenSecretEncrypted,
+        ctCveTokenId: values.ctCveTokenId,
+        ctCveTokenSecretEncrypted: values.ctCveTokenSecretEncrypted,
         updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: ctCveConnectorSettings.organisationId,
-        set: {
-          enabled: values.enabled,
-          name: values.name,
-          baseUrl: values.baseUrl,
-          inventoryTokenId: values.inventoryTokenId,
-          inventoryTokenSecretEncrypted: values.inventoryTokenSecretEncrypted,
-          ctCveTokenId: values.ctCveTokenId,
-          ctCveTokenSecretEncrypted: values.ctCveTokenSecretEncrypted,
-          updatedAt: now,
-        },
-      })
-  })
+      },
+    })
 
-  const saved = await getConnectorRowForOrg(orgId)
+  const saved = await getConnectorRowForOrg(instanceId)
   if (!saved) {
     throw new Error('Failed to save CT-CVE connector settings')
   }
   return rowToFull(saved)
 }
 
-export async function deleteCtCveConnectorSettings(orgId: string): Promise<void> {
-  const { withOrgDatabaseScope } = await import('../../db/index.ts')
-  await withOrgDatabaseScope(orgId, async (scopedDb) => {
-    await scopedDb
-      .delete(ctCveConnectorSettings)
-      .where(eq(ctCveConnectorSettings.organisationId, orgId))
-  })
+export async function deleteCtCveConnectorSettings(instanceId: string): Promise<void> {
+  const { db } = await import('../../db/index.ts')
+  await db
+    .delete(ctCveConnectorSettings)
+    .where(eq(ctCveConnectorSettings.instanceId, instanceId))
 }
 
 export function toCtCveInventoryPushTarget(
@@ -336,7 +330,7 @@ export function toCtCveInventoryPushTarget(
     token: {
       id: settings.inventoryTokenId,
       secret: settings.inventoryTokenSecret,
-      orgId: settings.organisationId,
+      instanceId: settings.instanceId,
       scopes: ['inventory:write', 'connection:read'],
     },
   }
@@ -346,17 +340,17 @@ export function toCtCveServiceToken(settings: CtCveConnectorSettingsFull): CtCve
   return {
     id: settings.ctCveTokenId,
     secret: settings.ctCveTokenSecret,
-    orgId: settings.organisationId,
+    instanceId: settings.instanceId,
     scopes: ['findings:write', 'connection:read'],
     revoked: false,
   }
 }
 
 export async function getCtCveServiceTokensForOrg(
-  orgId: string,
+  instanceId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<CtCveServiceToken[]> {
-  const row = await getConnectorRowForOrg(orgId)
+  const row = await getConnectorRowForOrg(instanceId)
   if (row) {
     if (!row.enabled) return []
     try {
@@ -367,14 +361,14 @@ export async function getCtCveServiceTokensForOrg(
   }
 
   return parseCtCveServiceTokens(env.CT_CVE_SERVICE_TOKENS)
-    .filter((token) => token.orgId === orgId && !token.revoked)
+    .filter((token) => token.instanceId === instanceId && !token.revoked)
 }
 
 export async function listCtCveInventoryPushTargetsFromSettings(): Promise<{
   settingsCount: number
   targets: CtCveInventoryPushTarget[]
 }> {
-  const rows = await listConnectorRowsAcrossOrganisations()
+  const rows = await listConnectorRowsAcrossInstances()
   return {
     settingsCount: rows.length,
     targets: rows
@@ -390,7 +384,7 @@ export function buildCtCveCtOpsConnectionConfig(
 ): CtCveCtOpsConnectionConfig {
   return {
     name: settings.name,
-    orgId: settings.organisationId,
+    instanceId: settings.instanceId,
     ctOpsBaseUrl: normaliseCtOpsBaseUrl(ctOpsBaseUrl),
     inventoryTokens: [{
       id: settings.inventoryTokenId,

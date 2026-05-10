@@ -19,50 +19,50 @@ const terminalSource = readFileSync(path.join(here, 'terminal.ts'), 'utf8')
 
 test('checks wrapper derives instance scope from the current session', () => {
   assert.match(checksSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(checksSource, /\borgId\b/)
+  assert.doesNotMatch(checksSource, /\binstanceId\b/)
 })
 
 test('service accounts wrapper derives instance scope from the current session', () => {
   assert.match(serviceAccountsSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(serviceAccountsSource, /\borgId\b/)
+  assert.doesNotMatch(serviceAccountsSource, /\binstanceId\b/)
 })
 
 test('software inventory wrapper derives instance scope from the current session', () => {
   assert.match(softwareInventorySource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(softwareInventorySource, /\borgId\b/)
+  assert.doesNotMatch(softwareInventorySource, /\binstanceId\b/)
 })
 
 test('host groups wrapper derives instance scope from the current session', () => {
   assert.match(hostGroupsSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(hostGroupsSource, /\borgId\b/)
+  assert.doesNotMatch(hostGroupsSource, /\binstanceId\b/)
 })
 
 test('networks wrapper derives instance scope from the current session', () => {
   assert.match(networksSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(networksSource, /\borgId\b/)
+  assert.doesNotMatch(networksSource, /\binstanceId\b/)
 })
 
 test('notes wrapper derives instance scope from the current session', () => {
   assert.match(notesSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(notesSource, /\borgId\b/)
+  assert.doesNotMatch(notesSource, /\binstanceId\b/)
 })
 
 test('tags wrapper derives instance scope from the current session', () => {
   assert.match(tagsSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(tagsSource, /\borgId\b/)
+  assert.doesNotMatch(tagsSource, /\binstanceId\b/)
 })
 
 test('terminal wrapper derives instance scope from the current session', () => {
   assert.match(terminalSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(terminalSource, /\borgId\b/)
+  assert.doesNotMatch(terminalSource, /\binstanceId\b/)
 })
 
 test('task runs wrapper derives instance scope from the current session', () => {
   assert.match(taskRunsSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(taskRunsSource, /\borgId\b/)
+  assert.doesNotMatch(taskRunsSource, /\binstanceId\b/)
 })
 
 test('task schedules wrapper derives instance scope from the current session', () => {
   assert.match(taskSchedulesSource, /resolveCurrentActionScope\(session\)/)
-  assert.doesNotMatch(taskSchedulesSource, /\borgId\b/)
+  assert.doesNotMatch(taskSchedulesSource, /\binstanceId\b/)
 })

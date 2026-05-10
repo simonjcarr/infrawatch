@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, integer, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { users } from './auth.ts'
 
@@ -8,7 +8,7 @@ export type TerminalSessionStatus = 'pending' | 'active' | 'ended' | 'error'
 
 export const terminalSessions = pgTable('terminal_sessions', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
   userId: text('user_id').notNull().references(() => users.id),
   sessionId: text('session_id').notNull().unique(),
@@ -23,7 +23,7 @@ export const terminalSessions = pgTable('terminal_sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index('terminal_sessions_org_host_idx').on(t.organisationId, t.hostId),
+  index('terminal_sessions_org_host_idx').on(t.instanceId, t.hostId),
   index('terminal_sessions_session_id_idx').on(t.sessionId),
 ])
 

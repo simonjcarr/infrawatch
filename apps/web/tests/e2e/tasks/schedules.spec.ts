@@ -9,7 +9,7 @@ test('admin can review, enable, and delete a scheduled task', async ({ authentic
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -34,7 +34,7 @@ test('admin can review, enable, and delete a scheduled task', async ({ authentic
   await sql`
     INSERT INTO task_schedules (
       id,
-      organisation_id,
+      instance_id,
       created_by,
       name,
       description,
@@ -112,7 +112,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -170,7 +170,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
       const rows = await sql<Array<{ id: string }>>`
         SELECT id
         FROM task_schedules
-        WHERE organisation_id = ${instanceId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Nightly patch run'
           AND deleted_at IS NULL
         LIMIT 1
@@ -181,7 +181,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
   const createdScheduleRows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM task_schedules
-    WHERE organisation_id = ${instanceId}
+    WHERE instance_id = ${instanceId}
       AND name = 'Nightly patch run'
       AND deleted_at IS NULL
     LIMIT 1
@@ -203,7 +203,7 @@ test('admin can create a patch schedule from the new schedule form', async ({ au
       }>>`
         SELECT name, cron_expression, timezone, target_id, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${instanceId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Nightly patch run'
           AND deleted_at IS NULL
         LIMIT 1
@@ -227,7 +227,7 @@ test('admin can create a security-only patch schedule for a host group', async (
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -264,7 +264,7 @@ test('admin can create a security-only patch schedule for a host group', async (
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
@@ -279,7 +279,7 @@ test('admin can create a security-only patch schedule for a host group', async (
   await sql`
     INSERT INTO host_group_members (
       id,
-      organisation_id,
+      instance_id,
       group_id,
       host_id
     )
@@ -342,7 +342,7 @@ test('admin can create a security-only patch schedule for a host group', async (
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, max_parallel, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${instanceId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Weekly security patch wave'
           AND deleted_at IS NULL
         LIMIT 1
@@ -368,7 +368,7 @@ test('admin can create a software inventory schedule for a single host', async (
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -431,7 +431,7 @@ test('admin can create a software inventory schedule for a single host', async (
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${instanceId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Weekly software inventory'
           AND deleted_at IS NULL
         LIMIT 1
@@ -456,7 +456,7 @@ test('admin can create a custom script schedule for a single host', async ({ aut
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -520,7 +520,7 @@ test('admin can create a custom script schedule for a single host', async ({ aut
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${instanceId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Daily diagnostics script'
           AND deleted_at IS NULL
         LIMIT 1
@@ -549,7 +549,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -586,7 +586,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
@@ -601,7 +601,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
   await sql`
     INSERT INTO host_group_members (
       id,
-      organisation_id,
+      instance_id,
       group_id,
       host_id
     )
@@ -623,7 +623,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
   await sql`
     INSERT INTO task_schedules (
       id,
-      organisation_id,
+      instance_id,
       created_by,
       name,
       description,
@@ -658,7 +658,7 @@ test('admin can edit an existing host-group schedule and review recent runs', as
   await sql`
     INSERT INTO task_runs (
       id,
-      organisation_id,
+      instance_id,
       triggered_by,
       scheduled_from_id,
       target_type,
@@ -757,7 +757,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -782,7 +782,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
@@ -797,7 +797,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
   await sql`
     INSERT INTO host_group_members (
       id,
-      organisation_id,
+      instance_id,
       group_id,
       host_id
     )
@@ -853,7 +853,7 @@ test('admin can create a service action schedule for a host group', async ({ aut
       }>>`
         SELECT name, cron_expression, timezone, target_type, target_id, max_parallel, task_type, config
         FROM task_schedules
-        WHERE organisation_id = ${instanceId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Restart nginx weekly'
           AND deleted_at IS NULL
         LIMIT 1

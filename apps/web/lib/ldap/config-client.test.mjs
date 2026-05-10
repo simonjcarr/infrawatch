@@ -6,7 +6,7 @@ import { sanitiseLdapConfigurationForClient } from './config-client.ts'
 test('sanitiseLdapConfigurationForClient omits bindPassword from client payloads', () => {
   const safe = sanitiseLdapConfigurationForClient({
     id: 'cfg_123',
-    organisationId: 'org_123',
+    instanceId: 'org_123',
     name: 'Primary LDAP',
     host: 'ldap.example.com',
     port: 636,

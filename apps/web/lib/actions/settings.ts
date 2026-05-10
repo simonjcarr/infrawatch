@@ -1,12 +1,12 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
 import { db } from '@/lib/db'
-import { organisations, parseOrgMetadata, users } from '@/lib/db/schema'
+import { instanceSettings, parseInstanceMetadata, users } from '@/lib/db/schema'
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { validateLicenceKey } from '@/lib/licence'
 import { encodeActivationToken } from '@/lib/licence-activation-token'
@@ -20,21 +20,21 @@ const updateOrgNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
 })
 
-export async function getCurrentOrganisationSettingsRecord() {
+export async function getCurrentInstanceSettingsRecord() {
   const session = await getRequiredSession()
-  const orgId = resolveOptionalActionScope(session)
-  if (!orgId) return null
-  return db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  const instanceId = resolveOptionalActionScope(session)
+  if (!instanceId) return null
+  return db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
   })
 }
 
 export async function updateOrgName(
-  orgId: string,
+  instanceId: string,
   name: string,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -46,9 +46,9 @@ export async function updateOrgName(
 
   try {
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ name: parsed.data.name, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     return { success: true }
   } catch (err) {
@@ -62,11 +62,11 @@ const metricRetentionSchema = z.object({
 })
 
 export async function updateMetricRetention(
-  orgId: string,
+  instanceId: string,
   days: number,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -78,9 +78,9 @@ export async function updateMetricRetention(
 
   try {
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metricRetentionDays: parsed.data.days, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     // Update TimescaleDB retention policies for both metric hypertables.
     // Each statement is wrapped in its own try/catch so failures silently degrade
@@ -110,7 +110,7 @@ export async function updateMetricRetention(
 }
 
 export async function saveLicenceKey(
-  orgId: string,
+  instanceId: string,
   key: string,
 ): Promise<{
   success: true
@@ -121,7 +121,7 @@ export async function saveLicenceKey(
 } | { error: string }> {
   let session
   try {
-    session = await requireOrgAdminAccess(orgId)
+    session = await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -131,16 +131,16 @@ export async function saveLicenceKey(
     return { error: result.error }
   }
 
-  if (result.payload.sub !== orgId) {
-    return { error: 'Licence key was issued to a different organisation' }
+  if (result.payload.sub !== instanceId) {
+    return { error: 'Licence key was issued to a different instance' }
   }
 
   try {
-    const previousLicence = await getTrustedEffectiveLicence(orgId)
+    const previousLicence = await getTrustedEffectiveLicence(instanceId)
     const nextMaxUsers = result.payload.maxUsers ?? FREE_INCLUDED_USER_SEATS
 
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({
         licenceKey: key.trim(),
         licenceTier: result.payload.tier,
@@ -148,15 +148,15 @@ export async function saveLicenceKey(
         licenceVerifierPublicKeyFingerprint: result.verifierPublicKeyFingerprint,
         updatedAt: new Date(),
       })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'licence.updated',
-      targetType: 'organisation',
-      targetId: orgId,
-      summary: `Updated organisation licence to ${result.payload.tier}`,
+      targetType: 'instance',
+      targetId: instanceId,
+      summary: `Updated instance licence to ${result.payload.tier}`,
       metadata: {
         previousTier: previousLicence.tier,
         nextTier: result.payload.tier,
@@ -179,21 +179,21 @@ export async function saveLicenceKey(
 }
 
 export async function generateActivationToken(
-  orgId: string,
+  instanceId: string,
 ): Promise<{ success: true; token: string } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
 
   try {
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { id: true, name: true },
     })
     if (!org) {
-      return { error: 'Organisation not found' }
+      return { error: 'Instance not found' }
     }
 
     const token = encodeActivationToken({
@@ -213,12 +213,12 @@ const freeSeatUsersSchema = z.object({
 })
 
 export async function updateFreeSeatUsers(
-  orgId: string,
+  instanceId: string,
   userIds: string[],
 ): Promise<{ success: true; userIds: string[] } | { error: string }> {
   let session
   try {
-    session = await requireOrgAdminAccess(orgId)
+    session = await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -235,15 +235,15 @@ export async function updateFreeSeatUsers(
 
   try {
     const [org, activeUsers] = await Promise.all([
-      db.query.organisations.findFirst({
-        where: eq(organisations.id, orgId),
+      db.query.instanceSettings.findFirst({
+        where: eq(instanceSettings.id, instanceId),
         columns: { metadata: true },
       }),
       uniqueUserIds.length === 0
         ? Promise.resolve([])
         : db.query.users.findMany({
             where: and(
-              eq(users.organisationId, orgId),
+              eq(users.instanceId, instanceId),
               eq(users.isActive, true),
               isNull(users.deletedAt),
               inArray(users.id, uniqueUserIds),
@@ -253,31 +253,31 @@ export async function updateFreeSeatUsers(
     ])
 
     if (!org) {
-      return { error: 'Organisation not found' }
+      return { error: 'Instance not found' }
     }
 
     const activeIds = new Set(activeUsers.map((user) => user.id))
     const invalidUserId = uniqueUserIds.find((userId) => !activeIds.has(userId))
     if (invalidUserId) {
-      return { error: 'Included-seat users must be active members of this organisation' }
+      return { error: 'Included-seat users must be active members of this instance' }
     }
 
     const metadata = {
-      ...parseOrgMetadata(org.metadata),
+      ...parseInstanceMetadata(org.metadata),
       freeSeatUserIds: uniqueUserIds,
     }
 
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     await writeAuditEvent(db, {
-      organisationId: orgId,
+      instanceId: instanceId,
       actorUserId: session.user.id,
       action: 'licence.free_seats.updated',
-      targetType: 'organisation',
-      targetId: orgId,
+      targetType: 'instance',
+      targetId: instanceId,
       summary: 'Updated included free-seat users',
       metadata: { freeSeatUserIds: uniqueUserIds },
     })

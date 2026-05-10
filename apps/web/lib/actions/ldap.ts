@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAdminAccess, requireOrgToolingAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAdminAccess, requireInstanceToolingAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -16,18 +16,18 @@ import {
   buildLdapLoginOptions,
   type LdapLoginOption,
 } from '@/lib/auth/ldap-login-options'
-import { getDefaultOrganisationId } from '@/lib/default-organisation'
+import { getDefaultInstanceId } from '@/lib/default-instance'
 import { testConnection as ldapTestConnection, searchUsers, lookupUserByDn, escapeLdapFilterValue } from '@/lib/ldap/client'
 import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
 export type { LdapConfigurationSafe } from '@/lib/ldap/config-client'
 
-async function getInstanceOrganisationId(): Promise<string> {
-  const organisationId = await getDefaultOrganisationId()
-  if (!organisationId) {
+async function getInstanceInstanceId(): Promise<string> {
+  const instanceId = await getDefaultInstanceId()
+  if (!instanceId) {
     throw new Error('Instance setup is incomplete')
   }
-  return organisationId
+  return instanceId
 }
 
 function safeDecrypt(value: string): string {
@@ -85,12 +85,12 @@ const updateLdapConfigSchema = z.object({
 
 export async function getLdapConfigurations(
 ): Promise<LdapConfigurationSafe[]> {
-  const orgId = await getDefaultOrganisationId()
-  if (!orgId) return []
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await getDefaultInstanceId()
+  if (!instanceId) return []
+  await requireInstanceAdminAccess(instanceId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
     orderBy: ldapConfigurations.createdAt,
@@ -101,12 +101,12 @@ export async function getLdapConfigurations(
 export async function getLdapConfiguration(
   configId: string,
 ): Promise<LdapConfigurationSafe | null> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceAdminAccess(instanceId)
   const result = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
   })
@@ -116,8 +116,8 @@ export async function getLdapConfiguration(
 export async function createLdapConfiguration(
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceAdminAccess(instanceId)
   const parsed = createLdapConfigSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -127,7 +127,7 @@ export async function createLdapConfiguration(
     const [row] = await db
       .insert(ldapConfigurations)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         name: parsed.data.name,
         host: parsed.data.host,
         port: parsed.data.port,
@@ -160,8 +160,8 @@ export async function updateLdapConfiguration(
   configId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceAdminAccess(instanceId)
   const parsed = updateLdapConfigSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -170,7 +170,7 @@ export async function updateLdapConfiguration(
   const existing = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
   })
@@ -201,7 +201,7 @@ export async function updateLdapConfiguration(
   await db
     .update(ldapConfigurations)
     .set(updates)
-    .where(and(eq(ldapConfigurations.id, configId), eq(ldapConfigurations.organisationId, orgId)))
+    .where(and(eq(ldapConfigurations.id, configId), eq(ldapConfigurations.instanceId, instanceId)))
 
   return { success: true }
 }
@@ -209,12 +209,12 @@ export async function updateLdapConfiguration(
 export async function deleteLdapConfiguration(
   configId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceAdminAccess(instanceId)
   const existing = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
   })
@@ -223,7 +223,7 @@ export async function deleteLdapConfiguration(
   await db
     .update(ldapConfigurations)
     .set({ deletedAt: new Date() })
-    .where(and(eq(ldapConfigurations.id, configId), eq(ldapConfigurations.organisationId, orgId)))
+    .where(and(eq(ldapConfigurations.id, configId), eq(ldapConfigurations.instanceId, instanceId)))
 
   return { success: true }
 }
@@ -231,12 +231,12 @@ export async function deleteLdapConfiguration(
 export async function testLdapConnection(
   configId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgAdminAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceAdminAccess(instanceId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
   })
@@ -277,14 +277,14 @@ export async function searchLdapDirectory(
   configId: string,
   query: string,
 ): Promise<{ success: true; users: LdapUserResult[] } | { error: string }> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgToolingAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceToolingAccess(instanceId)
   if (!query.trim()) return { success: true, users: [] }
 
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
   })
@@ -307,11 +307,11 @@ export type LookupConfigOption = {
 
 export async function getLookupConfigOptions(
 ): Promise<LookupConfigOption[]> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgToolingAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceToolingAccess(instanceId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       eq(ldapConfigurations.enabled, true),
       isNull(ldapConfigurations.deletedAt),
     ),
@@ -329,12 +329,12 @@ export async function lookupDirectoryUser(
   configId: string,
   dn: string,
 ): Promise<{ success: true; user: LdapUserDetailResult } | { error: string }> {
-  const orgId = await getInstanceOrganisationId()
-  await requireOrgToolingAccess(orgId)
+  const instanceId = await getInstanceInstanceId()
+  await requireInstanceToolingAccess(instanceId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(
       eq(ldapConfigurations.id, configId),
-      eq(ldapConfigurations.organisationId, orgId),
+      eq(ldapConfigurations.instanceId, instanceId),
       isNull(ldapConfigurations.deletedAt),
     ),
   })

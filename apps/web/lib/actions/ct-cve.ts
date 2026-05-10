@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { getRequiredSession } from '@/lib/auth/session'
-import { requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 import { resolveCurrentActionScope } from './action-scope'
 import {
   defaultCtCveConnectorTokenId,
@@ -25,7 +25,7 @@ export async function saveCtCveConnectorSettings(
   const session = await getRequiredSession()
   const scopeId = resolveCurrentActionScope(session)
   try {
-    await requireOrgAdminAccess(scopeId)
+    await requireInstanceAdminAccess(scopeId)
   } catch {
     return { error: 'You do not have permission to update CT-CVE settings' }
   }

@@ -7,7 +7,7 @@ import { createStorageStateForUser } from '../fixtures/auth'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -17,7 +17,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 async function createOrgUser(
   sql: ReturnType<typeof getTestDb>,
-  orgId: string,
+  instanceId: string,
   input: { email: string; isActive?: boolean; deleted?: boolean },
 ): Promise<string> {
   const userId = createId()
@@ -28,7 +28,7 @@ async function createOrgUser(
       name,
       email,
       email_verified,
-      organisation_id,
+      instance_id,
       role,
       is_active,
       deleted_at
@@ -38,7 +38,7 @@ async function createOrgUser(
       ${input.email},
       ${input.email},
       true,
-      ${orgId},
+      ${instanceId},
       'engineer',
       ${input.isActive ?? true},
       ${input.deleted ? new Date() : null}
@@ -66,8 +66,8 @@ test('deactivating a user revokes existing sessions and blocks stale dashboard/a
   baseURL,
 }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
-  const userId = await createOrgUser(sql, orgId, {
+  const instanceId = await getOrgId(sql)
+  const userId = await createOrgUser(sql, instanceId, {
     email: 'stale-deactivated@example.com',
   })
 
@@ -103,8 +103,8 @@ test('removing a user clears any leftover sessions', async ({
   baseURL,
 }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
-  const userId = await createOrgUser(sql, orgId, {
+  const instanceId = await getOrgId(sql)
+  const userId = await createOrgUser(sql, instanceId, {
     email: 'stale-removed@example.com',
     isActive: false,
   })

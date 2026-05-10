@@ -2,7 +2,7 @@ import { SignJWT, importPKCS8 } from 'jose'
 import { createId } from '@paralleldrive/cuid2'
 
 type TestLicenceOptions = {
-  orgId: string
+  instanceId: string
   tier?: 'community' | 'enterprise'
   features?: string[]
   maxUsers?: number
@@ -13,7 +13,7 @@ const LICENCE_ISSUER = 'licence.carrtech.dev'
 const LICENCE_AUDIENCE = 'install.carrtech.dev'
 
 export async function issueTestLicence({
-  orgId,
+  instanceId,
   tier = 'community',
   features = [],
   maxUsers = 10,
@@ -38,7 +38,7 @@ export async function issueTestLicence({
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
     .setIssuer(LICENCE_ISSUER)
     .setAudience(LICENCE_AUDIENCE)
-    .setSubject(orgId)
+    .setSubject(instanceId)
     .setJti(createId())
     .setIssuedAt()
     .setNotBefore('0s')

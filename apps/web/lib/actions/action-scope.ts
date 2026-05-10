@@ -3,7 +3,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 export function resolveCurrentActionScope(
   session: Awaited<ReturnType<typeof getRequiredSession>>,
 ): string {
-  const currentScope = session.user.organisationId
+  const currentScope = session.user.instanceId
   if (!currentScope) {
     throw new Error('Instance scope is not configured')
   }
@@ -13,5 +13,5 @@ export function resolveCurrentActionScope(
 export function resolveOptionalActionScope(
   session: Awaited<ReturnType<typeof getRequiredSession>>,
 ): string | null {
-  return session.user.organisationId ?? null
+  return session.user.instanceId ?? null
 }

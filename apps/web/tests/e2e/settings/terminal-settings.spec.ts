@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG } from '../fixtures/seed'
 
-test('admin can update organisation terminal settings from settings', async ({ authenticatedPage: page }) => {
+test('admin can update instance terminal settings from settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await page.goto('/settings/security/terminal')
@@ -25,7 +25,7 @@ test('admin can update organisation terminal settings from settings', async ({ a
         metadata: { terminalEnabled?: boolean; terminalLoggingEnabled?: boolean } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `
@@ -52,7 +52,7 @@ test('admin can update organisation terminal settings from settings', async ({ a
         metadata: { terminalEnabled?: boolean; terminalLoggingEnabled?: boolean } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `
@@ -68,7 +68,7 @@ test('admin can update organisation terminal settings from settings', async ({ a
     })
 })
 
-test('admin can update organisation notification settings from settings', async ({ authenticatedPage: page }) => {
+test('admin can update instance notification settings from settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await page.goto('/settings/monitoring/notifications')
@@ -97,7 +97,7 @@ test('admin can update organisation notification settings from settings', async 
         } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `
@@ -130,7 +130,7 @@ test('admin can update organisation notification settings from settings', async 
         } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `
@@ -174,7 +174,7 @@ test('admin can save SMTP relay settings and sees validation for an invalid test
         } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = 'e2e-test-org'
         LIMIT 1
       `

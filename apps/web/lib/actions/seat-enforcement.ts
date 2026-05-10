@@ -18,20 +18,20 @@ export class SeatLimitError extends Error {
   }
 }
 
-export async function getOrgSeatUsage(orgId: string, options: SeatUsageOptions = {}): Promise<SeatUsage> {
-  const licence = await getTrustedEffectiveLicence(orgId)
+export async function getOrgSeatUsage(instanceId: string, options: SeatUsageOptions = {}): Promise<SeatUsage> {
+  const licence = await getTrustedEffectiveLicence(instanceId)
   const now = new Date()
 
   const pendingInviteWhere = options.excludeInviteId
     ? and(
-        eq(invitations.organisationId, orgId),
+        eq(invitations.instanceId, instanceId),
         isNull(invitations.deletedAt),
         isNull(invitations.acceptedAt),
         gt(invitations.expiresAt, now),
         ne(invitations.id, options.excludeInviteId),
       )
     : and(
-        eq(invitations.organisationId, orgId),
+        eq(invitations.instanceId, instanceId),
         isNull(invitations.deletedAt),
         isNull(invitations.acceptedAt),
         gt(invitations.expiresAt, now),
@@ -41,7 +41,7 @@ export async function getOrgSeatUsage(orgId: string, options: SeatUsageOptions =
     db
       .select({ total: count() })
       .from(users)
-      .where(and(eq(users.organisationId, orgId), eq(users.isActive, true), isNull(users.deletedAt))),
+      .where(and(eq(users.instanceId, instanceId), eq(users.isActive, true), isNull(users.deletedAt))),
     db.select({ total: count() }).from(invitations).where(pendingInviteWhere),
   ])
 
@@ -53,10 +53,10 @@ export async function getOrgSeatUsage(orgId: string, options: SeatUsageOptions =
 }
 
 export async function assertCanReserveUserSeat(
-  orgId: string,
+  instanceId: string,
   options: SeatUsageOptions = {},
 ): Promise<SeatUsage> {
-  const usage = await getOrgSeatUsage(orgId, options)
+  const usage = await getOrgSeatUsage(instanceId, options)
   if (!canReserveSeats(usage, 1)) {
     throw new SeatLimitError(usage)
   }

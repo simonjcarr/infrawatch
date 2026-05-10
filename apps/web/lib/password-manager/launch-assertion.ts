@@ -18,8 +18,8 @@ export interface PasswordManagerLaunchAssertionConfig {
 }
 
 export interface PasswordManagerLaunchPrincipal {
-  organisationId: string
-  organisationName?: string | null
+  instanceId: string
+  instanceName?: string | null
   userId: string
   email: string
   name: string
@@ -112,15 +112,15 @@ export async function signPasswordManagerLaunchAssertion(
   const payload: Record<string, string> = {
     product: config.product,
     ct_ops_instance_id: config.ctOpsInstanceId,
-    ct_ops_organization_id: assertNonEmptyPrincipalField(principal.organisationId, 'organisationId'),
+    ct_ops_organization_id: assertNonEmptyPrincipalField(principal.instanceId, 'instanceId'),
     ct_ops_user_id: assertNonEmptyPrincipalField(principal.userId, 'userId'),
     email: assertNonEmptyPrincipalField(principal.email, 'email'),
     name: assertNonEmptyPrincipalField(principal.name, 'name'),
   }
 
-  const organisationName = principal.organisationName?.trim()
-  if (organisationName) {
-    payload.ct_ops_organization_name = organisationName
+  const instanceName = principal.instanceName?.trim()
+  if (instanceName) {
+    payload.ct_ops_organization_name = instanceName
   }
 
   return new SignJWT(payload)

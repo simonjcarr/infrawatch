@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,12 +15,12 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can create, edit, and delete a network and manage its hosts', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -32,7 +32,7 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
     VALUES
       (
         'network-host-1',
-        ${orgId},
+        ${instanceId},
         'edge-node-1',
         'Edge Node 1',
         'Ubuntu 24.04',
@@ -43,7 +43,7 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
       ),
       (
         'network-host-2',
-        ${orgId},
+        ${instanceId},
         'edge-node-2',
         'Edge Node 2',
         'Ubuntu 24.04',
@@ -70,7 +70,7 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
       const rows = await sql<Array<{ id: string | null }>>`
         SELECT id
         FROM networks
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND name = 'Branch Office'
           AND deleted_at IS NULL
         LIMIT 1
@@ -83,7 +83,7 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
   const createdRows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM networks
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND name = 'Branch Office'
       AND deleted_at IS NULL
     LIMIT 1
@@ -130,7 +130,7 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
   const membershipRows = await sql<Array<{ deleted_at: string | null; auto_assigned: boolean }>>`
     SELECT deleted_at, auto_assigned
     FROM host_network_memberships
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND network_id = ${networkId}
       AND host_id = 'network-host-1'
     LIMIT 1
@@ -154,7 +154,7 @@ test('admin can create, edit, and delete a network and manage its hosts', async 
       const rows = await sql<Array<{ deleted_at: string | null }>>`
         SELECT deleted_at
         FROM host_network_memberships
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND network_id = ${networkId}
           AND host_id = 'network-host-1'
         LIMIT 1

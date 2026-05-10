@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { agentQueries } from '@/lib/db/schema'
 import { and, eq, isNull } from 'drizzle-orm'
-import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiInstanceSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   let session
   try {
-    session = await getApiOrgSession()
+    session = await getApiInstanceSession()
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return Response.json({ error: err.message }, { status: err.status })
@@ -30,7 +30,7 @@ export async function GET(
     where: and(
       eq(agentQueries.id, queryId),
       eq(agentQueries.hostId, hostId),
-      eq(agentQueries.organisationId, user.organisationId),
+      eq(agentQueries.instanceId, user.instanceId),
       isNull(agentQueries.deletedAt),
     ),
   })

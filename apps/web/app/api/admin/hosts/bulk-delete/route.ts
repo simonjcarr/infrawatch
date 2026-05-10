@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   const matching = await db.query.hosts.findMany({
     columns: {
       id: true,
-      organisationId: true,
+      instanceId: true,
       hostname: true,
     },
     where: and(like(hosts.hostname, `${hostnamePrefix}%`), isNull(hosts.deletedAt)),
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   const failed: string[] = []
   let deleted = 0
   for (const h of matching) {
-    const result = await deleteHost(h.organisationId, h.id)
+    const result = await deleteHost(h.instanceId, h.id)
     if ('error' in result) {
       failed.push(`${h.hostname}: ${result.error}`)
     } else {

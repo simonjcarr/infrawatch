@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
           userId = existingUser.id
         } else {
           // Create new user
-          await assertCanReserveUserSeat(config.organisationId)
+          await assertCanReserveUserSeat(config.instanceId)
           userId = createId()
           const email = ldapUser.email || `${ldapUser.username}@ldap.local`
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
             name: ldapUser.displayName ?? ldapUser.username,
             email,
             emailVerified: true,
-            organisationId: config.organisationId,
+            instanceId: config.instanceId,
             role: 'pending',
           })
         }
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      await assertUserCanAccessSeat(user.organisationId!, user.id)
+      await assertUserCanAccessSeat(user.instanceId!, user.id)
 
       if (user.twoFactorEnabled) {
         const challengeId = `ldap-2fa-${createId()}`

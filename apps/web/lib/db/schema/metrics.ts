@@ -1,15 +1,15 @@
 import { pgTable, text, timestamp, real, integer, primaryKey, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 
 export const hostMetrics = pgTable(
   'host_metrics',
   {
     id: text('id').notNull().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     hostId: text('host_id')
       .notNull()
       .references(() => hosts.id),
@@ -24,9 +24,9 @@ export const hostMetrics = pgTable(
     primaryKey({ columns: [t.id, t.recordedAt] }),
     // Composite index for the most common query pattern: org + host within a time range.
     // Critical for TimescaleDB hypertables — without this every time-series query falls
-    // back to a full table scan, which degrades the entire cluster for all tenants.
+    // back to a full table scan, which degrades the entire cluster for all instances.
     index('host_metrics_org_host_time_idx').on(
-      t.organisationId,
+      t.instanceId,
       t.hostId,
       t.recordedAt,
     ),

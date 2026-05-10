@@ -25,10 +25,10 @@ test('serialiseAuditMetadata normalises dates, bigint values, and nested records
 
 test('buildAuditEventValues drops empty metadata and preserves nullable targets', () => {
   const values = buildAuditEventValues({
-    organisationId: 'org-1',
+    instanceId: 'org-1',
     actorUserId: 'user-1',
     action: 'licence.updated',
-    targetType: 'organisation',
+    targetType: 'instance',
     summary: 'Updated licence tier',
     metadata: undefined,
   })

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
+import { instanceSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { hasRole } from '@/lib/auth/guards'
 import { AdminTabs } from '@/components/shared/admin-tabs'
@@ -18,11 +18,11 @@ export default async function TerminalAccessSettingsPage() {
     redirect('/settings')
   }
 
-  const orgId = session.user.organisationId
-  if (!orgId) return null
+  const instanceId = session.user.instanceId
+  if (!instanceId) return null
 
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
   })
 
   if (!org) return null

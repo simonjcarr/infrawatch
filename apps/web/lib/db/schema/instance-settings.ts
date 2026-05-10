@@ -5,7 +5,7 @@ import { DEFAULT_NOTIFICATION_ROLES } from '../../auth/roles.ts'
 import type { HostCollectionSettings } from './hosts.ts'
 import { smtpRelaySettingsSchema, type SmtpRelaySettings } from '../../notifications/smtp-settings.ts'
 
-export interface OrgNotificationSettings {
+export interface InstanceNotificationSettings {
   inAppEnabled?: boolean      // default true — master switch for in-app notifications
   inAppRoles?: string[]       // default ['super_admin','org_admin','engineer']
   allowUserOptOut?: boolean   // default true — whether users can individually opt out
@@ -19,20 +19,20 @@ export interface SoftwareInventorySettings {
   includeWindowsStore?: boolean
 }
 
-export interface OrgSecuritySettings {
+export interface InstanceSecuritySettings {
   requireTwoFactor?: boolean
 }
 
-export interface OrgMetadata {
+export interface InstanceMetadata {
   defaultCollectionSettings?: HostCollectionSettings
   defaultTags?: Array<{ key: string; value: string }>
   freeSeatUserIds?: string[]
   terminalEnabled?: boolean
   terminalLoggingEnabled?: boolean
   terminalDirectAccess?: boolean
-  notificationSettings?: OrgNotificationSettings
+  notificationSettings?: InstanceNotificationSettings
   softwareInventorySettings?: SoftwareInventorySettings
-  securitySettings?: OrgSecuritySettings
+  securitySettings?: InstanceSecuritySettings
 }
 
 const tagPairSchema = z.object({
@@ -51,7 +51,7 @@ const hostCollectionSettingsSchema = z.object({
   }).strip().optional().catch(undefined),
 }).strip()
 
-const orgNotificationSettingsSchema = z.object({
+const instanceNotificationSettingsSchema = z.object({
   inAppEnabled: z.boolean().optional().catch(undefined),
   inAppRoles: z.array(z.string()).catch([...DEFAULT_NOTIFICATION_ROLES]).optional(),
   allowUserOptOut: z.boolean().optional().catch(undefined),
@@ -65,31 +65,31 @@ const softwareInventorySettingsSchema = z.object({
   includeWindowsStore: z.boolean().optional().catch(undefined),
 }).strip()
 
-const orgSecuritySettingsSchema = z.object({
+const instanceSecuritySettingsSchema = z.object({
   requireTwoFactor: z.boolean().optional().catch(undefined),
 }).strip()
 
-export const orgMetadataSchema = z.object({
+export const instanceMetadataSchema = z.object({
   defaultCollectionSettings: hostCollectionSettingsSchema.optional().catch(undefined),
   defaultTags: z.array(tagPairSchema).catch([]).optional(),
   freeSeatUserIds: z.array(z.string()).max(3).catch([]).optional(),
   terminalEnabled: z.boolean().optional().catch(undefined),
   terminalLoggingEnabled: z.boolean().optional().catch(undefined),
   terminalDirectAccess: z.boolean().optional().catch(undefined),
-  notificationSettings: orgNotificationSettingsSchema.optional().catch(undefined),
+  notificationSettings: instanceNotificationSettingsSchema.optional().catch(undefined),
   softwareInventorySettings: softwareInventorySettingsSchema.optional().catch(undefined),
-  securitySettings: orgSecuritySettingsSchema.optional().catch(undefined),
+  securitySettings: instanceSecuritySettingsSchema.optional().catch(undefined),
 }).strip()
 
-export function parseOrgMetadata(input: unknown): OrgMetadata {
-  const parsed = orgMetadataSchema.safeParse(input)
+export function parseInstanceMetadata(input: unknown): InstanceMetadata {
+  const parsed = instanceMetadataSchema.safeParse(input)
   if (!parsed.success) {
     return {}
   }
   return parsed.data
 }
 
-export const organisations = pgTable('organisations', {
+export const instanceSettings = pgTable('instance_settings', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
@@ -102,8 +102,10 @@ export const organisations = pgTable('organisations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
-  metadata: jsonb('metadata').$type<OrgMetadata>(),
+  metadata: jsonb('metadata').$type<InstanceMetadata>(),
 })
 
-export type Organisation = typeof organisations.$inferSelect
-export type NewOrganisation = typeof organisations.$inferInsert
+export type InstanceSettings = typeof instanceSettings.$inferSelect
+export type NewInstanceSettings = typeof instanceSettings.$inferInsert
+export type Instance = InstanceSettings
+export type NewInstance = NewInstanceSettings

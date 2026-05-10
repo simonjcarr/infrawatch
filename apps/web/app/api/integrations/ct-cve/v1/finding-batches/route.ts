@@ -58,18 +58,18 @@ export async function POST(request: NextRequest) {
     }, 400)
   }
 
-  const orgId = typeof payload === 'object' && payload && 'orgId' in payload
-    ? String((payload as { orgId?: unknown }).orgId ?? '').trim()
+  const instanceId = typeof payload === 'object' && payload && 'instanceId' in payload
+    ? String((payload as { instanceId?: unknown }).instanceId ?? '').trim()
     : ''
-  if (!orgId) {
+  if (!instanceId) {
     return errorResponse({
-      code: 'missing_org_id',
-      message: 'CT-CVE finding batch payload must include orgId.',
+      code: 'missing_instance_id',
+      message: 'CT-CVE finding batch payload must include instanceId.',
       retryable: false,
     }, 400)
   }
 
-  const tokens = await getCtCveServiceTokensForOrg(orgId)
+  const tokens = await getCtCveServiceTokensForOrg(instanceId)
   if (tokens.length === 0) {
     return errorResponse({
       code: 'ct_cve_not_configured',
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     body,
     headers: request.headers,
     requiredScope: 'findings:write',
-    orgId,
+    instanceId,
     tokens,
   })
 
@@ -102,11 +102,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await ingestCtCveFindingBatch(payload)
-    await recordCtCveFindingIngest(auth.token.orgId)
+    await recordCtCveFindingIngest(auth.token.instanceId)
     return NextResponse.json(result, { status: result.accepted ? 202 : 207 })
   } catch (error) {
     if (error instanceof CtCveFindingBatchValidationError) {
-      await recordCtCveConnectionError(auth.token.orgId, 'invalid_finding_batch')
+      await recordCtCveConnectionError(auth.token.instanceId, 'invalid_finding_batch')
       return errorResponse({
         code: 'invalid_payload',
         message: error.issues.join('; '),

@@ -129,7 +129,7 @@ async function warmupRequest(request: APIRequestContext, route: string): Promise
   }
 }
 
-setup('seed test organisation and warm Next routes', async ({ browser, baseURL }) => {
+setup('seed test instance and warm Next routes', async ({ browser, baseURL }) => {
   if (!baseURL) throw new Error('baseURL must be configured')
 
   await seedOrgAndUser()

@@ -1,9 +1,9 @@
 import 'server-only'
 import { cache } from 'react'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
+import { instanceSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 import { validateLicenceKey } from '@/lib/licence'
 import { hasFeature, type Feature, type LicenceTier } from '@/lib/features'
 import { createCommunityLicence } from '@/lib/standalone-empty-state'
@@ -31,14 +31,14 @@ export type EffectiveLicence = {
 
 // Cached per-request so multiple requireFeature() calls in one server action
 // don't re-validate the JWT repeatedly.
-const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicence> => {
-  const org = await db.query.organisations.findFirst({
+const loadEffectiveLicence = cache(async (instanceId: string): Promise<EffectiveLicence> => {
+  const org = await db.query.instanceSettings.findFirst({
     columns: {
       licenceTier: true,
       licenceKey: true,
       licenceVerifierPublicKey: true,
     },
-    where: eq(organisations.id, orgId),
+    where: eq(instanceSettings.id, instanceId),
   })
 
   if (!org) {
@@ -59,8 +59,8 @@ const loadEffectiveLicence = cache(async (orgId: string): Promise<EffectiveLicen
     return getCommunityLicence()
   }
 
-  if (result.payload.sub !== orgId) {
-    // Key belongs to a different organisation — reject it entirely.
+  if (result.payload.sub !== instanceId) {
+    // Key belongs to a different instance — reject it entirely.
     return getCommunityLicence()
   }
 
@@ -85,26 +85,26 @@ export async function getInstanceEffectiveLicence(
   return getEffectiveLicence(scopeId)
 }
 
-export async function getEffectiveLicence(orgId: string): Promise<EffectiveLicence> {
-  await requireOrgAccess(orgId)
-  return loadEffectiveLicence(orgId)
+export async function getEffectiveLicence(instanceId: string): Promise<EffectiveLicence> {
+  await requireInstanceAccess(instanceId)
+  return loadEffectiveLicence(instanceId)
 }
 
-export async function getTrustedEffectiveLicence(orgId: string): Promise<EffectiveLicence> {
-  return loadEffectiveLicence(orgId)
+export async function getTrustedEffectiveLicence(instanceId: string): Promise<EffectiveLicence> {
+  return loadEffectiveLicence(instanceId)
 }
 
-export async function hasLicenceFeature(orgId: string, feature: Feature): Promise<boolean> {
-  await requireOrgAccess(orgId)
-  const licence = await loadEffectiveLicence(orgId)
+export async function hasLicenceFeature(instanceId: string, feature: Feature): Promise<boolean> {
+  await requireInstanceAccess(instanceId)
+  const licence = await loadEffectiveLicence(instanceId)
   if (hasFeature(licence.tier, feature)) return true
   if (licence.features.includes(feature)) return true
   return false
 }
 
-export async function requireFeature(orgId: string, feature: Feature): Promise<void> {
-  await requireOrgAccess(orgId)
-  const licence = await loadEffectiveLicence(orgId)
+export async function requireFeature(instanceId: string, feature: Feature): Promise<void> {
+  await requireInstanceAccess(instanceId)
+  const licence = await loadEffectiveLicence(instanceId)
   if (hasFeature(licence.tier, feature)) return
   if (licence.features.includes(feature)) return
   throw new LicenceRequiredError(

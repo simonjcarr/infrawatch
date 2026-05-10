@@ -398,12 +398,12 @@ function eventClassName(event: CalendarEventInstanceView): string[] {
 }
 
 export function OperationsCalendarClient({
-  orgId,
+  instanceId,
   canEdit,
   initialHosts,
   initialUsers,
 }: {
-  orgId: string
+  instanceId: string
   canEdit: boolean
   initialHosts: CalendarHostOption[]
   initialUsers: CalendarUserOption[]
@@ -420,22 +420,22 @@ export function OperationsCalendarClient({
   const range = useMemo(() => getRangeForView(currentView, periodDate), [currentView, periodDate])
 
   const calendarQuery = useQuery({
-    queryKey: ['calendar-events', orgId, range.startsAt, range.endsAt],
-    queryFn: () => listCalendarEvents(orgId, range),
+    queryKey: ['calendar-events', instanceId, range.startsAt, range.endsAt],
+    queryFn: () => listCalendarEvents(instanceId, range),
     staleTime: 10_000,
   })
 
   const hostsQuery = useQuery({
-    queryKey: ['calendar-host-options', orgId, hostSearch],
-    queryFn: () => searchCalendarHosts(orgId, { query: hostSearch, limit: 100 }),
+    queryKey: ['calendar-host-options', instanceId, hostSearch],
+    queryFn: () => searchCalendarHosts(instanceId, { query: hostSearch, limit: 100 }),
     initialData: { hosts: initialHosts },
     staleTime: 30_000,
     enabled: dialogOpen,
   })
 
   const usersQuery = useQuery({
-    queryKey: ['calendar-user-options', orgId, userSearch],
-    queryFn: () => searchCalendarUsers(orgId, { query: userSearch, limit: 100 }),
+    queryKey: ['calendar-user-options', instanceId, userSearch],
+    queryFn: () => searchCalendarUsers(instanceId, { query: userSearch, limit: 100 }),
     initialData: { users: initialUsers },
     staleTime: 30_000,
     enabled: dialogOpen,
@@ -463,8 +463,8 @@ export function OperationsCalendarClient({
         clientRequestId: draft.mode === 'create' ? crypto.randomUUID() : undefined,
       }
       return draft.mode === 'create' || !draft.eventId
-        ? createCalendarEvent(orgId, payload)
-        : updateCalendarEvent(orgId, draft.eventId, payload)
+        ? createCalendarEvent(instanceId, payload)
+        : updateCalendarEvent(instanceId, draft.eventId, payload)
     },
     onSuccess: (result) => {
       if ('error' in result) {
@@ -472,7 +472,7 @@ export function OperationsCalendarClient({
         return
       }
       setDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['calendar-events', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] })
     },
     onError: (err) => {
       setFormError(err instanceof Error ? err.message : 'Failed to save calendar event')
@@ -482,7 +482,7 @@ export function OperationsCalendarClient({
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!draft.eventId) return { error: 'Calendar event not found' } as const
-      return deleteCalendarEvent(orgId, {
+      return deleteCalendarEvent(instanceId, {
         eventId: draft.eventId,
         recurrenceInstanceStartAt: draft.recurrenceInstanceStartAt,
         scope: draft.recurrenceInstanceStartAt ? 'this' : 'series',
@@ -494,7 +494,7 @@ export function OperationsCalendarClient({
         return
       }
       setDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['calendar-events', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] })
     },
   })
 
@@ -507,13 +507,13 @@ export function OperationsCalendarClient({
       allDay?: boolean
       scope: 'this' | 'series'
     }) => {
-      const result = await moveCalendarEventInstance(orgId, input)
+      const result = await moveCalendarEventInstance(instanceId, input)
       if ('error' in result) {
         throw new Error(result.error)
       }
-      await queryClient.invalidateQueries({ queryKey: ['calendar-events', orgId] })
+      await queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] })
     },
-    [orgId, queryClient],
+    [instanceId, queryClient],
   )
 
   useEffect(() => {

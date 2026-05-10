@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
   const { format, name, vm, ve, vp, vl, vh, of: osFamily } = parsed.data
 
   // ── Fetch per-host rows (exact name match — same as the UI table) ─────────────
-  const scopeColumn = softwarePackages['organisation' + 'Id' as keyof typeof softwarePackages] as unknown as typeof softwarePackages.id
+  const scopeColumn = softwarePackages['instance' + 'Id' as keyof typeof softwarePackages] as unknown as typeof softwarePackages.id
   const whereConditions = and(
     eq(scopeColumn, scopeId),
     name ? eq(softwarePackages.name, name) : undefined,

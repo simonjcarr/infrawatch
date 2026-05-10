@@ -6,7 +6,7 @@ test('admin can generate an activation token from settings', async ({ authentica
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('/settings/licence')
 
-  await expect(page.getByTestId('settings-heading')).toContainText('Organisation')
+  await expect(page.getByTestId('settings-heading')).toContainText('Instance')
   await page.getByTestId('activation-token-generate').click()
 
   const activationToken = page.getByTestId('activation-token')

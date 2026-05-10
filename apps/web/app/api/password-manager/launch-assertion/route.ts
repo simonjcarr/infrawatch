@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
-import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiInstanceSession } from '@/lib/auth/session'
 import { requireToolingAccess } from '@/lib/auth/tooling'
 import { db } from '@/lib/db'
-import { organisations } from '@/lib/db/schema'
+import { instanceSettings } from '@/lib/db/schema'
 import { logError } from '@/lib/logging'
 import {
   getPasswordManagerLaunchAssertionConfig,
@@ -22,13 +22,13 @@ function isLaunchConfigError(error: Error): boolean {
   return /^(PASSWORD_MANAGER_CT_OPS_|CT_OPS_INSTANCE_ID|BETTER_AUTH_URL)\b/.test(error.message)
 }
 
-async function findOrganisationName(organisationId: string): Promise<string | null> {
-  const organisation = await db.query.organisations.findFirst({
+async function findInstanceName(instanceId: string): Promise<string | null> {
+  const instance = await db.query.instanceSettings.findFirst({
     columns: { name: true },
-    where: eq(organisations.id, organisationId),
+    where: eq(instanceSettings.id, instanceId),
   })
 
-  return organisation?.name ?? null
+  return instance?.name ?? null
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let session
   try {
-    session = await getApiOrgSession(request.headers)
+    session = await getApiInstanceSession(request.headers)
     requireToolingAccess(session.user)
   } catch (error) {
     if (error instanceof ApiAuthError) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     throw error
   }
 
-  const rateLimitKey = `${session.user.organisationId}:${session.user.id}`
+  const rateLimitKey = `${session.user.instanceId}:${session.user.id}`
   if (!await launchAssertionRateLimit.check(rateLimitKey)) {
     return NextResponse.json(
       { error: 'Too many requests — please wait before trying again.' },
@@ -62,11 +62,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const config = getPasswordManagerLaunchAssertionConfig()
-    const organisationName = await findOrganisationName(session.user.organisationId)
+    const instanceName = await findInstanceName(session.user.instanceId)
     const assertion = await signPasswordManagerLaunchAssertion(
       {
-        organisationId: session.user.organisationId,
-        organisationName,
+        instanceId: session.user.instanceId,
+        instanceName,
         userId: session.user.id,
         email: session.user.email,
         name: session.user.name,
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   } catch (error) {
     logError('[password-manager] failed to mint launch assertion', error, {
-      organisationId: session.user.organisationId,
+      instanceId: session.user.instanceId,
       userId: session.user.id,
     })
 

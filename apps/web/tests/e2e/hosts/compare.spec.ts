@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,12 +15,12 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user can compare packages between two hosts', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -30,7 +30,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
     VALUES
       (
         'compare-host-a',
-        ${orgId},
+        ${instanceId},
         'compare-host-a',
         'Compare Host A',
         'Ubuntu 24.04',
@@ -39,7 +39,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
       ),
       (
         'compare-host-b',
-        ${orgId},
+        ${instanceId},
         'compare-host-b',
         'Compare Host B',
         'Ubuntu 24.04',
@@ -51,7 +51,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
   await sql`
     INSERT INTO software_packages (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       name,
       version,
@@ -63,7 +63,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
     VALUES
       (
         'compare-pkg-openssl-a',
-        ${orgId},
+        ${instanceId},
         'compare-host-a',
         'openssl',
         '3.0.2',
@@ -74,7 +74,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
       ),
       (
         'compare-pkg-nginx-a',
-        ${orgId},
+        ${instanceId},
         'compare-host-a',
         'nginx',
         '1.24.0',
@@ -85,7 +85,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
       ),
       (
         'compare-pkg-openssl-b',
-        ${orgId},
+        ${instanceId},
         'compare-host-b',
         'openssl',
         '3.0.3',
@@ -96,7 +96,7 @@ test('authenticated user can compare packages between two hosts', async ({ authe
       ),
       (
         'compare-pkg-curl-b',
-        ${orgId},
+        ${instanceId},
         'compare-host-b',
         'curl',
         '8.7.1',
@@ -123,12 +123,12 @@ test('authenticated user can compare packages between two hosts', async ({ authe
 
 test('authenticated user sees an empty-state message when no comparison host is supplied', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -137,7 +137,7 @@ test('authenticated user sees an empty-state message when no comparison host is 
     )
     VALUES (
       'compare-host-empty',
-      ${orgId},
+      ${instanceId},
       'compare-host-empty',
       'Compare Host Empty',
       'Ubuntu 24.04',

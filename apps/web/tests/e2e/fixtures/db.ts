@@ -90,7 +90,7 @@ const AUTH_AND_ORG_TABLES = [
   'account',
   'verification',
   'user',
-  'organisations',
+  'instance_settings',
 ]
 
 export async function truncateAppTables(): Promise<void> {

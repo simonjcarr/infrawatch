@@ -407,11 +407,11 @@ function TrackControls({ source }: { source: TrackSource }) {
 
 // ─── Certificate results display ─────────────────────────────────────────────
 
-function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
+function CertificateResults({ cert, keyMatch, onDownload, instanceId, source }: {
   cert: ParsedCertificate
   keyMatch?: boolean
   onDownload: (format: 'pem' | 'der' | 'pkcs7') => void
-  orgId: string
+  instanceId: string
   source: TrackSource | null
 }) {
   const daysAbs = Math.abs(cert.daysRemaining)
@@ -924,7 +924,7 @@ function readFileAsText(file: File): Promise<string> {
 
 // ─── Main page component ──────────────────────────────────────────────────────
 
-export function CertificateCheckerClient({ orgId }: { orgId: string }) {
+export function CertificateCheckerClient({ instanceId }: { instanceId: string }) {
   const [cert, setCert] = useState<ParsedCertificate | null>(null)
   const [keyMatch, setKeyMatch] = useState<boolean | undefined>(undefined)
   const [source, setSource] = useState<TrackSource | null>(null)
@@ -1001,7 +1001,7 @@ export function CertificateCheckerClient({ orgId }: { orgId: string }) {
       </Card>
 
       {cert ? (
-        <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} orgId={orgId} source={source} />
+        <CertificateResults cert={cert} keyMatch={keyMatch} onDownload={handleDownload} instanceId={instanceId} source={source} />
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground" data-testid="certificate-checker-empty-state">
           <ShieldCheck className="size-16 mb-4 opacity-20" />

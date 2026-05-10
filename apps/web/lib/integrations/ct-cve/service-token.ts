@@ -5,7 +5,7 @@ export type CtCveServiceTokenScope = 'findings:write' | 'inventory:write' | 'con
 export interface CtCveServiceToken {
   id: string
   secret: string
-  orgId: string
+  instanceId: string
   scopes: CtCveServiceTokenScope[]
   revoked?: boolean
 }
@@ -133,7 +133,7 @@ export async function verifyCtCveServiceRequest(options: {
   body: string | Buffer
   headers: HeaderBag
   requiredScope: CtCveServiceTokenScope
-  orgId: string
+  instanceId: string
   tokens: CtCveServiceToken[]
   nonceStore?: CtCveNonceStore
   now?: Date
@@ -158,8 +158,8 @@ export async function verifyCtCveServiceRequest(options: {
   if (!token.scopes.includes(options.requiredScope)) {
     return fail('insufficient_scope', 403, 'CT-CVE service token is not allowed to perform this action.')
   }
-  if (token.orgId !== options.orgId) {
-    return fail('org_scope_mismatch', 403, 'CT-CVE service token is not scoped to the requested organisation.')
+  if (token.instanceId !== options.instanceId) {
+    return fail('org_scope_mismatch', 403, 'CT-CVE service token is not scoped to the requested instance.')
   }
 
   const timestamp = getHeader(options.headers, 'x-ct-timestamp')
@@ -230,15 +230,15 @@ export function parseCtCveServiceTokens(input: string | undefined): CtCveService
     const record = value as Record<string, unknown>
     const id = typeof record.id === 'string' ? record.id.trim() : ''
     const secret = typeof record.secret === 'string' ? record.secret : ''
-    const orgId = typeof record.orgId === 'string' ? record.orgId.trim() : ''
+    const instanceId = typeof record.instanceId === 'string' ? record.instanceId.trim() : ''
     const scopes = Array.isArray(record.scopes)
       ? record.scopes.filter((scope): scope is CtCveServiceTokenScope => (
           scope === 'findings:write' || scope === 'inventory:write' || scope === 'connection:read'
         ))
       : []
 
-    if (!id || !orgId || scopes.length === 0) {
-      throw new Error(`CT_CVE_SERVICE_TOKENS[${index}] is missing id, orgId, or scopes`)
+    if (!id || !instanceId || scopes.length === 0) {
+      throw new Error(`CT_CVE_SERVICE_TOKENS[${index}] is missing id, instanceId, or scopes`)
     }
     if (Buffer.byteLength(secret, 'utf8') < 32) {
       throw new Error(`CT_CVE_SERVICE_TOKENS[${index}] secret must contain at least 32 bytes of entropy`)
@@ -247,7 +247,7 @@ export function parseCtCveServiceTokens(input: string | undefined): CtCveService
     return {
       id,
       secret,
-      orgId,
+      instanceId,
       scopes,
       revoked: record.revoked === true,
     }

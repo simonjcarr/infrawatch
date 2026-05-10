@@ -45,7 +45,7 @@ export function normalizePasswordManagerUiError(
     case 403:
       return {
         kind: 'shell-view',
-        message: 'Your current session cannot access Password Manager. Relaunch or switch organisation access.',
+        message: 'Your current session cannot access Password Manager. Relaunch or switch instance access.',
         view: 'access-denied',
       }
     case 404:

@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,11 +15,11 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user can review host local users and open a user detail page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -31,7 +31,7 @@ test('authenticated user can review host local users and open a user detail page
     )
     VALUES (
       'local-users-host',
-      ${orgId},
+      ${instanceId},
       'local-users-node',
       'Local Users Node',
       'Linux',
@@ -46,7 +46,7 @@ test('authenticated user can review host local users and open a user detail page
   await sql`
     INSERT INTO service_accounts (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       username,
       uid,
@@ -66,7 +66,7 @@ test('authenticated user can review host local users and open a user detail page
     VALUES
       (
         'local-user-alice',
-        ${orgId},
+        ${instanceId},
         'local-users-host',
         'alice-admin',
         1001,
@@ -85,7 +85,7 @@ test('authenticated user can review host local users and open a user detail page
       ),
       (
         'local-user-backup',
-        ${orgId},
+        ${instanceId},
         'local-users-host',
         'backup-svc',
         998,
@@ -104,7 +104,7 @@ test('authenticated user can review host local users and open a user detail page
       ),
       (
         'local-user-daemon',
-        ${orgId},
+        ${instanceId},
         'local-users-host',
         'legacy-daemon',
         997,
@@ -126,7 +126,7 @@ test('authenticated user can review host local users and open a user detail page
   await sql`
     INSERT INTO ssh_keys (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       service_account_id,
       key_type,
@@ -143,7 +143,7 @@ test('authenticated user can review host local users and open a user detail page
     )
     VALUES (
       'local-user-key-alice',
-      ${orgId},
+      ${instanceId},
       'local-users-host',
       'local-user-alice',
       'ed25519',
@@ -163,7 +163,7 @@ test('authenticated user can review host local users and open a user detail page
   await sql`
     INSERT INTO identity_events (
       id,
-      organisation_id,
+      instance_id,
       service_account_id,
       host_id,
       event_type,
@@ -172,7 +172,7 @@ test('authenticated user can review host local users and open a user detail page
     )
     VALUES (
       'local-user-event-alice',
-      ${orgId},
+      ${instanceId},
       'local-user-alice',
       'local-users-host',
       'account_discovered',

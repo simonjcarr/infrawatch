@@ -1,16 +1,16 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 import { getRequiredSession } from '@/lib/auth/session'
 
 import { db } from '@/lib/db'
-import { hosts, organisations, checks } from '@/lib/db/schema'
+import { hosts, instanceSettings, checks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import type { HostCollectionSettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import { resolveCurrentActionScope } from './action-scope'
 import { createCheck, updateCheck } from '@/lib/actions/checks'
 
@@ -20,9 +20,9 @@ export async function getHostCollectionSettings(
   const session = await getRequiredSession()
   const [currentScope, hostId] =
     args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
-  await requireOrgAccess(currentScope)
+  await requireInstanceAccess(currentScope)
   const host = await db.query.hosts.findFirst({
-    where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
     columns: { metadata: true },
   })
 
@@ -41,10 +41,10 @@ export async function updateHostCollectionSettings(
   const session = await getRequiredSession()
   const [currentScope, hostId, settings] =
     args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
-  await requireOrgWriteAccess(currentScope)
+  await requireInstanceWriteAccess(currentScope)
   try {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
       columns: { id: true, metadata: true },
     })
     if (!host) return { error: 'Host not found' }
@@ -58,7 +58,7 @@ export async function updateHostCollectionSettings(
     await db
       .update(hosts)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(and(eq(hosts.id, hostId), eq(hosts.organisationId, currentScope)))
+      .where(and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope)))
 
     // Auto-manage service_account and ssh_key_scan checks based on localUsers toggle
     await syncLocalUserChecks(currentScope, hostId, settings.localUsers)
@@ -71,15 +71,15 @@ export async function updateHostCollectionSettings(
 }
 
 export async function getOrgDefaultCollectionSettings(
-  orgId: string,
+  instanceId: string,
 ): Promise<HostCollectionSettings> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+  await requireInstanceAccess(instanceId)
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
 
-  const meta = parseOrgMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(org?.metadata)
   if (meta?.defaultCollectionSettings) {
     return meta.defaultCollectionSettings
   }
@@ -88,27 +88,27 @@ export async function getOrgDefaultCollectionSettings(
 }
 
 export async function updateOrgDefaultCollectionSettings(
-  orgId: string,
+  instanceId: string,
   settings: HostCollectionSettings,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAdminAccess(orgId)
+  await requireInstanceAdminAccess(instanceId)
   try {
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { id: true, metadata: true },
     })
-    if (!org) return { error: 'Organisation not found' }
+    if (!org) return { error: 'Instance not found' }
 
-    const currentMetadata = parseOrgMetadata(org.metadata)
+    const currentMetadata = parseInstanceMetadata(org.metadata)
     const updatedMetadata = {
       ...currentMetadata,
       defaultCollectionSettings: settings,
     }
 
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     return { success: true }
   } catch (err) {
@@ -118,14 +118,14 @@ export async function updateOrgDefaultCollectionSettings(
 }
 
 async function syncLocalUserChecks(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   enabled: boolean,
 ): Promise<void> {
   // Find existing service_account and ssh_key_scan checks for this host
   const existingChecks = await db.query.checks.findMany({
     where: and(
-      eq(checks.organisationId, orgId),
+      eq(checks.instanceId, instanceId),
       eq(checks.hostId, hostId),
       isNull(checks.deletedAt),
     ),
@@ -137,7 +137,7 @@ async function syncLocalUserChecks(
   if (enabled) {
     // Create checks if they don't exist, or re-enable if disabled
     if (!serviceAccountCheck) {
-      await createCheck(orgId, {
+      await createCheck(instanceId, {
         hostId,
         name: 'Local User Discovery',
         checkType: 'service_account',
@@ -145,11 +145,11 @@ async function syncLocalUserChecks(
         intervalSeconds: 300,
       })
     } else if (!serviceAccountCheck.enabled) {
-      await updateCheck(orgId, serviceAccountCheck.id, { enabled: true })
+      await updateCheck(instanceId, serviceAccountCheck.id, { enabled: true })
     }
 
     if (!sshKeyScanCheck) {
-      await createCheck(orgId, {
+      await createCheck(instanceId, {
         hostId,
         name: 'SSH Key Scan',
         checkType: 'ssh_key_scan',
@@ -157,15 +157,15 @@ async function syncLocalUserChecks(
         intervalSeconds: 300,
       })
     } else if (!sshKeyScanCheck.enabled) {
-      await updateCheck(orgId, sshKeyScanCheck.id, { enabled: true })
+      await updateCheck(instanceId, sshKeyScanCheck.id, { enabled: true })
     }
   } else {
     // Disable checks (don't delete — preserve history)
     if (serviceAccountCheck?.enabled) {
-      await updateCheck(orgId, serviceAccountCheck.id, { enabled: false })
+      await updateCheck(instanceId, serviceAccountCheck.id, { enabled: false })
     }
     if (sshKeyScanCheck?.enabled) {
-      await updateCheck(orgId, sshKeyScanCheck.id, { enabled: false })
+      await updateCheck(instanceId, sshKeyScanCheck.id, { enabled: false })
     }
   }
 }

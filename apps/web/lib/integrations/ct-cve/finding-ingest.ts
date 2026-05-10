@@ -29,13 +29,13 @@ export interface CtCveFindingRejection {
 
 interface HostRecord {
   id: string
-  organisationId: string
+  instanceId: string
   deletedAt: Date | null
 }
 
 interface SoftwarePackageRecord {
   id: string
-  organisationId: string
+  instanceId: string
   hostId: string
   removedAt: Date | null
   deletedAt: Date | null
@@ -49,9 +49,9 @@ type FindingKey = [hostId: string, softwarePackageId: string, cveId: string]
 
 export interface CtCveFindingRepository {
   transaction<T>(run: (repository: CtCveFindingRepository) => Promise<T>): Promise<T>
-  getHosts(orgId: string, hostIds: string[]): Promise<Map<string, HostRecord>>
-  getSoftwarePackages(orgId: string, packageIds: string[]): Promise<Map<string, SoftwarePackageRecord>>
-  getExistingFindings(orgId: string, keys: FindingKey[]): Promise<Map<string, ExistingFindingRecord>>
+  getHosts(instanceId: string, hostIds: string[]): Promise<Map<string, HostRecord>>
+  getSoftwarePackages(instanceId: string, packageIds: string[]): Promise<Map<string, SoftwarePackageRecord>>
+  getExistingFindings(instanceId: string, keys: FindingKey[]): Promise<Map<string, ExistingFindingRecord>>
   upsertCve(cve: NormalizedCtCveFinding['cve'] & {
     cveId: string
     severity: VulnerabilitySeverity
@@ -61,7 +61,7 @@ export interface CtCveFindingRepository {
     metadata: Record<string, unknown>
   }): Promise<void>
   upsertFinding(finding: {
-    organisationId: string
+    instanceId: string
     hostId: string
     softwarePackageId: string
     cveId: string
@@ -127,7 +127,7 @@ const findingSchema = z.object({
 
 const batchSchema = z.object({
   contractVersion: z.literal(CONTRACT_VERSION),
-  orgId: z.string().trim().min(1).max(200),
+  instanceId: z.string().trim().min(1).max(200),
   batchId: z.string().trim().min(1).max(200),
   generatedAt: dateSchema,
   findings: z.array(findingSchema).max(MAX_FINDINGS),
@@ -182,9 +182,9 @@ async function ingestValidatedBatch(
   ])
 
   const [hostMap, packageMap, existingMap] = await Promise.all([
-    repository.getHosts(batch.orgId, hostIds),
-    repository.getSoftwarePackages(batch.orgId, packageIds),
-    repository.getExistingFindings(batch.orgId, findingKeys),
+    repository.getHosts(batch.instanceId, hostIds),
+    repository.getSoftwarePackages(batch.instanceId, packageIds),
+    repository.getExistingFindings(batch.instanceId, findingKeys),
   ])
 
   const rejections: CtCveFindingRejection[] = []
@@ -226,7 +226,7 @@ async function ingestValidatedBatch(
     })
 
     await repository.upsertFinding({
-      organisationId: batch.orgId,
+      instanceId: batch.instanceId,
       hostId: finding.hostId,
       softwarePackageId: finding.softwarePackageId,
       cveId: finding.cveId,
@@ -312,33 +312,33 @@ function createDrizzleCtCveFindingRepository(database: Database): CtCveFindingRe
     async transaction(run) {
       return database.transaction(async (tx) => run(createDrizzleCtCveFindingRepository(tx as unknown as Database)))
     },
-    async getHosts(orgId, hostIds) {
+    async getHosts(instanceId, hostIds) {
       if (hostIds.length === 0) return new Map()
       const rows = await database
         .select({
           id: hosts.id,
-          organisationId: hosts.organisationId,
+          instanceId: hosts.instanceId,
           deletedAt: hosts.deletedAt,
         })
         .from(hosts)
-        .where(and(eq(hosts.organisationId, orgId), inArray(hosts.id, hostIds)))
+        .where(and(eq(hosts.instanceId, instanceId), inArray(hosts.id, hostIds)))
       return new Map(rows.map((row) => [row.id, row]))
     },
-    async getSoftwarePackages(orgId, packageIds) {
+    async getSoftwarePackages(instanceId, packageIds) {
       if (packageIds.length === 0) return new Map()
       const rows = await database
         .select({
           id: softwarePackages.id,
-          organisationId: softwarePackages.organisationId,
+          instanceId: softwarePackages.instanceId,
           hostId: softwarePackages.hostId,
           removedAt: softwarePackages.removedAt,
           deletedAt: softwarePackages.deletedAt,
         })
         .from(softwarePackages)
-        .where(and(eq(softwarePackages.organisationId, orgId), inArray(softwarePackages.id, packageIds)))
+        .where(and(eq(softwarePackages.instanceId, instanceId), inArray(softwarePackages.id, packageIds)))
       return new Map(rows.map((row) => [row.id, row]))
     },
-    async getExistingFindings(orgId, keys) {
+    async getExistingFindings(instanceId, keys) {
       if (keys.length === 0) return new Map()
       const hostIds = unique(keys.map(([hostId]) => hostId))
       const packageIds = unique(keys.map(([, packageId]) => packageId))
@@ -352,7 +352,7 @@ function createDrizzleCtCveFindingRepository(database: Database): CtCveFindingRe
         })
         .from(hostVulnerabilityFindings)
         .where(and(
-          eq(hostVulnerabilityFindings.organisationId, orgId),
+          eq(hostVulnerabilityFindings.instanceId, instanceId),
           inArray(hostVulnerabilityFindings.hostId, hostIds),
           inArray(hostVulnerabilityFindings.softwarePackageId, packageIds),
           inArray(hostVulnerabilityFindings.cveId, cveIds),
@@ -404,7 +404,7 @@ function createDrizzleCtCveFindingRepository(database: Database): CtCveFindingRe
         updatedAt: new Date(),
       }).onConflictDoUpdate({
         target: [
-          hostVulnerabilityFindings.organisationId,
+          hostVulnerabilityFindings.instanceId,
           hostVulnerabilityFindings.hostId,
           hostVulnerabilityFindings.softwarePackageId,
           hostVulnerabilityFindings.cveId,

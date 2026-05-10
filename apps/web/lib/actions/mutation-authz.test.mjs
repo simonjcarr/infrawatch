@@ -61,26 +61,26 @@ const adminGuardedActions = [
   ['tags-core.ts', 'updateOrgDefaultTags'],
 ]
 
-test('tenant state mutations require write-capable org access', () => {
+test('instance state mutations require write-capable org access', () => {
   for (const [fileName, action] of writeGuardedActions) {
     const segment = getActionSegment(fileName, action)
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgWriteAccess\((?:orgId|currentScope)\)/,
-      `${fileName} ${action} must reject read-only users before mutating tenant state`,
+      /(?:const session = )?await requireInstanceWriteAccess\((?:instanceId|currentScope)\)/,
+      `${fileName} ${action} must reject read-only users before mutating instance state`,
     )
   }
 })
 
-test('organisation-wide defaults and rules require org admin access', () => {
+test('instance-wide defaults and rules require org admin access', () => {
   for (const [fileName, action] of adminGuardedActions) {
     const segment = getActionSegment(fileName, action)
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgAdminAccess\((?:orgId|currentScope)\)/,
-      `${fileName} ${action} must require org admin access before mutating organisation-wide settings`,
+      /(?:const session = )?await requireInstanceAdminAccess\((?:instanceId|currentScope)\)/,
+      `${fileName} ${action} must require org admin access before mutating instance-wide settings`,
     )
   }
 })

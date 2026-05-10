@@ -1,12 +1,12 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import {
-  organisations,
+  instanceSettings,
   hosts,
   taskRuns,
   taskRunHosts,
@@ -26,7 +26,7 @@ import type {
 import { escapeLikePattern } from '@/lib/utils'
 import { compareVersions } from '@/lib/version-compare'
 import { createRateLimiter } from '@/lib/rate-limit'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 
 const triggerScanLimiter = createRateLimiter({
   scope: 'software-inventory:trigger-scan',
@@ -49,14 +49,14 @@ const softwareInventorySettingsSchema = z.object({
 })
 
 export async function getSoftwareInventorySettings(
-  orgId: string,
+  instanceId: string,
 ): Promise<SoftwareInventorySettings> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: and(eq(organisations.id, orgId), isNull(organisations.deletedAt)),
+  await requireInstanceAccess(instanceId)
+  const org = await db.query.instanceSettings.findFirst({
+    where: and(eq(instanceSettings.id, instanceId), isNull(instanceSettings.deletedAt)),
     columns: { metadata: true },
   })
-  const metadata = parseOrgMetadata(org?.metadata)
+  const metadata = parseInstanceMetadata(org?.metadata)
   return metadata.softwareInventorySettings ?? {
     enabled: false,
     intervalHours: 24,
@@ -64,11 +64,11 @@ export async function getSoftwareInventorySettings(
 }
 
 export async function updateSoftwareInventorySettings(
-  orgId: string,
+  instanceId: string,
   settings: SoftwareInventorySettings,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -79,18 +79,18 @@ export async function updateSoftwareInventorySettings(
   }
 
   try {
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     })
-    const currentMetadata = parseOrgMetadata(org?.metadata)
+    const currentMetadata = parseInstanceMetadata(org?.metadata)
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({
         metadata: { ...currentMetadata, softwareInventorySettings: parsed.data },
         updatedAt: new Date(),
       })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
     return { success: true }
   } catch (err) {
     logError('Failed to update software inventory settings:', err)
@@ -101,22 +101,22 @@ export async function updateSoftwareInventorySettings(
 // ── Triggering scans ──────────────────────────────────────────────────────────
 
 export async function triggerSoftwareScan(
-  orgId: string,
+  instanceId: string,
   hostId: string,
 ): Promise<{ success: true; taskRunId: string } | { error: string }> {
   let session
   try {
-    session = await requireOrgAdminAccess(orgId)
+    session = await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
-  if (!await triggerScanLimiter.check(orgId)) {
+  if (!await triggerScanLimiter.check(instanceId)) {
     return { error: 'Too many scan requests — please wait before triggering another scan.' }
   }
 
   try {
     const host = await db.query.hosts.findFirst({
-      where: and(eq(hosts.id, hostId), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
       columns: { id: true },
     })
     if (!host) return { error: 'Host not found' }
@@ -125,7 +125,7 @@ export async function triggerSoftwareScan(
       const [run] = await tx
         .insert(taskRuns)
         .values({
-          organisationId: orgId,
+          instanceId: instanceId,
           triggeredBy: session.user.id,
           targetType: 'host',
           targetId: hostId,
@@ -138,7 +138,7 @@ export async function triggerSoftwareScan(
       if (!run) return { error: 'Failed to create task run' }
 
       await tx.insert(taskRunHosts).values({
-        organisationId: orgId,
+        instanceId: instanceId,
         taskRunId: run.id,
         hostId,
         status: 'pending',
@@ -163,15 +163,15 @@ export interface HostSoftwareInventory {
 }
 
 export async function getHostSoftwareInventory(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   includeRemoved = false,
 ): Promise<HostSoftwareInventory> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const [packages, scans, settings, activeTaskRows, failedTaskRows] = await Promise.all([
     db.query.softwarePackages.findMany({
       where: and(
-        eq(softwarePackages.organisationId, orgId),
+        eq(softwarePackages.instanceId, instanceId),
         eq(softwarePackages.hostId, hostId),
         isNull(softwarePackages.deletedAt),
         ...(includeRemoved ? [] : [isNull(softwarePackages.removedAt)]),
@@ -180,13 +180,13 @@ export async function getHostSoftwareInventory(
     }),
     db.query.softwareScans.findMany({
       where: and(
-        eq(softwareScans.organisationId, orgId),
+        eq(softwareScans.instanceId, instanceId),
         eq(softwareScans.hostId, hostId),
       ),
       orderBy: [desc(softwareScans.createdAt)],
       limit: 1,
     }),
-    getSoftwareInventorySettings(orgId),
+    getSoftwareInventorySettings(instanceId),
     db
       .select({ status: taskRunHosts.status })
       .from(taskRunHosts)
@@ -201,7 +201,7 @@ export async function getHostSoftwareInventory(
       .where(
         and(
           eq(taskRunHosts.hostId, hostId),
-          eq(taskRunHosts.organisationId, orgId),
+          eq(taskRunHosts.instanceId, instanceId),
           inArray(taskRunHosts.status, ['pending', 'running']),
           isNull(taskRunHosts.deletedAt),
         ),
@@ -222,7 +222,7 @@ export async function getHostSoftwareInventory(
       .where(
         and(
           eq(taskRunHosts.hostId, hostId),
-          eq(taskRunHosts.organisationId, orgId),
+          eq(taskRunHosts.instanceId, instanceId),
           eq(taskRunHosts.status, 'failed'),
           isNull(taskRunHosts.deletedAt),
         ),
@@ -252,10 +252,10 @@ export interface PackageNameSuggestion {
 }
 
 export async function searchPackageNames(
-  orgId: string,
+  instanceId: string,
   q: string,
 ): Promise<PackageNameSuggestion[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   if (!q || q.length < 2 || q.length > 100) return []
 
   const escaped = `%${escapeLikePattern(q)}%`
@@ -268,7 +268,7 @@ export async function searchPackageNames(
     .from(softwarePackages)
     .where(
       and(
-        eq(softwarePackages.organisationId, orgId),
+        eq(softwarePackages.instanceId, instanceId),
         isNull(softwarePackages.removedAt),
         isNull(softwarePackages.deletedAt),
         ilike(softwarePackages.name, escaped),
@@ -315,11 +315,11 @@ export interface SoftwareReportResult {
 }
 
 export async function getSoftwareReport(
-  orgId: string,
+  instanceId: string,
   filters: SoftwareReportFilters = {},
 ): Promise<SoftwareReportResult> {
-  await requireOrgAccess(orgId)
-  if (!await softwareReportLimiter.check(orgId)) {
+  await requireInstanceAccess(instanceId)
+  if (!await softwareReportLimiter.check(instanceId)) {
     throw new Error('Too many requests — please wait before generating another report.')
   }
   const page = filters.page ?? 1
@@ -328,7 +328,7 @@ export async function getSoftwareReport(
 
   // Build the base where conditions
   const conditions = [
-    eq(softwarePackages.organisationId, orgId),
+    eq(softwarePackages.instanceId, instanceId),
     isNull(softwarePackages.removedAt),
     isNull(softwarePackages.deletedAt),
   ]
@@ -382,7 +382,7 @@ export async function getSoftwareReport(
     const members = await db.query.hostGroupMembers.findMany({
       columns: { hostId: true },
       where: and(
-        eq(hostGroupMembers.organisationId, orgId),
+        eq(hostGroupMembers.instanceId, instanceId),
         inArray(hostGroupMembers.groupId, filters.hostGroupIds),
         isNull(hostGroupMembers.deletedAt),
       ),
@@ -450,10 +450,10 @@ export interface NewPackageRow {
 }
 
 export async function getNewPackages(
-  orgId: string,
+  instanceId: string,
   windowDays: 7 | 30 = 7,
 ): Promise<NewPackageRow[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - windowDays)
 
@@ -465,7 +465,7 @@ export async function getNewPackages(
       firstSeenAt: true,
     },
     where: and(
-      eq(softwarePackages.organisationId, orgId),
+      eq(softwarePackages.instanceId, instanceId),
       isNull(softwarePackages.removedAt),
       isNull(softwarePackages.deletedAt),
       gte(softwarePackages.firstSeenAt, cutoff),
@@ -502,8 +502,8 @@ export interface DriftRow {
   versions: string[]
 }
 
-export async function getPackageDrift(orgId: string): Promise<DriftRow[]> {
-  await requireOrgAccess(orgId)
+export async function getPackageDrift(instanceId: string): Promise<DriftRow[]> {
+  await requireInstanceAccess(instanceId)
   const rows = await db
     .select({
       groupId: hostGroupMembers.groupId,
@@ -516,7 +516,7 @@ export async function getPackageDrift(orgId: string): Promise<DriftRow[]> {
       hostGroupMembers,
       and(
         eq(hostGroupMembers.hostId, softwarePackages.hostId),
-        eq(hostGroupMembers.organisationId, orgId),
+        eq(hostGroupMembers.instanceId, instanceId),
         isNull(hostGroupMembers.deletedAt),
       ),
     )
@@ -526,7 +526,7 @@ export async function getPackageDrift(orgId: string): Promise<DriftRow[]> {
     )
     .where(
       and(
-        eq(softwarePackages.organisationId, orgId),
+        eq(softwarePackages.instanceId, instanceId),
         isNull(softwarePackages.removedAt),
         isNull(softwarePackages.deletedAt),
       ),
@@ -589,11 +589,11 @@ export interface PackageDetailsResult {
 }
 
 export async function getPackageDetails(
-  orgId: string,
+  instanceId: string,
   packageName: string,
   osFamily?: string,
 ): Promise<PackageDetailsResult> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const packages = await db
     .select({
       hostId: softwarePackages.hostId,
@@ -611,7 +611,7 @@ export async function getPackageDetails(
     .innerJoin(hosts, and(eq(hosts.id, softwarePackages.hostId), isNull(hosts.deletedAt)))
     .where(
       and(
-        eq(softwarePackages.organisationId, orgId),
+        eq(softwarePackages.instanceId, instanceId),
         eq(softwarePackages.name, packageName),
         isNull(softwarePackages.removedAt),
         isNull(softwarePackages.deletedAt),
@@ -663,14 +663,14 @@ export async function getPackageDetails(
 }
 
 export async function getPackageVersions(
-  orgId: string,
+  instanceId: string,
   packageName: string,
 ): Promise<string[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const rows = await db.query.softwarePackages.findMany({
     columns: { version: true },
     where: and(
-      eq(softwarePackages.organisationId, orgId),
+      eq(softwarePackages.instanceId, instanceId),
       eq(softwarePackages.name, packageName),
       isNull(softwarePackages.removedAt),
       isNull(softwarePackages.deletedAt),
@@ -689,15 +689,15 @@ export interface HostCompareResult {
 }
 
 export async function compareHosts(
-  orgId: string,
+  instanceId: string,
   hostIdA: string,
   hostIdB: string,
 ): Promise<HostCompareResult> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const [pkgsA, pkgsB] = await Promise.all([
     db.query.softwarePackages.findMany({
       where: and(
-        eq(softwarePackages.organisationId, orgId),
+        eq(softwarePackages.instanceId, instanceId),
         eq(softwarePackages.hostId, hostIdA),
         isNull(softwarePackages.removedAt),
         isNull(softwarePackages.deletedAt),
@@ -705,7 +705,7 @@ export async function compareHosts(
     }),
     db.query.softwarePackages.findMany({
       where: and(
-        eq(softwarePackages.organisationId, orgId),
+        eq(softwarePackages.instanceId, instanceId),
         eq(softwarePackages.hostId, hostIdB),
         isNull(softwarePackages.removedAt),
         isNull(softwarePackages.deletedAt),
@@ -755,11 +755,11 @@ const saveReportSchema = z.object({
   filters: savedReportFiltersSchema,
 })
 
-export async function listSavedReports(orgId: string): Promise<SavedSoftwareReport[]> {
-  const session = await requireOrgAccess(orgId)
+export async function listSavedReports(instanceId: string): Promise<SavedSoftwareReport[]> {
+  const session = await requireInstanceAccess(instanceId)
   return db.query.savedSoftwareReports.findMany({
     where: and(
-      eq(savedSoftwareReports.organisationId, orgId),
+      eq(savedSoftwareReports.instanceId, instanceId),
       eq(savedSoftwareReports.userId, session.user.id),
       isNull(savedSoftwareReports.deletedAt),
     ),
@@ -768,11 +768,11 @@ export async function listSavedReports(orgId: string): Promise<SavedSoftwareRepo
 }
 
 export async function saveSoftwareReport(
-  orgId: string,
+  instanceId: string,
   name: string,
   filters: SoftwareReportFilters,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   const parsed = saveReportSchema.safeParse({ name, filters })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
@@ -782,7 +782,7 @@ export async function saveSoftwareReport(
     const [row] = await db
       .insert(savedSoftwareReports)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         userId: session.user.id,
         name: parsed.data.name,
         filters: parsed.data.filters,
@@ -796,10 +796,10 @@ export async function saveSoftwareReport(
 }
 
 export async function deleteSavedReport(
-  orgId: string,
+  instanceId: string,
   reportId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   try {
     await db
       .update(savedSoftwareReports)
@@ -807,7 +807,7 @@ export async function deleteSavedReport(
       .where(
         and(
           eq(savedSoftwareReports.id, reportId),
-          eq(savedSoftwareReports.organisationId, orgId),
+          eq(savedSoftwareReports.instanceId, instanceId),
           eq(savedSoftwareReports.userId, session.user.id),
         ),
       )

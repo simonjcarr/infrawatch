@@ -1,6 +1,6 @@
 'use server'
 
-import { requireOrgAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -78,11 +78,11 @@ const updateCheckSchema = z.object({
   intervalSeconds: z.number().int().min(10).max(3600).optional(),
 })
 
-export async function getChecksWithHistory(orgId: string, hostId: string): Promise<CheckWithHistory[]> {
-  await requireOrgAccess(orgId)
+export async function getChecksWithHistory(instanceId: string, hostId: string): Promise<CheckWithHistory[]> {
+  await requireInstanceAccess(instanceId)
   const rows = await db.query.checks.findMany({
     where: and(
-      eq(checks.organisationId, orgId),
+      eq(checks.instanceId, instanceId),
       eq(checks.hostId, hostId),
       isNull(checks.deletedAt),
     ),
@@ -102,10 +102,10 @@ export async function getChecksWithHistory(orgId: string, hostId: string): Promi
 }
 
 export async function createCheck(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   const parsed = createCheckSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -114,7 +114,7 @@ export async function createCheck(
   const host = await db.query.hosts.findFirst({
     where: and(
       eq(hosts.id, data.hostId),
-      eq(hosts.organisationId, orgId),
+      eq(hosts.instanceId, instanceId),
       isNull(hosts.deletedAt),
     ),
   })
@@ -124,7 +124,7 @@ export async function createCheck(
     const [row] = await db
       .insert(checks)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         hostId: data.hostId,
         name: data.name,
         checkType: data.checkType as CheckType,
@@ -141,11 +141,11 @@ export async function createCheck(
 }
 
 export async function updateCheck(
-  orgId: string,
+  instanceId: string,
   checkId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   const parsed = updateCheckSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -155,7 +155,7 @@ export async function updateCheck(
   const existing = await db.query.checks.findFirst({
     where: and(
       eq(checks.id, checkId),
-      eq(checks.organisationId, orgId),
+      eq(checks.instanceId, instanceId),
       isNull(checks.deletedAt),
     ),
   })
@@ -170,20 +170,20 @@ export async function updateCheck(
       ...(data.intervalSeconds !== undefined && { intervalSeconds: data.intervalSeconds }),
       updatedAt: new Date(),
     })
-    .where(and(eq(checks.id, checkId), eq(checks.organisationId, orgId)))
+    .where(and(eq(checks.id, checkId), eq(checks.instanceId, instanceId)))
 
   return { success: true }
 }
 
 export async function deleteCheckHistory(
-  orgId: string,
+  instanceId: string,
   checkId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   const existing = await db.query.checks.findFirst({
     where: and(
       eq(checks.id, checkId),
-      eq(checks.organisationId, orgId),
+      eq(checks.instanceId, instanceId),
       isNull(checks.deletedAt),
     ),
   })
@@ -195,14 +195,14 @@ export async function deleteCheckHistory(
 }
 
 export async function deleteCheck(
-  orgId: string,
+  instanceId: string,
   checkId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   const existing = await db.query.checks.findFirst({
     where: and(
       eq(checks.id, checkId),
-      eq(checks.organisationId, orgId),
+      eq(checks.instanceId, instanceId),
       isNull(checks.deletedAt),
     ),
   })
@@ -211,7 +211,7 @@ export async function deleteCheck(
   await db
     .update(checks)
     .set({ deletedAt: new Date() })
-    .where(and(eq(checks.id, checkId), eq(checks.organisationId, orgId)))
+    .where(and(eq(checks.id, checkId), eq(checks.instanceId, instanceId)))
 
   return { success: true }
 }

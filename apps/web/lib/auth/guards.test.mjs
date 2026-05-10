@@ -3,15 +3,15 @@ import assert from 'node:assert/strict'
 
 import {
   hasRole,
-  isSameOrg,
+  isSameInstance,
   requireActiveUser,
-  requireOrgAdmin,
-  requireOrgWriteAccess,
-  requireSameOrg,
+  requireInstanceAdmin,
+  requireInstanceWriteAccess,
+  requireSameInstance,
 } from './guards.ts'
 
 const activeAdmin = {
-  organisationId: 'org-1',
+  instanceId: 'org-1',
   role: 'org_admin',
   roles: ['org_admin'],
   isActive: true,
@@ -29,29 +29,29 @@ test('requireActiveUser rejects inactive or deleted users', () => {
   )
 })
 
-test('requireSameOrg accepts either org ids or org-scoped resources', () => {
-  assert.doesNotThrow(() => requireSameOrg(activeAdmin, 'org-1'))
-  assert.doesNotThrow(() => requireSameOrg(activeAdmin, { organisationId: 'org-1' }))
-  assert.equal(isSameOrg(activeAdmin, { organisationId: 'org-2' }), false)
+test('requireSameInstance accepts either instance ids or instance-scoped resources', () => {
+  assert.doesNotThrow(() => requireSameInstance(activeAdmin, 'org-1'))
+  assert.doesNotThrow(() => requireSameInstance(activeAdmin, { instanceId: 'org-1' }))
+  assert.equal(isSameInstance(activeAdmin, { instanceId: 'org-2' }), false)
 })
 
-test('requireSameOrg rejects cross-org access', () => {
+test('requireSameInstance rejects cross-instance access', () => {
   assert.throws(
-    () => requireSameOrg(activeAdmin, 'org-2'),
-    /forbidden: organisation mismatch/,
+    () => requireSameInstance(activeAdmin, 'org-2'),
+    /forbidden: instance mismatch/,
   )
 })
 
-test('requireOrgAdmin rejects non-admin roles', () => {
+test('requireInstanceAdmin rejects non-admin roles', () => {
   assert.throws(
-    () => requireOrgAdmin({ ...activeAdmin, role: 'engineer', roles: ['engineer'] }, 'org-1'),
+    () => requireInstanceAdmin({ ...activeAdmin, role: 'engineer', roles: ['engineer'] }, 'org-1'),
     /forbidden: admin role required/,
   )
 })
 
-test('requireOrgWriteAccess rejects read-only users', () => {
+test('requireInstanceWriteAccess rejects read-only users', () => {
   assert.throws(
-    () => requireOrgWriteAccess({ ...activeAdmin, role: 'read_only', roles: ['read_only'] }, 'org-1'),
+    () => requireInstanceWriteAccess({ ...activeAdmin, role: 'read_only', roles: ['read_only'] }, 'org-1'),
     /forbidden: write role required/,
   )
 })

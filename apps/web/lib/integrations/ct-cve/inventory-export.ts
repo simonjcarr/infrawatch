@@ -45,14 +45,14 @@ export interface CtCveInventoryPackageRecord {
 }
 
 export interface CtCveInventoryRepository {
-  getOrganisation(orgId: string): Promise<{ id: string; slug: string } | null>
-  listInventoryHosts(orgId: string, options: { limit: number; afterId?: string }): Promise<CtCveInventoryHostRecord[]>
-  listInventoryPackages(orgId: string, options: { limit: number; afterId?: string }): Promise<CtCveInventoryPackageRecord[]>
+  getInstance(instanceId: string): Promise<{ id: string; slug: string } | null>
+  listInventoryHosts(instanceId: string, options: { limit: number; afterId?: string }): Promise<CtCveInventoryHostRecord[]>
+  listInventoryPackages(instanceId: string, options: { limit: number; afterId?: string }): Promise<CtCveInventoryPackageRecord[]>
 }
 
 export interface CtCveInventorySnapshot {
   contractVersion: '2026-04-30'
-  orgId: string
+  instanceId: string
   orgSlug: string
   snapshotId: string
   snapshotType: 'full' | 'incremental'
@@ -146,31 +146,31 @@ function packageFingerprint(row: CtCveInventoryPackageRecord): string {
   return [row.hostId, row.name, row.version, row.architecture ?? '', row.source].join('\0')
 }
 
-function snapshotIdFor(orgId: string, generatedAt: Date, cursor: string | undefined) {
+function snapshotIdFor(instanceId: string, generatedAt: Date, cursor: string | undefined) {
   const compact = generatedAt.toISOString().replace(/[-:.]/g, '').replace('T', '_').replace('Z', '')
   const pageSuffix = cursor
     ? `_page_${createHash('sha256').update(cursor).digest('base64url').slice(0, 12)}`
     : ''
-  return `inv_${compact}_${orgId}${pageSuffix}`
+  return `inv_${compact}_${instanceId}${pageSuffix}`
 }
 
 export async function buildCtCveInventorySnapshot(options: {
-  orgId: string
+  instanceId: string
   cursor?: string
   snapshotType?: 'full' | 'incremental'
   generatedAt?: Date
   limits?: { hosts?: number; packages?: number }
   repository?: CtCveInventoryRepository
 }): Promise<CtCveInventorySnapshot> {
-  const orgId = options.orgId.trim()
-  if (!orgId) {
-    throw new Error('orgId is required to build a CT-CVE inventory snapshot')
+  const instanceId = options.instanceId.trim()
+  if (!instanceId) {
+    throw new Error('instanceId is required to build a CT-CVE inventory snapshot')
   }
 
   const repository = options.repository ?? await getDefaultRepository()
-  const organisation = await repository.getOrganisation(orgId)
-  if (!organisation) {
-    throw new Error('organisation not found for CT-CVE inventory snapshot')
+  const instance = await repository.getInstance(instanceId)
+  if (!instance) {
+    throw new Error('instance not found for CT-CVE inventory snapshot')
   }
 
   const hostLimit = Math.min(Math.max(options.limits?.hosts ?? DEFAULT_HOST_LIMIT, 1), DEFAULT_HOST_LIMIT)
@@ -178,8 +178,8 @@ export async function buildCtCveInventorySnapshot(options: {
   const cursor = decodeCursor(options.cursor)
 
   const [hostRows, packageRows] = await Promise.all([
-    repository.listInventoryHosts(orgId, { limit: hostLimit, afterId: cursor.hostAfterId }),
-    repository.listInventoryPackages(orgId, { limit: packageLimit, afterId: cursor.packageAfterId }),
+    repository.listInventoryHosts(instanceId, { limit: hostLimit, afterId: cursor.hostAfterId }),
+    repository.listInventoryPackages(instanceId, { limit: packageLimit, afterId: cursor.packageAfterId }),
   ])
 
   const activeHosts = hostRows.filter((row) => row.deletedAt === null)
@@ -192,9 +192,9 @@ export async function buildCtCveInventorySnapshot(options: {
 
   return {
     contractVersion: CONTRACT_VERSION,
-    orgId,
-    orgSlug: organisation.slug,
-    snapshotId: snapshotIdFor(orgId, generatedAt, options.cursor),
+    instanceId,
+    orgSlug: instance.slug,
+    snapshotId: snapshotIdFor(instanceId, generatedAt, options.cursor),
     snapshotType: options.snapshotType ?? 'full',
     generatedAt: generatedAt.toISOString(),
     cursor: nextCursor,
@@ -235,14 +235,14 @@ export async function buildCtCveInventorySnapshot(options: {
 
 export async function pushCtCveInventorySnapshot(options: {
   baseUrl: string
-  token: { id: string; secret: string; orgId: string; scopes: string[] }
+  token: { id: string; secret: string; instanceId: string; scopes: string[] }
   snapshot: CtCveInventorySnapshot
   nonce?: string
   timestamp?: string
   fetchImpl?: typeof fetch
   statusRepository?: CtCveConnectionStatusRepository
 }): Promise<CtCveInventoryPushResult> {
-  if (options.token.orgId !== options.snapshot.orgId || !options.token.scopes.includes('inventory:write')) {
+  if (options.token.instanceId !== options.snapshot.instanceId || !options.token.scopes.includes('inventory:write')) {
     throw new Error('CT-CVE inventory token is not scoped to this snapshot')
   }
 
@@ -270,12 +270,12 @@ export async function pushCtCveInventorySnapshot(options: {
 
   const payload = await response.json().catch(() => null) as CtCveInventoryPushResult | null
   if (!response.ok || !payload || typeof payload.accepted !== 'boolean') {
-    await recordCtCveConnectionError(options.snapshot.orgId, 'inventory_push_failed', {
+    await recordCtCveConnectionError(options.snapshot.instanceId, 'inventory_push_failed', {
       repository: options.statusRepository,
     })
     throw new Error(`CT-CVE inventory snapshot push failed with HTTP ${response.status}`)
   }
-  await recordCtCveInventoryPush(options.snapshot.orgId, {
+  await recordCtCveInventoryPush(options.snapshot.instanceId, {
     repository: options.statusRepository,
   })
   return payload
@@ -288,17 +288,17 @@ async function getDefaultRepository(): Promise<CtCveInventoryRepository> {
 
 function createDrizzleCtCveInventoryRepository(database: Database): CtCveInventoryRepository {
   return {
-    async getOrganisation(orgId) {
+    async getInstance(instanceId) {
       const { and, eq, isNull } = await import('drizzle-orm')
-      const { organisations } = await import('../../db/schema/index.ts')
+      const { instanceSettings } = await import('../../db/schema/index.ts')
       const [row] = await database
-        .select({ id: organisations.id, slug: organisations.slug })
-        .from(organisations)
-        .where(and(eq(organisations.id, orgId), isNull(organisations.deletedAt)))
+        .select({ id: instanceSettings.id, slug: instanceSettings.slug })
+        .from(instanceSettings)
+        .where(and(eq(instanceSettings.id, instanceId), isNull(instanceSettings.deletedAt)))
         .limit(1)
       return row ?? null
     },
-    async listInventoryHosts(orgId, options) {
+    async listInventoryHosts(instanceId, options) {
       const { and, asc, eq, gt, isNull } = await import('drizzle-orm')
       const { hosts } = await import('../../db/schema/index.ts')
       return database
@@ -316,14 +316,14 @@ function createDrizzleCtCveInventoryRepository(database: Database): CtCveInvento
         })
         .from(hosts)
         .where(and(
-          eq(hosts.organisationId, orgId),
+          eq(hosts.instanceId, instanceId),
           isNull(hosts.deletedAt),
           options.afterId ? gt(hosts.id, options.afterId) : undefined,
         ))
         .orderBy(asc(hosts.id))
         .limit(options.limit)
     },
-    async listInventoryPackages(orgId, options) {
+    async listInventoryPackages(instanceId, options) {
       const { and, asc, eq, gt, isNull } = await import('drizzle-orm')
       const { hosts, softwarePackages } = await import('../../db/schema/index.ts')
       return database
@@ -352,7 +352,7 @@ function createDrizzleCtCveInventoryRepository(database: Database): CtCveInvento
         .from(softwarePackages)
         .innerJoin(hosts, eq(hosts.id, softwarePackages.hostId))
         .where(and(
-          eq(softwarePackages.organisationId, orgId),
+          eq(softwarePackages.instanceId, instanceId),
           isNull(softwarePackages.removedAt),
           isNull(softwarePackages.deletedAt),
           isNull(hosts.deletedAt),

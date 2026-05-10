@@ -11,13 +11,13 @@ export const metadata: Metadata = {
 
 export default async function OperationsCalendarPage() {
   const session = await getRequiredSession()
-  const orgId = session.user.organisationId
+  const instanceId = session.user.instanceId
   const canEdit = hasRole(session.user, MEMBERSHIP_ROLES)
 
-  if (!orgId) {
+  if (!instanceId) {
     return (
       <OperationsCalendarClient
-        orgId=""
+        instanceId=""
         canEdit={canEdit}
         initialHosts={[]}
         initialUsers={[{
@@ -31,13 +31,13 @@ export default async function OperationsCalendarPage() {
   }
 
   const [hostResult, userResult] = await Promise.all([
-    searchCalendarHosts(orgId, { limit: 100 }),
-    searchCalendarUsers(orgId, { limit: 100 }),
+    searchCalendarHosts(instanceId, { limit: 100 }),
+    searchCalendarUsers(instanceId, { limit: 100 }),
   ])
 
   return (
     <OperationsCalendarClient
-      orgId={orgId}
+      instanceId={instanceId}
       canEdit={canEdit}
       initialHosts={'hosts' in hostResult ? hostResult.hosts : []}
       initialUsers={'users' in userResult ? userResult.users : []}

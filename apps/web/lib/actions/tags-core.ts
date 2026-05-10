@@ -1,14 +1,14 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { tags, resourceTags, organisations } from '@/lib/db/schema'
-import type { Tag, TagPair, OrgMetadata } from '@/lib/db/schema'
+import { tags, resourceTags, instanceSettings } from '@/lib/db/schema'
+import type { Tag, TagPair, InstanceMetadata } from '@/lib/db/schema'
 import { and, eq, sql, inArray, desc, asc } from 'drizzle-orm'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 
 export type TagAssignment = {
   resourceTagId: string
@@ -43,11 +43,11 @@ export async function mergeTagLayers(...layers: TagPair[][]): Promise<TagPair[]>
 }
 
 export async function searchTags(
-  orgId: string,
+  instanceId: string,
   query: string,
   opts?: { key?: string; limit?: number },
 ): Promise<Tag[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const q = (query ?? '').trim()
   const limit = Math.min(Math.max(opts?.limit ?? 10, 1), 50)
 
@@ -55,7 +55,7 @@ export async function searchTags(
   // values under that key so the UI can scope value suggestions to the chosen
   // key (the core dedupe UX — typing `env` then `pr` only surfaces values
   // already used under `env`).
-  const conditions = [eq(tags.organisationId, orgId)]
+  const conditions = [eq(tags.instanceId, instanceId)]
   if (opts?.key) {
     conditions.push(sql`lower(${tags.key}) = lower(${opts.key})`)
     if (q) conditions.push(sql`lower(${tags.value}) LIKE lower(${q + '%'})`)
@@ -73,18 +73,18 @@ export async function searchTags(
 }
 
 // Looks up an existing tag case-insensitively, inserting it if absent. The
-// case-insensitive unique index on (org_id, lower(key), lower(value)) is
+// case-insensitive unique index on (instance_id, lower(key), lower(value)) is
 // enforced by Postgres; we select-then-insert with a fallback re-select so
 // concurrent callers never see a unique violation bubble up.
 async function upsertTag(
   tx: typeof db,
-  orgId: string,
+  instanceId: string,
   pair: TagPair,
 ): Promise<string> {
   const existing = await tx.query.tags.findFirst({
     columns: { id: true },
     where: and(
-      eq(tags.organisationId, orgId),
+      eq(tags.instanceId, instanceId),
       sql`lower(${tags.key}) = lower(${pair.key})`,
       sql`lower(${tags.value}) = lower(${pair.value})`,
     ),
@@ -94,7 +94,7 @@ async function upsertTag(
   try {
     const [row] = await tx
       .insert(tags)
-      .values({ organisationId: orgId, key: pair.key, value: pair.value, usageCount: 0 })
+      .values({ instanceId: instanceId, key: pair.key, value: pair.value, usageCount: 0 })
       .returning({ id: tags.id })
     if (row?.id) return row.id
   } catch {
@@ -104,7 +104,7 @@ async function upsertTag(
   const retry = await tx.query.tags.findFirst({
     columns: { id: true },
     where: and(
-      eq(tags.organisationId, orgId),
+      eq(tags.instanceId, instanceId),
       sql`lower(${tags.key}) = lower(${pair.key})`,
       sql`lower(${tags.value}) = lower(${pair.value})`,
     ),
@@ -115,12 +115,12 @@ async function upsertTag(
 }
 
 export async function assignTagsToResource(
-  orgId: string,
+  instanceId: string,
   resourceType: string,
   resourceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
@@ -129,10 +129,10 @@ export async function assignTagsToResource(
 
     await db.transaction(async (tx) => {
       for (const p of deduped) {
-        const tagId = await upsertTag(tx as unknown as typeof db, orgId, p)
+        const tagId = await upsertTag(tx as unknown as typeof db, instanceId, p)
         const inserted = await tx
           .insert(resourceTags)
-          .values({ organisationId: orgId, resourceId, resourceType, tagId })
+          .values({ instanceId: instanceId, resourceId, resourceType, tagId })
           .onConflictDoNothing({
             target: [resourceTags.resourceId, resourceTags.resourceType, resourceTags.tagId],
           })
@@ -154,20 +154,20 @@ export async function assignTagsToResource(
 }
 
 export async function removeTagFromResource(
-  orgId: string,
+  instanceId: string,
   resourceTagId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   try {
     const row = await db.query.resourceTags.findFirst({
-      where: and(eq(resourceTags.id, resourceTagId), eq(resourceTags.organisationId, orgId)),
+      where: and(eq(resourceTags.id, resourceTagId), eq(resourceTags.instanceId, instanceId)),
     })
     if (!row) return { error: 'Tag assignment not found' }
 
     await db.transaction(async (tx) => {
       await tx
         .delete(resourceTags)
-        .where(and(eq(resourceTags.id, resourceTagId), eq(resourceTags.organisationId, orgId)))
+        .where(and(eq(resourceTags.id, resourceTagId), eq(resourceTags.instanceId, instanceId)))
       await tx
         .update(tags)
         .set({ usageCount: sql`GREATEST(${tags.usageCount} - 1, 0)` })
@@ -181,12 +181,12 @@ export async function removeTagFromResource(
 }
 
 export async function replaceResourceTags(
-  orgId: string,
+  instanceId: string,
   resourceType: string,
   resourceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgWriteAccess(orgId)
+  await requireInstanceWriteAccess(instanceId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
@@ -201,7 +201,7 @@ export async function replaceResourceTags(
       .innerJoin(tags, eq(tags.id, resourceTags.tagId))
       .where(
         and(
-          eq(resourceTags.organisationId, orgId),
+          eq(resourceTags.instanceId, instanceId),
           eq(resourceTags.resourceId, resourceId),
           eq(resourceTags.resourceType, resourceType),
         ),
@@ -236,10 +236,10 @@ export async function replaceResourceTags(
         }
       }
       for (const p of toAdd) {
-        const tagId = await upsertTag(tx as unknown as typeof db, orgId, p)
+        const tagId = await upsertTag(tx as unknown as typeof db, instanceId, p)
         const inserted = await tx
           .insert(resourceTags)
-          .values({ organisationId: orgId, resourceId, resourceType, tagId })
+          .values({ instanceId: instanceId, resourceId, resourceType, tagId })
           .onConflictDoNothing({
             target: [resourceTags.resourceId, resourceTags.resourceType, resourceTags.tagId],
           })
@@ -260,11 +260,11 @@ export async function replaceResourceTags(
 }
 
 export async function listResourceTags(
-  orgId: string,
+  instanceId: string,
   resourceType: string,
   resourceId: string,
 ): Promise<TagAssignment[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const rows = await db
     .select({
       resourceTagId: resourceTags.id,
@@ -276,7 +276,7 @@ export async function listResourceTags(
     .innerJoin(tags, eq(tags.id, resourceTags.tagId))
     .where(
       and(
-        eq(resourceTags.organisationId, orgId),
+        eq(resourceTags.instanceId, instanceId),
         eq(resourceTags.resourceId, resourceId),
         eq(resourceTags.resourceType, resourceType),
       ),
@@ -285,41 +285,41 @@ export async function listResourceTags(
   return rows
 }
 
-export async function getOrgDefaultTags(orgId: string): Promise<TagPair[]> {
-  await requireOrgAccess(orgId)
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
+export async function getOrgDefaultTags(instanceId: string): Promise<TagPair[]> {
+  await requireInstanceAccess(instanceId)
+  const org = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseOrgMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(org?.metadata)
   return meta?.defaultTags ?? []
 }
 
 export async function updateOrgDefaultTags(
-  orgId: string,
+  instanceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAdminAccess(orgId)
+  await requireInstanceAdminAccess(instanceId)
   try {
     const parsed = z.array(tagPairSchema).safeParse(pairs)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
     const deduped = dedupeByKey(parsed.data)
 
-    const org = await db.query.organisations.findFirst({
-      where: eq(organisations.id, orgId),
+    const org = await db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, instanceId),
       columns: { id: true, metadata: true },
     })
-    if (!org) return { error: 'Organisation not found' }
+    if (!org) return { error: 'Instance not found' }
 
-    const currentMetadata = parseOrgMetadata(org.metadata)
-    const updatedMetadata: OrgMetadata = {
+    const currentMetadata = parseInstanceMetadata(org.metadata)
+    const updatedMetadata: InstanceMetadata = {
       ...currentMetadata,
       defaultTags: deduped,
     }
     await db
-      .update(organisations)
+      .update(instanceSettings)
       .set({ metadata: updatedMetadata, updatedAt: new Date() })
-      .where(eq(organisations.id, orgId))
+      .where(eq(instanceSettings.id, instanceId))
 
     return { success: true }
   } catch (err) {

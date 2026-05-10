@@ -303,7 +303,7 @@ export async function validateLicenceKey(
       return { valid: false, error: 'Invalid licence tier in key' }
     }
     if (typeof payload.sub !== 'string' || !payload.sub) {
-      return { valid: false, error: 'Licence key is missing organisation field' }
+      return { valid: false, error: 'Licence key is missing instance field' }
     }
     if (typeof payload.jti !== 'string' || !payload.jti) {
       return { valid: false, error: 'Licence key is missing a licence id' }

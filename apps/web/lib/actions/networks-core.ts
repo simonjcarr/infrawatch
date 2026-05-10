@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import { networks, hostNetworkMemberships, hosts } from '@/lib/db/schema'
@@ -28,10 +28,10 @@ const networkSchema = z.object({
 
 // ── Network CRUD ──────────────────────────────────────────────────────────────
 
-export async function listNetworks(orgId: string): Promise<NetworkWithCount[]> {
-  await requireOrgAccess(orgId)
+export async function listNetworks(instanceId: string): Promise<NetworkWithCount[]> {
+  await requireInstanceAccess(instanceId)
   const rows = await db.query.networks.findMany({
-    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
+    where: and(eq(networks.instanceId, instanceId), isNull(networks.deletedAt)),
     orderBy: (n, { asc }) => [asc(n.name)],
   })
 
@@ -41,7 +41,7 @@ export async function listNetworks(orgId: string): Promise<NetworkWithCount[]> {
       count: sql<number>`cast(count(*) as int)`,
     })
     .from(hostNetworkMemberships)
-    .where(and(eq(hostNetworkMemberships.organisationId, orgId), isNull(hostNetworkMemberships.deletedAt)))
+    .where(and(eq(hostNetworkMemberships.instanceId, instanceId), isNull(hostNetworkMemberships.deletedAt)))
     .groupBy(hostNetworkMemberships.networkId)
 
   const countMap = new Map(counts.map((c) => [c.networkId, c.count]))
@@ -50,25 +50,25 @@ export async function listNetworks(orgId: string): Promise<NetworkWithCount[]> {
 }
 
 export async function getNetwork(
-  orgId: string,
+  instanceId: string,
   networkId: string,
 ): Promise<(Network & { members: Host[] }) | null> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const network = await db.query.networks.findFirst({
-    where: and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
+    where: and(eq(networks.id, networkId), eq(networks.instanceId, instanceId), isNull(networks.deletedAt)),
   })
   if (!network) return null
 
-  const members = await listHostsInNetwork(orgId, networkId)
+  const members = await listHostsInNetwork(instanceId, networkId)
   return { ...network, members }
 }
 
 export async function createNetwork(
-  orgId: string,
+  instanceId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true; network: Network } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -82,7 +82,7 @@ export async function createNetwork(
     const rows = await db
       .insert(networks)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         name: parsed.data.name,
         cidr: parsed.data.cidr,
         description: parsed.data.description ?? null,
@@ -98,12 +98,12 @@ export async function createNetwork(
 }
 
 export async function updateNetwork(
-  orgId: string,
+  instanceId: string,
   networkId: string,
   data: { name: string; cidr: string; description?: string },
 ): Promise<{ success: true } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -122,7 +122,7 @@ export async function updateNetwork(
         description: parsed.data.description ?? null,
         updatedAt: new Date(),
       })
-      .where(and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)))
+      .where(and(eq(networks.id, networkId), eq(networks.instanceId, instanceId), isNull(networks.deletedAt)))
       .returning({ id: networks.id })
 
     if (result.length === 0) return { error: 'Network not found' }
@@ -134,11 +134,11 @@ export async function updateNetwork(
 }
 
 export async function deleteNetwork(
-  orgId: string,
+  instanceId: string,
   networkId: string,
 ): Promise<{ success: true } | { error: string }> {
   try {
-    await requireOrgAdminAccess(orgId)
+    await requireInstanceAdminAccess(instanceId)
   } catch {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -147,7 +147,7 @@ export async function deleteNetwork(
     const result = await db
       .update(networks)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(networks.id, networkId), eq(networks.organisationId, orgId), isNull(networks.deletedAt)))
+      .where(and(eq(networks.id, networkId), eq(networks.instanceId, instanceId), isNull(networks.deletedAt)))
       .returning({ id: networks.id })
 
     if (result.length === 0) return { error: 'Network not found' }
@@ -159,7 +159,7 @@ export async function deleteNetwork(
       .where(
         and(
           eq(hostNetworkMemberships.networkId, networkId),
-          eq(hostNetworkMemberships.organisationId, orgId),
+          eq(hostNetworkMemberships.instanceId, instanceId),
           isNull(hostNetworkMemberships.deletedAt),
         ),
       )
@@ -174,11 +174,11 @@ export async function deleteNetwork(
 // ── Membership ────────────────────────────────────────────────────────────────
 
 export async function addHostToNetwork(
-  orgId: string,
+  instanceId: string,
   networkId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const session = await getRequiredSession()
   if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'You do not have permission to perform this action' }
@@ -189,7 +189,7 @@ export async function addHostToNetwork(
       where: and(
         eq(hostNetworkMemberships.networkId, networkId),
         eq(hostNetworkMemberships.hostId, hostId),
-        eq(hostNetworkMemberships.organisationId, orgId),
+        eq(hostNetworkMemberships.instanceId, instanceId),
       ),
     })
 
@@ -204,7 +204,7 @@ export async function addHostToNetwork(
     }
 
     await db.insert(hostNetworkMemberships).values({
-      organisationId: orgId,
+      instanceId: instanceId,
       networkId,
       hostId,
       autoAssigned: false,
@@ -217,11 +217,11 @@ export async function addHostToNetwork(
 }
 
 export async function removeHostFromNetwork(
-  orgId: string,
+  instanceId: string,
   networkId: string,
   hostId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const session = await getRequiredSession()
   if (!hasRole(session.user, MEMBERSHIP_ROLES)) {
     return { error: 'You do not have permission to perform this action' }
@@ -235,7 +235,7 @@ export async function removeHostFromNetwork(
         and(
           eq(hostNetworkMemberships.networkId, networkId),
           eq(hostNetworkMemberships.hostId, hostId),
-          eq(hostNetworkMemberships.organisationId, orgId),
+          eq(hostNetworkMemberships.instanceId, instanceId),
           isNull(hostNetworkMemberships.deletedAt),
         ),
       )
@@ -249,12 +249,12 @@ export async function removeHostFromNetwork(
   }
 }
 
-export async function listHostsInNetwork(orgId: string, networkId: string): Promise<Host[]> {
-  await requireOrgAccess(orgId)
+export async function listHostsInNetwork(instanceId: string, networkId: string): Promise<Host[]> {
+  await requireInstanceAccess(instanceId)
   const members = await db.query.hostNetworkMemberships.findMany({
     where: and(
       eq(hostNetworkMemberships.networkId, networkId),
-      eq(hostNetworkMemberships.organisationId, orgId),
+      eq(hostNetworkMemberships.instanceId, instanceId),
       isNull(hostNetworkMemberships.deletedAt),
     ),
     columns: { hostId: true },
@@ -265,7 +265,7 @@ export async function listHostsInNetwork(orgId: string, networkId: string): Prom
   const hostIds = members.map((m) => m.hostId)
 
   const hostRows = await db.query.hosts.findMany({
-    where: and(eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    where: and(eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
   })
 
   return hostRows.filter((h) => hostIds.includes(h.id))
@@ -277,14 +277,14 @@ export type NetworkMembershipEntry = {
 }
 
 export async function listMembershipsForNetwork(
-  orgId: string,
+  instanceId: string,
   networkId: string,
 ): Promise<NetworkMembershipEntry[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const rows = await db.query.hostNetworkMemberships.findMany({
     where: and(
       eq(hostNetworkMemberships.networkId, networkId),
-      eq(hostNetworkMemberships.organisationId, orgId),
+      eq(hostNetworkMemberships.instanceId, instanceId),
       isNull(hostNetworkMemberships.deletedAt),
     ),
     columns: { hostId: true, autoAssigned: true },
@@ -294,10 +294,10 @@ export async function listMembershipsForNetwork(
 
 export type NetworkWithHosts = Network & { hosts: Host[] }
 
-export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithHosts[]> {
-  await requireOrgAccess(orgId)
+export async function listNetworksWithHosts(instanceId: string): Promise<NetworkWithHosts[]> {
+  await requireInstanceAccess(instanceId)
   const networkRows = await db.query.networks.findMany({
-    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
+    where: and(eq(networks.instanceId, instanceId), isNull(networks.deletedAt)),
     orderBy: (n, { asc }) => [asc(n.name)],
   })
 
@@ -312,7 +312,7 @@ export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithH
     .innerJoin(hosts, eq(hostNetworkMemberships.hostId, hosts.id))
     .where(
       and(
-        eq(hostNetworkMemberships.organisationId, orgId),
+        eq(hostNetworkMemberships.instanceId, instanceId),
         isNull(hostNetworkMemberships.deletedAt),
         isNull(hosts.deletedAt),
       ),
@@ -331,12 +331,12 @@ export async function listNetworksWithHosts(orgId: string): Promise<NetworkWithH
   }))
 }
 
-export async function listNetworksForHost(orgId: string, hostId: string): Promise<NetworkWithMembership[]> {
-  await requireOrgAccess(orgId)
+export async function listNetworksForHost(instanceId: string, hostId: string): Promise<NetworkWithMembership[]> {
+  await requireInstanceAccess(instanceId)
   const members = await db.query.hostNetworkMemberships.findMany({
     where: and(
       eq(hostNetworkMemberships.hostId, hostId),
-      eq(hostNetworkMemberships.organisationId, orgId),
+      eq(hostNetworkMemberships.instanceId, instanceId),
       isNull(hostNetworkMemberships.deletedAt),
     ),
     columns: { networkId: true, autoAssigned: true },
@@ -348,7 +348,7 @@ export async function listNetworksForHost(orgId: string, hostId: string): Promis
   const autoMap = new Map(members.map((m) => [m.networkId, m.autoAssigned]))
 
   const networkRows = await db.query.networks.findMany({
-    where: and(eq(networks.organisationId, orgId), isNull(networks.deletedAt)),
+    where: and(eq(networks.instanceId, instanceId), isNull(networks.deletedAt)),
   })
 
   return networkRows

@@ -19,7 +19,7 @@ test('normalises CT-CVE connector settings and generates missing first-save secr
   ]
 
   const saved = normaliseCtCveConnectorSettingsForSave({
-    orgId: 'org_123',
+    instanceId: 'org_123',
     input: {
       enabled: true,
       name: '  Production CT-CVE  ',
@@ -34,7 +34,7 @@ test('normalises CT-CVE connector settings and generates missing first-save secr
   })
 
   assert.deepEqual(saved, {
-    organisationId: 'org_123',
+    instanceId: 'org_123',
     enabled: true,
     name: 'Production CT-CVE',
     baseUrl: 'https://ct-cve.example.invalid/api',
@@ -47,7 +47,7 @@ test('normalises CT-CVE connector settings and generates missing first-save secr
 
 test('preserves stored secrets when update form leaves secret fields blank', () => {
   const saved = normaliseCtCveConnectorSettingsForSave({
-    orgId: 'org_123',
+    instanceId: 'org_123',
     input: {
       enabled: false,
       name: 'Primary CT-CVE',
@@ -80,7 +80,7 @@ test('rejects invalid connector URL, token IDs, and weak secrets', () => {
   )
   assert.throws(
     () => normaliseCtCveConnectorSettingsForSave({
-      orgId: 'org_123',
+      instanceId: 'org_123',
       input: {
         enabled: true,
         name: 'Primary CT-CVE',
@@ -96,7 +96,7 @@ test('rejects invalid connector URL, token IDs, and weak secrets', () => {
   )
   assert.throws(
     () => normaliseCtCveConnectorSettingsForSave({
-      orgId: 'org_123',
+      instanceId: 'org_123',
       input: {
         enabled: true,
         name: 'Primary CT-CVE',
@@ -114,7 +114,7 @@ test('rejects invalid connector URL, token IDs, and weak secrets', () => {
 
 test('converts stored connector settings into both CTOPS runtime tokens and CT-CVE config', () => {
   const settings = {
-    organisationId: 'org_123',
+    instanceId: 'org_123',
     enabled: true,
     name: 'Primary CT-CVE',
     baseUrl: 'https://ct-cve.example.invalid',
@@ -131,7 +131,7 @@ test('converts stored connector settings into both CTOPS runtime tokens and CT-C
     token: {
       id: 'ctops_inventory_org_123',
       secret: inventorySecret,
-      orgId: 'org_123',
+      instanceId: 'org_123',
       scopes: ['inventory:write', 'connection:read'],
     },
   })
@@ -139,14 +139,14 @@ test('converts stored connector settings into both CTOPS runtime tokens and CT-C
   assert.deepEqual(toCtCveServiceToken(settings), {
     id: 'ctcve_findings_org_123',
     secret: ctCveSecret,
-    orgId: 'org_123',
+    instanceId: 'org_123',
     scopes: ['findings:write', 'connection:read'],
     revoked: false,
   })
 
   assert.deepEqual(buildCtCveCtOpsConnectionConfig(settings, 'https://ct-ops.example.invalid/settings'), {
     name: 'Primary CT-CVE',
-    orgId: 'org_123',
+    instanceId: 'org_123',
     ctOpsBaseUrl: 'https://ct-ops.example.invalid',
     inventoryTokens: [{
       id: 'ctops_inventory_org_123',

@@ -23,9 +23,9 @@ export interface HostFilterResult {
 
 // Builds a Drizzle WHERE clause for a host filter. All supplied fields AND
 // together. Returned SQL is always org-scoped and excludes soft-deleted hosts.
-export function buildHostFilterWhere(orgId: string, filter: HostFilter): SQL | undefined {
+export function buildHostFilterWhere(instanceId: string, filter: HostFilter): SQL | undefined {
   const conditions: SQL[] = [
-    eq(hosts.organisationId, orgId),
+    eq(hosts.instanceId, instanceId),
     isNull(hosts.deletedAt) as SQL,
   ]
 
@@ -72,7 +72,7 @@ export function buildHostFilterWhere(orgId: string, filter: HostFilter): SQL | u
       conditions.push(sql`EXISTS (
         SELECT 1 FROM ${resourceTags} rt
         INNER JOIN ${tags} tg ON tg.id = rt.tag_id
-        WHERE rt.organisation_id = ${orgId}
+        WHERE rt.instance_id = ${instanceId}
           AND rt.resource_id = ${hosts.id}
           AND rt.resource_type = 'host'
           AND lower(tg.key) = lower(${t.key})
@@ -88,7 +88,7 @@ export function buildHostFilterWhere(orgId: string, filter: HostFilter): SQL | u
       conditions.push(sql`NOT EXISTS (
         SELECT 1 FROM ${resourceTags} rt
         INNER JOIN ${tags} tg ON tg.id = rt.tag_id
-        WHERE rt.organisation_id = ${orgId}
+        WHERE rt.instance_id = ${instanceId}
           AND rt.resource_id = ${hosts.id}
           AND rt.resource_type = 'host'
           AND lower(tg.key) = lower(${t.key})

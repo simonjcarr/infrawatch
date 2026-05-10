@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { getHost } from '@/lib/actions/agents'
 import { getChecksWithHistory } from '@/lib/actions/checks'
 import { listNotesForHost } from '@/lib/actions/notes'
-import { ApiAuthError, getApiOrgSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiInstanceSession } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await getApiOrgSession()
+    await getApiInstanceSession()
   } catch (err) {
     if (err instanceof ApiAuthError) {
       return new Response(err.message, { status: err.status })

@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,11 +15,11 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can review, filter, and delete tracked certificates', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO certificates (
       id,
-      organisation_id,
+      instance_id,
       source,
       host,
       port,
@@ -37,7 +37,7 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
     VALUES
       (
         'cert-e2e-valid',
-        ${orgId},
+        ${instanceId},
         'discovered',
         'api.example.com',
         443,
@@ -54,7 +54,7 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
       ),
       (
         'cert-e2e-expiring',
-        ${orgId},
+        ${instanceId},
         'discovered',
         'edge.example.com',
         8443,
@@ -71,7 +71,7 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
       ),
       (
         'cert-e2e-expired',
-        ${orgId},
+        ${instanceId},
         'discovered',
         'legacy.example.com',
         443,
@@ -91,7 +91,7 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
   await sql`
     INSERT INTO certificate_events (
       id,
-      organisation_id,
+      instance_id,
       certificate_id,
       event_type,
       previous_status,
@@ -102,7 +102,7 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
     VALUES
       (
         'cert-event-discovered',
-        ${orgId},
+        ${instanceId},
         'cert-e2e-valid',
         'discovered',
         NULL,
@@ -112,7 +112,7 @@ test('admin can review, filter, and delete tracked certificates', async ({ authe
       ),
       (
         'cert-event-renewed',
-        ${orgId},
+        ${instanceId},
         'cert-e2e-valid',
         'renewed',
         'expiring_soon',

@@ -1,1 +1,0 @@
-ALTER TABLE "agent_enrolment_tokens" ADD COLUMN "skip_verify" boolean DEFAULT false NOT NULL;

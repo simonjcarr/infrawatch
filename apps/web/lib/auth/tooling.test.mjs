@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { canAccessTooling, requireToolingAccess } from './tooling.ts'
 
 const baseUser = {
-  organisationId: 'org-1',
+  instanceId: 'org-1',
   isActive: true,
   deletedAt: null,
 }

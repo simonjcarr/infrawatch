@@ -37,7 +37,7 @@ test('notification channel management actions require org admin access', () => {
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgAdminAccess\(orgId\)/,
+      /(?:const session = )?await requireInstanceAdminAccess\(instanceId\)/,
       `${action} must require org admin access before managing notification channels`,
     )
   }

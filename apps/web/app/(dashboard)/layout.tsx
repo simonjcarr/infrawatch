@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/pending-approval')
   }
 
-  const licence = await getInstanceEffectiveLicence(session.user.organisationId)
+  const licence = await getInstanceEffectiveLicence(session.user.instanceId)
 
   return (
     <CommandPaletteProvider userRole={session.user.role}>

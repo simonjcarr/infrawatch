@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, integer, real } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { z } from 'zod'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { agents } from './agents.ts'
 
 export interface DiskInfo {
@@ -137,9 +137,9 @@ export interface HostMetadata {
 
 export const hosts = pgTable('hosts', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   agentId: text('agent_id').references(() => agents.id),
   hostname: text('hostname').notNull(),
   displayName: text('display_name'),

@@ -2,10 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import * as hostsModule from './hosts.ts'
-import * as organisationsModule from './organisations.ts'
+import * as instance_settingsModule from './instance-settings.ts'
 
 const { parseHostMetadata } = hostsModule
-const { parseOrgMetadata } = organisationsModule
+const { parseInstanceMetadata } = instance_settingsModule
 
 test('parseHostMetadata strips unknown fields and falls back on malformed values', () => {
   const parsed = parseHostMetadata({
@@ -61,8 +61,8 @@ test('parseHostMetadata strips unknown fields and falls back on malformed values
   assert.equal('injected' in parsed, false)
 })
 
-test('parseOrgMetadata preserves valid settings and drops malformed nested metadata', () => {
-  const parsed = parseOrgMetadata({
+test('parseInstanceMetadata preserves valid settings and drops malformed nested metadata', () => {
+  const parsed = parseInstanceMetadata({
     defaultTags: [
       { key: 'env', value: 'prod', extra: 'drop-me' },
       { key: 42, value: 'bad' },

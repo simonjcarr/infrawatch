@@ -6,7 +6,7 @@ import { issueTestLicence } from '../fixtures/licence'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -14,28 +14,28 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   return rows[0]!.id
 }
 
-async function setOrgSeatLimit(sql: ReturnType<typeof getTestDb>, orgId: string, maxUsers: number): Promise<void> {
-  const licenceKey = await issueTestLicence({ orgId, tier: 'community', maxUsers })
+async function setOrgSeatLimit(sql: ReturnType<typeof getTestDb>, instanceId: string, maxUsers: number): Promise<void> {
+  const licenceKey = await issueTestLicence({ instanceId, tier: 'community', maxUsers })
   await sql`
-    UPDATE organisations
+    UPDATE instance_settings
     SET licence_key = ${licenceKey},
         licence_tier = 'community'
-    WHERE id = ${orgId}
+    WHERE id = ${instanceId}
   `
 }
 
-async function clearOrgLicence(sql: ReturnType<typeof getTestDb>, orgId: string): Promise<void> {
+async function clearOrgLicence(sql: ReturnType<typeof getTestDb>, instanceId: string): Promise<void> {
   await sql`
-    UPDATE organisations
+    UPDATE instance_settings
     SET licence_key = NULL,
         licence_tier = 'community'
-    WHERE id = ${orgId}
+    WHERE id = ${instanceId}
   `
 }
 
 async function insertActiveMember(
   sql: ReturnType<typeof getTestDb>,
-  orgId: string,
+  instanceId: string,
   id: string,
   email: string,
 ): Promise<void> {
@@ -45,7 +45,7 @@ async function insertActiveMember(
       name,
       email,
       email_verified,
-      organisation_id,
+      instance_id,
       role,
       roles,
       is_active,
@@ -56,7 +56,7 @@ async function insertActiveMember(
       ${email},
       ${email},
       true,
-      ${orgId},
+      ${instanceId},
       'engineer',
       '["engineer"]'::jsonb,
       true,
@@ -65,11 +65,11 @@ async function insertActiveMember(
   `
 }
 
-async function countActiveMembers(sql: ReturnType<typeof getTestDb>, orgId: string): Promise<number> {
+async function countActiveMembers(sql: ReturnType<typeof getTestDb>, instanceId: string): Promise<number> {
   const [row] = await sql<Array<{ count: string }>>`
     SELECT COUNT(*)::text AS count
     FROM "user"
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND is_active = true
       AND deleted_at IS NULL
   `
@@ -78,14 +78,14 @@ async function countActiveMembers(sql: ReturnType<typeof getTestDb>, orgId: stri
 
 async function ensureAtLeastActiveMembers(
   sql: ReturnType<typeof getTestDb>,
-  orgId: string,
+  instanceId: string,
   targetCount: number,
   idPrefix: string,
 ): Promise<number> {
-  let activeCount = await countActiveMembers(sql, orgId)
+  let activeCount = await countActiveMembers(sql, instanceId)
   for (let index = activeCount; index < targetCount; index += 1) {
     const id = `${idPrefix}-${index + 1}`
-    await insertActiveMember(sql, orgId, id, `${id}@example.com`)
+    await insertActiveMember(sql, instanceId, id, `${id}@example.com`)
     activeCount += 1
   }
   return activeCount
@@ -93,7 +93,7 @@ async function ensureAtLeastActiveMembers(
 
 test('admin can create and cancel a team invitation', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const inviteeEmail = 'teammate@example.com'
 
   await page.goto('/team')
@@ -118,7 +118,7 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
   const inviteRows = await sql<Array<{ id: string; role: string; roles: string[]; deleted_at: Date | null }>>`
     SELECT id, role, roles, deleted_at
     FROM invitations
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND email = ${inviteeEmail}
     ORDER BY created_at DESC
     LIMIT 1
@@ -145,7 +145,7 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
 
 test('admin cannot create a duplicate pending invitation for the same email address', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const inviteeEmail = 'duplicate-teammate@example.com'
 
   await page.goto('/team')
@@ -169,7 +169,7 @@ test('admin cannot create a duplicate pending invitation for the same email addr
   const inviteRows = await sql<Array<{ role: string; roles: string[]; deleted_at: Date | null }>>`
     SELECT role, roles, deleted_at
     FROM invitations
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND email = ${inviteeEmail}
     ORDER BY created_at ASC
   `
@@ -182,12 +182,12 @@ test('admin cannot create a duplicate pending invitation for the same email addr
 
 test('admin cannot create a fourth user invite on free Community seats', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const suffix = Date.now().toString()
   const inviteeEmail = `community-fourth-seat-${suffix}@example.com`
 
-  await clearOrgLicence(sql, orgId)
-  await ensureAtLeastActiveMembers(sql, orgId, 3, `community-seat-member-${suffix}`)
+  await clearOrgLicence(sql, instanceId)
+  await ensureAtLeastActiveMembers(sql, instanceId, 3, `community-seat-member-${suffix}`)
 
   await page.goto('/team')
 
@@ -203,13 +203,13 @@ test('admin cannot create a fourth user invite on free Community seats', async (
 
 test('an extra paid seat allows one more active user invitation', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const suffix = Date.now().toString()
   const inviteeEmail = `paid-fourth-seat-${suffix}@example.com`
 
   try {
-    const activeCount = await ensureAtLeastActiveMembers(sql, orgId, 3, `paid-seat-member-${suffix}`)
-    await setOrgSeatLimit(sql, orgId, activeCount + 1)
+    const activeCount = await ensureAtLeastActiveMembers(sql, instanceId, 3, `paid-seat-member-${suffix}`)
+    await setOrgSeatLimit(sql, instanceId, activeCount + 1)
 
     await page.goto('/team')
 
@@ -223,16 +223,16 @@ test('an extra paid seat allows one more active user invitation', async ({ authe
     await page.getByTestId('team-invite-done').click()
     await expect(page.getByTestId('team-pending-invite-row').filter({ hasText: inviteeEmail })).toBeVisible()
   } finally {
-    await clearOrgLicence(sql, orgId)
+    await clearOrgLicence(sql, instanceId)
   }
 })
 
 test('admin cannot create an invitation when user seats are exhausted', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   try {
-    await setOrgSeatLimit(sql, orgId, 1)
+    await setOrgSeatLimit(sql, instanceId, 1)
 
     await page.goto('/team')
 
@@ -248,24 +248,24 @@ test('admin cannot create an invitation when user seats are exhausted', async ({
     const inviteRows = await sql<Array<{ id: string }>>`
       SELECT id
       FROM invitations
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND email = 'seat-limited-teammate@example.com'
     `
     expect(inviteRows).toHaveLength(0)
   } finally {
-    await clearOrgLicence(sql, orgId)
+    await clearOrgLicence(sql, instanceId)
   }
 })
 
 test('admin re-inviting a removed user restores their membership instead of creating a pending invite', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   const removedEmail = 'restored-member@example.com'
 
-  const activeCount = await countActiveMembers(sql, orgId)
+  const activeCount = await countActiveMembers(sql, instanceId)
 
   try {
-    await setOrgSeatLimit(sql, orgId, activeCount + 1)
+    await setOrgSeatLimit(sql, instanceId, activeCount + 1)
 
     await sql`
       INSERT INTO "user" (
@@ -273,7 +273,7 @@ test('admin re-inviting a removed user restores their membership instead of crea
         name,
         email,
         email_verified,
-        organisation_id,
+        instance_id,
         role,
         roles,
         is_active,
@@ -284,7 +284,7 @@ test('admin re-inviting a removed user restores their membership instead of crea
         'Restored Member',
         ${removedEmail},
         true,
-        ${orgId},
+        ${instanceId},
         'read_only',
         '["read_only"]'::jsonb,
         false,
@@ -326,12 +326,12 @@ test('admin re-inviting a removed user restores their membership instead of crea
     const inviteRows = await sql<Array<{ id: string }>>`
       SELECT id
       FROM invitations
-      WHERE organisation_id = ${orgId}
+      WHERE instance_id = ${instanceId}
         AND email = ${removedEmail}
     `
 
     expect(inviteRows).toHaveLength(0)
   } finally {
-    await clearOrgLicence(sql, orgId)
+    await clearOrgLicence(sql, instanceId)
   }
 })

@@ -4,7 +4,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { and, asc, eq, gt, ilike, inArray, isNull, isNotNull, lt, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { writeAuditEvent } from '@/lib/audit/events'
-import { requireOrgAccess, requireOrgWriteAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 import { db } from '@/lib/db'
 import {
   CALENDAR_EVENT_CATEGORIES,
@@ -209,22 +209,22 @@ function uniqueValues(values: readonly string[]): string[] {
   return Array.from(new Set(values.filter((value) => value.trim().length > 0)))
 }
 
-async function ensureHostsBelongToOrg(orgId: string, hostIds: readonly string[]): Promise<{ ok: true; hostIds: string[] } | { error: string }> {
+async function ensureHostsBelongToOrg(instanceId: string, hostIds: readonly string[]): Promise<{ ok: true; hostIds: string[] } | { error: string }> {
   const uniqueHostIds = uniqueValues(hostIds)
   if (uniqueHostIds.length === 0) return { ok: true, hostIds: [] }
 
   const rows = await db.query.hosts.findMany({
-    where: and(inArray(hosts.id, uniqueHostIds), eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)),
+    where: and(inArray(hosts.id, uniqueHostIds), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
     columns: { id: true },
   })
   if (rows.length !== uniqueHostIds.length) {
-    return { error: 'One or more selected hosts were not found in this organisation' }
+    return { error: 'One or more selected hosts were not found in this instance' }
   }
   return { ok: true, hostIds: uniqueHostIds }
 }
 
 async function ensureUsersBelongToOrg(
-  orgId: string,
+  instanceId: string,
   participants: readonly z.infer<typeof participantInputSchema>[],
 ): Promise<{ ok: true; participants: Array<{ userId: string; role: CalendarParticipantRole }> } | { error: string }> {
   const byUser = new Map<string, CalendarParticipantRole>()
@@ -237,14 +237,14 @@ async function ensureUsersBelongToOrg(
   const rows = await db.query.users.findMany({
     where: and(
       inArray(users.id, userIds),
-      eq(users.organisationId, orgId),
+      eq(users.instanceId, instanceId),
       eq(users.isActive, true),
       isNull(users.deletedAt),
     ),
     columns: { id: true },
   })
   if (rows.length !== userIds.length) {
-    return { error: 'One or more selected participants were not found in this organisation' }
+    return { error: 'One or more selected participants were not found in this instance' }
   }
   return {
     ok: true,
@@ -254,7 +254,7 @@ async function ensureUsersBelongToOrg(
 
 async function replaceLinks(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  orgId: string,
+  instanceId: string,
   eventId: string,
   hostIds: readonly string[],
   participants: readonly { userId: string; role: CalendarParticipantRole }[],
@@ -263,13 +263,13 @@ async function replaceLinks(
   await tx.delete(calendarEventParticipants).where(eq(calendarEventParticipants.eventId, eventId))
 
   if (hostIds.length > 0) {
-    await tx.insert(calendarEventHosts).values(hostIds.map((hostId) => ({ organisationId: orgId, eventId, hostId })))
+    await tx.insert(calendarEventHosts).values(hostIds.map((hostId) => ({ instanceId: instanceId, eventId, hostId })))
   }
 
   if (participants.length > 0) {
     await tx.insert(calendarEventParticipants).values(
       participants.map((participant) => ({
-        organisationId: orgId,
+        instanceId: instanceId,
         eventId,
         userId: participant.userId,
         role: participant.role,
@@ -280,30 +280,30 @@ async function replaceLinks(
 
 async function copyLinksFromEvent(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  orgId: string,
+  instanceId: string,
   fromEventId: string,
   toEventId: string,
 ): Promise<void> {
   const [hostRows, participantRows] = await Promise.all([
     tx.query.calendarEventHosts.findMany({
-      where: and(eq(calendarEventHosts.eventId, fromEventId), eq(calendarEventHosts.organisationId, orgId)),
+      where: and(eq(calendarEventHosts.eventId, fromEventId), eq(calendarEventHosts.instanceId, instanceId)),
     }),
     tx.query.calendarEventParticipants.findMany({
-      where: and(eq(calendarEventParticipants.eventId, fromEventId), eq(calendarEventParticipants.organisationId, orgId)),
+      where: and(eq(calendarEventParticipants.eventId, fromEventId), eq(calendarEventParticipants.instanceId, instanceId)),
     }),
   ])
 
   await replaceLinks(
     tx,
-    orgId,
+    instanceId,
     toEventId,
     hostRows.map((row) => row.hostId),
     participantRows.map((row) => ({ userId: row.userId, role: row.role })),
   )
 }
 
-async function checkMutationLimit(orgId: string, userId: string): Promise<{ ok: true } | { error: string }> {
-  if (await calendarMutationLimiter.check(`${orgId}:${userId}`)) {
+async function checkMutationLimit(instanceId: string, userId: string): Promise<{ ok: true } | { error: string }> {
+  if (await calendarMutationLimiter.check(`${instanceId}:${userId}`)) {
     return { ok: true }
   }
   return { error: 'Too many calendar changes. Please wait a minute and try again.' }
@@ -426,10 +426,10 @@ async function hydrateInstances(rowsById: Map<string, CalendarEvent>, instances:
 }
 
 export async function listCalendarEvents(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ events: CalendarEventInstanceView[] } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const range = parseListRange(input)
   if ('error' in range) return range
 
@@ -437,7 +437,7 @@ export async function listCalendarEvents(
     const [rangeRows, seriesRows] = await Promise.all([
       db.query.calendarEvents.findMany({
         where: and(
-          eq(calendarEvents.organisationId, orgId),
+          eq(calendarEvents.instanceId, instanceId),
           isNull(calendarEvents.deletedAt),
           lt(calendarEvents.startsAt, range.endsAt),
           gt(calendarEvents.endsAt, range.startsAt),
@@ -446,7 +446,7 @@ export async function listCalendarEvents(
       }),
       db.query.calendarEvents.findMany({
         where: and(
-          eq(calendarEvents.organisationId, orgId),
+          eq(calendarEvents.instanceId, instanceId),
           isNull(calendarEvents.deletedAt),
           isNull(calendarEvents.seriesId),
           isNotNull(calendarEvents.recurrenceRule),
@@ -463,7 +463,7 @@ export async function listCalendarEvents(
     const exceptionRows = seriesIds.length > 0
       ? await db.query.calendarEvents.findMany({
           where: and(
-            eq(calendarEvents.organisationId, orgId),
+            eq(calendarEvents.instanceId, instanceId),
             isNull(calendarEvents.deletedAt),
             inArray(calendarEvents.seriesId, seriesIds),
           ),
@@ -518,16 +518,16 @@ export async function listCalendarEvents(
 }
 
 export async function searchCalendarHosts(
-  orgId: string,
+  instanceId: string,
   input: unknown = {},
 ): Promise<{ hosts: CalendarHostOption[] } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const parsed = searchInputSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid host search' }
 
   const query = parsed.data.query?.trim()
   const limit = parsed.data.limit ?? 50
-  const conditions = [eq(hosts.organisationId, orgId), isNull(hosts.deletedAt)]
+  const conditions = [eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)]
   if (query) {
     const pattern = `%${escapeLikePattern(query)}%`
     const searchClause = or(ilike(hosts.hostname, pattern), ilike(hosts.displayName, pattern))
@@ -544,17 +544,17 @@ export async function searchCalendarHosts(
 }
 
 export async function searchCalendarUsers(
-  orgId: string,
+  instanceId: string,
   input: unknown = {},
 ): Promise<{ users: CalendarUserOption[] } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const parsed = searchInputSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid user search' }
 
   const query = parsed.data.query?.trim()
   const limit = parsed.data.limit ?? 50
   const conditions = [
-    eq(users.organisationId, orgId),
+    eq(users.instanceId, instanceId),
     eq(users.isActive, true),
     isNull(users.deletedAt),
   ]
@@ -574,26 +574,26 @@ export async function searchCalendarUsers(
 }
 
 export async function createCalendarEvent(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const session = await requireOrgWriteAccess(orgId)
-  const limit = await checkMutationLimit(orgId, session.user.id)
+  const session = await requireInstanceWriteAccess(instanceId)
+  const limit = await checkMutationLimit(instanceId, session.user.id)
   if ('error' in limit) return limit
 
   const parsed = parseCalendarInput(input)
   if ('error' in parsed) return parsed
 
-  const hostCheck = await ensureHostsBelongToOrg(orgId, parsed.data.hostIds)
+  const hostCheck = await ensureHostsBelongToOrg(instanceId, parsed.data.hostIds)
   if ('error' in hostCheck) return hostCheck
-  const participantCheck = await ensureUsersBelongToOrg(orgId, parsed.data.participants)
+  const participantCheck = await ensureUsersBelongToOrg(instanceId, parsed.data.participants)
   if ('error' in participantCheck) return participantCheck
 
   try {
     const existingIdempotentEvent = parsed.data.clientRequestId
       ? await db.query.calendarEvents.findFirst({
           where: and(
-            eq(calendarEvents.organisationId, orgId),
+            eq(calendarEvents.instanceId, instanceId),
             eq(calendarEvents.clientRequestId, parsed.data.clientRequestId),
             isNull(calendarEvents.deletedAt),
           ),
@@ -609,7 +609,7 @@ export async function createCalendarEvent(
       const [created] = await tx
         .insert(calendarEvents)
         .values({
-          organisationId: orgId,
+          instanceId: instanceId,
           createdBy: session.user.id,
           title: parsed.data.title,
           description: parsed.data.description ?? null,
@@ -625,9 +625,9 @@ export async function createCalendarEvent(
         .returning({ id: calendarEvents.id })
 
       if (!created) throw new Error('Failed to create calendar event')
-      await replaceLinks(tx, orgId, created.id, hostCheck.hostIds, participantCheck.participants)
+      await replaceLinks(tx, instanceId, created.id, hostCheck.hostIds, participantCheck.participants)
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'calendar.event.created',
         targetType: 'calendar_event',
@@ -652,24 +652,24 @@ export async function createCalendarEvent(
 }
 
 export async function updateCalendarEvent(
-  orgId: string,
+  instanceId: string,
   eventId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgWriteAccess(orgId)
-  const limit = await checkMutationLimit(orgId, session.user.id)
+  const session = await requireInstanceWriteAccess(instanceId)
+  const limit = await checkMutationLimit(instanceId, session.user.id)
   if ('error' in limit) return limit
 
   const parsed = parseCalendarInput(input)
   if ('error' in parsed) return parsed
 
-  const hostCheck = await ensureHostsBelongToOrg(orgId, parsed.data.hostIds)
+  const hostCheck = await ensureHostsBelongToOrg(instanceId, parsed.data.hostIds)
   if ('error' in hostCheck) return hostCheck
-  const participantCheck = await ensureUsersBelongToOrg(orgId, parsed.data.participants)
+  const participantCheck = await ensureUsersBelongToOrg(instanceId, parsed.data.participants)
   if ('error' in participantCheck) return participantCheck
 
   const existing = await db.query.calendarEvents.findFirst({
-    where: and(eq(calendarEvents.id, eventId), eq(calendarEvents.organisationId, orgId), isNull(calendarEvents.deletedAt)),
+    where: and(eq(calendarEvents.id, eventId), eq(calendarEvents.instanceId, instanceId), isNull(calendarEvents.deletedAt)),
   })
   if (!existing) return { error: 'Calendar event not found' }
 
@@ -689,11 +689,11 @@ export async function updateCalendarEvent(
           recurrenceRule: existing.seriesId ? null : parsed.data.recurrenceRule,
           updatedAt: new Date(),
         })
-        .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.organisationId, orgId)))
+        .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.instanceId, instanceId)))
 
-      await replaceLinks(tx, orgId, eventId, hostCheck.hostIds, participantCheck.participants)
+      await replaceLinks(tx, instanceId, eventId, hostCheck.hostIds, participantCheck.participants)
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'calendar.event.updated',
         targetType: 'calendar_event',
@@ -716,11 +716,11 @@ export async function updateCalendarEvent(
 }
 
 export async function moveCalendarEventInstance(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  const session = await requireOrgWriteAccess(orgId)
-  const limit = await checkMutationLimit(orgId, session.user.id)
+  const session = await requireInstanceWriteAccess(instanceId)
+  const limit = await checkMutationLimit(instanceId, session.user.id)
   if ('error' in limit) return limit
 
   const parsed = moveCalendarEventInputSchema.safeParse(input)
@@ -741,7 +741,7 @@ export async function moveCalendarEventInstance(
   if (endsAt <= startsAt) return { error: 'End time must be after start time' }
 
   const existing = await db.query.calendarEvents.findFirst({
-    where: and(eq(calendarEvents.id, parsed.data.eventId), eq(calendarEvents.organisationId, orgId), isNull(calendarEvents.deletedAt)),
+    where: and(eq(calendarEvents.id, parsed.data.eventId), eq(calendarEvents.instanceId, instanceId), isNull(calendarEvents.deletedAt)),
   })
   if (!existing) return { error: 'Calendar event not found' }
 
@@ -750,7 +750,7 @@ export async function moveCalendarEventInstance(
       if (existing.recurrenceRule && recurrenceInstanceStartAt && parsed.data.scope === 'this') {
         const existingException = await tx.query.calendarEvents.findFirst({
           where: and(
-            eq(calendarEvents.organisationId, orgId),
+            eq(calendarEvents.instanceId, instanceId),
             eq(calendarEvents.seriesId, existing.id),
             eq(calendarEvents.recurrenceInstanceStartAt, recurrenceInstanceStartAt),
             isNull(calendarEvents.deletedAt),
@@ -778,7 +778,7 @@ export async function moveCalendarEventInstance(
         } else {
           await tx.insert(calendarEvents).values({
             id: exceptionId,
-            organisationId: orgId,
+            instanceId: instanceId,
             createdBy: session.user.id,
             title: existing.title,
             description: existing.description,
@@ -793,11 +793,11 @@ export async function moveCalendarEventInstance(
             recurrenceInstanceStartAt,
             exceptionType: 'modified',
           })
-          await copyLinksFromEvent(tx, orgId, existing.id, exceptionId)
+          await copyLinksFromEvent(tx, instanceId, existing.id, exceptionId)
         }
 
         await writeAuditEvent(tx, {
-          organisationId: orgId,
+          instanceId: instanceId,
           actorUserId: session.user.id,
           action: 'calendar.event.occurrence_moved',
           targetType: 'calendar_event',
@@ -823,10 +823,10 @@ export async function moveCalendarEventInstance(
           allDay: parsed.data.allDay ?? existing.allDay,
           updatedAt: new Date(),
         })
-        .where(and(eq(calendarEvents.id, existing.id), eq(calendarEvents.organisationId, orgId)))
+        .where(and(eq(calendarEvents.id, existing.id), eq(calendarEvents.instanceId, instanceId)))
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'calendar.event.moved',
         targetType: 'calendar_event',
@@ -844,18 +844,18 @@ export async function moveCalendarEventInstance(
 }
 
 export async function deleteCalendarEvent(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgWriteAccess(orgId)
-  const limit = await checkMutationLimit(orgId, session.user.id)
+  const session = await requireInstanceWriteAccess(instanceId)
+  const limit = await checkMutationLimit(instanceId, session.user.id)
   if ('error' in limit) return limit
 
   const parsed = deleteCalendarEventInputSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid calendar delete' }
 
   const existing = await db.query.calendarEvents.findFirst({
-    where: and(eq(calendarEvents.id, parsed.data.eventId), eq(calendarEvents.organisationId, orgId), isNull(calendarEvents.deletedAt)),
+    where: and(eq(calendarEvents.id, parsed.data.eventId), eq(calendarEvents.instanceId, instanceId), isNull(calendarEvents.deletedAt)),
   })
   if (!existing) return { error: 'Calendar event not found' }
 
@@ -864,7 +864,7 @@ export async function deleteCalendarEvent(
       if (existing.recurrenceRule && parsed.data.scope === 'this' && parsed.data.recurrenceInstanceStartAt) {
         const recurrenceInstanceStartAt = parseDate(parsed.data.recurrenceInstanceStartAt, 'Occurrence start time')
         await tx.insert(calendarEvents).values({
-          organisationId: orgId,
+          instanceId: instanceId,
           createdBy: session.user.id,
           title: existing.title,
           description: existing.description,
@@ -884,14 +884,14 @@ export async function deleteCalendarEvent(
           .set({ deletedAt: new Date(), updatedAt: new Date() })
           .where(
             or(
-              and(eq(calendarEvents.id, existing.id), eq(calendarEvents.organisationId, orgId)),
-              and(eq(calendarEvents.seriesId, existing.id), eq(calendarEvents.organisationId, orgId)),
+              and(eq(calendarEvents.id, existing.id), eq(calendarEvents.instanceId, instanceId)),
+              and(eq(calendarEvents.seriesId, existing.id), eq(calendarEvents.instanceId, instanceId)),
             ),
           )
       }
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'calendar.event.deleted',
         targetType: 'calendar_event',

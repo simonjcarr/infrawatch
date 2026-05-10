@@ -227,7 +227,7 @@ const PASSWORD_MANAGER_ENTRY_TEMPLATES: Array<{
 ]
 const DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID: PasswordManagerEntryTemplateId = 'login'
 
-export type PasswordManagerOrganisationUser = {
+export type PasswordManagerInstanceUser = {
   id: string
   name: string | null
   email: string
@@ -374,11 +374,11 @@ function getTimedSecretProgressPercent(timer: PasswordManagerTimedSecret | undef
 export function PasswordManagerClientShell({
   currentUserId,
   scopeId,
-  organisationUsers,
+  instanceUsers,
 }: {
   currentUserId: string
   scopeId: string
-  organisationUsers: PasswordManagerOrganisationUser[]
+  instanceUsers: PasswordManagerInstanceUser[]
 }) {
   const client = useMemo(
     () =>
@@ -393,8 +393,8 @@ export function PasswordManagerClientShell({
     scopeId,
     createInitialPasswordManagerShellState,
   )
-  const currentScopeId = ((state as unknown as Record<string, unknown>)['organisation' + 'Id'] as string | undefined) ?? ''
-  const scopeMetadata = { ['organisation' + 'Id']: currentScopeId }
+  const currentScopeId = ((state as unknown as Record<string, unknown>)['instance' + 'Id'] as string | undefined) ?? ''
+  const scopeMetadata = { ['instance' + 'Id']: currentScopeId }
   const [workspaceState, workspaceDispatch] = useReducer(
     reducePasswordManagerWorkspaceState,
     undefined,
@@ -740,7 +740,7 @@ export function PasswordManagerClientShell({
       return
     }
 
-    const externalUserIds = organisationUsers.map((user) => user.id)
+    const externalUserIds = instanceUsers.map((user) => user.id)
     if (externalUserIds.length === 0) {
       setMemberRecipients({})
       setMemberRecipientsPending(false)
@@ -810,7 +810,7 @@ export function PasswordManagerClientShell({
     return () => {
       cancelled = true
     }
-  }, [client, currentUserId, memberRecipientLookupVaultId, organisationUsers, selectedVault, state.view])
+  }, [client, currentUserId, memberRecipientLookupVaultId, instanceUsers, selectedVault, state.view])
 
   useEffect(() => {
     if (state.view !== 'unlocked' || !state.activeKeyPair) {
@@ -1421,13 +1421,13 @@ export function PasswordManagerClientShell({
 
     const externalUserId = memberUserId.trim()
     if (!externalUserId) {
-      setWorkspaceError('Select an organisation user to add as a member.')
+      setWorkspaceError('Select an instance user to add as a member.')
       return
     }
 
     const recipient = memberRecipients[externalUserId]
     if (!recipient) {
-      setWorkspaceError('Password Manager has not seen that organisation user yet. Ask them to launch Password Manager once, then retry.')
+      setWorkspaceError('Password Manager has not seen that instance user yet. Ask them to launch Password Manager once, then retry.')
       return
     }
     if (!recipient.setup_configured || !recipient.public_key_envelope) {
@@ -2088,7 +2088,7 @@ export function PasswordManagerClientShell({
           memberUserId={memberUserId}
           members={members}
           membersPending={membersPending}
-          organisationUsers={organisationUsers}
+          instanceUsers={instanceUsers}
           onCopyEntryField={handleCopyEntryField}
           onCopyPassword={handleCopyPassword}
           onCreateVault={runVaultCreate}
@@ -2496,7 +2496,7 @@ function PasswordManagerShellCard({
           icon={ShieldAlert}
           eyebrow="Access denied"
           title="Password Manager access is restricted"
-          description="Your current CT-Ops session does not have access to launch the Password Manager for this organisation."
+          description="Your current CT-Ops session does not have access to launch the Password Manager for this instance."
           statusLabel="Access denied"
           statusVariant="destructive"
           testId="password-manager-state-access-denied"
@@ -2644,7 +2644,7 @@ function PasswordManagerWorkspace({
   memberUserId,
   members,
   membersPending,
-  organisationUsers,
+  instanceUsers,
   onCopyEntryField,
   onCopyPassword,
   onCreateVault,
@@ -2723,7 +2723,7 @@ function PasswordManagerWorkspace({
   memberUserId: string
   members: MemberRecord[]
   membersPending: boolean
-  organisationUsers: PasswordManagerOrganisationUser[]
+  instanceUsers: PasswordManagerInstanceUser[]
   onCopyEntryField: (entry: PasswordManagerEntrySummary, fieldId: string, fieldLabel: string) => Promise<void>
   onCopyPassword: (entry: PasswordManagerEntrySummary) => Promise<void>
   onCreateVault: () => Promise<void>
@@ -2792,12 +2792,12 @@ function PasswordManagerWorkspace({
   const [sshKeyGenerationError, setSshKeyGenerationError] = useState<string | null>(null)
   const [visibleEntryPasswordFields, setVisibleEntryPasswordFields] = useState<Record<string, boolean>>({})
   const memberIds = new Set(members.map((member) => member.user_id))
-  const selectedOrganisationUser = organisationUsers.find((user) => user.id === memberUserId) ?? null
+  const selectedInstanceUser = instanceUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
   const activeEntryTemplate = getPasswordManagerEntryTemplate(entryTemplateId)
   const isViewingEntry = entryDialogMode === 'view'
-  const selectedMemberLabel = selectedOrganisationUser
-    ? `${selectedOrganisationUser.name || selectedOrganisationUser.email} (${selectedOrganisationUser.email})`
+  const selectedMemberLabel = selectedInstanceUser
+    ? `${selectedInstanceUser.name || selectedInstanceUser.email} (${selectedInstanceUser.email})`
     : 'Select user'
 
   async function handleCreateVaultFromDialog() {
@@ -3865,7 +3865,7 @@ function PasswordManagerWorkspace({
                   <Separator />
                   <div className="grid gap-4 lg:grid-cols-2">
                     <div className="grid gap-2">
-                      <Label>Organisation user</Label>
+                      <Label>Instance user</Label>
                       <Popover
                         open={memberSelectorOpen}
                         onOpenChange={(open) => {
@@ -3889,11 +3889,11 @@ function PasswordManagerWorkspace({
                         </PopoverTrigger>
                         <PopoverContent className="w-[360px] p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Search organisation users..." />
+                            <CommandInput placeholder="Search instance users..." />
                             <CommandList>
-                              <CommandEmpty>No organisation users found.</CommandEmpty>
+                              <CommandEmpty>No instance users found.</CommandEmpty>
                               <CommandGroup>
-                                {organisationUsers.map((user) => {
+                                {instanceUsers.map((user) => {
                                   const recipient = memberRecipients[user.id]
                                   const alreadyMember = recipient ? memberIds.has(recipient.user_id) : false
                                   const ready = Boolean(recipient?.setup_configured && recipient.public_key_envelope && !alreadyMember)

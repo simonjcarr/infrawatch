@@ -4,13 +4,13 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { twoFactor } from 'better-auth/plugins'
 import { authDb, db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
-import { parseOrgMetadata } from '@/lib/db/schema/organisations'
+import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import {
   getAuthEmailConfigFromOrgSettings,
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from './email'
-import { getDefaultOrganisationId } from '@/lib/default-organisation'
+import { getDefaultInstanceId } from '@/lib/default-instance'
 import {
   getBetterAuthOrigin,
   getBetterAuthSecret,
@@ -30,18 +30,18 @@ const requireEmailVerification = getRequireEmailVerification()
 async function getAuthEmailConfigForUser(userId: string) {
   const user = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.id, userId),
-    columns: { organisationId: true },
+    columns: { instanceId: true },
   })
-  const organisationId = user?.organisationId ?? await getDefaultOrganisationId()
-  if (!organisationId) return null
+  const instanceId = user?.instanceId ?? await getDefaultInstanceId()
+  if (!instanceId) return null
 
-  const organisation = await db.query.organisations.findFirst({
-    where: (organisations, { eq }) => eq(organisations.id, organisationId),
+  const instance = await db.query.instanceSettings.findFirst({
+    where: (instanceSettingsTable, { eq }) => eq(instanceSettingsTable.id, instanceId),
     columns: { metadata: true },
   })
-  if (!organisation) return null
+  if (!instance) return null
 
-  const metadata = parseOrgMetadata(organisation.metadata)
+  const metadata = parseInstanceMetadata(instance.metadata)
   return getAuthEmailConfigFromOrgSettings(metadata.notificationSettings)
 }
 

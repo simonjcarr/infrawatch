@@ -2,11 +2,11 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_USER } from '../fixtures/seed'
 
-test('organisation 2FA requirement redirects unprotected users to profile setup', async ({ authenticatedPage: page }) => {
+test('instance 2FA requirement redirects unprotected users to profile setup', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await sql`
-    UPDATE organisations
+    UPDATE instance_settings
     SET metadata = jsonb_build_object(
       'securitySettings',
       jsonb_build_object('requireTwoFactor', true)

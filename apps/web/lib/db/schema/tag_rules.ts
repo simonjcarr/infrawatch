@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import type { TagPair } from './tags.ts'
 
 // A host filter expressed as a discriminated-union of optional predicates.
@@ -30,9 +30,9 @@ export interface HostFilter {
 
 export const tagRules = pgTable('tag_rules', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   name: text('name').notNull(),
   filter: jsonb('filter').$type<HostFilter>().notNull(),
   tags: jsonb('tags').$type<TagPair[]>().notNull(),

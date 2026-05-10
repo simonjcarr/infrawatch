@@ -40,7 +40,7 @@ function finding(overrides = {}) {
 function batch(findings = [finding()], overrides = {}) {
   return {
     contractVersion: '2026-04-30',
-    orgId: 'org_1',
+    instanceId: 'org_1',
     batchId: 'findings_20260430_092000_org_1',
     generatedAt,
     findings,
@@ -50,8 +50,8 @@ function batch(findings = [finding()], overrides = {}) {
 
 function repo(overrides = {}) {
   const state = {
-    hosts: new Map([['host_1', { id: 'host_1', organisationId: 'org_1', deletedAt: null }]]),
-    packages: new Map([['pkg_1', { id: 'pkg_1', organisationId: 'org_1', hostId: 'host_1', removedAt: null, deletedAt: null }]]),
+    hosts: new Map([['host_1', { id: 'host_1', instanceId: 'org_1', deletedAt: null }]]),
+    packages: new Map([['pkg_1', { id: 'pkg_1', instanceId: 'org_1', hostId: 'host_1', removedAt: null, deletedAt: null }]]),
     existing: new Map(),
     cves: [],
     findings: [],
@@ -63,13 +63,13 @@ function repo(overrides = {}) {
       async transaction(run) {
         return run(this)
       },
-      async getHosts(_orgId, hostIds) {
+      async getHosts(_instanceId, hostIds) {
         return new Map(hostIds.map((id) => [id, state.hosts.get(id)]).filter(([, value]) => value))
       },
-      async getSoftwarePackages(_orgId, packageIds) {
+      async getSoftwarePackages(_instanceId, packageIds) {
         return new Map(packageIds.map((id) => [id, state.packages.get(id)]).filter(([, value]) => value))
       },
-      async getExistingFindings(_orgId, keys) {
+      async getExistingFindings(_instanceId, keys) {
         return new Map(keys.map((key) => [key.join('\0'), state.existing.get(key.join('\0'))]).filter(([, value]) => value))
       },
       async upsertCve(cve) {

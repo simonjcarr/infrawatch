@@ -63,7 +63,7 @@ test('super admin can review the current agent CA and upload a replacement CA fr
   await sql`
     INSERT INTO certificate_authorities (
       id,
-      organisation_id,
+      instance_id,
       purpose,
       cert_pem,
       key_pem_encrypted,
@@ -161,7 +161,7 @@ test('super admin can review the current agent CA and upload a replacement CA fr
   )
 })
 
-test('admin can require two-factor authentication for the organisation', async ({ authenticatedPage: page }) => {
+test('admin can require two-factor authentication for the instance', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await page.goto('/settings/security')
@@ -179,7 +179,7 @@ test('admin can require two-factor authentication for the organisation', async (
     .poll(async () => {
       const rows = await sql<Array<{ require_two_factor: boolean | null }>>`
         SELECT (metadata #>> '{securitySettings,requireTwoFactor}')::boolean AS require_two_factor
-        FROM organisations
+        FROM instance_settings
         LIMIT 1
       `
 

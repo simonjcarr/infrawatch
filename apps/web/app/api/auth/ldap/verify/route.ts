@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await assertUserCanAccessSeat(user.organisationId!, user.id)
+    await assertUserCanAccessSeat(user.instanceId!, user.id)
 
     const credential = await db.query.totpCredentials.findFirst({
       where: eq(totpCredentials.userId, user.id),

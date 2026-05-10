@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, integer, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 
 export type ServiceAccountStatus = 'active' | 'missing' | 'disabled'
@@ -19,7 +19,7 @@ export type IdentityEventType =
 
 export const serviceAccounts = pgTable('service_accounts', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
   username: text('username').notNull(),
   uid: integer('uid'),
@@ -40,15 +40,15 @@ export const serviceAccounts = pgTable('service_accounts', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (t) => [
-  uniqueIndex('service_accounts_identity_idx').on(t.organisationId, t.hostId, t.username),
-  index('service_accounts_org_type_idx').on(t.organisationId, t.accountType),
-  index('service_accounts_org_status_idx').on(t.organisationId, t.status),
-  index('service_accounts_org_host_idx').on(t.organisationId, t.hostId),
+  uniqueIndex('service_accounts_identity_idx').on(t.instanceId, t.hostId, t.username),
+  index('service_accounts_org_type_idx').on(t.instanceId, t.accountType),
+  index('service_accounts_org_status_idx').on(t.instanceId, t.status),
+  index('service_accounts_org_host_idx').on(t.instanceId, t.hostId),
 ])
 
 export const sshKeys = pgTable('ssh_keys', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
   serviceAccountId: text('service_account_id').references(() => serviceAccounts.id),
   keyType: text('key_type').notNull().$type<SshKeyType>().default('unknown'),
@@ -67,17 +67,17 @@ export const sshKeys = pgTable('ssh_keys', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (t) => [
-  uniqueIndex('ssh_keys_identity_idx').on(t.organisationId, t.hostId, t.fingerprintSha256, t.filePath),
-  index('ssh_keys_org_fingerprint_idx').on(t.organisationId, t.fingerprintSha256),
-  index('ssh_keys_org_type_idx').on(t.organisationId, t.keyType),
-  index('ssh_keys_org_status_idx').on(t.organisationId, t.status),
-  index('ssh_keys_org_host_idx').on(t.organisationId, t.hostId),
+  uniqueIndex('ssh_keys_identity_idx').on(t.instanceId, t.hostId, t.fingerprintSha256, t.filePath),
+  index('ssh_keys_org_fingerprint_idx').on(t.instanceId, t.fingerprintSha256),
+  index('ssh_keys_org_type_idx').on(t.instanceId, t.keyType),
+  index('ssh_keys_org_status_idx').on(t.instanceId, t.status),
+  index('ssh_keys_org_host_idx').on(t.instanceId, t.hostId),
   index('ssh_keys_account_idx').on(t.serviceAccountId),
 ])
 
 export const identityEvents = pgTable('identity_events', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   serviceAccountId: text('service_account_id').references(() => serviceAccounts.id),
   sshKeyId: text('ssh_key_id').references(() => sshKeys.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
@@ -86,7 +86,7 @@ export const identityEvents = pgTable('identity_events', {
   occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
   metadata: jsonb('metadata'),
 }, (t) => [
-  index('identity_events_org_time_idx').on(t.organisationId, t.occurredAt),
+  index('identity_events_org_time_idx').on(t.instanceId, t.occurredAt),
   index('identity_events_account_time_idx').on(t.serviceAccountId, t.occurredAt),
   index('identity_events_key_time_idx').on(t.sshKeyId, t.occurredAt),
   index('identity_events_host_time_idx').on(t.hostId, t.occurredAt),

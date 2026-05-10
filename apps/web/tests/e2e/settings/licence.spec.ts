@@ -6,7 +6,7 @@ import { issueTestLicence } from '../fixtures/licence'
 async function getOrg(sql: ReturnType<typeof getTestDb>): Promise<{ id: string; licence_tier: string }> {
   const rows = await sql<Array<{ id: string; licence_tier: string }>>`
     SELECT id, licence_tier
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -18,14 +18,14 @@ test('admin can validate and save a seat-capacity licence key from licence setti
   const sql = getTestDb()
   const org = await getOrg(sql)
   const licenceKey = await issueTestLicence({
-    orgId: org.id,
+    instanceId: org.id,
     tier: 'community',
     maxUsers: 8,
   })
 
   await page.goto('/settings/licence')
 
-  await expect(page.getByTestId('settings-heading')).toContainText('Organisation')
+  await expect(page.getByTestId('settings-heading')).toContainText('Instance')
   await expect(page.getByText('Current tier', { exact: true })).toBeVisible()
   await expect(page.getByText('Community', { exact: true })).toBeVisible()
 
@@ -45,7 +45,7 @@ test('admin can validate and save a seat-capacity licence key from licence setti
     .poll(async () => {
       const rows = await sql<Array<{ licence_tier: string; licence_key: string | null }>>`
         SELECT licence_tier, licence_key
-        FROM organisations
+        FROM instance_settings
         WHERE id = ${org.id}
         LIMIT 1
       `

@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess, requireOrgAdminAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -36,15 +36,15 @@ export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: 
   const session = await getRequiredSession()
   const currentScope = resolveOptionalActionScope(session)
   if (!currentScope) return { members: [session.user], pendingInvites: [] }
-  await requireOrgAccess(currentScope)
+  await requireInstanceAccess(currentScope)
 
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({
-      where: and(eq(users.organisationId, currentScope), isNull(users.deletedAt)),
+      where: and(eq(users.instanceId, currentScope), isNull(users.deletedAt)),
     }),
     db.query.invitations.findMany({
       where: and(
-        eq(invitations.organisationId, currentScope),
+        eq(invitations.instanceId, currentScope),
         isNull(invitations.deletedAt),
         isNull(invitations.acceptedAt),
         gt(invitations.expiresAt, new Date()),
@@ -58,8 +58,8 @@ export async function inviteUser(
   input: { email: string; roles: string[] },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
   const currentScope = resolveCurrentActionScope(await getRequiredSession())
-  const orgId = currentScope
-  await requireOrgAccess(orgId)
+  const instanceId = currentScope
+  await requireInstanceAccess(instanceId)
   const parsed = inviteSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -69,19 +69,19 @@ export async function inviteUser(
   const nextRole = getPrimaryRole(nextRoles)
 
   try {
-    const session = await requireOrgAdminAccess(orgId)
+    const session = await requireInstanceAdminAccess(instanceId)
 
     // Check for a previously removed user — restore them rather than re-registering,
     // since their account (and email) still exist in the database.
     const removedUser = await db.query.users.findFirst({
       where: and(
         eq(users.email, parsed.data.email),
-        eq(users.organisationId, orgId),
+        eq(users.instanceId, instanceId),
         isNotNull(users.deletedAt),
       ),
     })
     if (removedUser) {
-      await assertCanReserveUserSeat(orgId)
+      await assertCanReserveUserSeat(instanceId)
       await db.transaction(async (tx) => {
         await tx
           .update(users)
@@ -89,12 +89,12 @@ export async function inviteUser(
           .where(eq(users.id, removedUser.id))
 
         await writeAuditEvent(tx, {
-          organisationId: orgId,
+          instanceId: instanceId,
           actorUserId: session.user.id,
           action: 'user.restored',
           targetType: 'user',
           targetId: removedUser.id,
-          summary: `Restored ${removedUser.email} to the organisation`,
+          summary: `Restored ${removedUser.email} to the instance`,
           metadata: {
             targetEmail: removedUser.email,
             previousRole: removedUser.role,
@@ -110,18 +110,18 @@ export async function inviteUser(
     const existing = await db.query.users.findFirst({
       where: and(
         eq(users.email, parsed.data.email),
-        eq(users.organisationId, orgId),
+        eq(users.instanceId, instanceId),
         isNull(users.deletedAt),
       ),
     })
     if (existing) {
-      return { error: 'This user is already a member of your organisation' }
+      return { error: 'This user is already a member of your instance' }
     }
 
     const existingInvite = await db.query.invitations.findFirst({
       where: and(
         eq(invitations.email, parsed.data.email),
-        eq(invitations.organisationId, orgId),
+        eq(invitations.instanceId, instanceId),
         isNull(invitations.deletedAt),
         isNull(invitations.acceptedAt),
         gt(invitations.expiresAt, new Date()),
@@ -131,7 +131,7 @@ export async function inviteUser(
       return { error: 'An invitation has already been sent to this email address' }
     }
 
-    await assertCanReserveUserSeat(orgId)
+    await assertCanReserveUserSeat(instanceId)
 
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
@@ -143,7 +143,7 @@ export async function inviteUser(
           email: parsed.data.email,
           role: nextRole,
           roles: nextRoles,
-          organisationId: orgId,
+          instanceId: instanceId,
           invitedById: session.user.id,
           expiresAt,
         })
@@ -152,12 +152,12 @@ export async function inviteUser(
       if (!createdInvite) return null
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'invitation.created',
         targetType: 'invitation',
         targetId: createdInvite.id,
-        summary: `Invited ${createdInvite.email} to the organisation`,
+        summary: `Invited ${createdInvite.email} to the instance`,
         metadata: {
           targetEmail: createdInvite.email,
           role: createdInvite.role,
@@ -188,8 +188,8 @@ export async function updateUserRole(
   roles: string[],
 ): Promise<{ success: true } | { error: string }> {
   const currentScope = resolveCurrentActionScope(await getRequiredSession())
-  const orgId = currentScope
-  await requireOrgAccess(orgId)
+  const instanceId = currentScope
+  await requireInstanceAccess(instanceId)
   const parsed = updateRoleSchema.safeParse({ roles })
   if (!parsed.success) {
     return { error: 'Invalid role' }
@@ -199,9 +199,9 @@ export async function updateUserRole(
   const nextRole = getPrimaryRole(nextRoles)
 
   try {
-    const session = await requireOrgAdminAccess(orgId)
+    const session = await requireInstanceAdminAccess(instanceId)
     const targetUser = await db.query.users.findFirst({
-      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId)),
+      where: and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)),
       columns: { id: true, email: true, role: true, roles: true },
     })
     if (!targetUser) {
@@ -210,7 +210,7 @@ export async function updateUserRole(
 
     if (hasSuperAdminRole(targetUser.role, targetUser.roles) && !nextRoles.includes('super_admin')) {
       const orgUsers = await db.query.users.findMany({
-        where: and(eq(users.organisationId, orgId), isNull(users.deletedAt)),
+        where: and(eq(users.instanceId, instanceId), isNull(users.deletedAt)),
         columns: { id: true, role: true, roles: true },
       })
       const superAdmins = orgUsers.filter((user) => hasSuperAdminRole(user.role, user.roles))
@@ -225,10 +225,10 @@ export async function updateUserRole(
       await tx
         .update(users)
         .set({ role: nextRole, roles: nextRoles, updatedAt: new Date() })
-        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+        .where(and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)))
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'user.role.updated',
         targetType: 'user',
@@ -255,17 +255,17 @@ export async function deactivateUser(
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
   const currentScope = resolveCurrentActionScope(await getRequiredSession())
-  const orgId = currentScope
-  await requireOrgAccess(orgId)
+  const instanceId = currentScope
+  await requireInstanceAccess(instanceId)
   try {
-    const session = await requireOrgAdminAccess(orgId)
+    const session = await requireInstanceAdminAccess(instanceId)
 
     if (session.user.id === targetUserId) {
       return { error: 'You cannot deactivate your own account' }
     }
 
     const targetUser = await db.query.users.findFirst({
-      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      where: and(eq(users.id, targetUserId), eq(users.instanceId, instanceId), isNull(users.deletedAt)),
       columns: { id: true, email: true, isActive: true, role: true, roles: true },
     })
     if (!targetUser) {
@@ -274,7 +274,7 @@ export async function deactivateUser(
 
     const activeSuperAdmins = await db.query.users.findMany({
       where: and(
-        eq(users.organisationId, orgId),
+        eq(users.instanceId, instanceId),
         eq(users.isActive, true),
       ),
       columns: { id: true, role: true, roles: true },
@@ -289,12 +289,12 @@ export async function deactivateUser(
       await tx
         .update(users)
         .set({ isActive: false, updatedAt: new Date() })
-        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+        .where(and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)))
 
       await tx.delete(sessions).where(eq(sessions.userId, targetUserId))
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'user.deactivated',
         targetType: 'user',
@@ -321,13 +321,13 @@ export async function reactivateUser(
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
   const currentScope = resolveCurrentActionScope(await getRequiredSession())
-  const orgId = currentScope
-  await requireOrgAccess(orgId)
+  const instanceId = currentScope
+  await requireInstanceAccess(instanceId)
   try {
-    const session = await requireOrgAdminAccess(orgId)
+    const session = await requireInstanceAdminAccess(instanceId)
 
     const targetUser = await db.query.users.findFirst({
-      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      where: and(eq(users.id, targetUserId), eq(users.instanceId, instanceId), isNull(users.deletedAt)),
       columns: { id: true, email: true, isActive: true, role: true, roles: true },
     })
     if (!targetUser) {
@@ -335,17 +335,17 @@ export async function reactivateUser(
     }
 
     if (!targetUser.isActive) {
-      await assertCanReserveUserSeat(orgId)
+      await assertCanReserveUserSeat(instanceId)
     }
 
     await db.transaction(async (tx) => {
       await tx
         .update(users)
         .set({ isActive: true, updatedAt: new Date() })
-        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+        .where(and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)))
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'user.reactivated',
         targetType: 'user',
@@ -376,10 +376,10 @@ export async function removeUser(
   targetUserId: string,
 ): Promise<{ success: true } | { error: string }> {
   const currentScope = resolveCurrentActionScope(await getRequiredSession())
-  const orgId = currentScope
-  await requireOrgAccess(orgId)
+  const instanceId = currentScope
+  await requireInstanceAccess(instanceId)
   try {
-    const session = await requireOrgAdminAccess(orgId)
+    const session = await requireInstanceAdminAccess(instanceId)
 
     if (session.user.id === targetUserId) {
       return { error: 'You cannot remove your own account' }
@@ -387,7 +387,7 @@ export async function removeUser(
 
     const superAdmins = await db.query.users.findMany({
       where: and(
-        eq(users.organisationId, orgId),
+        eq(users.instanceId, instanceId),
         isNull(users.deletedAt),
       ),
       columns: { id: true, role: true, roles: true },
@@ -399,7 +399,7 @@ export async function removeUser(
     }
 
     const targetUser = await db.query.users.findFirst({
-      where: and(eq(users.id, targetUserId), eq(users.organisationId, orgId), isNull(users.deletedAt)),
+      where: and(eq(users.id, targetUserId), eq(users.instanceId, instanceId), isNull(users.deletedAt)),
       columns: { id: true, email: true, role: true, roles: true },
     })
     if (!targetUser) {
@@ -410,17 +410,17 @@ export async function removeUser(
       await tx
         .update(users)
         .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
-        .where(and(eq(users.id, targetUserId), eq(users.organisationId, orgId)))
+        .where(and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)))
 
       await tx.delete(sessions).where(eq(sessions.userId, targetUserId))
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'user.removed',
         targetType: 'user',
         targetId: targetUser.id,
-        summary: `Removed ${targetUser.email} from the organisation`,
+        summary: `Removed ${targetUser.email} from the instance`,
         metadata: {
           targetEmail: targetUser.email,
           role: targetUser.role,
@@ -440,13 +440,13 @@ export async function cancelInvite(
   inviteId: string,
 ): Promise<{ success: true } | { error: string }> {
   const currentScope = resolveCurrentActionScope(await getRequiredSession())
-  const orgId = currentScope
-  await requireOrgAccess(orgId)
+  const instanceId = currentScope
+  await requireInstanceAccess(instanceId)
   try {
-    const session = await requireOrgAdminAccess(orgId)
+    const session = await requireInstanceAdminAccess(instanceId)
 
     const invite = await db.query.invitations.findFirst({
-      where: and(eq(invitations.id, inviteId), eq(invitations.organisationId, orgId), isNull(invitations.deletedAt)),
+      where: and(eq(invitations.id, inviteId), eq(invitations.instanceId, instanceId), isNull(invitations.deletedAt)),
       columns: { id: true, email: true, role: true, roles: true, expiresAt: true },
     })
     if (!invite) {
@@ -457,10 +457,10 @@ export async function cancelInvite(
       await tx
         .update(invitations)
         .set({ deletedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(invitations.id, inviteId), eq(invitations.organisationId, orgId)))
+        .where(and(eq(invitations.id, inviteId), eq(invitations.instanceId, instanceId)))
 
       await writeAuditEvent(tx, {
-        organisationId: orgId,
+        instanceId: instanceId,
         actorUserId: session.user.id,
         action: 'invitation.cancelled',
         targetType: 'invitation',

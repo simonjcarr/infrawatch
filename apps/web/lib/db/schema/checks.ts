@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, boolean, integer, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 
 export interface PortCheckConfig {
@@ -53,7 +53,7 @@ export type CheckStatus = 'pass' | 'fail' | 'error'
 
 export const checks = pgTable('checks', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').references(() => hosts.id),
   name: text('name').notNull(),
   checkType: text('check_type').notNull().$type<CheckType>(),
@@ -65,14 +65,14 @@ export const checks = pgTable('checks', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('checks_org_host_idx').on(table.organisationId, table.hostId),
+  index('checks_org_host_idx').on(table.instanceId, table.hostId),
 ])
 
 export const checkResults = pgTable('check_results', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   checkId: text('check_id').notNull().references(() => checks.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   ranAt: timestamp('ran_at', { withTimezone: true }).notNull(),
   status: text('status').notNull().$type<CheckStatus>(),
   output: text('output'),
@@ -80,7 +80,7 @@ export const checkResults = pgTable('check_results', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index('check_results_check_idx').on(table.checkId, table.ranAt),
-  index('check_results_org_idx').on(table.organisationId, table.ranAt),
+  index('check_results_instance_idx').on(table.instanceId, table.ranAt),
 ])
 
 export type Check = typeof checks.$inferSelect

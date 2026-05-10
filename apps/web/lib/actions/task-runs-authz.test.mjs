@@ -36,7 +36,7 @@ test('privileged host task actions require org admin access and derive actors fr
     )
     assert.match(
       segment,
-      /const session = await requireOrgAdminAccess\(currentScope\)/,
+      /const session = await requireInstanceAdminAccess\(currentScope\)/,
       `${action} must capture an org-admin-authorized session`,
     )
     assert.match(
@@ -53,7 +53,7 @@ test('privileged task schedule mutations require org admin access', () => {
 
     assert.match(
       segment,
-      /(?:const session = )?await requireOrgAdminAccess\(currentScope\)/,
+      /(?:const session = )?await requireInstanceAdminAccess\(currentScope\)/,
       `${action} must require org admin access before mutating privileged schedules`,
     )
   }

@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 
 // Normalised tag catalogue. One row per distinct (org, key, value) — resource
 // assignments reference this table via resource_tags.tag_id. The case-insensitive
@@ -12,9 +12,9 @@ export const tags = pgTable(
   'tags',
   {
     id: text('id').primaryKey().$defaultFn(() => createId()),
-    organisationId: text('organisation_id')
+    instanceId: text('instance_id')
       .notNull()
-      .references(() => organisations.id),
+      .references(() => instanceSettings.id),
     key: text('key').notNull(),
     value: text('value').notNull(),
     usageCount: integer('usage_count').notNull().default(0),
@@ -22,11 +22,11 @@ export const tags = pgTable(
   },
   (table) => [
     uniqueIndex('tags_org_key_value_ci_uidx').on(
-      table.organisationId,
+      table.instanceId,
       sql`lower(${table.key})`,
       sql`lower(${table.value})`,
     ),
-    index('tags_org_key_idx').on(table.organisationId, table.key),
+    index('tags_org_key_idx').on(table.instanceId, table.key),
   ],
 )
 

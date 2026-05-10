@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -16,12 +16,12 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('admin can preview, apply, and save bulk host tags', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -33,7 +33,7 @@ test('admin can preview, apply, and save bulk host tags', async ({ authenticated
     VALUES
       (
         'bulk-tag-host-match',
-        ${orgId},
+        ${instanceId},
         'web-01',
         'Web 01',
         'Ubuntu 24.04',
@@ -44,7 +44,7 @@ test('admin can preview, apply, and save bulk host tags', async ({ authenticated
       ),
       (
         'bulk-tag-host-ignore',
-        ${orgId},
+        ${instanceId},
         'db-01',
         'DB 01',
         'Ubuntu 24.04',
@@ -113,7 +113,7 @@ test('admin can preview, apply, and save bulk host tags', async ({ authenticated
       }>>`
         SELECT name, filter, tags
         FROM tag_rules
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND deleted_at IS NULL
           AND name = 'Production web hosts'
         LIMIT 1

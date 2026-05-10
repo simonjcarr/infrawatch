@@ -33,7 +33,7 @@ function lint(code) {
 test('no-single-table-select allows aggregates and joins', () => {
   assert.deepEqual(
     lint(`
-      const rows = await db.select({ total: count() }).from(tags).where(eq(tags.organisationId, orgId))
+      const rows = await db.select({ total: count() }).from(tags).where(eq(tags.instanceId, instanceId))
     `),
     [],
   )
@@ -43,7 +43,7 @@ test('no-single-table-select allows aggregates and joins', () => {
       const rows = await db
         .select({ tagId: tags.id, hostId: hosts.id })
         .from(tags)
-        .innerJoin(hosts, eq(hosts.organisationId, tags.organisationId))
+        .innerJoin(hosts, eq(hosts.instanceId, tags.instanceId))
     `),
     [],
   )
@@ -54,7 +54,7 @@ test('no-single-table-select flags simple single-table reads on db and tx', () =
     const rows = await db
       .select()
       .from(tags)
-      .where(eq(tags.organisationId, orgId))
+      .where(eq(tags.instanceId, instanceId))
       .orderBy(desc(tags.usageCount))
   `)
   assert.equal(dbMessages.length, 1)
@@ -64,7 +64,7 @@ test('no-single-table-select flags simple single-table reads on db and tx', () =
     const rows = await tx
       .select({ id: tags.id })
       .from(tags)
-      .where(eq(tags.organisationId, orgId))
+      .where(eq(tags.instanceId, instanceId))
   `)
   assert.equal(txMessages.length, 1)
   assert.equal(txMessages[0]?.messageId, 'preferQueryApi')

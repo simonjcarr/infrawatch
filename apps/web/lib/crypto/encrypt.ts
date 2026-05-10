@@ -11,7 +11,7 @@ const VERSION_V1 = 0x01
 
 // Legacy constants — only used when decrypting values written before v1 was introduced.
 // The hardcoded salt was the security flaw fixed by v1: a single compromised secret
-// decrypted every stored credential across all organisations.
+// decrypted every stored credential across all instanceSettings.
 const LEGACY_SALT = 'infrawatch-ldap-encryption-salt'
 
 function deriveKey(salt: Buffer): Buffer {

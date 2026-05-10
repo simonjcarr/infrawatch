@@ -1,4 +1,4 @@
-export * from './organisations.ts'
+export * from './instance-settings.ts'
 export * from './auth.ts'
 export * from './invitations.ts'
 export * from './agents.ts'

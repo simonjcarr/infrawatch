@@ -19,7 +19,7 @@ test('deleteHost performs a hard delete and clears agent dependants before delet
 
   assert.match(
     segment,
-    /\.delete\(hosts\)[\s\S]*\.where\(and\(eq\(hosts\.id, hostId\), eq\(hosts\.organisationId, orgId\)\)\)/,
+    /\.delete\(hosts\)[\s\S]*\.where\(and\(eq\(hosts\.id, hostId\), eq\(hosts\.instanceId, instanceId\)\)\)/,
     'deleteHost must physically delete the host row',
   )
   assert.doesNotMatch(

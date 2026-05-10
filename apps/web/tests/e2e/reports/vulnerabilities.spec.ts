@@ -4,7 +4,7 @@ import { TEST_ORG } from '../fixtures/seed'
 
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
@@ -12,19 +12,19 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('vulnerability report filters open findings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
-    INSERT INTO hosts (id, organisation_id, hostname, display_name, os, arch, status)
-    VALUES ('report-vuln-host-1', ${orgId}, 'report-vuln-node-1', 'Report Vuln Node', 'linux', 'x86_64', 'online')
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, status)
+    VALUES ('report-vuln-host-1', ${instanceId}, 'report-vuln-node-1', 'Report Vuln Node', 'linux', 'x86_64', 'online')
   `
   await sql`
     INSERT INTO software_packages (
-      id, organisation_id, host_id, name, version, source,
+      id, instance_id, host_id, name, version, source,
       distro_id, distro_version_id, distro_codename, source_name,
       first_seen_at, last_seen_at
     )
     VALUES (
-      'report-vuln-pkg-1', ${orgId}, 'report-vuln-host-1', 'openssl', '3.0.2-0ubuntu1.15', 'dpkg',
+      'report-vuln-pkg-1', ${instanceId}, 'report-vuln-host-1', 'openssl', '3.0.2-0ubuntu1.15', 'dpkg',
       'ubuntu', '22.04', 'jammy', 'openssl',
       NOW(), NOW()
     )
@@ -35,12 +35,12 @@ test('vulnerability report filters open findings', async ({ authenticatedPage: p
   `
   await sql`
     INSERT INTO host_vulnerability_findings (
-      id, organisation_id, host_id, software_package_id, cve_id, status,
+      id, instance_id, host_id, software_package_id, cve_id, status,
       package_name, installed_version, fixed_version, source, severity,
       first_seen_at, last_seen_at
     )
     VALUES (
-      'report-finding-1', ${orgId}, 'report-vuln-host-1', 'report-vuln-pkg-1', 'CVE-2024-4321', 'open',
+      'report-finding-1', ${instanceId}, 'report-vuln-host-1', 'report-vuln-pkg-1', 'CVE-2024-4321', 'open',
       'openssl', '3.0.2-0ubuntu1.15', '3.0.2-0ubuntu1.16', 'dpkg', 'high',
       NOW(), NOW()
     )
@@ -56,34 +56,34 @@ test('vulnerability report filters open findings', async ({ authenticatedPage: p
 
 test('vulnerability report applies host group, severity, KEV, and fix filters', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
     VALUES (
       'report-vuln-group-1',
-      ${orgId},
+      ${instanceId},
       'Critical Linux',
       'Linux hosts with critical vulnerabilities.'
     )
   `
 
   await sql`
-    INSERT INTO hosts (id, organisation_id, hostname, display_name, os, arch, status)
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, status)
     VALUES
-      ('report-vuln-host-2', ${orgId}, 'report-vuln-node-2', 'Critical Linux Node', 'linux', 'x86_64', 'online'),
-      ('report-vuln-host-3', ${orgId}, 'report-vuln-node-3', 'General Linux Node', 'linux', 'x86_64', 'online')
+      ('report-vuln-host-2', ${instanceId}, 'report-vuln-node-2', 'Critical Linux Node', 'linux', 'x86_64', 'online'),
+      ('report-vuln-host-3', ${instanceId}, 'report-vuln-node-3', 'General Linux Node', 'linux', 'x86_64', 'online')
   `
 
   await sql`
-    INSERT INTO host_group_members (id, organisation_id, group_id, host_id)
+    INSERT INTO host_group_members (id, instance_id, group_id, host_id)
     VALUES (
       'report-vuln-group-member-1',
-      ${orgId},
+      ${instanceId},
       'report-vuln-group-1',
       'report-vuln-host-2'
     )
@@ -91,18 +91,18 @@ test('vulnerability report applies host group, severity, KEV, and fix filters', 
 
   await sql`
     INSERT INTO software_packages (
-      id, organisation_id, host_id, name, version, source,
+      id, instance_id, host_id, name, version, source,
       distro_id, distro_version_id, distro_codename, source_name,
       first_seen_at, last_seen_at
     )
     VALUES
       (
-        'report-vuln-pkg-2', ${orgId}, 'report-vuln-host-2', 'openssl', '3.0.1', 'dpkg',
+        'report-vuln-pkg-2', ${instanceId}, 'report-vuln-host-2', 'openssl', '3.0.1', 'dpkg',
         'ubuntu', '24.04', 'noble', 'openssl',
         NOW(), NOW()
       ),
       (
-        'report-vuln-pkg-3', ${orgId}, 'report-vuln-host-3', 'curl', '8.5.0', 'apk',
+        'report-vuln-pkg-3', ${instanceId}, 'report-vuln-host-3', 'curl', '8.5.0', 'apk',
         'alpine', '3.19', 'edge', 'curl',
         NOW(), NOW()
       )
@@ -117,18 +117,18 @@ test('vulnerability report applies host group, severity, KEV, and fix filters', 
 
   await sql`
     INSERT INTO host_vulnerability_findings (
-      id, organisation_id, host_id, software_package_id, cve_id, status,
+      id, instance_id, host_id, software_package_id, cve_id, status,
       package_name, installed_version, fixed_version, source, severity, known_exploited,
       first_seen_at, last_seen_at
     )
     VALUES
       (
-        'report-finding-2', ${orgId}, 'report-vuln-host-2', 'report-vuln-pkg-2', 'CVE-2024-9991', 'open',
+        'report-finding-2', ${instanceId}, 'report-vuln-host-2', 'report-vuln-pkg-2', 'CVE-2024-9991', 'open',
         'openssl', '3.0.1', '3.0.9', 'dpkg', 'critical', true,
         NOW(), NOW()
       ),
       (
-        'report-finding-3', ${orgId}, 'report-vuln-host-3', 'report-vuln-pkg-3', 'CVE-2024-9992', 'open',
+        'report-finding-3', ${instanceId}, 'report-vuln-host-3', 'report-vuln-pkg-3', 'CVE-2024-9992', 'open',
         'curl', '8.5.0', NULL, 'apk', 'medium', false,
         NOW(), NOW()
       )

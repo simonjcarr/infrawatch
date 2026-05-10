@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -48,10 +48,10 @@ const updateDomainAccountSchema = z.object({
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getDomainAccounts(
-  orgId: string,
+  instanceId: string,
   filters: DomainAccountListFilters = {},
 ): Promise<DomainAccount[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const {
     status,
     search,
@@ -62,7 +62,7 @@ export async function getDomainAccounts(
   } = filters
 
   const conditions = [
-    eq(domainAccounts.organisationId, orgId),
+    eq(domainAccounts.instanceId, instanceId),
     isNull(domainAccounts.deletedAt),
     ...(status != null ? [eq(domainAccounts.status, status)] : []),
     ...(search != null && search !== ''
@@ -88,14 +88,14 @@ export async function getDomainAccounts(
 }
 
 export async function getDomainAccount(
-  orgId: string,
+  instanceId: string,
   accountId: string,
 ): Promise<DomainAccount | null> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const result = await db.query.domainAccounts.findFirst({
     where: and(
       eq(domainAccounts.id, accountId),
-      eq(domainAccounts.organisationId, orgId),
+      eq(domainAccounts.instanceId, instanceId),
       isNull(domainAccounts.deletedAt),
     ),
   })
@@ -103,16 +103,16 @@ export async function getDomainAccount(
 }
 
 export async function getDomainAccountCounts(
-  orgId: string,
+  instanceId: string,
 ): Promise<DomainAccountCounts> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const statusRows = await db
     .select({
       status: domainAccounts.status,
       count: sql<number>`cast(count(*) as int)`,
     })
     .from(domainAccounts)
-    .where(and(eq(domainAccounts.organisationId, orgId), isNull(domainAccounts.deletedAt)))
+    .where(and(eq(domainAccounts.instanceId, instanceId), isNull(domainAccounts.deletedAt)))
     .groupBy(domainAccounts.status)
 
   const counts: DomainAccountCounts = {
@@ -137,10 +137,10 @@ export async function getDomainAccountCounts(
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function createDomainAccount(
-  orgId: string,
+  instanceId: string,
   input: unknown,
 ): Promise<{ success: true; id: string } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const parsed = createDomainAccountSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -150,7 +150,7 @@ export async function createDomainAccount(
     const [row] = await db
       .insert(domainAccounts)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         username: parsed.data.username,
         displayName: parsed.data.displayName || null,
         email: parsed.data.email || null,
@@ -173,11 +173,11 @@ export async function createDomainAccount(
 }
 
 export async function updateDomainAccount(
-  orgId: string,
+  instanceId: string,
   accountId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const parsed = updateDomainAccountSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
@@ -186,7 +186,7 @@ export async function updateDomainAccount(
   const existing = await db.query.domainAccounts.findFirst({
     where: and(
       eq(domainAccounts.id, accountId),
-      eq(domainAccounts.organisationId, orgId),
+      eq(domainAccounts.instanceId, instanceId),
       isNull(domainAccounts.deletedAt),
     ),
   })
@@ -205,20 +205,20 @@ export async function updateDomainAccount(
       }),
       updatedAt: new Date(),
     })
-    .where(and(eq(domainAccounts.id, accountId), eq(domainAccounts.organisationId, orgId)))
+    .where(and(eq(domainAccounts.id, accountId), eq(domainAccounts.instanceId, instanceId)))
 
   return { success: true }
 }
 
 export async function deleteDomainAccount(
-  orgId: string,
+  instanceId: string,
   accountId: string,
 ): Promise<{ success: true } | { error: string }> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
   const existing = await db.query.domainAccounts.findFirst({
     where: and(
       eq(domainAccounts.id, accountId),
-      eq(domainAccounts.organisationId, orgId),
+      eq(domainAccounts.instanceId, instanceId),
       isNull(domainAccounts.deletedAt),
     ),
   })
@@ -227,7 +227,7 @@ export async function deleteDomainAccount(
   await db
     .update(domainAccounts)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(domainAccounts.id, accountId), eq(domainAccounts.organisationId, orgId)))
+    .where(and(eq(domainAccounts.id, accountId), eq(domainAccounts.instanceId, instanceId)))
 
   return { success: true }
 }

@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, boolean, integer } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { z } from 'zod'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { users } from './auth.ts'
 
 export interface AgentEnrolmentTokenMetadata {
@@ -33,9 +33,9 @@ export function parseAgentEnrolmentTokenMetadata(input: unknown): AgentEnrolment
 
 export const agentEnrolmentTokens = pgTable('agent_enrolment_tokens', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   label: text('label').notNull(),
   token: text('token').notNull().unique().$defaultFn(() => createId()),
   // SHA-256 hex digest of token. Used for hash-based ingest validation so the
@@ -58,9 +58,9 @@ export const agentEnrolmentTokens = pgTable('agent_enrolment_tokens', {
 
 export const agents = pgTable('agents', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   hostname: text('hostname').notNull(),
   publicKey: text('public_key').notNull().unique(),
   status: text('status')
@@ -92,9 +92,9 @@ export const agentStatusHistory = pgTable('agent_status_history', {
   agentId: text('agent_id')
     .notNull()
     .references(() => agents.id),
-  organisationId: text('organisation_id')
+  instanceId: text('instance_id')
     .notNull()
-    .references(() => organisations.id),
+    .references(() => instanceSettings.id),
   status: text('status').notNull().$type<'pending' | 'active' | 'offline' | 'revoked'>(),
   actorId: text('actor_id'),
   reason: text('reason'),

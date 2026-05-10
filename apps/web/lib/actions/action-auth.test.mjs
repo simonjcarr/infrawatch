@@ -1,39 +1,39 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { assertOrgAccess, assertOrgAdminAccess, assertOrgWriteAccess } from './action-auth-core.ts'
+import { assertInstanceAccess, assertInstanceAdminAccess, assertInstanceWriteAccess } from './action-auth-core.ts'
 
-test('assertOrgAccess rejects inactive users', () => {
+test('assertInstanceAccess rejects inactive users', () => {
   assert.throws(
-    () => assertOrgAccess({ organisationId: 'org-1', isActive: false, deletedAt: null }, 'org-1'),
+    () => assertInstanceAccess({ instanceId: 'org-1', isActive: false, deletedAt: null }, 'org-1'),
     /forbidden: inactive user/,
   )
 })
 
-test('assertOrgAccess rejects deleted users', () => {
+test('assertInstanceAccess rejects deleted users', () => {
   assert.throws(
-    () => assertOrgAccess({ organisationId: 'org-1', isActive: true, deletedAt: new Date() }, 'org-1'),
+    () => assertInstanceAccess({ instanceId: 'org-1', isActive: true, deletedAt: new Date() }, 'org-1'),
     /forbidden: inactive user/,
   )
 })
 
-test('assertOrgAccess rejects cross-org access', () => {
+test('assertInstanceAccess rejects cross-org access', () => {
   assert.throws(
-    () => assertOrgAccess({ organisationId: 'org-1', isActive: true, deletedAt: null }, 'org-2'),
-    /forbidden: organisation mismatch/,
+    () => assertInstanceAccess({ instanceId: 'org-1', isActive: true, deletedAt: null }, 'org-2'),
+    /forbidden: instance mismatch/,
   )
 })
 
-test('assertOrgAccess allows active users in their own organisation', () => {
+test('assertInstanceAccess allows active users in their own instance', () => {
   assert.doesNotThrow(
-    () => assertOrgAccess({ organisationId: 'org-1', isActive: true, deletedAt: null }, 'org-1'),
+    () => assertInstanceAccess({ instanceId: 'org-1', isActive: true, deletedAt: null }, 'org-1'),
   )
 })
 
-test('assertOrgWriteAccess rejects read-only users in their own organisation', () => {
+test('assertInstanceWriteAccess rejects read-only users in their own instance', () => {
   assert.throws(
-    () => assertOrgWriteAccess({
-      organisationId: 'org-1',
+    () => assertInstanceWriteAccess({
+      instanceId: 'org-1',
       isActive: true,
       deletedAt: null,
       role: 'read_only',
@@ -42,10 +42,10 @@ test('assertOrgWriteAccess rejects read-only users in their own organisation', (
   )
 })
 
-test('assertOrgWriteAccess allows engineers in their own organisation', () => {
+test('assertInstanceWriteAccess allows engineers in their own instance', () => {
   assert.doesNotThrow(
-    () => assertOrgWriteAccess({
-      organisationId: 'org-1',
+    () => assertInstanceWriteAccess({
+      instanceId: 'org-1',
       isActive: true,
       deletedAt: null,
       role: 'engineer',
@@ -53,10 +53,10 @@ test('assertOrgWriteAccess allows engineers in their own organisation', () => {
   )
 })
 
-test('assertOrgAdminAccess rejects non-admin roles in the same organisation', () => {
+test('assertInstanceAdminAccess rejects non-admin roles in the same instance', () => {
   assert.throws(
-    () => assertOrgAdminAccess({
-      organisationId: 'org-1',
+    () => assertInstanceAdminAccess({
+      instanceId: 'org-1',
       isActive: true,
       deletedAt: null,
       role: 'engineer',
@@ -65,10 +65,10 @@ test('assertOrgAdminAccess rejects non-admin roles in the same organisation', ()
   )
 })
 
-test('assertOrgAdminAccess allows org admins in their own organisation', () => {
+test('assertInstanceAdminAccess allows org admins in their own instance', () => {
   assert.doesNotThrow(
-    () => assertOrgAdminAccess({
-      organisationId: 'org-1',
+    () => assertInstanceAdminAccess({
+      instanceId: 'org-1',
       isActive: true,
       deletedAt: null,
       role: 'org_admin',

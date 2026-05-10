@@ -9,7 +9,7 @@ import {
 const token = {
   id: 'ctops_inventory_token',
   secret: Buffer.from('ct-ops outbound inventory signing key only').toString('base64url'),
-  orgId: 'org_1',
+  instanceId: 'org_1',
   scopes: ['inventory:write'],
 }
 
@@ -64,11 +64,11 @@ test('pushes every paged inventory snapshot for configured targets', async () =>
       baseUrl: 'https://ct-cve.example.invalid',
       token,
     }],
-    buildSnapshot: async ({ orgId, cursor, snapshotType }) => {
-      snapshots.push({ orgId, cursor, snapshotType })
+    buildSnapshot: async ({ instanceId, cursor, snapshotType }) => {
+      snapshots.push({ instanceId, cursor, snapshotType })
       return {
         contractVersion: '2026-04-30',
-        orgId,
+        instanceId,
         orgSlug: 'acme',
         snapshotId: cursor ? 'snapshot_page_2' : 'snapshot_page_1',
         snapshotType,
@@ -93,8 +93,8 @@ test('pushes every paged inventory snapshot for configured targets', async () =>
   })
 
   assert.deepEqual(snapshots, [
-    { orgId: 'org_1', cursor: undefined, snapshotType: 'full' },
-    { orgId: 'org_1', cursor: 'next-page', snapshotType: 'full' },
+    { instanceId: 'org_1', cursor: undefined, snapshotType: 'full' },
+    { instanceId: 'org_1', cursor: 'next-page', snapshotType: 'full' },
   ])
   assert.equal(pushes.length, 2)
   assert.equal(pushes[0].baseUrl, 'https://ct-cve.example.invalid')
@@ -123,9 +123,9 @@ test('loads CT-CVE inventory push targets from app settings when no explicit tar
         token,
       }]
     },
-    buildSnapshot: async ({ orgId }) => ({
+    buildSnapshot: async ({ instanceId }) => ({
       contractVersion: '2026-04-30',
-      orgId,
+      instanceId,
       orgSlug: 'acme',
       snapshotId: 'snapshot',
       snapshotType: 'full',
@@ -175,9 +175,9 @@ test('reports target failures without stopping later targets', async () => {
         token: { ...token, id: 'ctops_inventory_token_2' },
       },
     ],
-    buildSnapshot: async ({ orgId }) => ({
+    buildSnapshot: async ({ instanceId }) => ({
       contractVersion: '2026-04-30',
-      orgId,
+      instanceId,
       orgSlug: 'acme',
       snapshotId: 'snapshot',
       snapshotType: 'full',

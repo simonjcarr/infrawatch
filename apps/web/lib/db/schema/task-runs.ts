@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, integer, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { users } from './auth.ts'
 
@@ -61,7 +61,7 @@ export type TaskResult = PatchTaskResult | CustomScriptTaskResult | ServiceTaskR
 
 export const taskRuns = pgTable('task_runs', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   // NULL when created by the system sweeper (e.g. automated software inventory scans).
   triggeredBy: text('triggered_by').references(() => users.id),
   // Links the run back to the task_schedules row that triggered it; NULL for ad-hoc runs.
@@ -79,14 +79,14 @@ export const taskRuns = pgTable('task_runs', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (t) => [
-  index('task_runs_org_idx').on(t.organisationId, t.createdAt),
+  index('task_runs_instance_idx').on(t.instanceId, t.createdAt),
   index('task_runs_target_idx').on(t.targetType, t.targetId),
   index('task_runs_scheduled_from_idx').on(t.scheduledFromId),
 ])
 
 export const taskRunHosts = pgTable('task_run_hosts', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   taskRunId: text('task_run_id').notNull().references(() => taskRuns.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
   status: text('status').notNull().default('pending').$type<TaskRunHostStatus>(),

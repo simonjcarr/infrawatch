@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -15,12 +15,12 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user can manage group and network memberships from the host detail page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -31,7 +31,7 @@ test('authenticated user can manage group and network memberships from the host 
     )
     VALUES (
       'membership-host-1',
-      ${orgId},
+      ${instanceId},
       'ops-node-01',
       'Ops Node 01',
       'Ubuntu 24.04',
@@ -45,13 +45,13 @@ test('authenticated user can manage group and network memberships from the host 
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
     VALUES (
       'membership-group-1',
-      ${orgId},
+      ${instanceId},
       'Canary Fleet',
       'Hosts staged for rollout validation'
     )
@@ -60,14 +60,14 @@ test('authenticated user can manage group and network memberships from the host 
   await sql`
     INSERT INTO networks (
       id,
-      organisation_id,
+      instance_id,
       name,
       cidr,
       description
     )
     VALUES (
       'membership-network-1',
-      ${orgId},
+      ${instanceId},
       'Ops LAN',
       '10.70.0.0/24',
       'Operations network'
@@ -94,7 +94,7 @@ test('authenticated user can manage group and network memberships from the host 
       const rows = await sql<Array<{ deleted_at: string | null }>>`
         SELECT deleted_at
         FROM host_group_members
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND group_id = 'membership-group-1'
           AND host_id = 'membership-host-1'
         LIMIT 1
@@ -112,7 +112,7 @@ test('authenticated user can manage group and network memberships from the host 
       const rows = await sql<Array<{ deleted_at: string | null }>>`
         SELECT deleted_at
         FROM host_group_members
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND group_id = 'membership-group-1'
           AND host_id = 'membership-host-1'
         LIMIT 1
@@ -139,7 +139,7 @@ test('authenticated user can manage group and network memberships from the host 
       const rows = await sql<Array<{ deleted_at: string | null; auto_assigned: boolean }>>`
         SELECT deleted_at, auto_assigned
         FROM host_network_memberships
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND network_id = 'membership-network-1'
           AND host_id = 'membership-host-1'
         LIMIT 1
@@ -157,7 +157,7 @@ test('authenticated user can manage group and network memberships from the host 
       const rows = await sql<Array<{ deleted_at: string | null }>>`
         SELECT deleted_at
         FROM host_network_memberships
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND network_id = 'membership-network-1'
           AND host_id = 'membership-host-1'
         LIMIT 1

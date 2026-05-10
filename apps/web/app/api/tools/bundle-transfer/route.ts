@@ -15,7 +15,7 @@ import { db } from '@/lib/db'
 import { hosts, taskRunHosts, taskRuns } from '@/lib/db/schema'
 import { resolveWarUrl } from '@/lib/jenkins/update-center'
 import { assertTrustedMutationOrigin } from '@/lib/security/trusted-origins'
-import { getApiOrgSession } from '@/lib/auth/session'
+import { getApiInstanceSession } from '@/lib/auth/session'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import { buildHostDownloadScript } from '@/lib/tools/bundle-transfer/host-download-script'
 import { getBundleTransferDownloadOrigin } from '@/lib/tools/bundle-transfer/download-origin'
@@ -156,7 +156,7 @@ type TransferJobPhase = 'queued' | 'downloading' | 'transferring' | 'completed' 
 type TransferJob = {
   id: string
   userId: string
-  organisationId: string
+  instanceId: string
   phase: TransferJobPhase
   fileName: string
   host: string
@@ -196,7 +196,7 @@ function publicJob(job: TransferJob) {
   }
 }
 
-function publishJob(job: TransferJob, patch: Partial<Omit<TransferJob, 'id' | 'userId' | 'organisationId' | 'createdAt'>>) {
+function publishJob(job: TransferJob, patch: Partial<Omit<TransferJob, 'id' | 'userId' | 'instanceId' | 'createdAt'>>) {
   Object.assign(job, patch, { updatedAt: Date.now() })
 }
 
@@ -437,7 +437,7 @@ async function createBundleTransferTask(
     const [run] = await tx
       .insert(taskRuns)
       .values({
-        organisationId: job.organisationId,
+        instanceId: job.instanceId,
         triggeredBy: job.userId,
         targetType: 'host',
         targetId: request.hostId,
@@ -459,7 +459,7 @@ async function createBundleTransferTask(
     if (!run) throw new Error('Failed to create host transfer task')
 
     await tx.insert(taskRunHosts).values({
-      organisationId: job.organisationId,
+      instanceId: job.instanceId,
       taskRunId: run.id,
       hostId: request.hostId,
       status: 'pending',
@@ -487,7 +487,7 @@ async function refreshTransferTaskStatus(job: TransferJob) {
   const hostRow = await db.query.taskRunHosts.findFirst({
     where: and(
       eq(taskRunHosts.taskRunId, job.taskRunId),
-      eq(taskRunHosts.organisationId, job.organisationId),
+      eq(taskRunHosts.instanceId, job.instanceId),
       isNull(taskRunHosts.deletedAt),
     ),
   })
@@ -622,7 +622,7 @@ async function runTransferJob(job: TransferJob, request: TransferRequest, baseUr
 
 async function getAuthorisedUser(request: NextRequest) {
   try {
-    const user = (await getApiOrgSession(request.headers)).user
+    const user = (await getApiInstanceSession(request.headers)).user
     return canAccessTooling(user) ? user : null
   } catch {
     return null
@@ -632,7 +632,7 @@ async function getAuthorisedUser(request: NextRequest) {
 async function serveBundleDownload(request: NextRequest) {
   cleanupOldJobs()
   const user = await getAuthorisedUser(request)
-  if (!user?.organisationId) {
+  if (!user?.instanceId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
   const jobId = request.nextUrl.searchParams.get('jobId')
@@ -645,7 +645,7 @@ async function serveBundleDownload(request: NextRequest) {
   if (
     !job ||
     job.userId !== user.id ||
-    job.organisationId !== user.organisationId ||
+    job.instanceId !== user.instanceId ||
     job.downloadToken !== token ||
     !job.archivePath ||
     job.phase !== 'transferring'
@@ -678,7 +678,7 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await getAuthorisedUser(request)
-  if (!user?.organisationId) {
+  if (!user?.instanceId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
@@ -694,7 +694,7 @@ export async function POST(request: NextRequest) {
   const host = await db.query.hosts.findFirst({
     where: and(
       eq(hosts.id, parsed.data.hostId),
-      eq(hosts.organisationId, user.organisationId),
+      eq(hosts.instanceId, user.instanceId),
       isNull(hosts.deletedAt),
     ),
   })
@@ -710,7 +710,7 @@ export async function POST(request: NextRequest) {
   const job: TransferJob = {
     id: randomUUID(),
     userId: user.id,
-    organisationId: user.organisationId,
+    instanceId: user.instanceId,
     phase: 'queued',
     fileName: parsed.data.fileName,
     host: host.hostname,
@@ -745,7 +745,7 @@ export async function GET(request: NextRequest) {
 
   cleanupOldJobs()
   const user = await getAuthorisedUser(request)
-  if (!user?.organisationId) {
+  if (!user?.instanceId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
   const jobId = request.nextUrl.searchParams.get('jobId')
@@ -753,7 +753,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
   }
   const job = transferJobs.get(jobId)
-  if (!job || job.userId !== user.id || job.organisationId !== user.organisationId) {
+  if (!job || job.userId !== user.id || job.instanceId !== user.instanceId) {
     return NextResponse.json({ error: 'Transfer job not found' }, { status: 404 })
   }
   await refreshTransferTaskStatus(job)

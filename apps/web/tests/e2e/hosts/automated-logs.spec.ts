@@ -5,7 +5,7 @@ import { TEST_ORG } from '../fixtures/seed'
 async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
-    FROM organisations
+    FROM instance_settings
     WHERE slug = ${TEST_ORG.slug}
     LIMIT 1
   `
@@ -16,12 +16,12 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user can bulk delete automated host logs from the host detail page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const orgId = await getOrgId(sql)
+  const instanceId = await getOrgId(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -32,7 +32,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
     )
     VALUES (
       'host-logs-e2e',
-      ${orgId},
+      ${instanceId},
       'host-logs-node-1',
       'Automation Host',
       'Ubuntu 24.04',
@@ -46,7 +46,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
   await sql`
     INSERT INTO task_runs (
       id,
-      organisation_id,
+      instance_id,
       triggered_by,
       target_type,
       target_id,
@@ -60,7 +60,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
     VALUES
       (
         'host-log-run-1',
-        ${orgId},
+        ${instanceId},
         NULL,
         'host',
         'host-logs-e2e',
@@ -73,7 +73,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
       ),
       (
         'host-log-run-2',
-        ${orgId},
+        ${instanceId},
         NULL,
         'host',
         'host-logs-e2e',
@@ -89,7 +89,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
   await sql`
     INSERT INTO task_run_hosts (
       id,
-      organisation_id,
+      instance_id,
       task_run_id,
       host_id,
       status,
@@ -100,7 +100,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
     VALUES
       (
         'host-log-run-host-1',
-        ${orgId},
+        ${instanceId},
         'host-log-run-1',
         'host-logs-e2e',
         'success',
@@ -110,7 +110,7 @@ test('authenticated user can bulk delete automated host logs from the host detai
       ),
       (
         'host-log-run-host-2',
-        ${orgId},
+        ${instanceId},
         'host-log-run-2',
         'host-logs-e2e',
         'failed',

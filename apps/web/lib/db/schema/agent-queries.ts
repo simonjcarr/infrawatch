@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 
 export type AgentQueryType = 'list_ports' | 'list_services'
@@ -24,7 +24,7 @@ export type AgentQueryResultPayload =
 
 export const agentQueries = pgTable('agent_queries', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').notNull().references(() => organisations.id),
+  instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
   hostId: text('host_id').notNull().references(() => hosts.id),
   queryType: text('query_type').notNull().$type<AgentQueryType>(),
   status: text('status').notNull().default('pending').$type<AgentQueryStatus>(),
@@ -39,7 +39,7 @@ export const agentQueries = pgTable('agent_queries', {
   metadata: jsonb('metadata'),
 }, (table) => [
   index('agent_queries_host_status_idx').on(table.hostId, table.status),
-  index('agent_queries_org_idx').on(table.organisationId, table.requestedAt),
+  index('agent_queries_instance_idx').on(table.instanceId, table.requestedAt),
 ])
 
 export type AgentQueryRow = typeof agentQueries.$inferSelect

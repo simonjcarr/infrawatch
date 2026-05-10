@@ -26,7 +26,7 @@ test('privileged agent actions derive audit actors from the authenticated sessio
     )
     assert.match(
       segment,
-      /const session = await requireOrgToolingAccess\(orgId\)/,
+      /const session = await requireInstanceToolingAccess\(instanceId\)/,
       `${action} must capture the tooling-authorized session`,
     )
   }
@@ -43,7 +43,7 @@ test('alert mutations derive audit actors from the authenticated session', () =>
     )
     assert.match(
       segment,
-      /const session = await requireOrg(?:Access|WriteAccess)\(orgId\)/,
+      /const session = await requireInstance(?:Access|WriteAccess)\((?:instanceId|currentScope)\)/,
       `${action} must capture the authenticated session`,
     )
     assert.match(

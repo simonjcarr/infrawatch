@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getCurrentOrganisationSettingsRecord } from '@/lib/actions/settings'
+import { getCurrentInstanceSettingsRecord } from '@/lib/actions/settings'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { SettingsClient } from '../../settings-client'
 import { hasRole } from '@/lib/auth/guards'
@@ -15,7 +15,7 @@ export default async function AgentDefaultsPage() {
   const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
-  const org = await getCurrentOrganisationSettingsRecord()
+  const org = await getCurrentInstanceSettingsRecord()
 
   if (!org) return null
 

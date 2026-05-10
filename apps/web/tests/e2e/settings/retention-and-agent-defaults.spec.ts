@@ -17,7 +17,7 @@ test('admin can update metric retention from monitoring settings', async ({ auth
     .poll(async () => {
       const rows = await sql<Array<{ metric_retention_days: number }>>`
         SELECT metric_retention_days
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `
@@ -51,7 +51,7 @@ test('admin can update default host collection settings from agent defaults', as
         } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `
@@ -92,7 +92,7 @@ test('admin can update software inventory defaults from agent settings', async (
         } | null
       }>>`
         SELECT metadata
-        FROM organisations
+        FROM instance_settings
         WHERE slug = ${TEST_ORG.slug}
         LIMIT 1
       `

@@ -429,7 +429,7 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
               Terminal Access
             </CardTitle>
             <CardDescription>
-              Control terminal access for this host. These settings override the global organisation setting.
+              Control terminal access for this host. These settings override the global instance setting.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

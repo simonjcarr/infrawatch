@@ -2,25 +2,25 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('admin can create and revoke an enrolment token from agent settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await page.goto('/settings/agents')
 
@@ -67,7 +67,7 @@ test('admin can create and revoke an enrolment token from agent settings', async
           token,
           token_hash
         FROM agent_enrolment_tokens
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND label = 'Datacenter Linux'
         LIMIT 1
       `
@@ -98,7 +98,7 @@ test('admin can create and revoke an enrolment token from agent settings', async
       const rows = await sql<Array<{ deleted_at: Date | null }>>`
         SELECT deleted_at
         FROM agent_enrolment_tokens
-        WHERE organisation_id = ${orgId}
+        WHERE instance_id = ${instanceId}
           AND label = 'Datacenter Linux'
         LIMIT 1
       `
@@ -109,7 +109,7 @@ test('admin can create and revoke an enrolment token from agent settings', async
 
 test('admin cannot create an auto-approved token without super admin privileges', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getOrgAndUserIds(sql)
 
   await page.goto('/settings/agents')
 
@@ -127,7 +127,7 @@ test('admin cannot create an auto-approved token without super admin privileges'
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM agent_enrolment_tokens
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND label = 'Remote Edge'
     LIMIT 1
   `
@@ -137,13 +137,13 @@ test('admin cannot create an auto-approved token without super admin privileges'
 
 test('admin can generate an install bundle with an existing token and bundle tags', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
   let capturedBody: Record<string, unknown> | null = null
 
   await sql`
     INSERT INTO agent_enrolment_tokens (
       id,
-      organisation_id,
+      instance_id,
       label,
       token,
       created_by_id,
@@ -156,7 +156,7 @@ test('admin can generate an install bundle with an existing token and bundle tag
     )
     VALUES (
       'bundle-existing-token-id',
-      ${orgId},
+      ${instanceId},
       'Bundle Existing Token',
       'bundle-existing-token-value',
       ${userId},

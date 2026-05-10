@@ -2,31 +2,31 @@ import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
 
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('admin can review, filter, acknowledge, and clean up alert settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -37,7 +37,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
     VALUES
       (
         'alert-host-critical',
-        ${orgId},
+        ${instanceId},
         'db-primary',
         'DB Primary',
         'Ubuntu 24.04',
@@ -47,7 +47,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
       ),
       (
         'alert-host-warning',
-        ${orgId},
+        ${instanceId},
         'web-edge',
         'Web Edge',
         'Ubuntu 24.04',
@@ -60,7 +60,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
   await sql`
     INSERT INTO alert_rules (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       name,
       condition_type,
@@ -70,7 +70,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
     VALUES
       (
         'alert-rule-critical',
-        ${orgId},
+        ${instanceId},
         'alert-host-critical',
         'High CPU',
         'metric_threshold',
@@ -79,7 +79,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
       ),
       (
         'alert-rule-warning',
-        ${orgId},
+        ${instanceId},
         'alert-host-warning',
         'Disk Filling',
         'metric_threshold',
@@ -93,7 +93,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
       id,
       rule_id,
       host_id,
-      organisation_id,
+      instance_id,
       status,
       message,
       triggered_at
@@ -103,7 +103,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
         'alert-instance-critical',
         'alert-rule-critical',
         'alert-host-critical',
-        ${orgId},
+        ${instanceId},
         'firing',
         'CPU usage exceeded 95%',
         NOW() - INTERVAL '6 minutes'
@@ -112,7 +112,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
         'alert-instance-warning',
         'alert-rule-warning',
         'alert-host-warning',
-        ${orgId},
+        ${instanceId},
         'firing',
         'Disk usage exceeded 82%',
         NOW() - INTERVAL '3 minutes'
@@ -121,7 +121,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
         'alert-instance-history',
         'alert-rule-warning',
         'alert-host-warning',
-        ${orgId},
+        ${instanceId},
         'resolved',
         'Disk usage returned to normal',
         NOW() - INTERVAL '2 days'
@@ -137,7 +137,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
   await sql`
     INSERT INTO alert_silences (
       id,
-      organisation_id,
+      instance_id,
       host_id,
       reason,
       starts_at,
@@ -146,7 +146,7 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
     )
     VALUES (
       'alert-silence-maintenance',
-      ${orgId},
+      ${instanceId},
       'alert-host-critical',
       'Maintenance window',
       NOW() - INTERVAL '15 minutes',
@@ -158,14 +158,14 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
   await sql`
     INSERT INTO notification_channels (
       id,
-      organisation_id,
+      instance_id,
       name,
       type,
       config
     )
     VALUES (
       'alert-channel-email',
-      ${orgId},
+      ${instanceId},
       'Primary Email',
       'smtp',
       '{"toAddresses":["alerts@example.com","ops@example.com"]}'::jsonb
@@ -231,12 +231,12 @@ test('admin can review, filter, acknowledge, and clean up alert settings', async
 
 test('admin can create a silence, email channel, and webhook channel from the alerts page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -246,7 +246,7 @@ test('admin can create a silence, email channel, and webhook channel from the al
     )
     VALUES (
       'alert-host-create',
-      ${orgId},
+      ${instanceId},
       'app-edge',
       'App Edge',
       'Ubuntu 24.04',
@@ -301,16 +301,16 @@ test('admin can create a silence, email channel, and webhook channel from the al
     webhook_secret: string | null
   }>>`
     SELECT
-      (SELECT reason FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_reason,
-      (SELECT host_id FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_host_id,
-      (SELECT created_by FROM alert_silences WHERE organisation_id = ${orgId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_created_by,
-      (SELECT name FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_name,
-      (SELECT type FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_type,
-      (SELECT ARRAY(SELECT jsonb_array_elements_text(config->'toAddresses')) FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS recipients,
-      (SELECT name FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_name,
-      (SELECT type FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_type,
-      (SELECT config->>'url' FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_url,
-      (SELECT config->>'secret' FROM notification_channels WHERE organisation_id = ${orgId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_secret
+      (SELECT reason FROM alert_silences WHERE instance_id = ${instanceId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_reason,
+      (SELECT host_id FROM alert_silences WHERE instance_id = ${instanceId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_host_id,
+      (SELECT created_by FROM alert_silences WHERE instance_id = ${instanceId} AND reason = 'E2E maintenance window' AND deleted_at IS NULL LIMIT 1) AS silence_created_by,
+      (SELECT name FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_name,
+      (SELECT type FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS channel_type,
+      (SELECT ARRAY(SELECT jsonb_array_elements_text(config->'toAddresses')) FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'Escalation Email' AND deleted_at IS NULL LIMIT 1) AS recipients,
+      (SELECT name FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_name,
+      (SELECT type FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_type,
+      (SELECT config->>'url' FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_url,
+      (SELECT config->>'secret' FROM notification_channels WHERE instance_id = ${instanceId} AND name = 'PagerDuty Webhook' AND deleted_at IS NULL LIMIT 1) AS webhook_secret
   `
 
   expect(createdRows).toEqual([

@@ -19,7 +19,7 @@ export interface PasswordManagerActiveKeyPair {
 }
 
 export interface PasswordManagerShellState {
-  organisationId: string
+  instanceId: string
   activeKeyPair: PasswordManagerActiveKeyPair | null
   encryptedPrivateKeyEnvelope: PasswordManagerEncryptedPrivateKeyEnvelope | null
   launchNonce: number
@@ -52,11 +52,11 @@ export type PasswordManagerShellEvent =
   | { type: 'unlock-failed'; message: string; needsRelaunch: boolean }
   | { type: 'lock' }
   | { type: 'restart-launch' }
-  | { type: 'organisation-changed'; organisationId: string }
+  | { type: 'instance-changed'; instanceId: string }
 
-export function createInitialPasswordManagerShellState(organisationId: string): PasswordManagerShellState {
+export function createInitialPasswordManagerShellState(instanceId: string): PasswordManagerShellState {
   return {
-    organisationId,
+    instanceId,
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: null,
     launchNonce: 0,
@@ -181,12 +181,12 @@ export function reducePasswordManagerShellState(
       }
     case 'restart-launch':
       return {
-        ...createInitialPasswordManagerShellState(state.organisationId),
+        ...createInitialPasswordManagerShellState(state.instanceId),
         launchNonce: state.launchNonce + 1,
       }
-    case 'organisation-changed':
+    case 'instance-changed':
       return {
-        ...createInitialPasswordManagerShellState(event.organisationId),
+        ...createInitialPasswordManagerShellState(event.instanceId),
         launchNonce: state.launchNonce + 1,
       }
   }

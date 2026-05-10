@@ -1,20 +1,20 @@
 import { ADMIN_ROLES, MEMBERSHIP_ROLES, normalizeAssignedRoles } from './roles.ts'
 import type { SessionUser } from './session.ts'
 
-type OrgScopedUser = Pick<SessionUser, 'organisationId' | 'isActive' | 'deletedAt'>
-type GuardUser = OrgScopedUser & Pick<SessionUser, 'role'> & Partial<Pick<SessionUser, 'roles'>>
-type OrgTarget = string | { organisationId: string | null }
+type InstanceScopedUser = Pick<SessionUser, 'instanceId' | 'isActive' | 'deletedAt'>
+type GuardUser = InstanceScopedUser & Pick<SessionUser, 'role'> & Partial<Pick<SessionUser, 'roles'>>
+type InstanceTarget = string | { instanceId: string | null }
 type RoleInput = string | readonly string[]
 
-function toOrganisationId(target: OrgTarget): string | null {
-  return typeof target === 'string' ? target : target.organisationId
+function toInstanceId(target: InstanceTarget): string | null {
+  return typeof target === 'string' ? target : target.instanceId
 }
 
 function toRoleList(roles: RoleInput): readonly string[] {
   return typeof roles === 'string' ? [roles] : roles
 }
 
-export function isActiveUser(user: OrgScopedUser): boolean {
+export function isActiveUser(user: InstanceScopedUser): boolean {
   return user.isActive && !user.deletedAt
 }
 
@@ -23,21 +23,21 @@ export function hasRole(user: Pick<SessionUser, 'role'> & Partial<Pick<SessionUs
   return toRoleList(roles).some((role) => userRoles.some((userRole) => userRole === role))
 }
 
-export function isSameOrg(user: Pick<SessionUser, 'organisationId'>, target: OrgTarget): boolean {
-  return user.organisationId === toOrganisationId(target)
+export function isSameInstance(user: Pick<SessionUser, 'instanceId'>, target: InstanceTarget): boolean {
+  return user.instanceId === toInstanceId(target)
 }
 
-export function requireActiveUser(user: OrgScopedUser): void {
+export function requireActiveUser(user: InstanceScopedUser): void {
   if (!isActiveUser(user)) {
     throw new Error('forbidden: inactive user')
   }
 }
 
-export function requireSameOrg(user: OrgScopedUser, target: OrgTarget): void {
+export function requireSameInstance(user: InstanceScopedUser, target: InstanceTarget): void {
   requireActiveUser(user)
 
-  if (!isSameOrg(user, target)) {
-    throw new Error('forbidden: organisation mismatch')
+  if (!isSameInstance(user, target)) {
+    throw new Error('forbidden: instance mismatch')
   }
 }
 
@@ -51,12 +51,12 @@ export function requireRole(
   }
 }
 
-export function requireOrgAdmin(user: GuardUser, target: OrgTarget): void {
-  requireSameOrg(user, target)
+export function requireInstanceAdmin(user: GuardUser, target: InstanceTarget): void {
+  requireSameInstance(user, target)
   requireRole(user, ADMIN_ROLES)
 }
 
-export function requireOrgWriteAccess(user: GuardUser, target: OrgTarget): void {
-  requireSameOrg(user, target)
+export function requireInstanceWriteAccess(user: GuardUser, target: InstanceTarget): void {
+  requireSameInstance(user, target)
   requireRole(user, MEMBERSHIP_ROLES, 'forbidden: write role required')
 }

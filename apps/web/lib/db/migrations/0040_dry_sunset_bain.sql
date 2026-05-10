@@ -1,2 +1,0 @@
-ALTER TABLE "agent_enrolment_tokens" ADD COLUMN "token_hash" text;--> statement-breakpoint
-ALTER TABLE "agent_enrolment_tokens" ADD CONSTRAINT "agent_enrolment_tokens_token_hash_unique" UNIQUE("token_hash");

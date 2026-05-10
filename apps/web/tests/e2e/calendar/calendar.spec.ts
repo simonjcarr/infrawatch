@@ -4,25 +4,25 @@ import { TEST_ORG, TEST_USER } from '../fixtures/seed'
 
 const CALENDAR_TEST_NOW = new Date('2026-05-09T12:00:00Z')
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ orgId: string; userId: string }> {
-  const rows = await sql<Array<{ org_id: string; user_id: string }>>`
-    SELECT organisations.id AS org_id, "user".id AS user_id
-    FROM organisations
-    JOIN "user" ON "user".organisation_id = organisations.id
-    WHERE organisations.slug = ${TEST_ORG.slug}
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return {
-    orgId: rows[0]!.org_id,
+    instanceId: rows[0]!.instance_id,
     userId: rows[0]!.user_id,
   }
 }
 
 test('engineer can create a host-linked calendar event with participant roles across calendar views', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getOrgAndUserIds(sql)
 
   await sql`
     UPDATE "user"
@@ -31,13 +31,13 @@ test('engineer can create a host-linked calendar event with participant roles ac
   `
 
   await sql`
-    INSERT INTO hosts (id, organisation_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
-    VALUES ('calendar-host-1', ${orgId}, 'calendar-host-1', 'Calendar Host', 'Ubuntu 24.04', 'x86_64', '["10.70.0.10"]'::jsonb, 'online', NOW())
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
+    VALUES ('calendar-host-1', ${instanceId}, 'calendar-host-1', 'Calendar Host', 'Ubuntu 24.04', 'x86_64', '["10.70.0.10"]'::jsonb, 'online', NOW())
   `
 
   await sql`
-    INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at, organisation_id, role, roles, is_active)
-    VALUES ('calendar-approver-1', 'Calendar Approver', 'calendar-approver@example.com', true, NOW(), NOW(), ${orgId}, 'org_admin', '["org_admin"]'::jsonb, true)
+    INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at, instance_id, role, roles, is_active)
+    VALUES ('calendar-approver-1', 'Calendar Approver', 'calendar-approver@example.com', true, NOW(), NOW(), ${instanceId}, 'org_admin', '["org_admin"]'::jsonb, true)
   `
 
   await page.clock.setFixedTime(CALENDAR_TEST_NOW)
@@ -84,7 +84,7 @@ test('engineer can create a host-linked calendar event with participant roles ac
     FROM calendar_events
     LEFT JOIN calendar_event_hosts ON calendar_event_hosts.event_id = calendar_events.id
     LEFT JOIN calendar_event_participants ON calendar_event_participants.event_id = calendar_events.id
-    WHERE calendar_events.organisation_id = ${orgId}
+    WHERE calendar_events.instance_id = ${instanceId}
       AND calendar_events.title = 'Kernel patch planning'
     GROUP BY calendar_events.id
   `
@@ -100,12 +100,12 @@ test('engineer can create a host-linked calendar event with participant roles ac
 
 test('dragging one recurring occurrence creates an exception without moving the series', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     INSERT INTO calendar_events (
       id,
-      organisation_id,
+      instance_id,
       created_by,
       title,
       starts_at,
@@ -118,7 +118,7 @@ test('dragging one recurring occurrence creates an exception without moving the 
     )
     VALUES (
       'calendar-series-1',
-      ${orgId},
+      ${instanceId},
       ${userId},
       'Weekly maintenance window',
       '2026-05-04T09:00:00Z',
@@ -152,7 +152,7 @@ test('dragging one recurring occurrence creates an exception without moving the 
   const rows = await sql<Array<{ series_id: string | null; exception_type: string | null; starts_at: string }>>`
     SELECT series_id, exception_type, starts_at::text
     FROM calendar_events
-    WHERE organisation_id = ${orgId}
+    WHERE instance_id = ${instanceId}
       AND (id = 'calendar-series-1' OR series_id = 'calendar-series-1')
     ORDER BY starts_at
   `
@@ -167,13 +167,13 @@ test('dragging one recurring occurrence creates an exception without moving the 
 
 test('overlapping timed calendar events render side by side', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
-    INSERT INTO calendar_events (id, organisation_id, created_by, title, starts_at, ends_at, all_day, timezone, status, category)
+    INSERT INTO calendar_events (id, instance_id, created_by, title, starts_at, ends_at, all_day, timezone, status, category)
     VALUES
-      ('calendar-overlap-1', ${orgId}, ${userId}, 'First overlapping maintenance', '2026-05-08T10:00:00Z', '2026-05-08T11:00:00Z', false, 'UTC', 'planned', 'maintenance'),
-      ('calendar-overlap-2', ${orgId}, ${userId}, 'Second overlapping maintenance', '2026-05-08T10:00:00Z', '2026-05-08T11:00:00Z', false, 'UTC', 'planned', 'patching')
+      ('calendar-overlap-1', ${instanceId}, ${userId}, 'First overlapping maintenance', '2026-05-08T10:00:00Z', '2026-05-08T11:00:00Z', false, 'UTC', 'planned', 'maintenance'),
+      ('calendar-overlap-2', ${instanceId}, ${userId}, 'Second overlapping maintenance', '2026-05-08T10:00:00Z', '2026-05-08T11:00:00Z', false, 'UTC', 'planned', 'patching')
   `
 
   await page.clock.setFixedTime(CALENDAR_TEST_NOW)
@@ -202,7 +202,7 @@ test('overlapping timed calendar events render side by side', async ({ authentic
 
 test('read-only users can view calendar events but cannot create them', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { orgId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
 
   await sql`
     UPDATE "user"
@@ -211,8 +211,8 @@ test('read-only users can view calendar events but cannot create them', async ({
   `
 
   await sql`
-    INSERT INTO calendar_events (id, organisation_id, created_by, title, starts_at, ends_at, all_day, timezone, status, category)
-    VALUES ('calendar-readonly-1', ${orgId}, ${userId}, 'Read only maintenance', '2026-05-08T08:00:00Z', '2026-05-08T09:00:00Z', false, 'UTC', 'planned', 'maintenance')
+    INSERT INTO calendar_events (id, instance_id, created_by, title, starts_at, ends_at, all_day, timezone, status, category)
+    VALUES ('calendar-readonly-1', ${instanceId}, ${userId}, 'Read only maintenance', '2026-05-08T08:00:00Z', '2026-05-08T09:00:00Z', false, 'UTC', 'planned', 'maintenance')
   `
 
   await page.clock.setFixedTime(CALENDAR_TEST_NOW)

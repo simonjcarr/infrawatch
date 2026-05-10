@@ -9,7 +9,7 @@ test('admin can review a completed grouped task run and switch between host outp
   await sql`
     INSERT INTO host_groups (
       id,
-      organisation_id,
+      instance_id,
       name,
       description
     )
@@ -24,7 +24,7 @@ test('admin can review a completed grouped task run and switch between host outp
   await sql`
     INSERT INTO hosts (
       id,
-      organisation_id,
+      instance_id,
       hostname,
       display_name,
       os,
@@ -61,7 +61,7 @@ test('admin can review a completed grouped task run and switch between host outp
   await sql`
     INSERT INTO host_group_members (
       id,
-      organisation_id,
+      instance_id,
       group_id,
       host_id
     )
@@ -83,7 +83,7 @@ test('admin can review a completed grouped task run and switch between host outp
   await sql`
     INSERT INTO task_runs (
       id,
-      organisation_id,
+      instance_id,
       triggered_by,
       target_type,
       target_id,
@@ -112,7 +112,7 @@ test('admin can review a completed grouped task run and switch between host outp
   await sql`
     INSERT INTO task_run_hosts (
       id,
-      organisation_id,
+      instance_id,
       task_run_id,
       host_id,
       status,

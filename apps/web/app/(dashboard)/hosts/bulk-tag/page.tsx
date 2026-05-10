@@ -13,5 +13,5 @@ export default async function BulkTagPage() {
     session.user.role === 'super_admin' || session.user.role === 'org_admin' || session.user.role === 'engineer'
   if (!isAdmin) redirect('/dashboard')
 
-  return <BulkTagClient orgId={session.user.organisationId!} />
+  return <BulkTagClient instanceId={session.user.instanceId!} />
 }

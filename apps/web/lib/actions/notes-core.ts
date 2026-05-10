@@ -1,7 +1,7 @@
 'use server'
 
 import { logError } from '@/lib/logging'
-import { requireOrgAccess } from '@/lib/actions/action-auth'
+import { requireInstanceAccess } from '@/lib/actions/action-auth'
 
 import { db } from '@/lib/db'
 import {
@@ -104,26 +104,26 @@ const updateNoteSchema = z.object({
 // ── Read ─────────────────────────────────────────────────────────────────────
 
 export async function listNotesForHost(
-  orgId: string,
+  instanceId: string,
   hostId: string,
   filter?: { categories?: NoteCategory[]; includePrivate?: boolean },
 ): Promise<ResolvedNote[]> {
-  await requireOrgAccess(orgId)
-  return resolveNotesForHost(orgId, hostId, filter)
+  await requireInstanceAccess(instanceId)
+  return resolveNotesForHost(instanceId, hostId, filter)
 }
 
 export async function listNotes(
-  orgId: string,
+  instanceId: string,
   filter: {
     categories?: NoteCategory[]
     authorId?: string
     mineOnly?: boolean
   } = {},
 ): Promise<Note[]> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   const conditions = [
-    eq(notes.organisationId, orgId),
+    eq(notes.instanceId, instanceId),
     isNull(notes.deletedAt),
     // Privacy: exclude other users' private notes unless you are the author or
     // super_admin.
@@ -152,8 +152,8 @@ export async function listNotes(
 // websearch_to_tsquery is forgiving of partial queries but still throws on
 // truly malformed input — the ILIKE fallback means a user's search box always
 // returns something sensible even if they paste an unbalanced quote.
-export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
-  const session = await requireOrgAccess(orgId)
+export async function searchNotes(instanceId: string, q: string): Promise<Note[]> {
+  const session = await requireInstanceAccess(instanceId)
   const trimmed = q.trim()
   if (trimmed.length === 0) return []
 
@@ -166,7 +166,7 @@ export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
     const rows = await db.execute(sql`
       SELECT n.*
       FROM notes n
-      WHERE n.organisation_id = ${orgId}
+      WHERE n.instance_id = ${instanceId}
         AND n.deleted_at IS NULL
         AND ${privacyFilter}
         AND n.search_vector @@ websearch_to_tsquery('english', ${trimmed})
@@ -181,7 +181,7 @@ export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
     const rows = await db.execute(sql`
       SELECT n.*
       FROM notes n
-      WHERE n.organisation_id = ${orgId}
+      WHERE n.instance_id = ${instanceId}
         AND n.deleted_at IS NULL
         AND ${privacyFilter}
         AND n.title ILIKE ${like}
@@ -193,15 +193,15 @@ export async function searchNotes(orgId: string, q: string): Promise<Note[]> {
 }
 
 export async function getNote(
-  orgId: string,
+  instanceId: string,
   noteId: string,
 ): Promise<{ note: Note; targets: NoteTarget[] } | null> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   const note = await db.query.notes.findFirst({
     where: and(
       eq(notes.id, noteId),
-      eq(notes.organisationId, orgId),
+      eq(notes.instanceId, instanceId),
       isNull(notes.deletedAt),
     ),
   })
@@ -209,7 +209,7 @@ export async function getNote(
   if (!canReadNote(session.user, note)) return null
 
   const targets = await db.query.noteTargets.findMany({
-    where: and(eq(noteTargets.noteId, noteId), eq(noteTargets.organisationId, orgId)),
+    where: and(eq(noteTargets.noteId, noteId), eq(noteTargets.instanceId, instanceId)),
   })
 
   return { note, targets }
@@ -218,10 +218,10 @@ export async function getNote(
 // ── Write ────────────────────────────────────────────────────────────────────
 
 export async function createNote(
-  orgId: string,
+  instanceId: string,
   input: z.input<typeof createNoteSchema>,
 ): Promise<{ success: true; note: Note } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!canCreateNote(session.user)) {
     return { error: 'You do not have permission to perform this action' }
   }
@@ -236,7 +236,7 @@ export async function createNote(
       const [row] = await tx
         .insert(notes)
         .values({
-          organisationId: orgId,
+          instanceId: instanceId,
           authorId: session.user.id,
           title: parsed.data.title,
           body: parsed.data.body,
@@ -248,7 +248,7 @@ export async function createNote(
 
       // Seed the first revision so the timeline has a starting point.
       await tx.insert(noteRevisions).values({
-        organisationId: orgId,
+        instanceId: instanceId,
         noteId: row.id,
         editorId: session.user.id,
         title: row.title,
@@ -259,7 +259,7 @@ export async function createNote(
       if (parsed.data.targets.length > 0) {
         await tx.insert(noteTargets).values(
           parsed.data.targets.map((t) => ({
-            organisationId: orgId,
+            instanceId: instanceId,
             noteId: row.id,
             targetType: t.targetType as NoteTargetType,
             targetId: t.targetType === 'tag_selector' ? null : t.targetId,
@@ -280,11 +280,11 @@ export async function createNote(
 }
 
 export async function updateNote(
-  orgId: string,
+  instanceId: string,
   noteId: string,
   input: z.input<typeof updateNoteSchema>,
 ): Promise<{ success: true; note: Note } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   const parsed = updateNoteSchema.safeParse(input)
   if (!parsed.success) {
@@ -296,7 +296,7 @@ export async function updateNote(
       const existing = await tx.query.notes.findFirst({
         where: and(
           eq(notes.id, noteId),
-          eq(notes.organisationId, orgId),
+          eq(notes.instanceId, instanceId),
           isNull(notes.deletedAt),
         ),
       })
@@ -326,7 +326,7 @@ export async function updateNote(
           lastEditedById: session.user.id,
           updatedAt: new Date(),
         })
-        .where(and(eq(notes.id, noteId), eq(notes.organisationId, orgId)))
+        .where(and(eq(notes.id, noteId), eq(notes.instanceId, instanceId)))
         .returning()
       if (!updated) return { error: 'Note not found' }
 
@@ -344,7 +344,7 @@ export async function updateNote(
 
       if (!sameAuthorRecent) {
         await tx.insert(noteRevisions).values({
-          organisationId: orgId,
+          instanceId: instanceId,
           noteId,
           editorId: session.user.id,
           title: updated.title,
@@ -362,16 +362,16 @@ export async function updateNote(
 }
 
 export async function deleteNote(
-  orgId: string,
+  instanceId: string,
   noteId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   try {
     const existing = await db.query.notes.findFirst({
       where: and(
         eq(notes.id, noteId),
-        eq(notes.organisationId, orgId),
+        eq(notes.instanceId, instanceId),
         isNull(notes.deletedAt),
       ),
     })
@@ -383,7 +383,7 @@ export async function deleteNote(
     await db
       .update(notes)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(notes.id, noteId), eq(notes.organisationId, orgId)))
+      .where(and(eq(notes.id, noteId), eq(notes.instanceId, instanceId)))
 
     return { success: true }
   } catch (err) {
@@ -396,11 +396,11 @@ export async function deleteNote(
 // the editor; pinning is preserved by pre-reading and re-applying isPinned
 // where the caller passes it, otherwise defaults to false.
 export async function setNoteTargets(
-  orgId: string,
+  instanceId: string,
   noteId: string,
   targets: z.input<typeof targetSchema>[],
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   const parsed = z.array(targetSchema).max(50).safeParse(targets)
   if (!parsed.success) {
@@ -412,7 +412,7 @@ export async function setNoteTargets(
       const existing = await tx.query.notes.findFirst({
         where: and(
           eq(notes.id, noteId),
-          eq(notes.organisationId, orgId),
+          eq(notes.instanceId, instanceId),
           isNull(notes.deletedAt),
         ),
       })
@@ -423,12 +423,12 @@ export async function setNoteTargets(
 
       await tx
         .delete(noteTargets)
-        .where(and(eq(noteTargets.noteId, noteId), eq(noteTargets.organisationId, orgId)))
+        .where(and(eq(noteTargets.noteId, noteId), eq(noteTargets.instanceId, instanceId)))
 
       if (parsed.data.length > 0) {
         await tx.insert(noteTargets).values(
           parsed.data.map((t) => ({
-            organisationId: orgId,
+            instanceId: instanceId,
             noteId,
             targetType: t.targetType as NoteTargetType,
             targetId: t.targetType === 'tag_selector' ? null : t.targetId,
@@ -455,18 +455,18 @@ export async function setNoteTargets(
 // Pin a note to a specific target (host or host_group). Tag-selector targets
 // ignore pins — the resolver already filters those out.
 export async function toggleNotePin(
-  orgId: string,
+  instanceId: string,
   noteTargetId: string,
   pinned: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   try {
     return await db.transaction(async (tx) => {
       const target = await tx.query.noteTargets.findFirst({
         where: and(
           eq(noteTargets.id, noteTargetId),
-          eq(noteTargets.organisationId, orgId),
+          eq(noteTargets.instanceId, instanceId),
         ),
       })
       if (!target) return { error: 'Target not found' }
@@ -474,7 +474,7 @@ export async function toggleNotePin(
       const note = await tx.query.notes.findFirst({
         where: and(
           eq(notes.id, target.noteId),
-          eq(notes.organisationId, orgId),
+          eq(notes.instanceId, instanceId),
           isNull(notes.deletedAt),
         ),
       })
@@ -495,7 +495,7 @@ export async function toggleNotePin(
           .innerJoin(notes, eq(notes.id, noteTargets.noteId))
           .where(
             and(
-              eq(noteTargets.organisationId, orgId),
+              eq(noteTargets.instanceId, instanceId),
               eq(noteTargets.targetType, target.targetType),
               eq(noteTargets.targetId, target.targetId),
               eq(noteTargets.isPinned, true),
@@ -524,17 +524,17 @@ export async function toggleNotePin(
 // Author-only flag. Admins intentionally cannot flip someone else's note
 // between private and shared — that preserves trust in the privacy toggle.
 export async function toggleNotePrivate(
-  orgId: string,
+  instanceId: string,
   noteId: string,
   isPrivate: boolean,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   try {
     const existing = await db.query.notes.findFirst({
       where: and(
         eq(notes.id, noteId),
-        eq(notes.organisationId, orgId),
+        eq(notes.instanceId, instanceId),
         isNull(notes.deletedAt),
       ),
     })
@@ -546,7 +546,7 @@ export async function toggleNotePrivate(
     await db
       .update(notes)
       .set({ isPrivate, updatedAt: new Date() })
-      .where(and(eq(notes.id, noteId), eq(notes.organisationId, orgId)))
+      .where(and(eq(notes.id, noteId), eq(notes.instanceId, instanceId)))
 
     return { success: true }
   } catch (err) {
@@ -558,18 +558,18 @@ export async function toggleNotePrivate(
 // ── Reactions ────────────────────────────────────────────────────────────────
 
 export async function addNoteReaction(
-  orgId: string,
+  instanceId: string,
   noteId: string,
   reaction: NoteReactionType,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
   if (!NOTE_REACTIONS.includes(reaction)) return { error: 'Invalid reaction' }
 
   try {
     const existing = await db.query.notes.findFirst({
       where: and(
         eq(notes.id, noteId),
-        eq(notes.organisationId, orgId),
+        eq(notes.instanceId, instanceId),
         isNull(notes.deletedAt),
       ),
     })
@@ -581,7 +581,7 @@ export async function addNoteReaction(
     await db
       .insert(noteReactions)
       .values({
-        organisationId: orgId,
+        instanceId: instanceId,
         noteId,
         userId: session.user.id,
         reaction,
@@ -598,18 +598,18 @@ export async function addNoteReaction(
 }
 
 export async function removeNoteReaction(
-  orgId: string,
+  instanceId: string,
   noteId: string,
   reaction: NoteReactionType,
 ): Promise<{ success: true } | { error: string }> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   try {
     await db
       .delete(noteReactions)
       .where(
         and(
-          eq(noteReactions.organisationId, orgId),
+          eq(noteReactions.instanceId, instanceId),
           eq(noteReactions.noteId, noteId),
           eq(noteReactions.userId, session.user.id),
           eq(noteReactions.reaction, reaction),
@@ -623,33 +623,33 @@ export async function removeNoteReaction(
 }
 
 export async function listNoteReactions(
-  orgId: string,
+  instanceId: string,
   noteId: string,
 ): Promise<NoteReaction[]> {
-  await requireOrgAccess(orgId)
+  await requireInstanceAccess(instanceId)
 
   return db.query.noteReactions.findMany({
-    where: and(eq(noteReactions.noteId, noteId), eq(noteReactions.organisationId, orgId)),
+    where: and(eq(noteReactions.noteId, noteId), eq(noteReactions.instanceId, instanceId)),
   })
 }
 
 // ── Revisions ────────────────────────────────────────────────────────────────
 
 export async function listNoteRevisions(
-  orgId: string,
+  instanceId: string,
   noteId: string,
 ): Promise<NoteRevision[]> {
-  const session = await requireOrgAccess(orgId)
+  const session = await requireInstanceAccess(instanceId)
 
   const note = await db.query.notes.findFirst({
-    where: and(eq(notes.id, noteId), eq(notes.organisationId, orgId)),
+    where: and(eq(notes.id, noteId), eq(notes.instanceId, instanceId)),
   })
   if (!note || !canReadNote(session.user, note)) return []
 
   return db.query.noteRevisions.findMany({
     where: and(
       eq(noteRevisions.noteId, noteId),
-      eq(noteRevisions.organisationId, orgId),
+      eq(noteRevisions.instanceId, instanceId),
     ),
     orderBy: (r, { desc: d }) => [d(r.createdAt)],
     limit: MAX_REVISIONS_RENDERED,
@@ -661,7 +661,7 @@ export async function listNoteRevisions(
 function rowsToNotes(rows: unknown): Note[] {
   return (rows as Array<Record<string, unknown>>).map((r) => ({
     id: r.id as string,
-    organisationId: r.organisation_id as string,
+    instanceId: r.instance_id as string,
     authorId: r.author_id as string,
     lastEditedById: (r.last_edited_by_id as string | null) ?? null,
     title: r.title as string,

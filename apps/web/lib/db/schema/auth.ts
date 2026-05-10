@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 
 // Better Auth core tables
 export const users = pgTable(
@@ -14,7 +14,7 @@ export const users = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     // Extended fields
-    organisationId: text('organisation_id').references(() => organisations.id),
+    instanceId: text('instance_id').references(() => instanceSettings.id),
     role: text('role').notNull().default('engineer'),
     roles: jsonb('roles').$type<string[]>().notNull().default([]),
     isActive: boolean('is_active').notNull().default(true),
@@ -25,7 +25,7 @@ export const users = pgTable(
   },
   (table) => [
     index('users_org_active_deleted_name_email_idx').on(
-      table.organisationId,
+      table.instanceId,
       table.isActive,
       table.deletedAt,
       table.name,

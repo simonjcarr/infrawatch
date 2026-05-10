@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
-import { organisations } from './organisations.ts'
+import { instanceSettings } from './instance-settings.ts'
 
 export type CaPurpose = 'agent_ca'
 export type CaSource = 'auto' | 'byo'
@@ -8,7 +8,7 @@ export type CaSource = 'auto' | 'byo'
 /**
  * Certificate authorities managed by ct-ops.
  *
- * Today there is exactly one row: purpose='agent_ca' with organisationId=NULL
+ * Today there is exactly one row: purpose='agent_ca' with instanceId=NULL
  * (install-wide). The private key PEM is AES-256-GCM encrypted using the same
  * scheme as apps/web/lib/crypto/encrypt.ts.
  *
@@ -18,7 +18,7 @@ export type CaSource = 'auto' | 'byo'
  */
 export const certificateAuthorities = pgTable('certificate_authorities', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  organisationId: text('organisation_id').references(() => organisations.id),
+  instanceId: text('instance_id').references(() => instanceSettings.id),
   purpose: text('purpose').notNull().$type<CaPurpose>(),
   certPem: text('cert_pem').notNull(),
   keyPemEncrypted: text('key_pem_encrypted').notNull(),

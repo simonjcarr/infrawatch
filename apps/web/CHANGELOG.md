@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.129.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.2...web/v0.129.3) (2026-05-10)
+
+
+### Bug Fixes
+
+* **web:** restore standalone admin access ([b5ab5f1](https://github.com/carrtech-dev/ct-ops/commit/b5ab5f1f8629c3d4a4d2e6fc3cdb999cd5620a76))
+
 ## [0.129.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.1...web/v0.129.2) (2026-05-10)
 
 

@@ -122,14 +122,14 @@ docker compose -f docker-compose.single.yml exec web sh -c "cd /app && node_modu
 Open [https://localhost](https://localhost) in a browser. On first visit your browser will warn about the self-signed certificate — accept it to continue, or see [Replacing the TLS certificate](../deployment/docker-compose.md#replacing-the-tls-certificate) to install one from your own CA.
 
 1. Click **Register** and create your account
-2. Complete the **onboarding wizard** — enter your organisation name and click **Create Organisation**
+2. CT-Ops opens directly into the standalone instance setup flow after registration
 3. You're now logged in as `super_admin`
 
 ---
 
 ## Create an enrolment token
 
-An enrolment token is what the agent uses to register itself with your organisation.
+An enrolment token is what the agent uses to register itself with your CT-Ops instance.
 
 1. In the sidebar, click **Administration → Agents → Enrolment**
 2. Click **New Token**
@@ -162,7 +162,7 @@ address = "localhost:9443"
 ca_cert_file = "deploy/dev-tls/server.crt"
 
 [agent]
-org_token = "YOUR_ENROLMENT_TOKEN"
+enrolment_token = "YOUR_ENROLMENT_TOKEN"
 data_dir = "/tmp/ct-ops-agent"
 version = "0.1.0"
 heartbeat_interval_secs = 30

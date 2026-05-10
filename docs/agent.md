@@ -14,7 +14,7 @@ Agent                         Ingest Service               Database
   ├─ generate Ed25519 keypair       │                           │
   ├─ load/create agent state        │                           │
   │                                │                           │
-  ├── Register(org_token, pubkey) ──►                           │
+  ├── Register(enrolment_token, pubkey) ──►                     │
   │                                ├── validate enrolment token─►
   │                                ├── insert agent (pending) ──►
   │◄─ {agent_id, status:"pending"} ─┤                           │
@@ -106,8 +106,8 @@ ca_cert_file = ""
 
 [agent]
 # Enrolment token from the CT-Ops UI (Administration → Agents → Enrolment).
-# Can also be set via the CT_OPS_ORG_TOKEN environment variable.
-org_token = ""
+# Can also be set via the CT_OPS_ENROLMENT_TOKEN environment variable.
+enrolment_token = ""
 
 # Directory where the agent stores its identity.
 # Contains: agent_key.pem, agent_key.pub, agent_state.json
@@ -130,13 +130,13 @@ All config values can be overridden with environment variables. Useful for conta
 |---|---|
 | `CT_OPS_INGEST_ADDRESS` | `ingest.address` |
 | `CT_OPS_INGEST_CA_CERT` | `ingest.ca_cert_file` |
-| `CT_OPS_ORG_TOKEN` | `agent.org_token` |
+| `CT_OPS_ENROLMENT_TOKEN` | `agent.enrolment_token` |
 | `CT_OPS_DATA_DIR` | `agent.data_dir` |
 
 Example:
 
 ```bash
-CT_OPS_ORG_TOKEN=abc123 \
+CT_OPS_ENROLMENT_TOKEN=abc123 \
 CT_OPS_INGEST_ADDRESS=ingest.internal:9443 \
 ct-ops-agent -config /etc/ct-ops/agent.toml
 ```
@@ -161,7 +161,7 @@ The agent generates and persists its identity on first run. The data directory c
 
 When the agent starts for the first time (no `agent_state.json`):
 
-1. Sends `Register` RPC with the org token and its Ed25519 public key
+1. Sends `Register` RPC with the enrolment token and its Ed25519 public key
 2. Server validates the token and inserts an `agents` row
 3. If the token has **auto-approve** enabled → server sets status to `active` and returns a JWT immediately
 4. If not → server returns `status: "pending"`; agent polls every 30 seconds

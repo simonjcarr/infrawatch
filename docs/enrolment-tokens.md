@@ -1,6 +1,6 @@
 # Enrolment Tokens
 
-Enrolment tokens are how you control which agents are allowed to register with your organisation. An agent must present a valid token when it first connects — without one, the ingest service rejects the registration.
+Enrolment tokens are how you control which agents are allowed to register with your CT-Ops instance. An agent must present a valid token when it first connects — without one, the ingest service rejects the registration.
 
 ---
 
@@ -87,7 +87,7 @@ Without auto-approve, the agent waits in `pending` state. An admin must click **
 ## Security notes
 
 - Enrolment tokens only control **who can register**. Once registered, the agent uses a JWT for all communication — the token plays no further role.
-- A token grants access to your entire organisation. Treat tokens with the same care as API keys — don't commit them to source control or share them in chat.
+- A token grants access to your CT-Ops instance. Treat tokens with the same care as API keys — don't commit them to source control or share them in chat.
 - Set an expiry date on tokens you hand to third parties or contractors.
 - Use `Max uses: 1` for registering a single known host when you want to prevent the token being reused.
 - All token activity is logged — the usage count on the token table increments for each registration.

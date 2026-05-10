@@ -75,7 +75,7 @@ From the Scheduled Tasks list, click the **Play** icon next to a schedule to tri
 | `engineer` | ✅ | ✅ | ✅ |
 | `read_only` | ❌ | ❌ | ❌ |
 
-Schedules are scoped to the creator's organisation; read access requires no additional permission beyond a dashboard session.
+Schedules are scoped to the creator's CT-Ops instance; read access requires no additional permission beyond a dashboard session.
 
 ---
 

@@ -74,9 +74,9 @@ To reject a pending agent, click **Revoke**.
 
 ## Duplicate-Host Protection
 
-Two live hosts in the same organisation cannot share a hostname or IP address — on a real network that would be a configuration error. CT-Ops enforces this at two points:
+Two live hosts in the same CT-Ops instance cannot share a hostname or IP address — on a real network that would be a configuration error. CT-Ops enforces this at two points:
 
-- **At registration time** — when an agent calls `Register`, the ingest service checks for an existing non-deleted host in the same organisation whose hostname matches or whose reported IP addresses overlap any of the new agent's IPs.
+- **At registration time** — when an agent calls `Register`, the ingest service checks for an existing non-deleted host in the same instance whose hostname matches or whose reported IP addresses overlap any of the new agent's IPs.
 - **At approval time** — the same check runs when an admin approves a pending agent, in case a collision emerged while the agent was queued.
 
 What happens on a match depends on the state of the existing host:

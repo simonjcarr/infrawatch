@@ -15,7 +15,7 @@ That single command will:
 1. Start a `timescale/timescaledb:latest-pg16` container via Testcontainers (tmpfs-backed).
 2. Run all Drizzle migrations against the container.
 3. Launch Next.js dev on port `3100` (configurable via `E2E_PORT`).
-4. Run a setup project that seeds an organisation and an admin user (`e2e@example.com` / `TestPassword123!`).
+4. Run a setup project that seeds the baseline CT-Ops instance and an admin user (`e2e@example.com` / `TestPassword123!`).
 5. Run the chromium test project.
 6. Stop the container on exit.
 
@@ -51,7 +51,7 @@ After the container is ready, the runner builds a mapped `postgres://test:test@<
 
 Once Playwright is running, seeding happens as a dedicated setup project (`auth.setup.ts`). The `chromium` project declares it as a dependency, so the seed runs before any spec.
 
-Per-test isolation is provided by an auto-running `autoTruncate` fixture that runs `TRUNCATE ... RESTART IDENTITY CASCADE` on every app table between tests and deletes all sessions. Seed rows (organisations, user, account) are preserved. Tests run serially with a single worker; moving to parallel workers would require one Next.js process per worker on distinct ports.
+Per-test isolation is provided by an auto-running `autoTruncate` fixture that runs `TRUNCATE ... RESTART IDENTITY CASCADE` on every app table between tests and deletes all sessions. Seed rows (instance settings, user, account) are preserved. Tests run serially with a single worker; moving to parallel workers would require one Next.js process per worker on distinct ports.
 
 ## Authentication in tests
 
@@ -81,10 +81,10 @@ test('shows seeded hosts', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await sql`
-    INSERT INTO hosts (id, organisation_id, hostname, status)
+    INSERT INTO hosts (id, instance_id, hostname, status)
     VALUES (
       'test-host-1',
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
       'web-01',
       'online'
     )
@@ -97,19 +97,19 @@ test('shows seeded hosts', async ({ authenticatedPage: page }) => {
 
 Use direct SQL seeding when the setup is only test data and does not need to verify a UI or HTTP workflow. Use the product UI or an API request when the creation path itself is part of the behavior under test, or when production code must perform side effects such as password hashing, session creation, token generation, or validation.
 
-The baseline seed is `seedOrgAndUser()` in `tests/e2e/fixtures/seed.ts`. It is intentionally idempotent: it signs up `e2e@example.com` through Better Auth so the password and account rows are correct, creates the `e2e-test-org` organisation if needed, promotes the user to admin, and deletes the sign-up session so login tests start cleanly.
+The baseline seed is `seedOrgAndUser()` in `tests/e2e/fixtures/seed.ts`. It is intentionally idempotent: it signs up `e2e@example.com` through Better Auth so the password and account rows are correct, creates the baseline `instance_settings` row if needed, promotes the user to admin, and deletes the sign-up session so login tests start cleanly.
 
 When adding feature-specific seed helpers:
 
 1. Put shared helpers near the E2E feature or in `tests/e2e/fixtures/` if they will be reused.
 2. Keep seed data minimal and deterministic.
-3. Always create required relationships explicitly, especially `organisation_id`, ownership fields, and foreign keys.
+3. Always create required relationships explicitly, especially `instance_id`, ownership fields, and foreign keys.
 4. Prefer IDs and names that make assertions readable.
 5. Avoid relying on records created by another spec; each spec should seed what it needs.
 
 ## Isolation and cleanup
 
-Every spec that imports `test` from `tests/e2e/fixtures/test.ts` gets the auto-running `autoTruncate` fixture. That fixture truncates application tables before each test and deletes sessions, while preserving Better Auth/account rows and the baseline organisation/user created by the setup project.
+Every spec that imports `test` from `tests/e2e/fixtures/test.ts` gets the auto-running `autoTruncate` fixture. That fixture truncates application tables before each test and deletes sessions, while preserving Better Auth/account rows and the baseline instance/user created by the setup project.
 
 When a migration adds a new application table, update the `APP_TABLES` list in `tests/e2e/fixtures/db.ts` if that table can receive data during E2E tests. Otherwise, state can leak between tests and make failures order-dependent. Do not add Better Auth identity tables such as `user` or `account` to the truncate list unless the baseline seeding strategy is changed at the same time.
 
@@ -134,10 +134,10 @@ test('feature behavior', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 
   await sql`
-    INSERT INTO example_table (id, organisation_id, name)
+    INSERT INTO example_table (id, instance_id, name)
     VALUES (
       'example-1',
-      (SELECT id FROM organisations WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
       'Example'
     )
   `

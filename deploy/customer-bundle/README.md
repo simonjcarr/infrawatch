@@ -52,7 +52,7 @@ This will:
 5. A one-shot migration container applies database migrations before web and ingest start
 
 Open `https://localhost` (or whatever you set as `BETTER_AUTH_URL`) and
-follow the in-app onboarding to create your first organisation and admin
+register your first admin user for this CT-Ops instance
 user. Your browser will warn about the self-signed certificate on first
 visit unless you replace `deploy/tls/server.{crt,key}` with a certificate
 from your own CA.

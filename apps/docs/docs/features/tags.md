@@ -25,7 +25,7 @@ Merge order: `org defaults → token tags → CLI tags → rules` (last-wins).
 ## Autocomplete and dedupe
 
 All tags live in a normalised catalogue. The TagEditor's two-field key + value
-inputs autocomplete from tags already used in the organisation. The unique
+inputs autocomplete from tags already used in the instance. The unique
 index is case-insensitive, so typing `Prod` where `prod` already exists
 suggests the canonical spelling instead of creating a near-duplicate.
 

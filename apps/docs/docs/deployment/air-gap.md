@@ -108,7 +108,7 @@ From **Administration → Agents → Enrolment**, an `org_admin` or `super_admin
 - `agent.toml` pre-populated with this server's ingest address
 - `SHA256SUMS` and a `README.md`
 
-The bundle can be transferred by any approved mechanism (USB, jump host, managed file share) and installed with a single command — no outbound connectivity to the CT-Ops server is required during install. A single-use, short-expiry enrolment token can be embedded in the bundle, or left out so the operator supplies it via `CT_OPS_ORG_TOKEN` at install time.
+The bundle can be transferred by any approved mechanism (USB, jump host, managed file share) and installed with a single command — no outbound connectivity to the CT-Ops server is required during install. A single-use, short-expiry enrolment token can be embedded in the bundle, or left out so the operator supplies it via `CT_OPS_ENROLMENT_TOKEN` at install time.
 
 See [Offline Agent Install Bundle](../getting-started/agent-install-bundle.md) for the full walkthrough.
 

@@ -458,18 +458,16 @@ show_version() {
     | sed -n 's/.*"apps\/web"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
   echo "App version:      ${APP_VERSION:-unknown}"
 
-  # Tier lives on the organisations row — query the DB directly so the licence
-  # status is accurate even if no user is logged in. Multiple orgs are unusual
-  # on a single-host install but possible; show all of them.
+  # Tier lives on instance_settings — query the DB directly so the licence
+  # status is accurate even if no user is logged in.
   : "${POSTGRES_USER:=ctops}"
   : "${POSTGRES_DB:=ctops}"
   TIERS=$(docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At \
-    -c "SELECT name || ': ' || licence_tier FROM organisations WHERE deleted_at IS NULL ORDER BY created_at;" 2>/dev/null || true)
+    -c "SELECT COALESCE(licence_tier, 'community') FROM instance_settings LIMIT 1;" 2>/dev/null || true)
   if [ -z "$TIERS" ]; then
-    echo "Licence tier:     unknown (no organisation configured yet)"
+    echo "Licence tier:     unknown (instance settings not configured yet)"
   else
-    echo "Licence tier:"
-    printf '  %s\n' $TIERS
+    echo "Licence tier:     $TIERS"
   fi
 }
 

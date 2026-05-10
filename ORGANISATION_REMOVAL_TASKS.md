@@ -391,7 +391,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1234](https://github.com/carrtech-dev/ct-ops/pull/1234)
 
 Summary: Replaced the mixed host-detail metadata slice after auditing the
 remaining org-scoped surface and finding the previous task still spans host

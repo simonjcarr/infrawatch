@@ -241,6 +241,17 @@ test('hosted password manager flow keeps plaintext and key material inside the b
       : ''
   await expect(page.getByText(addedMemberUserId)).toBeVisible()
 
+  await page.reload()
+  await expect(page.getByTestId('password-manager-state-locked')).toBeVisible()
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
+  await page.getByRole('button', { name: 'Unlock' }).click()
+  await expect(page.getByTestId('password-manager-workspace')).toBeVisible()
+  await page.getByRole('tab', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Rotate vault key' }).click()
+  await expect(page.getByTestId('password-manager-workspace')).toContainText(
+    'Vault key rotated safely for the current active members.',
+  )
+
   const memberCard = page.getByTestId(`password-manager-member-${addedMemberUserId}`)
   await memberCard.getByRole('button', { name: 'Save role' }).click()
   await memberCard.getByRole('button', { name: 'Remove' }).click()
@@ -283,7 +294,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   expect(passwordManagerMock.launchAssertions()).toHaveLength(3)
   expect(passwordManagerMock.requestsFor('POST', '/vaults')).toHaveLength(1)
-  expect(passwordManagerMock.requestsFor('POST', '/vaults/vault-1/key-epochs')).toHaveLength(1)
+  expect(passwordManagerMock.requestsFor('POST', '/vaults/vault-1/key-epochs')).toHaveLength(2)
 
   const auditPaths = passwordManagerMock.auditRequests().map((request) => request.path)
   expect(auditPaths).toEqual([

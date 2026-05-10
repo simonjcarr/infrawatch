@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.0...web/v0.131.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **password-manager:** allow standalone launch assertions ([1ece1e3](https://github.com/carrtech-dev/ct-ops/commit/1ece1e365408389138b9444f72ddbeb08d14437e))
+
 ## [0.131.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.130.0...web/v0.131.0) (2026-05-10)
 
 

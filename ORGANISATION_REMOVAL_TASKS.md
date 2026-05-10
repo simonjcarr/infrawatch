@@ -432,7 +432,7 @@ Status: Complete
 
 Completed by: Codex automation
 
-PR:
+PR: [#1235](https://github.com/carrtech-dev/ct-ops/pull/1235)
 
 Summary: Removed caller-supplied organisation identity from the host detail
 page, host stream route, checks flows, compare view, and local-user detail/list
@@ -736,7 +736,13 @@ including a few newly-exposed unused vars in Task 11-adjacent host alert UI);
 `pnpm --dir apps/web test:unit` (fails only `lib/db/rls.test.mjs` and
 `lib/integrations/ct-cve/db-nonce-store.test.mjs` because no working container
 runtime is available here); `pnpm --dir apps/web exec playwright test --list`
-(passes); `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret
+(passes); `BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=dummy-secret-for-ci-build-only-at-least-32
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/dummy pnpm --filter
+web run build` (passes after removing a stray type-only server-action export
+that broke `/tasks` and `/tasks/schedules/[id]` during Next page-data
+collection); `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=test-secret
 pnpm --dir apps/web exec playwright test tests/e2e/notifications/bell.spec.ts
 --project=chromium --grep "authenticated user can review topbar notifications
 and open the linked resource"` (fails before execution because Next

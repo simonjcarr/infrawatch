@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.1...web/v0.131.2) (2026-05-10)
+
+
+### Bug Fixes
+
+* **password-manager:** surface vault rotation feedback ([60ea344](https://github.com/carrtech-dev/ct-ops/commit/60ea3445af97ae7e81f7e2c41a10a192438324aa))
+
 ## [0.131.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.0...web/v0.131.1) (2026-05-10)
 
 

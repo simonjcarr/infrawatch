@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.4](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.3...agent/v0.34.4) (2026-05-10)
+
+
+### Bug Fixes
+
+* **ingest:** remove org-scoped agent identity ([#1248](https://github.com/carrtech-dev/ct-ops/issues/1248)) ([3be0471](https://github.com/carrtech-dev/ct-ops/commit/3be047199c6e96c3fe1bd6f5320f8911991dbc35))
+
 ## [0.34.3](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.2...agent/v0.34.3) (2026-05-09)
 
 

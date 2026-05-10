@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
-import { ApiAuthError, getApiInstanceSession } from '@/lib/auth/session'
+import { ApiAuthError, getApiSession } from '@/lib/auth/session'
 import { requireToolingAccess } from '@/lib/auth/tooling'
 import { db } from '@/lib/db'
 import { instanceSettings } from '@/lib/db/schema'
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let session
   try {
-    session = await getApiInstanceSession(request.headers)
+    session = await getApiSession(request.headers)
     requireToolingAccess(session.user)
   } catch (error) {
     if (error instanceof ApiAuthError) {
@@ -52,20 +52,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     throw error
   }
 
-  const rateLimitKey = `${session.user.instanceId}:${session.user.id}`
-  if (!await launchAssertionRateLimit.check(rateLimitKey)) {
-    return NextResponse.json(
-      { error: 'Too many requests — please wait before trying again.' },
-      { status: 429 },
-    )
-  }
-
   try {
     const config = getPasswordManagerLaunchAssertionConfig()
-    const instanceName = await findInstanceName(session.user.instanceId)
+    const launchScopeId = session.user.instanceId ?? config.ctOpsInstanceId
+    const rateLimitKey = `${launchScopeId}:${session.user.id}`
+    if (!await launchAssertionRateLimit.check(rateLimitKey)) {
+      return NextResponse.json(
+        { error: 'Too many requests — please wait before trying again.' },
+        { status: 429 },
+      )
+    }
+
+    const instanceName = session.user.instanceId
+      ? await findInstanceName(session.user.instanceId)
+      : null
     const assertion = await signPasswordManagerLaunchAssertion(
       {
-        instanceId: session.user.instanceId,
+        instanceId: launchScopeId,
         instanceName,
         userId: session.user.id,
         email: session.user.email,
@@ -84,7 +87,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   } catch (error) {
     logError('[password-manager] failed to mint launch assertion', error, {
-      instanceId: session.user.instanceId,
+      instanceId: session.user.instanceId ?? null,
       userId: session.user.id,
     })
 

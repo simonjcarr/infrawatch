@@ -57,6 +57,7 @@ const standaloneApiRoutes = [
   'app/api/domain-accounts/counts/route.ts',
   'app/api/domain-accounts/route.ts',
   'app/api/overview/route.ts',
+  'app/api/password-manager/launch-assertion/route.ts',
   'app/api/service-accounts/counts/route.ts',
   'app/api/service-accounts/route.ts',
   'app/api/system/health/route.ts',

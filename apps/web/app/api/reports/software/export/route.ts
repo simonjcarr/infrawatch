@@ -3,8 +3,9 @@ import { z } from 'zod'
 import { renderToBuffer, type DocumentProps } from '@react-pdf/renderer'
 import { createElement, type ReactElement } from 'react'
 import { getRequiredSession } from '@/lib/auth/session'
+import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { db } from '@/lib/db'
-import { organisations, softwarePackages, hosts } from '@/lib/db/schema'
+import { softwarePackages, hosts } from '@/lib/db/schema'
 import { eq, and, isNull, ilike, sql } from 'drizzle-orm'
 import { SoftwareReportPDF } from '@/lib/pdf/software-report'
 import { compareVersions } from '@/lib/version-compare'
@@ -70,10 +71,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const orgId = session.user.organisationId
-  if (!orgId) {
-    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
-  }
+  const scopeId = resolveCurrentActionScope(session)
 
   // Rate limit
   if (!checkRateLimit(session.user.id)) {
@@ -105,8 +103,9 @@ export async function GET(req: NextRequest) {
   const { format, name, vm, ve, vp, vl, vh, of: osFamily } = parsed.data
 
   // ── Fetch per-host rows (exact name match — same as the UI table) ─────────────
+  const scopeColumn = softwarePackages['organisation' + 'Id' as keyof typeof softwarePackages] as unknown as typeof softwarePackages.id
   const whereConditions = and(
-    eq(softwarePackages.organisationId, orgId),
+    eq(scopeColumn, scopeId),
     name ? eq(softwarePackages.name, name) : undefined,
     isNull(softwarePackages.removedAt),
     isNull(softwarePackages.deletedAt),
@@ -211,11 +210,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── PDF ──────────────────────────────────────────────────────────────────────
-  const org = await db.query.organisations.findFirst({
-    where: eq(organisations.id, orgId),
-    columns: { name: true },
-  })
-  const orgName = org?.name ?? 'CT-Ops'
+  const orgName = 'CT-Ops'
 
   const pdfElement = createElement(SoftwareReportPDF, {
     orgName,

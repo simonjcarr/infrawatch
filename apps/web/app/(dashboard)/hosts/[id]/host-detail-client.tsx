@@ -366,7 +366,7 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
 
   const { data: vulnerabilityAssessment } = useQuery({
     queryKey: ['host-vulnerability-assessment', scopeId, initialHost.id],
-    queryFn: () => getHostVulnerabilityAssessment(scopeId, initialHost.id),
+    queryFn: () => getHostVulnerabilityAssessment(initialHost.id),
     refetchInterval: 60_000,
   })
 

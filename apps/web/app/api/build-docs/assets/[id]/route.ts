@@ -9,11 +9,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return NextResponse.json({ error: 'No organisation' }, { status: 403 })
 
   const { id } = await params
-  const result = await getBuildDocAssetBytes(orgId, id)
+  const result = await getBuildDocAssetBytes(id)
   if (!result) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return new NextResponse(new Uint8Array(result.bytes), {

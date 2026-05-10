@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 export default async function BundlersPage() {
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
-  const orgId = session.user.organisationId ?? ''
 
   return (
     <div className="space-y-6">
@@ -21,7 +20,7 @@ export default async function BundlersPage() {
           Build self-contained bundles of upstream software for installation into air-gapped networks.
         </p>
       </div>
-      <BundlersClient orgId={orgId} />
+      <BundlersClient />
     </div>
   )
 }

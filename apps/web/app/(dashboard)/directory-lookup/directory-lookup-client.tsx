@@ -101,10 +101,8 @@ function humaniseTimestamp(key: string, value: string): string | null {
 }
 
 export function DirectoryLookupClient({
-  orgId,
   configs,
 }: {
-  orgId: string
   configs: LookupConfigOption[]
 }) {
   const [configId, setConfigId] = useState<string>(configs[0]!.id)
@@ -176,7 +174,7 @@ export function DirectoryLookupClient({
       const cid = configIdRef.current
       setSearching(true)
       try {
-        const result = await searchLdapDirectory(orgId, cid, value.trim())
+        const result = await searchLdapDirectory(cid, value.trim())
         if ('error' in result) {
           setError(result.error)
           setSuggestions([])
@@ -198,7 +196,7 @@ export function DirectoryLookupClient({
         setSearching(false)
       }
     }, 300)
-  }, [orgId])
+  }, [])
 
   async function selectUser(user: LdapUserResult) {
     setShowSuggestions(false)
@@ -211,7 +209,7 @@ export function DirectoryLookupClient({
     setAttrFilter('')
 
     try {
-      const result = await lookupDirectoryUser(orgId, configId, user.dn)
+      const result = await lookupDirectoryUser(configId, user.dn)
       if ('error' in result) {
         setError(result.error)
         return

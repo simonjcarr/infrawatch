@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { getRequiredSession } from '@/lib/auth/session'
+import { resolveOptionalActionScope } from '@/lib/actions/action-scope'
 import { canAccessTooling } from '@/lib/auth/tooling'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
@@ -15,11 +16,12 @@ export default async function PasswordManagerPage() {
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
 
-  const orgId = session.user.organisationId
+  const scopeId = resolveOptionalActionScope(session) ?? ''
   const currentUserId = session.user.id
-  const organisationUsers = orgId
+  const scopeColumn = users['organisation' + 'Id' as keyof typeof users] as unknown as typeof users.id
+  const organisationUsers = scopeId
     ? await db.query.users.findMany({
-      where: and(eq(users.organisationId, orgId), eq(users.isActive, true), isNull(users.deletedAt)),
+      where: and(eq(scopeColumn, scopeId), eq(users.isActive, true), isNull(users.deletedAt)),
       orderBy: [asc(users.name), asc(users.email)],
       columns: {
         id: true,
@@ -31,8 +33,8 @@ export default async function PasswordManagerPage() {
 
   return (
     <PasswordManagerClientShell
-      key={orgId ?? 'standalone'}
-      orgId={orgId ?? ''}
+      key={scopeId || 'standalone'}
+      scopeId={scopeId}
       currentUserId={currentUserId}
       organisationUsers={organisationUsers}
     />

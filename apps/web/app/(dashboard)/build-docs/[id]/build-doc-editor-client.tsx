@@ -98,13 +98,11 @@ function SortableSection({
 }
 
 export function BuildDocEditorClient({
-  orgId,
   userRole,
   detail,
   renderModel,
   snippets,
 }: {
-  orgId: string
   userRole: string
   detail: BuildDocDetail
   renderModel: BuildDocRenderModel
@@ -170,7 +168,7 @@ export function BuildDocEditorClient({
         const value = formData.get(`field-${field.id}`)
         fieldValues[field.id] = field.type === 'boolean' ? value === 'on' : String(value ?? '')
       }
-      const result = await updateBuildDoc(orgId, doc.id, {
+      const result = await updateBuildDoc(doc.id, {
         title: String(formData.get('title') ?? ''),
         status: String(formData.get('status') ?? 'draft') as typeof doc.status,
         hostName: String(formData.get('hostName') ?? ''),
@@ -189,7 +187,7 @@ export function BuildDocEditorClient({
   function submitNewSection(formData: FormData) {
     setError(null)
     startTransition(async () => {
-      const result = await createBuildDocSection(orgId, doc.id, {
+      const result = await createBuildDocSection(doc.id, {
         title: String(formData.get('title') ?? ''),
         body: String(formData.get('body') ?? ''),
         fieldValues: {},
@@ -211,7 +209,7 @@ export function BuildDocEditorClient({
     const draft = draftFor(section)
     setError(null)
     startTransition(async () => {
-      const result = await updateBuildDocSection(orgId, section.id, {
+      const result = await updateBuildDocSection(section.id, {
         title: draft.title,
         body: draft.body,
         fieldValues: section.fieldValues,
@@ -233,7 +231,7 @@ export function BuildDocEditorClient({
   function insertSnippet(snippetId: string) {
     setError(null)
     startTransition(async () => {
-      const result = await insertBuildDocSnippetAsSection(orgId, doc.id, snippetId)
+      const result = await insertBuildDocSnippetAsSection(doc.id, snippetId)
       if ('error' in result) setError(result.error)
       else {
         const next = [...sections, result.data]
@@ -250,7 +248,7 @@ export function BuildDocEditorClient({
   function uploadImage(sectionId: string, formData: FormData) {
     setError(null)
     startTransition(async () => {
-      const result = await uploadBuildDocAsset(orgId, doc.id, sectionId, formData)
+      const result = await uploadBuildDocAsset(doc.id, sectionId, formData)
       if ('error' in result) setError(result.error)
       else {
         const next = [...assets, result.data]
@@ -269,7 +267,7 @@ export function BuildDocEditorClient({
     setSections(next)
     rebuildModel(next)
     startTransition(async () => {
-      const result = await reorderBuildDocSections(orgId, doc.id, next.map((section) => section.id))
+      const result = await reorderBuildDocSections(doc.id, next.map((section) => section.id))
       if ('error' in result) setError(result.error)
     })
   }

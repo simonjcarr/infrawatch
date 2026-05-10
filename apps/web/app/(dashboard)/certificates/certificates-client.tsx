@@ -83,11 +83,9 @@ function SummaryCard({
 }
 
 export function CertificatesClient({
-  orgId,
   initialCertificates,
   initialCounts,
 }: {
-  orgId: string
   initialCertificates: Certificate[]
   initialCounts: CertificateCounts
 }) {
@@ -109,7 +107,7 @@ export function CertificatesClient({
   const useServerInitialCertificates = statusFilter === 'all' && hostFilter === '' && sortBy === 'not_after'
 
   const { data: certs = initialCertificates } = useQuery({
-    queryKey: ['certificates', orgId, filters],
+    queryKey: ['certificates', filters],
     queryFn: async () => {
       const params = new URLSearchParams({
         ...(filters.status ? { status: filters.status } : {}),
@@ -127,7 +125,7 @@ export function CertificatesClient({
   })
 
   const { data: counts = initialCounts } = useQuery({
-    queryKey: ['certificate-counts', orgId],
+    queryKey: ['certificate-counts'],
     queryFn: async () => {
       const res = await fetch('/api/certificates/counts')
       if (!res.ok) throw new Error('Failed to fetch certificate counts')
@@ -138,10 +136,10 @@ export function CertificatesClient({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (certId: string) => deleteCertificate(orgId, certId),
+    mutationFn: (certId: string) => deleteCertificate(certId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['certificates', orgId] })
-      queryClient.invalidateQueries({ queryKey: ['certificate-counts', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['certificates'] })
+      queryClient.invalidateQueries({ queryKey: ['certificate-counts'] })
     },
   })
 

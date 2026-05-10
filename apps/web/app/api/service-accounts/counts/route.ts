@@ -15,11 +15,9 @@ export async function GET() {
     }
     throw err
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return Response.json({ total: 0, human: 0, service: 0, system: 0, disabled: 0, missing: 0 })
 
   try {
-    const counts = await getServiceAccountCounts(orgId)
+    const counts = await getServiceAccountCounts()
     return Response.json(counts)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

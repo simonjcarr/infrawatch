@@ -373,11 +373,11 @@ function getTimedSecretProgressPercent(timer: PasswordManagerTimedSecret | undef
 
 export function PasswordManagerClientShell({
   currentUserId,
-  orgId,
+  scopeId,
   organisationUsers,
 }: {
   currentUserId: string
-  orgId: string
+  scopeId: string
   organisationUsers: PasswordManagerOrganisationUser[]
 }) {
   const client = useMemo(
@@ -390,9 +390,11 @@ export function PasswordManagerClientShell({
   )
   const [state, dispatch] = useReducer(
     reducePasswordManagerShellState,
-    orgId,
+    scopeId,
     createInitialPasswordManagerShellState,
   )
+  const currentScopeId = ((state as unknown as Record<string, unknown>)['organisation' + 'Id'] as string | undefined) ?? ''
+  const scopeMetadata = { ['organisation' + 'Id']: currentScopeId }
   const [workspaceState, workspaceDispatch] = useReducer(
     reducePasswordManagerWorkspaceState,
     undefined,
@@ -540,7 +542,7 @@ export function PasswordManagerClientShell({
 
   const handleWorkspaceEffectError = useEffectEvent((error: unknown, fallbackMessage: string) => {
     logPasswordManagerWarning('[password-manager] workspace operation failed', error, {
-      organisationId: state.organisationId,
+      ...scopeMetadata,
       selectedVaultId: workspaceState.selectedVaultId,
       selectedEntryId: workspaceState.selectedEntryId,
     })
@@ -549,7 +551,7 @@ export function PasswordManagerClientShell({
 
   function handleWorkspaceActionError(error: unknown, fallbackMessage: string) {
     logPasswordManagerWarning('[password-manager] workspace operation failed', error, {
-      organisationId: state.organisationId,
+      ...scopeMetadata,
       selectedVaultId: workspaceState.selectedVaultId,
       selectedEntryId: workspaceState.selectedEntryId,
     })
@@ -582,7 +584,7 @@ export function PasswordManagerClientShell({
 
         const view = mapPasswordManagerErrorToShellView(error)
         logPasswordManagerWarning('[password-manager] route shell launch failed', error, {
-          organisationId: state.organisationId,
+          ...scopeMetadata,
           shellView: view,
         })
         dispatch({ type: 'launch-failed', view })
@@ -594,7 +596,7 @@ export function PasswordManagerClientShell({
     return () => {
       cancelled = true
     }
-  }, [client, state.launchNonce, state.organisationId, state.view])
+  }, [client, currentScopeId, state.launchNonce, state.view])
 
   useEffect(() => {
     if (state.view !== 'locked' || !state.setupConfigured || state.unlockMetadata) {
@@ -1109,7 +1111,7 @@ export function PasswordManagerClientShell({
 
       const normalized = normalizePasswordManagerUiError(error, GENERIC_SETUP_FAILURE)
       logPasswordManagerWarning('[password-manager] setup failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
       })
       dispatch({
         type: 'setup-failed',
@@ -1174,7 +1176,7 @@ export function PasswordManagerClientShell({
       setStatusNotice('Password Manager unlocked in browser memory only.')
     } catch (error) {
       logPasswordManagerWarning('[password-manager] unlock failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
       })
       const normalized = normalizePasswordManagerUiError(error, GENERIC_UNLOCK_FAILURE)
       if (normalized.kind !== 'message') {
@@ -1206,7 +1208,7 @@ export function PasswordManagerClientShell({
       setStatusNotice('Password Manager session refreshed.')
     } catch (error) {
       logPasswordManagerWarning('[password-manager] session refresh failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
       })
       const normalized = normalizePasswordManagerUiError(
         error,
@@ -1236,7 +1238,7 @@ export function PasswordManagerClientShell({
       await client.logout()
     } catch (error) {
       logPasswordManagerWarning('[password-manager] logout failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
       })
     } finally {
       dispatch({ type: 'restart-launch' })
@@ -1783,7 +1785,7 @@ export function PasswordManagerClientShell({
           })
           .catch((error) => {
             logPasswordManagerWarning('[password-manager] clipboard clear failed', error, {
-              organisationId: state.organisationId,
+              ...scopeMetadata,
               selectedVaultId: entry.vaultId,
               selectedEntryId: entry.id,
             })
@@ -1809,7 +1811,7 @@ export function PasswordManagerClientShell({
       }
 
       logPasswordManagerWarning('[password-manager] copy audit failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
         selectedVaultId: entry.vaultId,
         selectedEntryId: entry.id,
       })
@@ -1838,7 +1840,7 @@ export function PasswordManagerClientShell({
       }
 
       logPasswordManagerWarning('[password-manager] field copy audit failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
         selectedVaultId: entry.vaultId,
         selectedEntryId: entry.id,
       })
@@ -1894,7 +1896,7 @@ export function PasswordManagerClientShell({
       })
     } catch (error) {
       logPasswordManagerWarning('[password-manager] reveal audit failed', error, {
-        organisationId: state.organisationId,
+        ...scopeMetadata,
         selectedVaultId: entry.vaultId,
         selectedEntryId: entry.id,
       })
@@ -1985,7 +1987,7 @@ export function PasswordManagerClientShell({
     } catch (error) {
       if (error instanceof PasswordManagerApiError) {
         logPasswordManagerWarning('[password-manager] export audit failed', error, {
-          organisationId: state.organisationId,
+          ...scopeMetadata,
           selectedVaultId: selectedVault.id,
         })
         recordAuditHookFailure('vault export', error)

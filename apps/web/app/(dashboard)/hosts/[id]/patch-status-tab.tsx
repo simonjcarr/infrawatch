@@ -36,7 +36,7 @@ function PatchBadge({ status }: { status: string }) {
 export function PatchStatusTab({ scopeId, hostId }: Props) {
   const { data: patchStatus, isLoading } = useQuery({
     queryKey: ['host-patch-status', scopeId, hostId],
-    queryFn: () => getHostPatchStatus(scopeId, hostId),
+    queryFn: () => getHostPatchStatus(hostId),
   })
 
   if (isLoading) {

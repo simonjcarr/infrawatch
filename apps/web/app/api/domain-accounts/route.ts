@@ -17,8 +17,6 @@ export async function GET(request: NextRequest) {
     }
     throw err
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return Response.json([])
 
   const { searchParams } = request.nextUrl
   const filters: DomainAccountListFilters = {
@@ -31,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const accounts = await getDomainAccounts(orgId, filters)
+    const accounts = await getDomainAccounts(filters)
     return Response.json(accounts)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

@@ -46,14 +46,12 @@ function defaultTemplateFields() {
 }
 
 export function BuildDocsClient({
-  orgId,
   userRole,
   initialDocs,
   initialTemplates,
   initialSnippets,
   initialStorageSettings,
 }: {
-  orgId: string
   userRole: string
   initialDocs: BuildDocListItem[]
   initialTemplates: BuildDocTemplateWithVersion[]
@@ -77,9 +75,9 @@ export function BuildDocsClient({
   function refreshAll() {
     startTransition(async () => {
       const [nextDocs, nextTemplates, nextSnippets] = await Promise.all([
-        listBuildDocs(orgId),
-        listBuildDocTemplates(orgId),
-        listBuildDocSnippets(orgId),
+        listBuildDocs(),
+        listBuildDocTemplates(),
+        listBuildDocSnippets(),
       ])
       setDocs(nextDocs)
       setTemplates(nextTemplates)
@@ -92,7 +90,7 @@ export function BuildDocsClient({
     startTransition(async () => {
       try {
         const fields = JSON.parse(String(formData.get('fields') ?? '[]'))
-        const result = await createBuildDocTemplate(orgId, {
+        const result = await createBuildDocTemplate({
           name: String(formData.get('name') ?? ''),
           description: String(formData.get('description') ?? ''),
           isDefault: formData.get('isDefault') === 'on',
@@ -111,7 +109,7 @@ export function BuildDocsClient({
     setError(null)
     startTransition(async () => {
       const tags = String(formData.get('tags') ?? '').split(',').map((tag) => tag.trim()).filter(Boolean)
-      const result = await createBuildDocSnippet(orgId, {
+      const result = await createBuildDocSnippet({
         title: String(formData.get('title') ?? ''),
         body: String(formData.get('body') ?? ''),
         category: String(formData.get('category') || 'general'),
@@ -132,7 +130,7 @@ export function BuildDocsClient({
         const value = formData.get(`field-${field.id}`)
         fieldValues[field.id] = field.type === 'boolean' ? value === 'on' : String(value ?? '')
       }
-      const result = await createBuildDoc(orgId, {
+      const result = await createBuildDoc({
         title: String(formData.get('title') ?? ''),
         templateVersionId,
         hostName: String(formData.get('hostName') ?? ''),
@@ -165,7 +163,7 @@ export function BuildDocsClient({
             provider: 'filesystem',
             filesystem: { rootPath: String(formData.get('rootPath') || '') || undefined },
           }
-      const result = await saveBuildDocAssetStorageSettings(orgId, config)
+      const result = await saveBuildDocAssetStorageSettings(config)
       if ('error' in result) setError(result.error)
       else refreshAll()
     })
@@ -173,7 +171,7 @@ export function BuildDocsClient({
 
   function runSearch() {
     startTransition(async () => {
-      setDocs(await searchBuildDocs(orgId, query))
+      setDocs(await searchBuildDocs(query))
     })
   }
 
@@ -185,7 +183,7 @@ export function BuildDocsClient({
         <div>
           <h1 className="text-2xl font-semibold text-foreground" data-testid="build-docs-heading">Build Docs</h1>
           <p className="text-muted-foreground mt-1">
-            Create VM build records from organisation templates, reusable snippets, screenshots, and structured sections.
+            Create VM build records from instance templates, reusable snippets, screenshots, and structured sections.
           </p>
         </div>
       </div>

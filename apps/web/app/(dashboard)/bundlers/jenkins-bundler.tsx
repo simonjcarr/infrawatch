@@ -280,7 +280,7 @@ Jenkins.instance.pluginManager.plugins
   .each { println it }
 `
 
-export function JenkinsBundler({ orgId }: { orgId: string }) {
+export function JenkinsBundler() {
   const [coreVersion, setCoreVersion] = useState('')
   const [javaVersion, setJavaVersion] = useState<string>('')
   const [pluginsText, setPluginsText] = useState('')
@@ -960,7 +960,6 @@ export function JenkinsBundler({ orgId }: { orgId: string }) {
       <BundleTransferDialog
         open={transferOpen}
         onOpenChange={setTransferOpen}
-        orgId={orgId}
         buildBundle={buildTransferBundle}
         onTransferStarted={setTransferJob}
       />

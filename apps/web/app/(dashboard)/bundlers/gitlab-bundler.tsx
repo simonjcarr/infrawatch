@@ -124,7 +124,7 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
-export function GitLabBundler({ orgId }: { orgId: string }) {
+export function GitLabBundler() {
   const [currentVersion, setCurrentVersion] = useState('')
   const [targetVersion, setTargetVersion] = useState('')
   const [edition, setEdition] = useState<'ee' | 'ce'>('ee')
@@ -573,7 +573,6 @@ export function GitLabBundler({ orgId }: { orgId: string }) {
       <BundleTransferDialog
         open={transferOpen}
         onOpenChange={setTransferOpen}
-        orgId={orgId}
         buildBundle={buildTransferBundle}
         onTransferStarted={setTransferJob}
       />

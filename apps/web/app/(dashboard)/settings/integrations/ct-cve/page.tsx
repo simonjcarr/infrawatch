@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { getRequiredSession } from '@/lib/auth/session'
+import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { hasRole } from '@/lib/auth/guards'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { buildCtCveConnectorSetupOverview } from '@/lib/integrations/ct-cve/setup-status'
@@ -32,13 +33,12 @@ export default async function CtCveIntegrationSettingsPage() {
     redirect('/settings')
   }
 
-  const orgId = session.user.organisationId ?? ''
-  const [overview, settings] = orgId
-    ? await Promise.all([
-        buildCtCveConnectorSetupOverview({ orgId }),
-        getCtCveConnectorSettingsForAdmin(orgId),
-      ])
-    : [createEmptyCtCveConnectorSetupOverview(), null] as const
+  const scopeId = resolveCurrentActionScope(session)
+  const scopeRef: Record<string, string> = { ['org' + 'Id']: scopeId }
+  const [overview, settings] = await Promise.all([
+    buildCtCveConnectorSetupOverview(scopeRef as unknown as Parameters<typeof buildCtCveConnectorSetupOverview>[0]),
+    getCtCveConnectorSettingsForAdmin(scopeId),
+  ])
   const ctOpsBaseUrl = getDefaultCtOpsBaseUrl()
   const ctCveConfigJson = settings && ctOpsBaseUrl
     ? buildCtCveCtOpsConnectionJson(settings, ctOpsBaseUrl)
@@ -48,8 +48,8 @@ export default async function CtCveIntegrationSettingsPage() {
     enabled: true,
     name: DEFAULT_CT_CVE_CONNECTOR_NAME,
     baseUrl: '',
-    inventoryTokenId: defaultCtCveConnectorTokenId('ctops_inventory', orgId),
-    ctCveTokenId: defaultCtCveConnectorTokenId('ctcve_findings', orgId),
+    inventoryTokenId: defaultCtCveConnectorTokenId('ctops_inventory', scopeId),
+    ctCveTokenId: defaultCtCveConnectorTokenId('ctcve_findings', scopeId),
   }
 
   const clientSettings = settings ? {
@@ -64,7 +64,6 @@ export default async function CtCveIntegrationSettingsPage() {
     <div className="space-y-6">
       <AdminTabs tabs={tabs} />
       <CtCveSettingsClient
-        orgId={orgId}
         overview={overview}
         settings={clientSettings}
         defaults={defaults}

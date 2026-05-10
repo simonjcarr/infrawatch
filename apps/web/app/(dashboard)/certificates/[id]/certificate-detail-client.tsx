@@ -57,12 +57,11 @@ function CopyButton({ value }: { value: string }) {
 }
 
 interface Props {
-  orgId: string
   initialCertificate: Certificate
   initialEvents: CertificateEvent[]
 }
 
-export function CertificateDetailClient({ orgId: _orgId, initialCertificate, initialEvents }: Props) {
+export function CertificateDetailClient({ initialCertificate, initialEvents }: Props) {
   const cert = initialCertificate
   const events = initialEvents
 

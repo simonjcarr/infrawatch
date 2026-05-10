@@ -794,7 +794,7 @@ This slice owns operational coordination and agent management workflows.
 
 ## Task 12 - Web Reporting, Integrations, Certificates, And Remaining Dashboard Conversion
 
-Status: Not started
+Status: In progress
 
 Completed by:
 

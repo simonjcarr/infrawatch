@@ -5,9 +5,10 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { SettingsClient } from './settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
-  title: 'Organisation Settings',
+  title: 'Instance Settings',
 }
 
 export default async function SettingsPage() {
@@ -30,16 +31,16 @@ export default async function SettingsPage() {
           ]}
         />
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Instance</h1>
           <p className="text-sm text-muted-foreground">
-            Organisation profile settings will be available after instance setup is complete.
+            Instance profile settings will be available after setup is complete.
           </p>
         </div>
       </div>
     )
   }
 
-  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
 
   return (
     <div className="space-y-6">
@@ -53,8 +54,8 @@ export default async function SettingsPage() {
         org={org}
         isAdmin={isAdmin}
         sections={['organisation']}
-        title="Organisation"
-        description="Manage your organisation profile."
+        title="Instance"
+        description="Manage your instance profile."
       />
     </div>
   )

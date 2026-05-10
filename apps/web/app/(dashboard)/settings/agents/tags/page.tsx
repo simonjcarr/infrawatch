@@ -4,6 +4,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { listTagRules } from '@/lib/actions/tag-rules'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { TagRulesClient } from '../../tag-rules/tag-rules-client'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
   title: 'Agent Tag Rules',
@@ -11,8 +12,7 @@ export const metadata: Metadata = {
 
 export default async function AgentTagRulesPage() {
   const session = await getRequiredSession()
-  const isAdmin =
-    session.user.role === 'super_admin' || session.user.role === 'org_admin'
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const rules = await listTagRules()

@@ -4,6 +4,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { getCurrentOrganisationSettingsRecord } from '@/lib/actions/settings'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { SettingsClient } from '../../settings-client'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
   title: 'Agent Defaults',
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export default async function AgentDefaultsPage() {
   const session = await getRequiredSession()
-  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const org = await getCurrentOrganisationSettingsRecord()

@@ -4,6 +4,7 @@ import { listEnrolmentTokens } from '@/lib/actions/agents'
 import { AgentsSettingsClient } from './agents-client'
 import { redirect } from 'next/navigation'
 import { AdminTabs } from '@/components/shared/admin-tabs'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
   title: 'Agent Enrolment',
@@ -12,8 +13,7 @@ export const metadata: Metadata = {
 export default async function AgentsSettingsPage() {
   const session = await getRequiredSession()
 
-  const isAdmin =
-    session.user.role === 'super_admin' || session.user.role === 'org_admin'
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const tokens = await listEnrolmentTokens()

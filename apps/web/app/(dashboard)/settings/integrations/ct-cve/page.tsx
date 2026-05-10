@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { getRequiredSession } from '@/lib/auth/session'
-import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { hasRole } from '@/lib/auth/guards'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { buildCtCveConnectorSetupOverview } from '@/lib/integrations/ct-cve/setup-status'
 import {
@@ -28,7 +28,7 @@ const tabs = [
 export default async function CtCveIntegrationSettingsPage() {
   const session = await getRequiredSession()
 
-  if (!ADMIN_ROLES.includes(session.user.role)) {
+  if (!hasRole(session.user, ['org_admin', 'super_admin'])) {
     redirect('/settings')
   }
 

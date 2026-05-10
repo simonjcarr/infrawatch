@@ -4,6 +4,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { getGlobalAlertDefaults } from '@/lib/actions/alerts'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { GlobalAlertsClient } from '../alerts/alerts-client'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
   title: 'Monitoring Settings',
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export default async function MonitoringSettingsPage() {
   const session = await getRequiredSession()
-  const isAdmin = session.user.role === 'super_admin' || session.user.role === 'org_admin'
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const defaults = await getGlobalAlertDefaults()

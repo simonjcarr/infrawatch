@@ -17,6 +17,10 @@ const licenceGuardSource = readFileSync(
   path.join(repoRoot, 'lib/actions/licence-guard.ts'),
   'utf8',
 )
+const sessionSource = readFileSync(
+  path.join(repoRoot, 'lib/auth/session.ts'),
+  'utf8',
+)
 
 const sidebarLinkedPages = [
   'app/(dashboard)/alerts/page.tsx',
@@ -58,6 +62,24 @@ const standaloneApiRoutes = [
   'app/api/system/health/route.ts',
 ]
 
+const administrationPages = [
+  'app/(dashboard)/settings/agents/defaults/page.tsx',
+  'app/(dashboard)/settings/agents/page.tsx',
+  'app/(dashboard)/settings/agents/software/page.tsx',
+  'app/(dashboard)/settings/agents/tags/page.tsx',
+  'app/(dashboard)/settings/integrations/ct-cve/page.tsx',
+  'app/(dashboard)/settings/integrations/page.tsx',
+  'app/(dashboard)/settings/integrations/smtp/page.tsx',
+  'app/(dashboard)/settings/licence/page.tsx',
+  'app/(dashboard)/settings/monitoring/notifications/page.tsx',
+  'app/(dashboard)/settings/monitoring/page.tsx',
+  'app/(dashboard)/settings/monitoring/retention/page.tsx',
+  'app/(dashboard)/settings/page.tsx',
+  'app/(dashboard)/settings/security/page.tsx',
+  'app/(dashboard)/settings/security/terminal/page.tsx',
+  'app/(dashboard)/settings/system/page.tsx',
+]
+
 test('dashboard shell falls back to community licence without org-backed scope', () => {
   assert.match(
     dashboardLayoutSource,
@@ -94,5 +116,23 @@ test('standalone sidebar APIs use regular session auth and empty no-org fallback
     const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')
     assert.match(source, /getApiSession\(/, `${relativePath} should allow no-org sessions`)
     assert.doesNotMatch(source, /getApiOrg(Admin)?Session\(/)
+  }
+})
+
+test('fresh standalone sessions promote the first active user to instance admin', () => {
+  assert.match(sessionSource, /ensureInstanceHasSuperAdmin\(user\)/)
+  assert.match(sessionSource, /activeUsers\[0\]\?\.id !== user\.id/)
+  assert.match(sessionSource, /set\(\{ role: INSTANCE_ADMIN_ROLE, roles, updatedAt: new Date\(\) \}\)/)
+})
+
+test('administration pages use normalized role checks', () => {
+  for (const relativePath of administrationPages) {
+    const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')
+    assert.match(source, /hasRole\(session\.user, \['org_admin', 'super_admin'\]\)/)
+    assert.doesNotMatch(
+      source,
+      /ADMIN_ROLES\.includes\(session\.user\.role\)|session\.user\.role === 'super_admin'|\['org_admin', 'super_admin'\]\.includes\(session\.user\.role\)/,
+      `${relativePath} should not depend on the primary legacy role string`,
+    )
   }
 })

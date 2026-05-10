@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.129.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.128.0...web/v0.129.0) (2026-05-10)
+
+
+### Features
+
+* **web:** remove org ids from task 11 surfaces ([#1235](https://github.com/carrtech-dev/ct-ops/issues/1235)) ([46cfa5e](https://github.com/carrtech-dev/ct-ops/commit/46cfa5eb8e9a97591523513c6dd9ee7ab6faa90b))
+
 ## [0.128.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.127.0...web/v0.128.0) (2026-05-09)
 
 

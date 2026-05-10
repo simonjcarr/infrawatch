@@ -6,6 +6,7 @@ import { organisations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { SettingsClient } from '../../settings-client'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
   title: 'SMTP Relay Settings',
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 
 export default async function SmtpRelaySettingsPage() {
   const session = await getRequiredSession()
-  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const orgId = session.user.organisationId

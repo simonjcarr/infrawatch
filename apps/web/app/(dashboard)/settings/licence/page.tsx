@@ -8,6 +8,7 @@ import { AdminTabs } from '@/components/shared/admin-tabs'
 import { getEffectiveLicence } from '@/lib/actions/licence-guard'
 import { getOrgSeatUsage } from '@/lib/actions/seat-enforcement'
 import { createCommunityLicence } from '@/lib/standalone-empty-state'
+import { hasRole } from '@/lib/auth/guards'
 
 export const metadata: Metadata = {
   title: 'Licence Settings',
@@ -59,7 +60,7 @@ export default async function LicenceSettingsPage() {
 
   if (!org) return null
 
-  const isAdmin = ['org_admin', 'super_admin'].includes(session.user.role)
+  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
 
   return (
     <div className="space-y-6">
@@ -73,7 +74,7 @@ export default async function LicenceSettingsPage() {
         org={org}
         isAdmin={isAdmin}
         sections={['licence']}
-        title="Organisation"
+        title="Licence"
         description="Manage seats, licence expiry, and Enterprise capabilities."
         effectiveLicence={{
           tier: effectiveLicence.tier,

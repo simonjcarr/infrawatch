@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import type { User } from '@/lib/db/schema'
 import { requireActiveUser, requireOrgAdmin } from './guards'
 import { EXPIRED_SESSION_LOGIN_PATH } from './redirects'
@@ -13,6 +13,8 @@ import { organisations } from '@/lib/db/schema'
 import { parseOrgMetadata } from '@/lib/db/schema/organisations'
 import { getTwoFactorPolicyRedirect } from './two-factor-policy'
 import { getDefaultOrganisationId } from '@/lib/default-organisation'
+
+const INSTANCE_ADMIN_ROLE = 'super_admin'
 
 // Re-export User as SessionUser for convenience
 export type { User as SessionUser }
@@ -40,10 +42,12 @@ export class ApiAuthError extends Error {
 }
 
 async function findSessionUser(userId: string): Promise<User | null> {
-  const user = await db.query.users.findFirst({
+  let user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   })
   if (!user) return null
+
+  user = await ensureInstanceHasSuperAdmin(user)
 
   const organisationId = user.organisationId ?? await getDefaultOrganisationId()
 
@@ -53,6 +57,31 @@ async function findSessionUser(userId: string): Promise<User | null> {
     role: getPrimaryRole(user.roles, user.role),
     roles: normalizeAssignedRoles(user.roles, user.role),
   }
+}
+
+async function ensureInstanceHasSuperAdmin(user: User): Promise<User> {
+  if (!user.isActive || user.deletedAt) return user
+  if (normalizeAssignedRoles(user.roles, user.role).includes(INSTANCE_ADMIN_ROLE)) return user
+
+  const activeUsers = await db.query.users.findMany({
+    where: (table, { eq, and, isNull }) => and(eq(table.isActive, true), isNull(table.deletedAt)),
+    columns: { id: true, role: true, roles: true },
+    orderBy: [asc(users.createdAt), asc(users.email)],
+  })
+
+  const hasSuperAdmin = activeUsers.some((row) =>
+    normalizeAssignedRoles(row.roles, row.role).includes(INSTANCE_ADMIN_ROLE),
+  )
+  if (hasSuperAdmin || activeUsers[0]?.id !== user.id) return user
+
+  const roles = normalizeAssignedRoles([INSTANCE_ADMIN_ROLE])
+  const [promoted] = await db
+    .update(users)
+    .set({ role: INSTANCE_ADMIN_ROLE, roles, updatedAt: new Date() })
+    .where(eq(users.id, user.id))
+    .returning()
+
+  return promoted ?? { ...user, role: INSTANCE_ADMIN_ROLE, roles }
 }
 
 async function loadSessionWithUser(requestHeaders: Headers): Promise<RequiredSession | null> {

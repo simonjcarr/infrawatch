@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
     }
     throw err
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return Response.json([])
 
   const { searchParams } = request.nextUrl
   const filters: CertificateListFilters = {
@@ -32,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const certificates = await getCertificates(orgId, filters)
+    const certificates = await getCertificates(filters)
     return Response.json(certificates)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

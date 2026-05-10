@@ -274,10 +274,10 @@ function toLdapUserResult(user: LdapUser): LdapUserResult {
 }
 
 export async function searchLdapDirectory(
-  orgId: string,
   configId: string,
   query: string,
 ): Promise<{ success: true; users: LdapUserResult[] } | { error: string }> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgToolingAccess(orgId)
   if (!query.trim()) return { success: true, users: [] }
 
@@ -306,8 +306,8 @@ export type LookupConfigOption = {
 }
 
 export async function getLookupConfigOptions(
-  orgId: string,
 ): Promise<LookupConfigOption[]> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgToolingAccess(orgId)
   const rows = await db.query.ldapConfigurations.findMany({
     where: and(
@@ -326,10 +326,10 @@ export type LdapUserDetailResult = LdapUserResult & {
 }
 
 export async function lookupDirectoryUser(
-  orgId: string,
   configId: string,
   dn: string,
 ): Promise<{ success: true; user: LdapUserDetailResult } | { error: string }> {
+  const orgId = await getInstanceOrganisationId()
   await requireOrgToolingAccess(orgId)
   const config = await db.query.ldapConfigurations.findFirst({
     where: and(

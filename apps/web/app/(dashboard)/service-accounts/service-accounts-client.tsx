@@ -116,11 +116,9 @@ const INITIAL_ADD_FORM = {
 }
 
 export function ServiceAccountsClient({
-  orgId,
   initialAccounts,
   initialCounts,
 }: {
-  orgId: string
   initialAccounts: DomainAccount[]
   initialCounts: DomainAccountCounts
 }) {
@@ -134,7 +132,7 @@ export function ServiceAccountsClient({
   const [addError, setAddError] = useState<string | null>(null)
 
   const { data: accounts = initialAccounts } = useQuery({
-    queryKey: ['domain-accounts', orgId],
+    queryKey: ['domain-accounts'],
     queryFn: async () => {
       const params = new URLSearchParams({
         sortBy: 'username',
@@ -166,7 +164,7 @@ export function ServiceAccountsClient({
   }, [accounts, searchTerm, statusFilter])
 
   const { data: counts = initialCounts } = useQuery({
-    queryKey: ['domain-account-counts', orgId],
+    queryKey: ['domain-account-counts'],
     queryFn: async () => {
       const res = await fetch('/api/domain-accounts/counts')
       if (!res.ok) throw new Error('Failed to fetch service account counts')
@@ -180,7 +178,7 @@ export function ServiceAccountsClient({
 
   const addMutation = useMutation({
     mutationFn: () =>
-      createDomainAccount(orgId, {
+      createDomainAccount({
         username: addForm.username,
         displayName: addForm.displayName,
         email: addForm.email,

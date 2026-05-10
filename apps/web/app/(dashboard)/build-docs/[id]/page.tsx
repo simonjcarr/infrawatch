@@ -21,17 +21,15 @@ export default async function BuildDocPage({ params }: Props) {
   const { id } = await params
   const session = await getRequiredSession()
   if (!canAccessTooling(session.user)) redirect('/dashboard')
-  const orgId = session.user.organisationId!
   const [detail, model, snippets] = await Promise.all([
-    getBuildDoc(orgId, id),
-    getBuildDocRenderModel(orgId, id),
-    listBuildDocSnippets(orgId),
+    getBuildDoc(id),
+    getBuildDocRenderModel(id),
+    listBuildDocSnippets(),
   ])
   if (!detail || !model) notFound()
 
   return (
     <BuildDocEditorClient
-      orgId={orgId}
       userRole={session.user.role}
       detail={detail}
       renderModel={model}

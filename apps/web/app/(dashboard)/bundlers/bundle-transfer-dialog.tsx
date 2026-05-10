@@ -46,12 +46,11 @@ export type TransferJobStatus = {
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  orgId: string
   buildBundle: () => TransferBundle
   onTransferStarted: (job: TransferJobStatus) => void
 }
 
-export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle, onTransferStarted }: Props) {
+export function BundleTransferDialog({ open, onOpenChange, buildBundle, onTransferStarted }: Props) {
   const [hosts, setHosts] = useState<HostWithAgent[]>([])
   const [loadingHosts, setLoadingHosts] = useState(false)
   const [search, setSearch] = useState('')
@@ -66,7 +65,7 @@ export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle, o
     let cancelled = false
     setLoadingHosts(true)
     setError(null)
-    listHosts(orgId)
+    listHosts()
       .then((rows) => {
         if (!cancelled) setHosts(rows)
       })
@@ -79,7 +78,7 @@ export function BundleTransferDialog({ open, onOpenChange, orgId, buildBundle, o
     return () => {
       cancelled = true
     }
-  }, [open, orgId])
+  }, [open])
 
   const filteredHosts = useMemo(() => {
     const q = search.toLowerCase().trim()

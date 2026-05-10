@@ -15,11 +15,9 @@ export async function GET() {
     }
     throw err
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return Response.json(EMPTY_DOMAIN_ACCOUNT_COUNTS)
 
   try {
-    const counts = await getDomainAccountCounts(orgId)
+    const counts = await getDomainAccountCounts()
     return Response.json(counts)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

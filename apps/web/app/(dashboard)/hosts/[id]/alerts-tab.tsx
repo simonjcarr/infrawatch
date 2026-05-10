@@ -224,7 +224,7 @@ function AddRuleDialog({
 
   const { data: orgCerts = [] } = useQuery({
     queryKey: ['certificates', scopeId],
-    queryFn: () => getCertificates(scopeId, { limit: 200 }),
+    queryFn: () => getCertificates({ limit: 200 }),
     enabled: conditionType === 'cert_expiry' && certScope === 'specific',
   })
 

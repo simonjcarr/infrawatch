@@ -31,7 +31,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 export function VulnerabilitiesTab({ scopeId, hostId }: Props) {
   const { data: findings = [], isLoading } = useQuery({
     queryKey: ['host-vulnerabilities', scopeId, hostId],
-    queryFn: () => getHostVulnerabilities(scopeId, hostId),
+    queryFn: () => getHostVulnerabilities(hostId),
     staleTime: 30_000,
   })
 
@@ -112,4 +112,3 @@ export function VulnerabilitiesTab({ scopeId, hostId }: Props) {
     </div>
   )
 }
-

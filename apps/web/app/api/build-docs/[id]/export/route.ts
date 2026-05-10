@@ -30,8 +30,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   if (!checkRateLimit(session.user.id)) {
     return NextResponse.json({ error: 'Too many exports. Please wait a moment and try again.' }, { status: 429 })
   }
@@ -42,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.success) return NextResponse.json({ error: 'Invalid export format' }, { status: 400 })
 
   const { id } = await params
-  const model = await getBuildDocRenderModel(orgId, id)
+  const model = await getBuildDocRenderModel(id)
   if (!model) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (parsed.data.format === 'pdf') {

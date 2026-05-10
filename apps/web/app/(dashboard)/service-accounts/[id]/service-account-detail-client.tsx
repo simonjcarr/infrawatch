@@ -90,10 +90,8 @@ function InfoCard({
 }
 
 export function ServiceAccountDetailClient({
-  orgId,
   account,
 }: {
-  orgId: string
   account: DomainAccount
 }) {
   const router = useRouter()
@@ -111,7 +109,7 @@ export function ServiceAccountDetailClient({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const updateMutation = useMutation({
-    mutationFn: () => updateDomainAccount(orgId, account.id, {
+    mutationFn: () => updateDomainAccount(account.id, {
       displayName: editForm.displayName,
       email: editForm.email,
       status: editForm.status,
@@ -126,7 +124,7 @@ export function ServiceAccountDetailClient({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteDomainAccount(orgId, account.id),
+    mutationFn: () => deleteDomainAccount(account.id),
     onSuccess: (result) => {
       if ('error' in result) return
       queryClient.invalidateQueries({ queryKey: ['domain-accounts'] })

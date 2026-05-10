@@ -16,11 +16,9 @@ export async function GET() {
     }
     throw err
   }
-  const orgId = session.user.organisationId
-  if (!orgId) return Response.json(EMPTY_CERTIFICATE_COUNTS)
 
   try {
-    const counts = await getCertificateCounts(orgId)
+    const counts = await getCertificateCounts()
     return Response.json(counts)
   } catch (err) {
     if (err instanceof LicenceRequiredError) {

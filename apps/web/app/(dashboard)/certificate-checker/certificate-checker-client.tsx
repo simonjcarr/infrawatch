@@ -260,7 +260,7 @@ const REFRESH_OPTIONS = [
   { value: '86400', label: 'Every 24 hours' },
 ] as const
 
-function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }) {
+function TrackControls({ source }: { source: TrackSource }) {
   const [state, setState] = useState<TrackState>({ status: 'idle' })
   const [dialogOpen, setDialogOpen] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState('3600')
@@ -269,7 +269,7 @@ function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }
   async function submitUpload() {
     if (source.kind !== 'upload') return
     setState({ status: 'loading' })
-    const result = await trackCertificateFromUpload(orgId, { pem: source.pem })
+    const result = await trackCertificateFromUpload({ pem: source.pem })
     applyResult(result)
   }
 
@@ -277,7 +277,7 @@ function TrackControls({ orgId, source }: { orgId: string; source: TrackSource }
     if (source.kind !== 'url') return
     setState({ status: 'loading' })
     setDialogOpen(false)
-    const result = await trackCertificateFromUrl(orgId, {
+    const result = await trackCertificateFromUrl({
       url: source.url,
       refreshIntervalSeconds: parseInt(refreshInterval, 10),
       tlsSkipVerify,
@@ -433,7 +433,7 @@ function CertificateResults({ cert, keyMatch, onDownload, orgId, source }: {
           <p className="text-sm text-muted-foreground mt-1 font-mono">{cert.subject}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {source && <TrackControls orgId={orgId} source={source} />}
+          {source && <TrackControls source={source} />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">

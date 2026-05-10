@@ -81,7 +81,6 @@ import { compareVersions } from '@/lib/version-compare'
 import type { HostGroup } from '@/lib/db/schema'
 
 interface Props {
-  orgId: string
   orgName: string
   hostGroups: Pick<HostGroup, 'id' | 'name'>[]
 }
@@ -108,7 +107,7 @@ const OS_OPTIONS = [
 ]
 
 
-export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
+export function SoftwareReportClient({ orgName, hostGroups }: Props) {
   const queryClient = useQueryClient()
   const [activeView, setActiveView] = useState<ActiveView>('search')
 
@@ -163,65 +162,65 @@ export function SoftwareReportClient({ orgId, orgName, hostGroups }: Props) {
 
   // Typeahead suggestions
   const { data: suggestions = [] } = useQuery({
-    queryKey: ['pkg-name-suggestions', orgId, nameInput],
-    queryFn: () => searchPackageNames(orgId, nameInput),
+    queryKey: ['pkg-name-suggestions', nameInput],
+    queryFn: () => searchPackageNames(nameInput),
     enabled: nameInput.length >= 2,
     staleTime: 10_000,
   })
 
   // Package details (shown when a package is selected)
   const { data: packageDetails, isLoading: detailsLoading } = useQuery({
-    queryKey: ['package-details', orgId, nameParam, osFamilyFilter],
-    queryFn: () => getPackageDetails(orgId, nameParam, osFamilyFilter || undefined),
+    queryKey: ['package-details', nameParam, osFamilyFilter],
+    queryFn: () => getPackageDetails(nameParam, osFamilyFilter || undefined),
     enabled: activeView === 'search' && !!nameParam,
     staleTime: 30_000,
   })
 
   // Available versions for the exact-version dropdown
   const { data: availableVersions = [] } = useQuery({
-    queryKey: ['package-versions', orgId, nameParam],
-    queryFn: () => getPackageVersions(orgId, nameParam),
+    queryKey: ['package-versions', nameParam],
+    queryFn: () => getPackageVersions(nameParam),
     enabled: activeView === 'search' && !!nameParam && versionMode === 'exact',
     staleTime: 30_000,
   })
 
   // New packages
   const { data: newPackages = [], isLoading: newLoading } = useQuery({
-    queryKey: ['new-packages', orgId, newWindowDays],
-    queryFn: () => getNewPackages(orgId, newWindowDays),
+    queryKey: ['new-packages', newWindowDays],
+    queryFn: () => getNewPackages(newWindowDays),
     enabled: activeView === 'new-packages',
     staleTime: 60_000,
   })
 
   // Package drift
   const { data: driftRows = [], isLoading: driftLoading } = useQuery({
-    queryKey: ['package-drift', orgId],
-    queryFn: () => getPackageDrift(orgId),
+    queryKey: ['package-drift'],
+    queryFn: () => getPackageDrift(),
     enabled: activeView === 'drift',
     staleTime: 60_000,
   })
 
   // Saved reports
   const { data: savedReports = [] } = useQuery({
-    queryKey: ['saved-software-reports', orgId],
-    queryFn: () => listSavedReports(orgId),
+    queryKey: ['saved-software-reports'],
+    queryFn: () => listSavedReports(),
   })
 
   const saveMutation = useMutation({
-    mutationFn: () => saveSoftwareReport(orgId, saveName, filters),
+    mutationFn: () => saveSoftwareReport(saveName, filters),
     onSuccess: (result) => {
       if ('success' in result) {
         setSaveDialogOpen(false)
         setSaveName('')
-        queryClient.invalidateQueries({ queryKey: ['saved-software-reports', orgId] })
+        queryClient.invalidateQueries({ queryKey: ['saved-software-reports'] })
       }
     },
   })
 
   const deleteSavedMutation = useMutation({
-    mutationFn: (id: string) => deleteSavedReport(orgId, id),
+    mutationFn: (id: string) => deleteSavedReport(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-software-reports', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['saved-software-reports'] })
     },
   })
 

@@ -794,19 +794,41 @@ This slice owns operational coordination and agent management workflows.
 
 ## Task 12 - Web Reporting, Integrations, Certificates, And Remaining Dashboard Conversion
 
-Status: In progress
+Status: Complete
 
-Completed by:
+Completed by: Codex automation
 
-PR:
+PR: [#1244](https://github.com/carrtech-dev/ct-ops/pull/1244)
 
-Summary:
+Summary: Removed caller-supplied organisation identity from the Task 12-owned
+reporting, certificates, build docs, directory lookup, service accounts,
+bundlers, password-manager launch, SMTP integration, and CT-CVE settings
+surfaces by switching those pages, route handlers, and public actions to
+derive instance scope from the authenticated session. Split build docs,
+certificates, domain accounts, patch status, and vulnerability reports into
+instance-scoped wrappers over new `*-core.ts` modules so the remaining
+org-scoped database internals are isolated for Task 13 cleanup.
 
-Files changed:
+Files changed: `ORGANISATION_REMOVAL_TASKS.md`,
+`apps/web/app/(dashboard)/{build-docs,bundlers,certificates,directory-lookup,password-manager,reports,service-accounts,settings/integrations}`,
+`apps/web/app/(dashboard)/certificate-checker/certificate-checker-client.tsx`,
+`apps/web/app/(dashboard)/hosts/[id]/{alerts-tab.tsx,host-detail-client.tsx,patch-status-tab.tsx,vulnerabilities-tab.tsx}`,
+`apps/web/app/api/{build-docs,certificates,domain-accounts,reports/software,service-accounts}`,
+`apps/web/lib/actions/{build-docs,build-docs-core,certificates,certificates-core,ct-cve,domain-accounts,domain-accounts-core,ldap,patch-status,patch-status-core,vulnerabilities,vulnerabilities-core}.ts`
 
-Validation:
+Validation: `pnpm install --frozen-lockfile`; `pnpm --dir apps/web type-check`
+(passes); `pnpm --dir apps/web lint` (passes with warnings only);
+`pnpm --dir apps/web test:unit` (fails only `lib/db/rls.test.mjs` and
+`lib/integrations/ct-cve/db-nonce-store.test.mjs` because no working container
+runtime is available here); `pnpm --dir apps/web exec playwright test --list`
+(passes); `rg -n "orgId|organisationId|organisation_id|org_id|organisations|tenant" 'apps/web/app/(dashboard)/reports' 'apps/web/app/(dashboard)/certificates' 'apps/web/app/(dashboard)/bundlers' 'apps/web/app/(dashboard)/build-docs' 'apps/web/app/(dashboard)/directory-lookup' 'apps/web/app/(dashboard)/service-accounts' 'apps/web/app/(dashboard)/password-manager' 'apps/web/app/(dashboard)/settings/integrations' apps/web/app/api/{reports,certificates,service-accounts,build-docs} apps/web/lib/actions/{build-docs,certificates,ct-cve,domain-accounts,software-inventory,vulnerabilities}.ts`
+(no matches)
 
-Follow-up:
+Follow-up: Start Task 13 next. Task 13 still needs to delete the remaining
+org-scoped internals isolated in `apps/web/lib/actions/{build-docs,certificates,domain-accounts,patch-status,vulnerabilities}-core.ts`,
+remove the broader schema/RLS residue, and address the two container-runtime
+unit tests plus local browser smoke coverage if a working container runtime and
+instrumentation environment are available.
 
 ### Required work
 

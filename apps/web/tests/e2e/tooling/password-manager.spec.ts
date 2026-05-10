@@ -258,7 +258,9 @@ test('hosted password manager flow keeps plaintext and key material inside the b
 
   await page.getByRole('tab', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Rotate vault key' }).click()
-  await expect(page.getByText('Vault key rotated safely for the current active members.')).toBeVisible()
+  await expect(page.getByTestId('password-manager-workspace')).toContainText(
+    'Vault key rotated safely for the current active members.',
+  )
 
   await page.getByRole('tab', { name: 'Passwords' }).click()
   await entryCard.getByRole('button', { name: 'Edit' }).click()

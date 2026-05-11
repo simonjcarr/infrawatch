@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.135.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.134.0...web/v0.135.0) (2026-05-11)
+
+
+### Features
+
+* **automation:** add feature flags and ansible provider foundation ([#1301](https://github.com/carrtech-dev/ct-ops/issues/1301)) ([d8959fc](https://github.com/carrtech-dev/ct-ops/commit/d8959fc792d9dc771dbf07d714bea846c3760922))
+
 ## [0.134.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.133.1...web/v0.134.0) (2026-05-11)
 
 

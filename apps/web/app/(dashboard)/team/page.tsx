@@ -15,6 +15,7 @@ export default async function TeamPage() {
     <TeamClient
       currentUserId={session.user.id}
       currentUserRole={session.user.role}
+      hasInstanceScope={Boolean(session.user.instanceId)}
       initialMembers={members}
       initialPendingInvites={pendingInvites}
     />

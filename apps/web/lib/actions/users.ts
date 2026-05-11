@@ -57,7 +57,9 @@ export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: 
 export async function inviteUser(
   input: { email: string; roles: string[] },
 ): Promise<{ inviteLink: string } | { restored: true } | { error: string }> {
-  const currentScope = resolveCurrentActionScope(await getRequiredSession())
+  const session = await getRequiredSession()
+  const currentScope = resolveOptionalActionScope(session)
+  if (!currentScope) return { error: 'Team invitations require an instance to be configured' }
   const instanceId = currentScope
   await requireInstanceAccess(instanceId)
   const parsed = inviteSchema.safeParse(input)
@@ -69,7 +71,7 @@ export async function inviteUser(
   const nextRole = getPrimaryRole(nextRoles)
 
   try {
-    const session = await requireInstanceAdminAccess(instanceId)
+    const adminSession = await requireInstanceAdminAccess(instanceId)
 
     // Check for a previously removed user — restore them rather than re-registering,
     // since their account (and email) still exist in the database.
@@ -90,7 +92,7 @@ export async function inviteUser(
 
         await writeAuditEvent(tx, {
           instanceId: instanceId,
-          actorUserId: session.user.id,
+          actorUserId: adminSession.user.id,
           action: 'user.restored',
           targetType: 'user',
           targetId: removedUser.id,
@@ -144,7 +146,7 @@ export async function inviteUser(
           role: nextRole,
           roles: nextRoles,
           instanceId: instanceId,
-          invitedById: session.user.id,
+          invitedById: adminSession.user.id,
           expiresAt,
         })
         .returning()
@@ -153,7 +155,7 @@ export async function inviteUser(
 
       await writeAuditEvent(tx, {
         instanceId: instanceId,
-        actorUserId: session.user.id,
+        actorUserId: adminSession.user.id,
         action: 'invitation.created',
         targetType: 'invitation',
         targetId: createdInvite.id,

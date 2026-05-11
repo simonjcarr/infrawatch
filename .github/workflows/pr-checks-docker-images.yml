@@ -5,6 +5,7 @@ on:
     paths:
       - "agent/**"
       - "apps/ingest/**"
+      - "apps/ansible-api/**"
       - "apps/web/**"
       - "proto/**"
       - ".dockerignore"
@@ -16,12 +17,14 @@ on:
       - "go.work"
       - "go.work.sum"
       - ".github/workflows/pr-checks-docker-images.yml"
+      - ".github/workflows/docker-publish-ansible-api.yml"
   push:
     branches:
       - main
     paths:
       - "agent/**"
       - "apps/ingest/**"
+      - "apps/ansible-api/**"
       - "apps/web/**"
       - "proto/**"
       - ".dockerignore"
@@ -33,12 +36,22 @@ on:
       - "go.work"
       - "go.work.sum"
       - ".github/workflows/pr-checks-docker-images.yml"
+      - ".github/workflows/docker-publish-ansible-api.yml"
 
 concurrency:
   group: docker-image-check-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  ansible-api-contract:
+    name: Ansible API contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test ansible-api contract
+        run: PYTHONPATH=apps/ansible-api python3 -m unittest discover -s apps/ansible-api/tests
+
   web-image:
     name: Web Docker image
     runs-on: ubuntu-latest
@@ -82,3 +95,25 @@ jobs:
           load: false
           cache-from: type=gha,scope=pr-ingest-image-amd64
           cache-to: type=gha,mode=max,scope=pr-ingest-image-amd64
+
+  ansible-api-image:
+    name: Ansible API Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: image=moby/buildkit:v0.29.0
+
+      - name: Build ansible-api image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./apps/ansible-api
+          file: ./apps/ansible-api/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: false
+          cache-from: type=gha,scope=pr-ansible-api-image-amd64
+          cache-to: type=gha,mode=max,scope=pr-ansible-api-image-amd64

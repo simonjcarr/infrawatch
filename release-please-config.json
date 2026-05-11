@@ -21,6 +21,13 @@
       "tag-separator": "/",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md"
+    },
+    "apps/ansible-api": {
+      "release-type": "simple",
+      "component": "ansible-api",
+      "tag-separator": "/",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }

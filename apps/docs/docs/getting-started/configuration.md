@@ -22,6 +22,7 @@ All CT-Ops configuration is via environment variables. There are no config files
 | `AGENT_DIST_DIR` | — | `/var/lib/ct-ops/agent-dist` | Directory where compiled agent binaries are stored for download. If you override or mount it, ensure it is writable by uid/gid `1001` (`nextjs:nodejs`) |
 | `AGENT_DOWNLOAD_BASE_URL` | — | `https://localhost` | Public URL agents use to download new binaries. Must be reachable from every agent host |
 | `INGEST_WS_URL` | — | *(empty)* | WebSocket URL of the ingest service. Empty = same-origin via the bundled nginx (recommended). Set to an absolute `wss://` URL only to bypass the bundled proxy |
+| `ANSIBLE_API_URL` | — | `http://ansible-api:8080` | Internal URL used by the web app to health-check the optional Ansible automation API service |
 | `WEB_TLS_CERT` | — | `/var/lib/ct-ops/server-tls/server.crt` | Path to the nginx-facing server cert. The enrolment bundle route reads this file and embeds it so agents can verify the HTTPS download URL |
 | `CT_CVE_SERVICE_TOKENS` | — 🔒 | *(empty)* | JSON allow-list of signed CT-CVE service tokens that can deliver findings or call CT Ops connection health; use `findings:write` and `connection:read` scopes for the initial inbound connector |
 | `CT_CVE_INVENTORY_PUSH_TARGETS` | — 🔒 | *(empty)* | JSON list of outbound CT-CVE inventory targets. Each entry contains `name`, `baseUrl`, and a token object with `id`, `secret`, `ctOpsInstallationId`, and `scopes:["inventory:write"]`; schedule `pnpm --dir apps/web ct-cve:push-inventory` to send snapshots |
@@ -131,5 +132,11 @@ Loopback-only ports (reachable from the host over SSH tunnels only):
 | Web | 3000 | HTTP | Next.js — fronted by nginx |
 | Ingest | 8080 | HTTP | JWKS, `/healthz`, WebSocket terminal — fronted by nginx |
 | PostgreSQL | 5432 | TCP | Database |
+
+Optional internal-only services:
+
+| Service | Port | Protocol | Purpose |
+|---|---|---|---|
+| Ansible API | 8080 | HTTP | Optional automation provider, reachable only on the Compose network when enabled |
 
 Override the nginx port bindings with `NGINX_HTTPS_PORT` and `NGINX_HTTP_PORT` in `.env` if 443/80 are already in use.

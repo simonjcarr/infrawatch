@@ -13,18 +13,12 @@ import {
   getCtCveConnectorSettingsForAdmin,
   getDefaultCtOpsBaseUrl,
 } from '@/lib/integrations/ct-cve/connector-settings'
-import { createEmptyCtCveConnectorSetupOverview } from '@/lib/standalone-empty-state'
 import { CtCveSettingsClient } from './ct-cve-settings-client'
+import { integrationSettingsTabs } from '../tabs'
 
 export const metadata: Metadata = {
   title: 'CT-CVE Integration Settings',
 }
-
-const tabs = [
-  { title: 'LDAP / Directory', href: '/settings/integrations' },
-  { title: 'SMTP relay', href: '/settings/integrations/smtp' },
-  { title: 'CT-CVE', href: '/settings/integrations/ct-cve' },
-]
 
 export default async function CtCveIntegrationSettingsPage() {
   const session = await getRequiredSession()
@@ -62,7 +56,7 @@ export default async function CtCveIntegrationSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <AdminTabs tabs={tabs} />
+      <AdminTabs tabs={integrationSettingsTabs} />
       <CtCveSettingsClient
         overview={overview}
         settings={clientSettings}

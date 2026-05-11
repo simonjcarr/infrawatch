@@ -15,12 +15,14 @@ on:
       - "deploy/scripts/test-password-manager-nginx.sh"
       - "deploy/scripts/test-password-manager-startup.sh"
       - "deploy/scripts/test-start.sh"
+      - "deploy/scripts/test-ansible-profile-wiring.sh"
       - "deploy/scripts/test-web-entrypoint.sh"
       - "deploy/scripts/test-upgrade.sh"
       - "deploy/scripts/test-support-data.sh"
       - "deploy/scripts/fetch-licence-public-key.sh"
       - "deploy/nginx/nginx.conf"
       - "docker-compose.single.yml"
+      - "apps/ansible-api/**"
       - "apps/web/entrypoint.sh"
       - ".env.example"
       - "install.sh"
@@ -37,8 +39,9 @@ jobs:
           set -euo pipefail
           WEB_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/web@sha256:1111111111111111111111111111111111111111111111111111111111111111"
           INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          ANSIBLE_API_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:3333333333333333333333333333333333333333333333333333333333333333"
           python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json
-          export WEB_IMAGE_REF INGEST_IMAGE_REF
+          export WEB_IMAGE_REF INGEST_IMAGE_REF ANSIBLE_API_IMAGE_REF
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml dist/ct-ops/docker-compose.yml
           cp .env.example dist/ct-ops/.env.example
@@ -53,8 +56,8 @@ jobs:
           bash deploy/scripts/fetch-licence-public-key.sh dist/ct-ops/licence-keys/current.pem
           cp deploy/nginx/nginx.conf dist/ct-ops/deploy/nginx/nginx.conf
           echo "test" > dist/ct-ops/VERSION
-          perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
-          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m' dist/ct-ops/.env.example
+          perl -0pi -e 's/\$\{WEB_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/web:latest\}/$ENV{WEB_IMAGE_REF}/g; s/\$\{INGEST_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ingest:latest\}/$ENV{INGEST_IMAGE_REF}/g; s/\$\{ANSIBLE_API_IMAGE:-ghcr\.io\/carrtech-dev\/ct-ops\/ansible-api:latest\}/$ENV{ANSIBLE_API_IMAGE_REF}/g' dist/ct-ops/docker-compose.yml
+          perl -0pi -e 's/^# WEB_IMAGE=.*$/WEB_IMAGE=$ENV{WEB_IMAGE_REF}/m; s/^# INGEST_IMAGE=.*$/INGEST_IMAGE=$ENV{INGEST_IMAGE_REF}/m; s/^# ANSIBLE_API_IMAGE=.*$/ANSIBLE_API_IMAGE=$ENV{ANSIBLE_API_IMAGE_REF}/m' dist/ct-ops/.env.example
           chmod +x dist/ct-ops/start.sh dist/ct-ops/backup.sh dist/ct-ops/build-offline-installer.sh dist/ct-ops/refresh_licence_key dist/ct-ops/upgrade.sh dist/ct-ops/generate_support_data
 
       - name: Validate scripts and required files
@@ -91,6 +94,7 @@ jobs:
           bash deploy/scripts/test-password-manager-nginx.sh
           bash deploy/scripts/test-password-manager-startup.sh
           bash deploy/scripts/test-start.sh
+          bash deploy/scripts/test-ansible-profile-wiring.sh
           bash deploy/scripts/test-web-entrypoint.sh
           bash deploy/scripts/test-upgrade.sh
           bash deploy/scripts/test-support-data.sh
@@ -102,7 +106,7 @@ jobs:
           POSTGRES_PASSWORD: build-time-placeholder
         run: |
           set -euo pipefail
-          refs="$(docker compose config --images)"
+          refs="$(docker compose --profile ansible config --images)"
           echo "$refs"
           expected_password_manager_ref="$(python3 -c 'import json; print(json.load(open("password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
           grep -Fxq "$expected_password_manager_ref" <<< "$refs"

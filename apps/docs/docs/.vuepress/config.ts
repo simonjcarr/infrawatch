@@ -78,6 +78,7 @@ export default defineUserConfig({
           '/features/scheduled-tasks.md',
           '/features/tags.md',
           '/features/notes.md',
+          '/features/feature-flags.md',
         ],
       },
       {

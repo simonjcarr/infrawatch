@@ -5,6 +5,7 @@ import { AdminTabs } from '@/components/shared/admin-tabs'
 import { SettingsClient } from '../../settings-client'
 import { hasRole } from '@/lib/auth/guards'
 import { getCurrentInstanceSettingsRecord } from '@/lib/actions/settings'
+import { integrationSettingsTabs } from '../tabs'
 
 export const metadata: Metadata = {
   title: 'SMTP Relay Settings',
@@ -21,11 +22,7 @@ export default async function SmtpRelaySettingsPage() {
     return (
       <div className="space-y-6">
         <AdminTabs
-          tabs={[
-            { title: 'LDAP / Directory', href: '/settings/integrations' },
-            { title: 'SMTP relay', href: '/settings/integrations/smtp' },
-            { title: 'CT-CVE', href: '/settings/integrations/ct-cve' },
-          ]}
+          tabs={integrationSettingsTabs}
         />
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">SMTP Relay</h1>
@@ -40,11 +37,7 @@ export default async function SmtpRelaySettingsPage() {
   return (
     <div className="space-y-6">
       <AdminTabs
-        tabs={[
-          { title: 'LDAP / Directory', href: '/settings/integrations' },
-          { title: 'SMTP relay', href: '/settings/integrations/smtp' },
-          { title: 'CT-CVE', href: '/settings/integrations/ct-cve' },
-        ]}
+        tabs={integrationSettingsTabs}
       />
       <SettingsClient
         org={org}

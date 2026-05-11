@@ -1,0 +1,175 @@
+name: Build and publish Docker image (ansible-api)
+
+on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: Release tag. The image version is derived from the tag suffix after the first slash.
+        required: true
+        type: string
+    outputs:
+      image_ref:
+        description: Digest-pinned multi-arch Ansible API image reference.
+        value: ${{ jobs.merge-ansible-api.outputs.image_ref }}
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Release tag to build. Must already exist.
+        required: true
+        type: string
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/ct-ops
+  TAG_NAME: ${{ inputs.tag_name || github.event.release.tag_name }}
+
+jobs:
+  build-ansible-api:
+    name: Build ansible-api image (${{ matrix.platform }})
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'ansible-api/')
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: self-hosted
+            suffix: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+
+    steps:
+      - name: Reset workspace ownership
+        if: matrix.runner == 'self-hosted'
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R $(id -u):$(id -g) /ws 2>/dev/null || true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG_NAME }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: image=moby/buildkit:v0.29.0
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/ansible-api
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./apps/ansible-api
+          file: ./apps/ansible-api/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.IMAGE_PREFIX }}/ansible-api,push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=ansible-api-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=ansible-api-${{ matrix.suffix }}
+
+      - name: Export digest
+        run: |
+          rm -rf /tmp/digests
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: ansible-api-digest-${{ matrix.suffix }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Clean up runner disk
+        if: always() && matrix.runner == 'self-hosted'
+        run: |
+          set +e
+          docker run --rm -v "$GITHUB_WORKSPACE:/ws" alpine \
+            chown -R "$(id -u):$(id -g)" /ws 2>/dev/null || true
+          find "$GITHUB_WORKSPACE" -mindepth 1 -delete 2>/dev/null || true
+          rm -rf /tmp/digests 2>/dev/null || true
+          docker buildx prune -f --filter "until=1h" 2>/dev/null || true
+          docker system prune -f --filter "until=1h" 2>/dev/null || true
+          exit 0
+
+  merge-ansible-api:
+    name: Merge ansible-api image manifests
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'ansible-api/')
+    runs-on: ubuntu-latest
+    needs: build-ansible-api
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_ref: ${{ steps.final-image.outputs.ref }}
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: ansible-api-digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: image=moby/buildkit:v0.29.0
+
+      - name: Derive version
+        id: version
+        run: |
+          echo "value=${TAG_NAME#*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/ansible-api
+          tags: |
+            type=raw,value=${{ steps.version.outputs.value }}
+            type=raw,value=latest
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.IMAGE_PREFIX }}/ansible-api@sha256:%s ' *)
+
+      - name: Capture manifest digest
+        id: final-image
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect "${{ env.IMAGE_PREFIX }}/ansible-api:${{ steps.version.outputs.value }}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "ref=${{ env.IMAGE_PREFIX }}/ansible-api@${digest}" >> "$GITHUB_OUTPUT"

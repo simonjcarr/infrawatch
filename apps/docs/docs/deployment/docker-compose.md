@@ -119,6 +119,7 @@ The one-shot `migrate` container applies database migrations before web and inge
 | `password-manager-api` | `ghcr.io/carrtech-dev/ct-password-manager/api@sha256:...` | none | Bundled CT Password Manager API, reverse proxied by CT-Ops at `/password-manager-api/` |
 | `web` | `ghcr.io/carrtech-dev/ct-ops/web@sha256:...` | 127.0.0.1:3000 | Next.js web app (reached via nginx) |
 | `ingest` | `ghcr.io/carrtech-dev/ct-ops/ingest@sha256:...` | **9443**, 127.0.0.1:8080 | Agent gRPC (:9443 direct, bypasses nginx) + JWKS on loopback |
+| `ansible-api` | `ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:...` | none | Optional Ansible automation API, started only through the `ansible` Compose profile |
 
 Only `443`, `80`, and `9443` are published on all host interfaces:
 
@@ -126,6 +127,8 @@ Only `443`, `80`, and `9443` are published on all host interfaces:
 - `9443` — agent gRPC with mTLS. Agents connect direct to the ingest container; the proxy is intentionally skipped so client-cert verification is never terminated mid-hop.
 
 The remaining ports are bound to `127.0.0.1` only, so `web:3000`, `ingest:8080`, and Postgres are reachable from the host (for debugging over SSH tunnels) but not from the network. Override the nginx ports with `NGINX_HTTPS_PORT` / `NGINX_HTTP_PORT` in `.env` if 80/443 are already in use.
+
+The optional `ansible-api` service is not published to the host. CT-Ops starts it only when an administrator enables Ansible automation in the database and an operator re-runs `./start.sh`. The web app never mounts the Docker socket and cannot start this container itself.
 
 When installing inside a VM, LXC, or Incus instance that sits behind a NAT or
 private bridge, forward the external HTTPS port and `9443` to the instance.

@@ -150,6 +150,7 @@ const DEFAULT_PASSWORD_REVEAL_TIMEOUT_SECONDS = 10
 const DEFAULT_PASSWORD_CLIPBOARD_TIMEOUT_SECONDS = 20
 const MIN_PASSWORD_TIMEOUT_SECONDS = 1
 const MAX_PASSWORD_TIMEOUT_SECONDS = 300
+const PASSWORD_MANAGER_FIXED_MASK = '************'
 
 type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
 type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note' | 'ssh-key-pair'
@@ -320,6 +321,10 @@ function getPasswordManagerEntryIcon(templateId: string | undefined): ReactNode 
     default:
       return <KeyRound className="size-4 text-muted-foreground" />
   }
+}
+
+function getPasswordManagerCopyActionLabel(label: string): string {
+  return label === 'URL' ? 'Copy URL' : `Copy ${label.toLowerCase()}`
 }
 
 function clampPasswordManagerTimeoutSeconds(value: unknown, fallback: number): number {
@@ -1910,8 +1915,25 @@ export function PasswordManagerClientShell({
     }
   }
 
-  async function handleCopyEntryField(entry: PasswordManagerEntrySummary, fieldId: string, fieldLabel: string) {
-    const value = entry.payload.fields?.[fieldId]
+  async function handleCopyEntryField(
+    entry: PasswordManagerEntrySummary,
+    fieldId: string,
+    fieldLabel: string,
+    valueOverride?: string,
+  ) {
+    const value =
+      valueOverride ??
+      (fieldId === 'title'
+        ? entry.payload.title
+        : fieldId === 'username'
+          ? entry.payload.username
+          : fieldId === 'password'
+            ? entry.payload.password
+            : fieldId === 'url'
+              ? entry.payload.url
+              : fieldId === 'notes'
+                ? entry.payload.notes
+                : entry.payload.fields?.[fieldId])
     if (!value) {
       setWorkspaceError(`${fieldLabel} is empty and cannot be copied.`)
       return
@@ -2817,7 +2839,12 @@ function PasswordManagerWorkspace({
   members: MemberRecord[]
   membersPending: boolean
   instanceUsers: PasswordManagerInstanceUser[]
-  onCopyEntryField: (entry: PasswordManagerEntrySummary, fieldId: string, fieldLabel: string) => Promise<void>
+  onCopyEntryField: (
+    entry: PasswordManagerEntrySummary,
+    fieldId: string,
+    fieldLabel: string,
+    valueOverride?: string,
+  ) => Promise<void>
   onCopyPassword: (entry: PasswordManagerEntrySummary) => Promise<void>
   onCreateVault: () => Promise<void>
   onCreateVaultDescriptionChange: (value: string) => void
@@ -2942,6 +2969,31 @@ function PasswordManagerWorkspace({
       ...current,
       [fieldId]: !current[fieldId],
     }))
+  }
+
+  function renderEntryDialogCopyButton(fieldId: string, fieldLabel: string, value: string) {
+    if ((!isViewingEntry && !editingEntryId) || !selectedEntry || !value) {
+      return null
+    }
+
+    const copyLabel = getPasswordManagerCopyActionLabel(fieldLabel)
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => void onCopyEntryField(selectedEntry, fieldId, fieldLabel, value)}
+            aria-label={copyLabel}
+            title={copyLabel}
+          >
+            <Copy className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{copyLabel}</TooltipContent>
+      </Tooltip>
+    )
   }
 
   function resetSshKeyGenerationControls() {
@@ -3406,7 +3458,10 @@ function PasswordManagerWorkspace({
               </DialogHeader>
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="password-manager-entry-title">Title</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="password-manager-entry-title">Title</Label>
+                    {renderEntryDialogCopyButton('title', 'Title', entryTitle)}
+                  </div>
                   <Input
                     id="password-manager-entry-title"
                     value={entryTitle}
@@ -3567,16 +3622,11 @@ function PasswordManagerWorkspace({
                         onEntryFieldChange(field.id, nextValue)
                       }
                     }
-                    const sshCopyLabel =
-                      field.id === 'publicMaterial'
-                        ? 'Copy public key or certificate'
-                        : field.id === 'privateKey'
-                          ? 'Copy private key'
-                          : `Copy ${field.label.toLowerCase()}`
-                    const canCopySshField =
-                      isViewingEntry && activeEntryTemplate.id === 'ssh-key-pair' && !!editingEntryId && !!selectedEntry && !!value
+                    const canCopyDialogField = (isViewingEntry || !!editingEntryId) && !!selectedEntry && !!value
                     const canGeneratePassword = field.id === 'password' && !isViewingEntry
-                    const canTogglePasswordVisibility = field.type === 'password' && !isViewingEntry
+                    const canTogglePasswordVisibility = field.type === 'password'
+                    const useFixedPasswordMask =
+                      field.type === 'password' && !!value && !!editingEntryId && !visibleEntryPasswordFields[field.id]
                     const passwordVisibilityLabel = field.label.toLowerCase()
                     const fieldContainerClassName =
                       field.multiline || canGeneratePassword
@@ -3593,41 +3643,30 @@ function PasswordManagerWorkspace({
                       >
                         <div className="flex items-center justify-between gap-2">
                           <Label htmlFor={fieldId}>{field.label}</Label>
-                          {canGeneratePassword ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setPasswordGeneratorDialogOpen(true)}
-                              disabled={!selectedVault}
-                            >
-                              <KeyRound className="size-4" />
-                              Generate password
-                            </Button>
-                          ) : canCopySshField ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  onClick={() => void onCopyEntryField(selectedEntry!, field.id, field.label)}
-                                  aria-label={sshCopyLabel}
-                                  title={sshCopyLabel}
-                                >
-                                  <Copy className="size-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>{sshCopyLabel}</TooltipContent>
-                            </Tooltip>
-                          ) : activeEntryTemplate.id === 'ssh-key-pair' && !isViewingEntry ? (
-                            <Label
-                              htmlFor={`${fieldId}-file`}
-                              className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
-                            >
-                              Upload file
-                            </Label>
-                          ) : null}
+                          <div className="flex items-center gap-1.5">
+                            {canGeneratePassword ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPasswordGeneratorDialogOpen(true)}
+                                disabled={!selectedVault}
+                              >
+                                <KeyRound className="size-4" />
+                                Generate password
+                              </Button>
+                            ) : null}
+                            {canCopyDialogField ? (
+                              renderEntryDialogCopyButton(field.id, field.label, value)
+                            ) : activeEntryTemplate.id === 'ssh-key-pair' && !isViewingEntry ? (
+                              <Label
+                                htmlFor={`${fieldId}-file`}
+                                className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
+                              >
+                                Upload file
+                              </Label>
+                            ) : null}
+                          </div>
                         </div>
                         {field.multiline ? (
                           <Textarea
@@ -3641,10 +3680,11 @@ function PasswordManagerWorkspace({
                           <>
                             <Input
                               id={fieldId}
-                              type={canTogglePasswordVisibility && visibleEntryPasswordFields[field.id] ? 'text' : field.type}
-                              value={value}
+                              type={useFixedPasswordMask || visibleEntryPasswordFields[field.id] ? 'text' : field.type}
+                              value={useFixedPasswordMask ? PASSWORD_MANAGER_FIXED_MASK : value}
                               onChange={(event) => handleChange(event.target.value)}
                               disabled={!selectedVault || isViewingEntry}
+                              readOnly={useFixedPasswordMask}
                               className={canTogglePasswordVisibility ? 'pr-10' : undefined}
                             />
                             {canTogglePasswordVisibility ? (
@@ -3701,7 +3741,10 @@ function PasswordManagerWorkspace({
                   })}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="password-manager-entry-notes">Notes</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="password-manager-entry-notes">Notes</Label>
+                    {renderEntryDialogCopyButton('notes', 'Notes', entryNotes)}
+                  </div>
                   <Textarea
                     id="password-manager-entry-notes"
                     value={entryNotes}

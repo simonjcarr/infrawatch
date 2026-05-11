@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.133.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.132.1...web/v0.133.0) (2026-05-11)
+
+
+### Features
+
+* **password-manager:** add entry field copy controls ([fef37e3](https://github.com/carrtech-dev/ct-ops/commit/fef37e38be3e320d7ae3cd6c06ccfd1018f28b56))
+
 ## [0.132.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.132.0...web/v0.132.1) (2026-05-11)
 
 

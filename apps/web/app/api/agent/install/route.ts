@@ -13,11 +13,11 @@ const installRateLimit = createRateLimiter({
 
 /**
  * Returns a shell bootstrap script that detects OS/arch, downloads the agent
- * binary from this server, and installs it when CT_OPS_ORG_TOKEN is supplied
+ * binary from this server, and installs it when CT_OPS_ENROLMENT_TOKEN is supplied
  * in the runtime environment.
  *
  * Usage — download and install after exporting a token:
- *   export CT_OPS_ORG_TOKEN="<TOKEN>"
+ *   export CT_OPS_ENROLMENT_TOKEN="<TOKEN>"
  *   curl -fsSL "https://ct-ops.example.com/api/agent/install" | sh
  *
  * Usage — download only, then install manually:

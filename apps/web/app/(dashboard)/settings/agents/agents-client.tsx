@@ -360,7 +360,7 @@ export function AgentsSettingsClient({
                     <CopyButton text={newTokenValue} />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    This token will not be shown again in full. The install command passes it via <code>CT_OPS_ORG_TOKEN</code>, not in the URL.
+                    This token will not be shown again in full. The install command passes it via <code>CT_OPS_ENROLMENT_TOKEN</code>, not in the URL.
                   </p>
                 </div>
               </details>
@@ -713,7 +713,7 @@ function BundleDialog({ open, onOpenChange, activeTokens }: BundleDialogProps) {
                 <div className="flex-1">
                   <span className="text-sm font-medium">No token (operator supplies it)</span>
                   <p className="text-xs text-muted-foreground">
-                    Installer reads the token from <code>CT_OPS_ORG_TOKEN</code> at install
+                    Installer reads the token from <code>CT_OPS_ENROLMENT_TOKEN</code> at install
                     time — safest for wide distribution.
                   </p>
                 </div>

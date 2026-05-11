@@ -145,10 +145,10 @@ export async function buildInstallBundle(opts: BundleOptions): Promise<{
 function renderAgentToml(opts: BundleOptions): string {
   const skipVerify = opts.skipVerify ? 'true' : 'false'
   const tokenLine = opts.token
-    ? `org_token = "${opts.token}"`
+    ? `enrolment_token = "${opts.token}"`
     : `# Paste the enrolment token from the CT-Ops UI (Administration → Agents → Enrolment).
-# Can also be set via the CT_OPS_ORG_TOKEN environment variable.
-org_token = ""`
+# Can also be set via the CT_OPS_ENROLMENT_TOKEN environment variable.
+enrolment_token = ""`
 
   return `# CT-Ops Agent Configuration
 # Generated install bundle — edit values as needed before running install.
@@ -182,11 +182,11 @@ ${renderTagTomlLine(opts.tags)}
 
 function renderUnixInstallScript(opts: BundleOptions): string {
   const tlsFlag = opts.skipVerify ? ' --tls-skip-verify' : ''
-  const tokenArg = opts.token ? `"${opts.token}"` : '"$CT_OPS_ORG_TOKEN"'
+  const tokenArg = opts.token ? `"${opts.token}"` : '"$CT_OPS_ENROLMENT_TOKEN"'
   const tokenGuard = opts.token
     ? ''
-    : `if [ -z "\${CT_OPS_ORG_TOKEN:-}" ]; then
-  echo "Set CT_OPS_ORG_TOKEN before running this script, or pass --token to the agent manually." >&2
+    : `if [ -z "\${CT_OPS_ENROLMENT_TOKEN:-}" ]; then
+  echo "Set CT_OPS_ENROLMENT_TOKEN before running this script, or pass --token to the agent manually." >&2
   exit 1
 fi
 `
@@ -235,11 +235,11 @@ function renderWindowsInstallScript(opts: BundleOptions): string {
   const tlsFlag = opts.skipVerify ? ' --tls-skip-verify' : ''
   const tokenExpr = opts.token
     ? `"${opts.token}"`
-    : '$env:CT_OPS_ORG_TOKEN'
+    : '$env:CT_OPS_ENROLMENT_TOKEN'
   const tokenGuard = opts.token
     ? ''
-    : `if (-not $env:CT_OPS_ORG_TOKEN) {
-  Write-Error "Set the CT_OPS_ORG_TOKEN environment variable before running this script."
+    : `if (-not $env:CT_OPS_ENROLMENT_TOKEN) {
+  Write-Error "Set the CT_OPS_ENROLMENT_TOKEN environment variable before running this script."
   exit 1
 }
 `
@@ -296,8 +296,8 @@ ${
 }`
     : `This bundle does **not** contain an enrolment token. Before running the install script:
 
-- **Linux / macOS:** \`export CT_OPS_ORG_TOKEN=<token-from-ui>\`
-- **Windows (PowerShell):** \`$env:CT_OPS_ORG_TOKEN = "<token-from-ui>"\`
+- **Linux / macOS:** \`export CT_OPS_ENROLMENT_TOKEN=<token-from-ui>\`
+- **Windows (PowerShell):** \`$env:CT_OPS_ENROLMENT_TOKEN = "<token-from-ui>"\`
 
 Create a token in the CT-Ops UI under **Administration → Agents → Enrolment**.`
 

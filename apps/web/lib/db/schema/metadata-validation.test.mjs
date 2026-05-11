@@ -77,6 +77,15 @@ test('parseInstanceMetadata preserves valid settings and drops malformed nested 
       intervalHours: 24,
       includeSnapFlatpak: 'yes',
     },
+    featureFlags: {
+      'automation.ansible': true,
+      'unknown.flag': true,
+      malformed: 'yes',
+    },
+    automationSettings: {
+      provider: 'ansible',
+      injected: true,
+    },
   })
 
   assert.deepEqual(parsed.defaultTags, [])
@@ -89,5 +98,11 @@ test('parseInstanceMetadata preserves valid settings and drops malformed nested 
     enabled: true,
     intervalHours: 24,
     includeSnapFlatpak: undefined,
+  })
+  assert.deepEqual(parsed.featureFlags, {
+    'automation.ansible': true,
+  })
+  assert.deepEqual(parsed.automationSettings, {
+    provider: 'ansible',
   })
 })

@@ -30,7 +30,7 @@ REQUIRED_VARS=(BETTER_AUTH_URL BETTER_AUTH_TRUSTED_ORIGINS BETTER_AUTH_SECRET PO
 
 # Optional variables — missing values get a warning, not an error. Most have
 # safe localhost defaults baked into docker-compose.yml.
-OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
+OPTIONAL_VARS=(AGENT_DOWNLOAD_BASE_URL INGEST_WS_URL CT_OPS_TRUST_PROXY_HEADERS CT_OPS_LOADTEST_ADMIN_KEY WEB_IMAGE INGEST_IMAGE ANSIBLE_API_IMAGE PASSWORD_MANAGER_DB_PASSWORD PASSWORD_MANAGER_CT_OPS_ISSUER PASSWORD_MANAGER_CT_OPS_AUDIENCE PASSWORD_MANAGER_CT_OPS_PRODUCT PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY PASSWORD_MANAGER_TRUSTED_ORIGINS PASSWORD_MANAGER_SESSION_COOKIE_SECURE CT_OPS_INSTANCE_ID)
 REQUIRED_FILES=(
   docker-compose.yml
   password-manager-release.json
@@ -141,6 +141,33 @@ validate_password_manager_image_pin() {
     echo "password-manager-migrate: ${migrate_image:-<missing>}" >&2
     exit 1
   fi
+}
+
+should_start_ansible_profile() {
+  local instance_id="${CT_OPS_INSTANCE_ID:-ct-ops-dev}"
+  local postgres_user="${POSTGRES_USER:-ctops}"
+  local postgres_db="${POSTGRES_DB:-ctops}"
+  local enabled
+
+  if ! enabled="$(docker compose exec -T db psql \
+    -U "$postgres_user" \
+    -d "$postgres_db" \
+    -At \
+    -v ON_ERROR_STOP=1 \
+    -v instance_id="$instance_id" \
+    -c "SELECT CASE WHEN EXISTS (
+      SELECT 1
+      FROM instance_settings
+      WHERE id = :'instance_id'
+        AND COALESCE(metadata->'featureFlags'->>'automation.ansible', 'false') = 'true'
+        AND COALESCE(metadata->'automationSettings'->>'provider', 'none') = 'ansible'
+    ) THEN 'true' ELSE 'false' END;" 2>/dev/null)"; then
+    echo "ERROR: could not read Ansible automation setting from the CT-Ops database." >&2
+    echo "Check the db container logs, then re-run ./start.sh." >&2
+    exit 1
+  fi
+
+  [ "$enabled" = "true" ]
 }
 
 require_openssl() {
@@ -716,8 +743,21 @@ start_stack() {
     exit 1
   fi
 
+  local compose_profile_args=()
+  if should_start_ansible_profile; then
+    echo "Ansible automation is enabled; starting optional ansible-api service."
+    compose_profile_args=(--profile ansible)
+    if [ ! -f "images.tar.gz" ]; then
+      if ! docker compose --profile ansible pull ansible-api; then
+        echo "" >&2
+        echo "ERROR: failed to pull the optional Ansible API image from GHCR." >&2
+        exit 1
+      fi
+    fi
+  fi
+
   echo "Starting CT-Ops..."
-  if ! docker compose up -d; then
+  if ! docker compose "${compose_profile_args[@]}" up -d; then
     echo "" >&2
     echo "ERROR: 'docker compose up' failed." >&2
     echo "Recent logs (last 50 lines per service):" >&2

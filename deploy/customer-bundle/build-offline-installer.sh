@@ -39,7 +39,7 @@ export BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-build-time-placeholder}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-build-time-placeholder}"
 
 echo "Resolving image names from docker-compose.yml..."
-IMAGES=$(docker compose config --images 2>/dev/null | sort -u)
+IMAGES=$(docker compose --profile ansible config --images 2>/dev/null | sort -u)
 if [ -z "$IMAGES" ]; then
   echo "ERROR: could not resolve any image names from docker-compose.yml" >&2
   exit 1

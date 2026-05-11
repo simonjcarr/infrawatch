@@ -123,6 +123,7 @@ services:
       # in the agent host's trust store.
       WEB_TLS_CERT: /var/lib/ct-ops/server-tls/server.crt
       CT_OPS_LOADTEST_ADMIN_KEY: ${CT_OPS_LOADTEST_ADMIN_KEY:-}
+      ANSIBLE_API_URL: ${ANSIBLE_API_URL:-http://ansible-api:8080}
       # Latest CarrTech licence verifier key. CT-Ops stores the exact public key
       # that validates each saved licence, so future image upgrades cannot break
       # existing licences. This mounted file is used for newly pasted licences.
@@ -219,6 +220,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  ansible-api:
+    image: ${ANSIBLE_API_IMAGE:-ghcr.io/carrtech-dev/ct-ops/ansible-api:latest}
+    build:
+      context: apps/ansible-api
+      dockerfile: Dockerfile
+    profiles:
+      - ansible
+    restart: unless-stopped
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   nginx:
     image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10

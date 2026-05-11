@@ -167,6 +167,34 @@ validate_password_manager_image_pin() {
   fi
 }
 
+should_start_ansible_profile() {
+  local compose_file="$1"
+  local instance_id="${CT_OPS_INSTANCE_ID:-ct-ops-dev}"
+  local postgres_user="${POSTGRES_USER:-ctops}"
+  local postgres_db="${POSTGRES_DB:-ctops}"
+  local enabled
+
+  if ! enabled="$(docker compose -f "$compose_file" exec -T db psql \
+    -U "$postgres_user" \
+    -d "$postgres_db" \
+    -At \
+    -v ON_ERROR_STOP=1 \
+    -v instance_id="$instance_id" \
+    -c "SELECT CASE WHEN EXISTS (
+      SELECT 1
+      FROM instance_settings
+      WHERE id = :'instance_id'
+        AND COALESCE(metadata->'featureFlags'->>'automation.ansible', 'false') = 'true'
+        AND COALESCE(metadata->'automationSettings'->>'provider', 'none') = 'ansible'
+    ) THEN 'true' ELSE 'false' END;" 2>/dev/null)"; then
+    echo "ERROR: could not read Ansible automation setting from the CT-Ops database." >&2
+    echo "Check the db container logs, then re-run ./start.sh." >&2
+    exit 1
+  fi
+
+  [ "$enabled" = "true" ]
+}
+
 remove_legacy_password_manager_api_image_env
 
 require_openssl() {
@@ -491,7 +519,13 @@ if ! $LOCAL; then
   echo "Running database migrations..."
   docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate
   docker compose -f docker-compose.single.yml up --force-recreate --abort-on-container-exit --exit-code-from password-manager-migrate password-manager-migrate
-  docker compose -f docker-compose.single.yml up -d --pull always
+  if should_start_ansible_profile docker-compose.single.yml; then
+    echo "Ansible automation is enabled; starting optional ansible-api service."
+    docker compose -f docker-compose.single.yml --profile ansible pull ansible-api
+    docker compose -f docker-compose.single.yml --profile ansible up -d --pull always
+  else
+    docker compose -f docker-compose.single.yml up -d --pull always
+  fi
 
   # The release-please manifest is baked into both web and ingest images at
   # build time. Nothing else for this script to do.

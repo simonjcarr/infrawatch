@@ -55,7 +55,7 @@ const NAV_ITEMS: ReadonlyArray<Omit<CommandPaletteItem, 'group'>> = [
   { id: 'nav-instance', label: 'Instance', icon: Settings, href: '/settings', keywords: ['settings', 'profile'] },
   { id: 'nav-agents-admin', label: 'Agents', icon: Server, href: '/settings/agents', keywords: ['enrolment', 'defaults'] },
   { id: 'nav-monitoring-admin', label: 'Monitoring Settings', icon: BellPlus, href: '/settings/monitoring', keywords: ['alerts', 'retention'] },
-  { id: 'nav-integrations-admin', label: 'Integrations', icon: Key, href: '/settings/integrations', keywords: ['ldap', 'smtp', 'directory'] },
+  { id: 'nav-integrations-admin', label: 'Integrations', icon: Key, href: '/settings/integrations', keywords: ['ldap', 'smtp', 'directory', 'automation', 'ansible'] },
   { id: 'nav-security-admin', label: 'Security', icon: Lock, href: '/settings/security', keywords: ['mtls', 'terminal'] },
   { id: 'nav-system-health', label: 'System', icon: HeartPulse, href: '/settings/system', keywords: ['health'] },
 ]

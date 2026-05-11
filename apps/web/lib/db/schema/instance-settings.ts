@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { DEFAULT_NOTIFICATION_ROLES } from '../../auth/roles.ts'
 import type { HostCollectionSettings } from './hosts.ts'
 import { smtpRelaySettingsSchema, type SmtpRelaySettings } from '../../notifications/smtp-settings.ts'
+import { normaliseFeatureFlagOverrides, type FeatureFlagOverrides } from '../../feature-flags.ts'
 
 export interface InstanceNotificationSettings {
   inAppEnabled?: boolean      // default true — master switch for in-app notifications
@@ -23,10 +24,16 @@ export interface InstanceSecuritySettings {
   requireTwoFactor?: boolean
 }
 
+export interface InstanceAutomationSettings {
+  provider: 'none' | 'ansible'
+}
+
 export interface InstanceMetadata {
   defaultCollectionSettings?: HostCollectionSettings
   defaultTags?: Array<{ key: string; value: string }>
   freeSeatUserIds?: string[]
+  featureFlags?: FeatureFlagOverrides
+  automationSettings?: InstanceAutomationSettings
   terminalEnabled?: boolean
   terminalLoggingEnabled?: boolean
   terminalDirectAccess?: boolean
@@ -69,10 +76,16 @@ const instanceSecuritySettingsSchema = z.object({
   requireTwoFactor: z.boolean().optional().catch(undefined),
 }).strip()
 
+const instanceAutomationSettingsSchema = z.object({
+  provider: z.enum(['none', 'ansible']).catch('none'),
+}).strip()
+
 export const instanceMetadataSchema = z.object({
   defaultCollectionSettings: hostCollectionSettingsSchema.optional().catch(undefined),
   defaultTags: z.array(tagPairSchema).catch([]).optional(),
   freeSeatUserIds: z.array(z.string()).max(3).catch([]).optional(),
+  featureFlags: z.preprocess(normaliseFeatureFlagOverrides, z.record(z.string(), z.boolean())).optional().catch(undefined),
+  automationSettings: instanceAutomationSettingsSchema.optional().catch(undefined),
   terminalEnabled: z.boolean().optional().catch(undefined),
   terminalLoggingEnabled: z.boolean().optional().catch(undefined),
   terminalDirectAccess: z.boolean().optional().catch(undefined),

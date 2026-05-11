@@ -8,6 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 
 const sources = {
   'alerts.ts': readFileSync(path.join(here, 'alerts.ts'), 'utf8'),
+  'automation.ts': readFileSync(path.join(here, 'automation.ts'), 'utf8'),
   'checks-core.ts': readFileSync(path.join(here, 'checks-core.ts'), 'utf8'),
   'host-groups-core.ts': readFileSync(path.join(here, 'host-groups-core.ts'), 'utf8'),
   'host-groups.ts': readFileSync(path.join(here, 'host-groups.ts'), 'utf8'),
@@ -54,6 +55,7 @@ const adminGuardedActions = [
   ['alerts.ts', 'createGlobalAlertDefault'],
   ['alerts.ts', 'deleteGlobalAlertDefault'],
   ['alerts.ts', 'applyGlobalDefaultsToHost'],
+  ['automation.ts', 'updateAnsibleAutomationSettings'],
   ['host-settings.ts', 'updateOrgDefaultCollectionSettings'],
   ['tag-rules.ts', 'createTagRule'],
   ['tag-rules.ts', 'updateTagRule'],

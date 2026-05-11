@@ -1,17 +1,14 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { signOut } from '@/lib/auth/client'
+import { navigateWithFreshDocument } from '@/lib/auth/fresh-navigation'
 
 export function SeatLimitExceededCard() {
-  const router = useRouter()
-
   async function handleSignOut() {
     await signOut()
-    router.push('/login')
-    router.refresh()
+    navigateWithFreshDocument('/login', 'replace')
   }
 
   return (

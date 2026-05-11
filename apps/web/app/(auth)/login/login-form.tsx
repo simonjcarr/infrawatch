@@ -4,7 +4,6 @@ import { useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +16,7 @@ import {
   getInviteRegisterPath,
 } from '@/lib/auth/invite-redirects'
 import type { LdapLoginOption } from '@/lib/auth/ldap-login-options'
+import { navigateWithFreshDocument } from '@/lib/auth/fresh-navigation'
 
 const localLoginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -59,7 +59,6 @@ function cleanTwoFactorCode(code: string, method: LocalTwoFactorMethod): string 
 }
 
 export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = null }: LoginFormProps) {
-  const router = useRouter()
   const inviteAcceptPath = getInviteAcceptPath(inviteToken)
   const ldapLoginEnabled = ldapLoginOptions.length > 0
   const defaultLdapLoginOption = ldapLoginOptions[0] ?? null
@@ -118,7 +117,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
       return
     }
 
-    router.push(inviteAcceptPath ?? '/dashboard')
+    navigateWithFreshDocument(inviteAcceptPath ?? '/dashboard', 'replace')
   }
 
   async function onLocalTwoFactorSubmit(event: FormEvent<HTMLFormElement>) {
@@ -138,7 +137,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
         return
       }
 
-      router.push(inviteAcceptPath ?? '/dashboard')
+      navigateWithFreshDocument(inviteAcceptPath ?? '/dashboard', 'replace')
     } catch {
       setServerError('An unexpected error occurred.')
     } finally {
@@ -180,7 +179,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
         return
       }
 
-      router.push('/dashboard')
+      navigateWithFreshDocument('/dashboard', 'replace')
     } catch {
       setServerError('An unexpected error occurred.')
     }
@@ -207,7 +206,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
         return
       }
 
-      router.push('/dashboard')
+      navigateWithFreshDocument('/dashboard', 'replace')
     } catch {
       setServerError('An unexpected error occurred.')
     }

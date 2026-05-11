@@ -37,6 +37,30 @@ const teamClientSource = readFileSync(
   path.join(repoRoot, 'app/(dashboard)/team/team-client.tsx'),
   'utf8',
 )
+const loginFormSource = readFileSync(
+  path.join(repoRoot, 'app/(auth)/login/login-form.tsx'),
+  'utf8',
+)
+const registerFormSource = readFileSync(
+  path.join(repoRoot, 'app/(auth)/register/register-form.tsx'),
+  'utf8',
+)
+const topbarSource = readFileSync(
+  path.join(repoRoot, 'components/shared/topbar.tsx'),
+  'utf8',
+)
+const pendingApprovalCardSource = readFileSync(
+  path.join(repoRoot, 'app/(setup)/pending-approval/pending-approval-card.tsx'),
+  'utf8',
+)
+const seatLimitCardSource = readFileSync(
+  path.join(repoRoot, 'app/(setup)/seat-limit-exceeded/seat-limit-exceeded-card.tsx'),
+  'utf8',
+)
+const proxySource = readFileSync(
+  path.join(repoRoot, 'proxy.ts'),
+  'utf8',
+)
 
 const sidebarLinkedPages = [
   'app/(dashboard)/alerts/page.tsx',
@@ -174,6 +198,24 @@ test('people administration keeps the member list fresh after invite conflicts',
   assert.match(teamClientSource, /refetchOnWindowFocus: 'always'/)
   assert.match(teamClientSource, /refetchInterval: 15_000/)
   assert.match(teamClientSource, /onSettled: invalidate/)
+})
+
+test('auth transitions use fresh document navigations and no-store responses', () => {
+  for (const [name, source] of [
+    ['login form', loginFormSource],
+    ['register form', registerFormSource],
+    ['topbar sign out', topbarSource],
+    ['pending approval sign out', pendingApprovalCardSource],
+    ['seat-limit sign out', seatLimitCardSource],
+  ]) {
+    assert.match(source, /navigateWithFreshDocument/, `${name} should avoid cached App Router transitions`)
+    assert.doesNotMatch(source, /router\.push\((inviteAcceptPath \?\? )?'\/dashboard'\)/, `${name} should not soft-navigate after auth changes`)
+    assert.doesNotMatch(source, /router\.push\('\/login'\)/, `${name} should not soft-navigate after sign-out`)
+  }
+
+  assert.match(proxySource, /NO_STORE_CACHE_CONTROL/)
+  assert.match(proxySource, /applyNoStoreHeaders\(response\)/)
+  assert.match(proxySource, /isSessionScopedRoute/)
 })
 
 test('role assignment can claim pending users that signed up outside the instance scope', () => {

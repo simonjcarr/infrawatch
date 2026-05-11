@@ -21,6 +21,7 @@ import {
 import { signIn, signUp } from '@/lib/auth/client'
 import { getInviteByToken } from '@/lib/actions/auth'
 import { getInviteAcceptPath, getInviteLoginPath } from '@/lib/auth/invite-redirects'
+import { navigateWithFreshDocument } from '@/lib/auth/fresh-navigation'
 
 const registerSchema = z
   .object({
@@ -100,7 +101,7 @@ export function RegisterForm({ requireEmailVerification }: RegisterFormProps) {
       return
     }
 
-    router.push(callbackURL)
+    navigateWithFreshDocument(callbackURL, 'replace')
   }
 
   return (

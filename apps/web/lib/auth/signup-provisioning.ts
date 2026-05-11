@@ -1,12 +1,12 @@
-import type { AssignedRole } from './roles.ts'
+import type { AssignedRole, LegacyRole } from './roles.ts'
 
 const INVITE_ACCEPT_PATH = '/accept-invite'
-const DIRECT_SIGNUP_ROLE: AssignedRole = 'engineer'
+const DIRECT_SIGNUP_ROLE: LegacyRole = 'pending'
 const FIRST_USER_ROLE: AssignedRole = 'super_admin'
 
 export type DirectSignupProvisioning = {
   instanceId?: string
-  role: AssignedRole
+  role: LegacyRole
   roles: AssignedRole[]
 }
 
@@ -28,7 +28,7 @@ export function getDirectSignupProvisioning(input: {
   const role = input.activeUserCount === 0 ? FIRST_USER_ROLE : DIRECT_SIGNUP_ROLE
   const provisioning: DirectSignupProvisioning = {
     role,
-    roles: [role],
+    roles: role === 'pending' ? [] : [role],
   }
 
   if (input.defaultInstanceId) {

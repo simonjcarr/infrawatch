@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test'
 import { countVerificationEmails, waitForVerificationUrl } from '../fixtures/email'
 import { getTestDb } from '../fixtures/db'
+import { TEST_USER } from '../fixtures/seed'
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false'
 
@@ -90,56 +91,48 @@ test('email sign-up can continue without verification when disabled', async ({ p
   await page.waitForURL('**/dashboard')
 })
 
-test('direct sign-ups join the instance people list when verification is disabled', async ({ page }) => {
+test('direct sign-ups wait for role assignment and appear in the people list', async ({ page }) => {
   test.skip(requireEmailVerification, 'email verification is required for this run')
 
   const suffix = Date.now()
-  const firstEmail = `direct-member-one-${suffix}@example.com`
-  const secondEmail = `direct-member-two-${suffix}@example.com`
+  const directEmail = `direct-member-${suffix}@example.com`
   const password = 'TestPassword123!'
   const sql = getTestDb()
 
   await page.goto('/register')
-  await page.getByLabel('Full name').fill('Direct Member One')
-  await page.getByLabel('Email').fill(firstEmail)
+  await page.getByLabel('Full name').fill('Direct Member')
+  await page.getByLabel('Email').fill(directEmail)
   await page.getByLabel(/^Password$/).fill(password)
   await page.getByLabel(/^Confirm password$/).fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
-  await page.waitForURL('**/dashboard')
+  await page.waitForURL('**/pending-approval')
+  await expect(page.getByTestId('pending-approval-card')).toBeVisible()
+  await expect(page.getByText('Waiting for a role to be assigned.')).toBeVisible()
 
-  const firstRows = await sql<Array<{ id: string; instance_id: string | null }>>`
-    SELECT id, instance_id
+  const directRows = await sql<Array<{ id: string; instance_id: string | null; role: string; roles: string[] }>>`
+    SELECT id, instance_id, role, roles
     FROM "user"
-    WHERE email = ${firstEmail}
+    WHERE email = ${directEmail}
     LIMIT 1
   `
-  expect(firstRows).toHaveLength(1)
-  expect(firstRows[0]?.instance_id).toBeTruthy()
+  expect(directRows).toHaveLength(1)
+  expect(directRows[0]?.instance_id).toBeTruthy()
+  expect(directRows[0]?.role).toBe('pending')
+  expect(directRows[0]?.roles).toEqual([])
 
-  await sql`DELETE FROM "session" WHERE user_id = ${firstRows[0]!.id}`
+  await sql`DELETE FROM "session" WHERE user_id = ${directRows[0]!.id}`
   await page.context().clearCookies()
 
-  await page.goto('/register')
-  await page.getByLabel('Full name').fill('Direct Member Two')
-  await page.getByLabel('Email').fill(secondEmail)
-  await page.getByLabel(/^Password$/).fill(password)
-  await page.getByLabel(/^Confirm password$/).fill(password)
-  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.goto('/login')
+  await page.getByTestId('login-email').fill(TEST_USER.email)
+  await page.getByTestId('login-password').fill(TEST_USER.password)
+  await page.getByTestId('login-submit').click()
   await page.waitForURL('**/dashboard')
 
   await page.goto('/team')
+  await expect(page.getByTestId('team-invite-open')).toBeVisible()
   const memberRowsLocator = page.locator('[data-testid^="team-member-row-"]')
-  await expect(memberRowsLocator.filter({ hasText: 'Direct Member One' })).toBeVisible()
-  await expect(memberRowsLocator.filter({ hasText: 'Direct Member Two' })).toBeVisible()
-
-  const memberRows = await sql<Array<{ email: string; instance_id: string | null }>>`
-    SELECT email, instance_id
-    FROM "user"
-    WHERE email IN (${firstEmail}, ${secondEmail})
-    ORDER BY email
-  `
-  expect(memberRows).toEqual([
-    { email: firstEmail, instance_id: firstRows[0]!.instance_id },
-    { email: secondEmail, instance_id: firstRows[0]!.instance_id },
-  ])
+  const directMemberRow = memberRowsLocator.filter({ hasText: 'Direct Member' })
+  await expect(directMemberRow).toBeVisible()
+  await expect(directMemberRow).toContainText('No Role assigned')
 })

@@ -29,7 +29,7 @@ test('pending users are redirected to approval and can sign out', async ({ authe
     await page.waitForURL('**/pending-approval')
     await expect(page.getByTestId('pending-approval-card')).toBeVisible()
     await expect(page.getByTestId('pending-approval-heading')).toContainText('Account pending approval')
-    await expect(page.getByText('needs to be approved by an administrator.')).toBeVisible()
+    await expect(page.getByText('Waiting for a role to be assigned.')).toBeVisible()
 
     await page.getByTestId('pending-approval-signout').click()
     await page.waitForURL('**/login')

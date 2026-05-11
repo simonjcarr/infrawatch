@@ -48,6 +48,7 @@ interface PasswordManagerMockState {
 export interface PasswordManagerMockController {
   getMemberEnvelope(userId: string): PasswordManagerMemberEnvelope
   failNextRefreshWithSessionExpiry(): void
+  setVaultRole(vaultId: string, role: string): void
   switchAuthenticatedInstance(): Promise<void>
   launchAssertions(): string[]
   requestsFor(method: string, path: string): PasswordManagerMockRequest[]
@@ -658,6 +659,17 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
     },
     failNextRefreshWithSessionExpiry() {
       state.failNextRefresh = true
+    },
+    setVaultRole(vaultId: string, role: string) {
+      const vault = state.vaults.get(vaultId)
+      if (!vault) {
+        throw new Error(`Password Manager mock vault not found: ${vaultId}`)
+      }
+      vault.record.role = role
+      const currentMember = vault.members.get(state.currentUserId)
+      if (currentMember) {
+        currentMember.role = role
+      }
     },
     async switchAuthenticatedInstance() {
       const sql = getTestDb()

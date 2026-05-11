@@ -3057,6 +3057,7 @@ function PasswordManagerWorkspace({
   const [sshKeyGenerationPending, setSshKeyGenerationPending] = useState(false)
   const [sshKeyGenerationError, setSshKeyGenerationError] = useState<string | null>(null)
   const [visibleEntryPasswordFields, setVisibleEntryPasswordFields] = useState<Record<string, boolean>>({})
+  const [workspaceTab, setWorkspaceTab] = useState('passwords')
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedInstanceUser = instanceUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
@@ -3069,9 +3070,16 @@ function PasswordManagerWorkspace({
   }, [memberRecipients])
   const activeEntryTemplate = getPasswordManagerEntryTemplate(entryTemplateId)
   const isViewingEntry = entryDialogMode === 'view'
+  const canManageSelectedVault = !!selectedVault && canManageVaultRole(selectedVault.role)
   const selectedMemberLabel = selectedInstanceUser
     ? `${selectedInstanceUser.name || selectedInstanceUser.email} (${selectedInstanceUser.email})`
     : 'Select user'
+
+  useEffect(() => {
+    if (workspaceTab === 'settings' && !canManageSelectedVault) {
+      setWorkspaceTab('passwords')
+    }
+  }, [canManageSelectedVault, workspaceTab])
 
   async function handleCreateVaultFromDialog() {
     await onCreateVault()
@@ -3081,6 +3089,9 @@ function PasswordManagerWorkspace({
   }
 
   function handleStartCreateEntryDialog() {
+    if (!canManageSelectedVault) {
+      return
+    }
     onStartCreateEntry()
     setEntryDialogMode('create')
     setVisibleEntryPasswordFields({})
@@ -3090,6 +3101,9 @@ function PasswordManagerWorkspace({
   }
 
   function handleStartEditEntryDialog(entry: PasswordManagerEntrySummary) {
+    if (!canManageSelectedVault) {
+      return
+    }
     onSelectEntry(entry.id)
     onStartEditEntry(entry)
     setEntryDialogMode('edit')
@@ -3337,10 +3351,15 @@ function PasswordManagerWorkspace({
       </Dialog>
 
       <Tabs
-        defaultValue="passwords"
+        value={workspaceTab}
         className="gap-4"
         onValueChange={(value) => {
-          if (value === 'settings') {
+          if (value === 'settings' && !canManageSelectedVault) {
+            setWorkspaceTab('passwords')
+            return
+          }
+          setWorkspaceTab(value)
+          if (value === 'settings' && canManageSelectedVault) {
             onMemberRecipientLookupRequest()
           }
         }}
@@ -3354,10 +3373,12 @@ function PasswordManagerWorkspace({
             <ScrollText className="size-4" />
             Audit
           </TabsTrigger>
-          <TabsTrigger value="settings">
-            <Settings className="size-4" />
-            Settings
-          </TabsTrigger>
+          {canManageSelectedVault ? (
+            <TabsTrigger value="settings">
+              <Settings className="size-4" />
+              Settings
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="passwords" className="space-y-4">
@@ -3377,46 +3398,48 @@ function PasswordManagerWorkspace({
                     <Download className="mr-2 size-4" />
                     Export vault
                   </Button>
-                  <div className="inline-flex rounded-md shadow-xs">
-                    <Button
-                      variant="outline"
-                      className="rounded-r-none border-r-0"
-                      onClick={handleStartCreateEntryDialog}
-                      disabled={!selectedVault || workspacePending}
-                    >
-                      <Plus className="mr-2 size-4" />
-                      New entry
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="rounded-l-none px-2"
-                          aria-label="Choose entry template"
-                          data-testid="password-manager-entry-template-menu"
-                          disabled={!selectedVault || workspacePending}
-                        >
-                          <ChevronsUpDown className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-64">
-                        <DropdownMenuLabel>Entry template</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                          value={selectedEntryTemplateId}
-                          onValueChange={(value) => onEntryTemplateChange(value as PasswordManagerEntryTemplateId)}
-                        >
-                          {PASSWORD_MANAGER_ENTRY_TEMPLATES.map((template) => (
-                            <DropdownMenuRadioItem key={template.id} value={template.id}>
-                              <div className="grid gap-0.5">
-                                <span>{template.label}</span>
-                                <span className="text-xs text-muted-foreground">{template.description}</span>
-                              </div>
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  {canManageSelectedVault ? (
+                    <div className="inline-flex rounded-md shadow-xs">
+                      <Button
+                        variant="outline"
+                        className="rounded-r-none border-r-0"
+                        onClick={handleStartCreateEntryDialog}
+                        disabled={!selectedVault || workspacePending}
+                      >
+                        <Plus className="mr-2 size-4" />
+                        New entry
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="rounded-l-none px-2"
+                            aria-label="Choose entry template"
+                            data-testid="password-manager-entry-template-menu"
+                            disabled={!selectedVault || workspacePending}
+                          >
+                            <ChevronsUpDown className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                          <DropdownMenuLabel>Entry template</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={selectedEntryTemplateId}
+                            onValueChange={(value) => onEntryTemplateChange(value as PasswordManagerEntryTemplateId)}
+                          >
+                            {PASSWORD_MANAGER_ENTRY_TEMPLATES.map((template) => (
+                              <DropdownMenuRadioItem key={template.id} value={template.id}>
+                                <div className="grid gap-0.5">
+                                  <span>{template.label}</span>
+                                  <span className="text-xs text-muted-foreground">{template.description}</span>
+                                </div>
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </CardHeader>
@@ -3548,20 +3571,22 @@ function PasswordManagerWorkspace({
                           <TooltipContent>View entry</TooltipContent>
                         </Tooltip>
                       ) : null}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon-sm"
-                            onClick={() => handleStartEditEntryDialog(entry)}
-                            aria-label="Edit entry"
-                            title="Edit entry"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit entry</TooltipContent>
-                      </Tooltip>
+                      {canManageSelectedVault ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              onClick={() => handleStartEditEntryDialog(entry)}
+                              aria-label="Edit entry"
+                              title="Edit entry"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit entry</TooltipContent>
+                        </Tooltip>
+                      ) : null}
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -3588,10 +3613,12 @@ function PasswordManagerWorkspace({
                               View
                             </DropdownMenuItem>
                           ) : null}
-                          <DropdownMenuItem onSelect={() => handleStartEditEntryDialog(entry)}>
-                            <Pencil className="size-4" />
-                            Edit
-                          </DropdownMenuItem>
+                          {canManageSelectedVault ? (
+                            <DropdownMenuItem onSelect={() => handleStartEditEntryDialog(entry)}>
+                              <Pencil className="size-4" />
+                              Edit
+                            </DropdownMenuItem>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -4137,7 +4164,8 @@ function PasswordManagerWorkspace({
           </Card>
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-4">
+        {canManageSelectedVault ? (
+          <TabsContent value="settings" className="space-y-4">
           {selectedVault ? (
             <Card className="border-border/60 shadow-xs">
               <CardHeader>
@@ -4474,7 +4502,8 @@ function PasswordManagerWorkspace({
               ) : null}
             </CardContent>
           </Card>
-        </TabsContent>
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   )

@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 131 — Password Manager vault role UI gates
+
+**Read-only vault workspace controls** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Gated vault mutation affordances from the selected vault role returned by the
+  Password Manager API: only `owner` and `manager` roles can open Settings,
+  create entries, choose entry templates, or open edit-entry forms.
+- Kept read-only vault use intact for restricted roles by leaving vault
+  selection, entry listing, reveal, copy, export, and Audit available.
+- Added a hosted Password Manager E2E regression that downgrades the selected
+  vault to `viewer` and asserts Settings, New entry, template selection, and
+  entry edit controls are hidden.
+
+**Validation**
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'tests/e2e/fixtures/password-manager.ts' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts --grep "read-only vault roles"` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 130 — Password Manager tenant audit view
 
 **Standards-oriented audit visibility** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/client.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

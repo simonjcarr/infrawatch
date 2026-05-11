@@ -330,6 +330,53 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
 
     if (!await ensureSession()) return
 
+    if (method === 'GET' && path === '/audit-events') {
+      await fulfillJson(route, 200, {
+        events: [
+          {
+            id: 'audit-event-1',
+            created_at: nowIso(),
+            actor_user_id: state.currentUserId,
+            actor_email: TEST_USER.email,
+            actor_display_name: TEST_USER.name,
+            event_type: 'entry.copied',
+            object_type: 'entry',
+            object_id: 'entry-2',
+            vault_id: 'vault-1',
+            outcome: 'success',
+            summary: `${TEST_USER.name} copied a secret field.`,
+            metadata: { field_type: 'password' },
+          },
+          {
+            id: 'audit-event-2',
+            created_at: nowIso(),
+            actor_user_id: state.currentUserId,
+            actor_email: TEST_USER.email,
+            actor_display_name: TEST_USER.name,
+            event_type: 'vault.member_added',
+            object_type: 'vault_member',
+            object_id: state.currentUserId,
+            vault_id: 'vault-1',
+            outcome: 'success',
+            summary: `${TEST_USER.name} added a vault member.`,
+            metadata: { role: 'viewer' },
+          },
+        ],
+        next_cursor: '',
+      })
+      return
+    }
+
+    if (method === 'GET' && path === '/audit-events/integrity') {
+      await fulfillJson(route, 200, {
+        latest_sequence_number: 2,
+        latest_event_hash: 'abcdef1234567890',
+        verified: true,
+        checked_events: 2,
+      })
+      return
+    }
+
     if (method === 'GET' && path === '/vaults') {
       await fulfillJson(route, 200, {
         vaults: Array.from(state.vaults.values()).map((vault) => vault.record),

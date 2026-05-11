@@ -15,6 +15,33 @@
 
 ## What Has Been Built
 
+### Session 130 — Password Manager tenant audit view
+
+**Standards-oriented audit visibility** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/client.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Added Password Manager client support for the standalone API's redacted
+  tenant audit event listing and audit integrity status routes.
+- Added an unlocked workspace Audit tab with tenant-wide filters for vault,
+  actor, event type, object type, outcome, and time range.
+- Rendered public-safe audit evidence only: timestamp, actor, action, target,
+  outcome, summary, and integrity status, with E2E assertions that forensic or
+  secret-shaped fields are not displayed.
+- Updated the bundled Password Manager API pin to `api/v0.1.4` /
+  `ghcr.io/carrtech-dev/ct-password-manager/api@sha256:6f5cc00a33d5df59cbca9968b178675ea45afff9b8f9c2394c2b3ae0a7d09220`,
+  which contains the audit read API and integrity-chain migration.
+
+**Validation**
+- `PASSWORD_MANAGER_OPENAPI_CONTRACT_PATH=/Volumes/MacBookStorage-Dev/dev/carrtech/ct-password-manager-audit-view/docs/api-contract/openapi.json node --experimental-strip-types --test apps/web/lib/password-manager/client.test.mjs`
+- `python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json`
+- `bash deploy/scripts/test-password-manager-release-contract.sh`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `bash deploy/scripts/test-password-manager-nginx.sh`
+- `bash deploy/scripts/test-password-manager-startup.sh`
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'lib/password-manager/client.ts' 'lib/password-manager/client.test.mjs' 'tests/e2e/fixtures/password-manager.ts' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `BETTER_AUTH_URL=http://localhost:3000 BETTER_AUTH_SECRET=local-build-secret DATABASE_URL=postgres://test:test@localhost:5432/ctops_test pnpm --dir apps/web build` (passes with existing Turbopack NFT warning and expected placeholder-secret Better Auth warnings)
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 129 — Password Manager vault settings simplification
 
 **Member identity and advanced key material UI** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
@@ -31,7 +58,6 @@
 - `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'tests/e2e/tooling/password-manager.spec.ts'`
 - `pnpm --dir apps/web type-check`
 - `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
-- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
 
 ### Session 128 — Password Manager field copy controls
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.5](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.4...agent/v0.34.5) (2026-05-11)
+
+
+### Bug Fixes
+
+* **agent:** align enrolment token environment ([713f007](https://github.com/carrtech-dev/ct-ops/commit/713f0075239e275f97b1e95a1651777723ddfd99))
+
 ## [0.34.4](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.3...agent/v0.34.4) (2026-05-10)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.135.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.135.0...web/v0.135.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **web:** cover customer start script query regression ([#1304](https://github.com/carrtech-dev/ct-ops/issues/1304)) ([557d214](https://github.com/carrtech-dev/ct-ops/commit/557d214be01b57f486e5946a94f3f046f7995fe3))
+
 ## [0.135.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.134.0...web/v0.135.0) (2026-05-11)
 
 

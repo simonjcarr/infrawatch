@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.11...web/v0.132.0) (2026-05-11)
+
+
+### Features
+
+* **web:** surface instance name context ([230cd2c](https://github.com/carrtech-dev/ct-ops/commit/230cd2cdfeb7601d7352bd13620d85f8e818ba7a))
+
 ## [0.131.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.10...web/v0.131.11) (2026-05-11)
 
 

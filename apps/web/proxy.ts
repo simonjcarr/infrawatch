@@ -4,6 +4,8 @@ import { getClientIpFromHeaders } from '@/lib/client-ip'
 import { buildContentSecurityPolicy } from '@/lib/security/csp'
 
 const AUTH_ROUTES = ['/login', '/register']
+const SETUP_ROUTES = ['/pending-approval', '/seat-limit-exceeded', '/setup-email', '/check-email']
+const NO_STORE_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, proxy-revalidate'
 
 const PROTECTED_PATHS = [
   '/dashboard',
@@ -44,14 +46,29 @@ function checkAuthRateLimit(ip: string, now = Date.now()): boolean {
   return true
 }
 
+function applyCommonSecurityHeaders(response: NextResponse, requestId: string, csp: string): NextResponse {
+  response.headers.set('X-Request-Id', requestId)
+  response.headers.set('Content-Security-Policy', csp)
+  return response
+}
+
+function applyNoStoreHeaders(response: NextResponse): NextResponse {
+  response.headers.set('Cache-Control', NO_STORE_CACHE_CONTROL)
+  response.headers.set('Pragma', 'no-cache')
+  response.headers.set('Expires', '0')
+  return response
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isAuthenticated = hasBetterAuthSessionCookie(request.cookies)
 
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r))
+  const isSetupRoute = SETUP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'))
   const isProtectedRoute = PROTECTED_PATHS.some(
     (r) => pathname === r || pathname.startsWith(r + '/'),
   )
+  const isSessionScopedRoute = isAuthRoute || isSetupRoute || isProtectedRoute || pathname.startsWith('/api/auth/')
 
   // Honour an upstream-supplied request ID (load balancer, proxy) or generate one.
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
@@ -75,25 +92,23 @@ export function proxy(request: NextRequest) {
         { error: 'Too many requests — please wait before trying again.' },
         { status: 429 },
       )
-      limitResponse.headers.set('X-Request-Id', requestId)
-      limitResponse.headers.set('Content-Security-Policy', csp)
-      return limitResponse
+      applyCommonSecurityHeaders(limitResponse, requestId, csp)
+      return applyNoStoreHeaders(limitResponse)
     }
   }
 
   if (!isAuthenticated && isProtectedRoute) {
     const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
-    redirectResponse.headers.set('X-Request-Id', requestId)
-    redirectResponse.headers.set('Content-Security-Policy', csp)
-    return redirectResponse
+    applyCommonSecurityHeaders(redirectResponse, requestId, csp)
+    return applyNoStoreHeaders(redirectResponse)
   }
-
-  void isAuthRoute
 
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   // Echo the ID back to the client so it appears in browser DevTools / client logs.
-  response.headers.set('X-Request-Id', requestId)
-  response.headers.set('Content-Security-Policy', csp)
+  applyCommonSecurityHeaders(response, requestId, csp)
+  if (isSessionScopedRoute) {
+    applyNoStoreHeaders(response)
+  }
   return response
 }
 

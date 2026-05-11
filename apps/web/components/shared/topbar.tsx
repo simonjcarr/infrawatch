@@ -2,6 +2,7 @@
 
 import { signOut, useSession } from '@/lib/auth/client'
 import { useRouter } from 'next/navigation'
+import { navigateWithFreshDocument } from '@/lib/auth/fresh-navigation'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,7 +32,7 @@ export function Topbar() {
   const router = useRouter()
 
   async function handleSignOut() {
-    await signOut({ fetchOptions: { onSuccess: () => router.push('/login') } })
+    await signOut({ fetchOptions: { onSuccess: () => navigateWithFreshDocument('/login', 'replace') } })
   }
 
   const userName = session?.user?.name ?? 'User'

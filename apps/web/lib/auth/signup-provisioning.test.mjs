@@ -17,13 +17,13 @@ test('direct signup provisioning assigns the first user as super admin', () => {
   )
 })
 
-test('direct signup provisioning assigns later users to the default instance as engineers', () => {
+test('direct signup provisioning holds later users without a role until approval', () => {
   assert.deepEqual(
     getDirectSignupProvisioning({ defaultInstanceId: 'instance-1', activeUserCount: 2 }),
     {
       instanceId: 'instance-1',
-      role: 'engineer',
-      roles: ['engineer'],
+      role: 'pending',
+      roles: [],
     },
   )
 })

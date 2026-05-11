@@ -19,13 +19,12 @@ export function PendingApprovalCard() {
       <CardHeader>
         <CardTitle data-testid="pending-approval-heading">Account pending approval</CardTitle>
         <CardDescription>
-          Your account has been created but needs to be approved by an administrator.
-          You&apos;ll be able to access the dashboard once a role has been assigned to you.
+          Waiting for a role to be assigned.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">
-          If you believe this is an error, please contact your system administrator.
+          Your account has been created. You&apos;ll be able to access CT-Ops once a Super Admin assigns a role.
         </p>
       </CardContent>
       <CardFooter>

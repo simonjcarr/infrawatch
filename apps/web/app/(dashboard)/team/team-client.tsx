@@ -35,10 +35,12 @@ function roleBadgeVariant(role: string): 'destructive' | 'default' | 'secondary'
 
 function roleBadgeClassName(role: string): string {
   if (role === 'pending') return 'border-yellow-600 text-yellow-700 dark:border-yellow-500 dark:text-yellow-400'
+  if (role === 'no_role') return 'border-yellow-600 text-yellow-700 dark:border-yellow-500 dark:text-yellow-400'
   return ''
 }
 
 function formatRole(role: string) {
+  if (role === 'no_role') return 'No Role assigned'
   return role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -60,6 +62,7 @@ const canManage = (role: string) => role === 'super_admin' || role === 'org_admi
 
 function getDisplayedRoles(entity: Pick<User | Invitation, 'role' | 'roles'>): string[] {
   const roles = normalizeAssignedRoles(entity.roles, entity.role)
+  if (roles.length === 0 && entity.role === 'pending') return ['no_role']
   return roles.length > 0 ? roles : [entity.role]
 }
 
@@ -493,7 +496,7 @@ function RoleBadgeList({ roles }: { roles: string[] }) {
     <div className="flex flex-wrap gap-1.5">
       {roles.map((role) => (
         <Badge key={role} variant={roleBadgeVariant(role)} className={roleBadgeClassName(role)}>
-          {role === 'pending' ? 'Pending Approval' : formatRole(role)}
+          {formatRole(role)}
         </Badge>
       ))}
     </div>

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.8...web/v0.131.9) (2026-05-11)
+
+
+### Bug Fixes
+
+* **auth:** create configured standalone instance scope ([132af34](https://github.com/carrtech-dev/ct-ops/commit/132af34abc8fc37758d5b53067d42f441044ffe3))
+
 ## [0.131.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.7...web/v0.131.8) (2026-05-11)
 
 

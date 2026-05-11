@@ -259,7 +259,13 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     addMemberRequest?.jsonBody && typeof addMemberRequest.jsonBody === 'object' && !Array.isArray(addMemberRequest.jsonBody)
       ? String(addMemberRequest.jsonBody.user_id)
       : ''
-  await expect(page.getByText(addedMemberUserId)).toBeVisible()
+  const addedMemberCard = page.getByTestId(`password-manager-member-${addedMemberUserId}`)
+  await expect(addedMemberCard.getByText(TEST_PASSWORD_MANAGER_MEMBER.name)).toBeVisible()
+  await expect(addedMemberCard.getByText(TEST_PASSWORD_MANAGER_MEMBER.email)).toBeVisible()
+  await expect(addedMemberCard.getByText(`Password Manager ID: ${addedMemberUserId}`)).toBeVisible()
+  await expect(addedMemberCard.getByLabel('Public-key envelope')).not.toBeVisible()
+  await addedMemberCard.getByText('Advanced key material').click()
+  await expect(addedMemberCard.getByLabel('Public-key envelope')).toBeVisible()
 
   await page.reload()
   await expect(page.getByTestId('password-manager-state-locked')).toBeVisible()

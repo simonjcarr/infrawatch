@@ -264,6 +264,10 @@ function sortMembers(members: MemberRecord[]): MemberRecord[] {
   })
 }
 
+function memberRecipientDisplayName(recipient: MemberRecipientRecord | undefined, fallbackUserId: string): string {
+  return recipient?.display_name?.trim() || recipient?.email?.trim() || fallbackUserId
+}
+
 function upsertVaultEpochKey(vaultKeyCache: Map<string, Map<number, CryptoKey>>, vaultId: string, epoch: number, key: CryptoKey) {
   const existing = vaultKeyCache.get(vaultId) ?? new Map<number, CryptoKey>()
   existing.set(epoch, key)
@@ -2915,6 +2919,13 @@ function PasswordManagerWorkspace({
   const memberIds = new Set(members.map((member) => member.user_id))
   const selectedInstanceUser = instanceUsers.find((user) => user.id === memberUserId) ?? null
   const selectedRecipient = memberUserId ? memberRecipients[memberUserId] : undefined
+  const memberRecipientsByPasswordManagerId = useMemo(() => {
+    const recipientsById = new Map<string, MemberRecipientRecord>()
+    for (const recipient of Object.values(memberRecipients)) {
+      recipientsById.set(recipient.user_id, recipient)
+    }
+    return recipientsById
+  }, [memberRecipients])
   const activeEntryTemplate = getPasswordManagerEntryTemplate(entryTemplateId)
   const isViewingEntry = entryDialogMode === 'view'
   const selectedMemberLabel = selectedInstanceUser
@@ -3184,7 +3195,15 @@ function PasswordManagerWorkspace({
         </DialogContent>
       </Dialog>
 
-      <Tabs defaultValue="passwords" className="gap-4">
+      <Tabs
+        defaultValue="passwords"
+        className="gap-4"
+        onValueChange={(value) => {
+          if (value === 'settings') {
+            onMemberRecipientLookupRequest()
+          }
+        }}
+      >
         <TabsList>
           <TabsTrigger value="passwords">
             <KeyRound className="size-4" />
@@ -3945,63 +3964,79 @@ function PasswordManagerWorkspace({
                 <p className="text-sm text-muted-foreground">This vault has no active members.</p>
               ) : null}
               <div className="space-y-3">
-                {members.map((member) => (
-                  <div
-                    key={member.user_id}
-                    className="rounded-xl border border-border/60 p-4"
-                    data-testid={`password-manager-member-${member.user_id}`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-foreground">{member.user_id}</p>
-                        <p className="text-sm text-muted-foreground">Wrapped key epoch {member.key_epoch}</p>
+                {members.map((member) => {
+                  const recipient = memberRecipientsByPasswordManagerId.get(member.user_id)
+                  const displayName = memberRecipientDisplayName(recipient, member.user_id)
+                  const email = recipient?.email?.trim()
+
+                  return (
+                    <div
+                      key={member.user_id}
+                      className="rounded-xl border border-border/60 p-4"
+                      data-testid={`password-manager-member-${member.user_id}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <p className="truncate font-medium text-foreground">{displayName}</p>
+                          {email && email !== displayName ? (
+                            <p className="truncate text-sm text-muted-foreground">{email}</p>
+                          ) : null}
+                          <p className="break-all text-xs text-muted-foreground">Password Manager ID: {member.user_id}</p>
+                          <p className="text-sm text-muted-foreground">Wrapped key epoch {member.key_epoch}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Select
+                            value={memberRoleEdits[member.user_id] ?? member.role}
+                            onValueChange={(value) => onMemberRoleEditChange(member.user_id, value)}
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue placeholder="Role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PASSWORD_MANAGER_MEMBER_ROLES.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {role}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button variant="outline" size="sm" onClick={() => void onUpdateMemberRole(member)} disabled={!selectedVault || workspacePending}>
+                            <Pencil className="mr-2 size-4" />
+                            Save role
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => void onMemberRemove(member)} disabled={!selectedVault || workspacePending}>
+                            <Trash2 className="mr-2 size-4" />
+                            Remove
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Select
-                          value={memberRoleEdits[member.user_id] ?? member.role}
-                          onValueChange={(value) => onMemberRoleEditChange(member.user_id, value)}
-                        >
-                          <SelectTrigger className="w-36">
-                            <SelectValue placeholder="Role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PASSWORD_MANAGER_MEMBER_ROLES.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button variant="outline" size="sm" onClick={() => void onUpdateMemberRole(member)} disabled={!selectedVault || workspacePending}>
-                          <Pencil className="mr-2 size-4" />
-                          Save role
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => void onMemberRemove(member)} disabled={!selectedVault || workspacePending}>
-                          <Trash2 className="mr-2 size-4" />
-                          Remove
-                        </Button>
-                      </div>
+                      {member.user_id !== '' && member.user_id !== ' ' ? (
+                        <details className="mt-3 rounded-lg border border-border/60 px-3 py-2">
+                          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+                            Advanced key material
+                          </summary>
+                          <div className="mt-3 grid gap-2">
+                            <Label htmlFor={`password-manager-member-envelope-${member.user_id}`}>
+                              Public-key envelope
+                            </Label>
+                            <Textarea
+                              id={`password-manager-member-envelope-${member.user_id}`}
+                              value={memberPublicKeyEnvelopeInputs[member.user_id] ?? ''}
+                              onChange={(event) => onMemberPublicKeyEnvelopeInputChange(member.user_id, event.target.value)}
+                              placeholder={
+                                member.user_id === currentPasswordManagerUserId
+                                  ? 'Current session key is already available locally.'
+                                  : '{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
+                              }
+                              disabled={member.user_id === currentPasswordManagerUserId}
+                              className="min-h-24 font-mono text-xs"
+                            />
+                          </div>
+                        </details>
+                      ) : null}
                     </div>
-                    {member.user_id !== '' && member.user_id !== ' ' ? (
-                      <div className="mt-3 grid gap-2">
-                        <Label htmlFor={`password-manager-member-envelope-${member.user_id}`}>
-                          Public-key envelope for future rotations
-                        </Label>
-                        <Textarea
-                          id={`password-manager-member-envelope-${member.user_id}`}
-                          value={memberPublicKeyEnvelopeInputs[member.user_id] ?? ''}
-                          onChange={(event) => onMemberPublicKeyEnvelopeInputChange(member.user_id, event.target.value)}
-                          placeholder={
-                            member.user_id === currentPasswordManagerUserId
-                              ? 'Current session key is already available locally.'
-                              : '{"version":1,"algorithm":"rsa-oaep-256","public_key_spki_b64":"..."}'
-                          }
-                          disabled={member.user_id === currentPasswordManagerUserId}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {selectedVault ? (

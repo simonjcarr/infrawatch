@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.5...web/v0.131.6) (2026-05-11)
+
+
+### Bug Fixes
+
+* **auth:** persist direct signup instance membership ([5aab11e](https://github.com/carrtech-dev/ct-ops/commit/5aab11efff5ae14abf3f0af3ea57c647b7c5d6cb))
+
 ## [0.131.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.4...web/v0.131.5) (2026-05-11)
 
 

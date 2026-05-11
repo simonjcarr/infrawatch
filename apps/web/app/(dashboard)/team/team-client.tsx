@@ -51,6 +51,7 @@ type InviteValues = z.infer<typeof inviteSchema>
 interface TeamClientProps {
   currentUserId: string
   currentUserRole: string
+  hasInstanceScope: boolean
   initialMembers: User[]
   initialPendingInvites: Invitation[]
 }
@@ -65,6 +66,7 @@ function getDisplayedRoles(entity: Pick<User | Invitation, 'role' | 'roles'>): s
 export function TeamClient({
   currentUserId,
   currentUserRole,
+  hasInstanceScope,
   initialMembers,
   initialPendingInvites,
 }: TeamClientProps) {
@@ -200,7 +202,7 @@ export function TeamClient({
             Manage members and pending invitations
           </p>
         </div>
-        {canManage(currentUserRole) && (
+        {canManage(currentUserRole) && hasInstanceScope && (
           <Button onClick={() => setIsInviteOpen(true)} size="sm" data-testid="team-invite-open">
             <UserPlus className="size-4 mr-2" />
             Invite member

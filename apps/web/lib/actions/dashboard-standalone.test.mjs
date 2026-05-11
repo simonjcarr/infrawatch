@@ -21,6 +21,18 @@ const sessionSource = readFileSync(
   path.join(repoRoot, 'lib/auth/session.ts'),
   'utf8',
 )
+const usersActionSource = readFileSync(
+  path.join(repoRoot, 'lib/actions/users.ts'),
+  'utf8',
+)
+const teamPageSource = readFileSync(
+  path.join(repoRoot, 'app/(dashboard)/team/page.tsx'),
+  'utf8',
+)
+const teamClientSource = readFileSync(
+  path.join(repoRoot, 'app/(dashboard)/team/team-client.tsx'),
+  'utf8',
+)
 
 const sidebarLinkedPages = [
   'app/(dashboard)/alerts/page.tsx',
@@ -124,6 +136,17 @@ test('fresh standalone sessions promote the first active user to instance admin'
   assert.match(sessionSource, /ensureInstanceHasSuperAdmin\(user\)/)
   assert.match(sessionSource, /activeUsers\[0\]\?\.id !== user\.id/)
   assert.match(sessionSource, /set\(\{ role: INSTANCE_ADMIN_ROLE, roles, updatedAt: new Date\(\) \}\)/)
+})
+
+test('team invitations are disabled without an instance-backed scope', () => {
+  assert.match(usersActionSource, /const currentScope = resolveOptionalActionScope\(session\)/)
+  assert.match(
+    usersActionSource,
+    /if \(!currentScope\) return \{ error: 'Team invitations require an instance to be configured' \}/,
+  )
+  assert.match(teamPageSource, /hasInstanceScope=\{Boolean\(session\.user\.instanceId\)\}/)
+  assert.match(teamClientSource, /hasInstanceScope: boolean/)
+  assert.match(teamClientSource, /canManage\(currentUserRole\) && hasInstanceScope/)
 })
 
 test('administration pages use normalized role checks', () => {

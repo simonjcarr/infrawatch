@@ -1,6 +1,7 @@
 import { logError } from '@/lib/logging'
 import { NextRequest, NextResponse } from 'next/server'
-import archiver from 'archiver'
+// @ts-expect-error @types/archiver has not caught up with archiver 8's ESM class exports.
+import { ZipArchive } from 'archiver'
 import { z } from 'zod'
 import { and, eq, isNull } from 'drizzle-orm'
 import { Readable } from 'node:stream'
@@ -149,6 +150,15 @@ type ArchiveSpec = {
   entries: ArchiveEntry[]
   manifest: unknown
   readme?: string
+}
+
+type ZipArchiveWriter = {
+  append(source: string, data: { name: string }): ZipArchiveWriter
+  destroy(): void
+  file(filename: string, data: { name: string }): ZipArchiveWriter
+  finalize(): Promise<void>
+  on(event: 'warning' | 'error', listener: (err: Error) => void): ZipArchiveWriter
+  pipe(destination: NodeJS.WritableStream): NodeJS.WritableStream
 }
 
 type TransferJobPhase = 'queued' | 'downloading' | 'transferring' | 'completed' | 'failed'
@@ -376,7 +386,7 @@ async function writeLocalArchive(params: {
   job: TransferJob
 }) {
   await new Promise<void>(async (resolve, reject) => {
-    const archive = archiver('zip', { zlib: { level: 0 } })
+    const archive = new ZipArchive({ zlib: { level: 0 } }) as ZipArchiveWriter
     const out = createWriteStream(params.archivePath)
     let settled = false
     const settle = (err?: Error) => {

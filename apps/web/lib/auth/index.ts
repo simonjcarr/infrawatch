@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { twoFactor } from 'better-auth/plugins'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import { authDb, db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
@@ -23,6 +24,7 @@ import {
 } from './email-verification-rate-limit'
 import { getVerificationResendClientIp } from './email-verification-resend'
 import { passwordLoginAttemptGuard } from './login-attempts'
+import { getDirectSignupProvisioning, isInviteSignupCallback } from './signup-provisioning'
 
 const LOGIN_THROTTLED_MESSAGE = 'Too many login attempts — please wait before trying again.'
 const requireEmailVerification = getRequireEmailVerification()
@@ -56,6 +58,33 @@ export const auth = betterAuth({
       totpCredentials: schema.totpCredentials,
     },
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user, ctx) => {
+          if (isInviteSignupCallback(ctx?.body?.callbackURL)) {
+            return { data: user }
+          }
+
+          const [activeUsersRow, defaultInstanceId] = await Promise.all([
+            db
+              .select({ total: count() })
+              .from(schema.users)
+              .where(and(eq(schema.users.isActive, true), isNull(schema.users.deletedAt))),
+            getDefaultInstanceId(),
+          ])
+          const activeUserCount = activeUsersRow[0]?.total ?? 0
+
+          return {
+            data: {
+              ...user,
+              ...getDirectSignupProvisioning({ defaultInstanceId, activeUserCount }),
+            },
+          }
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification,

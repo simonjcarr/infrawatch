@@ -154,14 +154,16 @@ should_start_ansible_profile() {
     -d "$postgres_db" \
     -At \
     -v ON_ERROR_STOP=1 \
-    -v instance_id="$instance_id" \
-    -c "SELECT CASE WHEN EXISTS (
+    -v instance_id="$instance_id" 2>/dev/null <<'SQL'
+SELECT CASE WHEN EXISTS (
       SELECT 1
       FROM instance_settings
       WHERE id = :'instance_id'
         AND COALESCE(metadata->'featureFlags'->>'automation.ansible', 'false') = 'true'
         AND COALESCE(metadata->'automationSettings'->>'provider', 'none') = 'ansible'
-    ) THEN 'true' ELSE 'false' END;" 2>/dev/null)"; then
+    ) THEN 'true' ELSE 'false' END;
+SQL
+  )"; then
     echo "ERROR: could not read Ansible automation setting from the CT-Ops database." >&2
     echo "Check the db container logs, then re-run ./start.sh." >&2
     exit 1

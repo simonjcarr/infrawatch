@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 129 — Password Manager vault settings simplification
+
+**Member identity and advanced key material UI** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Changed the vault Settings member list to display recipient name/email when
+  available, with the Password Manager user ID demoted to secondary metadata.
+- Triggered the existing member-recipient lookup when Settings is opened so
+  existing vault members can be labelled from recipient metadata.
+- Moved the public-key envelope textarea into an advanced disclosure while
+  preserving the manual fallback path used by key rotation.
+- Extended the hosted Password Manager E2E flow to assert member name/email
+  display and hidden-by-default public-key envelope controls.
+
+**Validation**
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 128 — Password Manager field copy controls
 
 **Entry dialog copy and masking hardening** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

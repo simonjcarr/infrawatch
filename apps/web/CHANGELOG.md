@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.11](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.10...web/v0.131.11) (2026-05-11)
+
+
+### Bug Fixes
+
+* **auth:** prevent cached session data after account changes ([b6a6947](https://github.com/carrtech-dev/ct-ops/commit/b6a6947eb7b0bad33f5bbcec0011f849f8db4c17))
+
 ## [0.131.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.9...web/v0.131.10) (2026-05-11)
 
 

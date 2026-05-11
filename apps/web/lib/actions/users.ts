@@ -6,7 +6,7 @@ import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { users, invitations, sessions } from '@/lib/db/schema'
-import { eq, and, isNull, isNotNull, gt } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull, gt, sql } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { getRequiredSession } from '@/lib/auth/session'
@@ -32,11 +32,30 @@ function hasSuperAdminRole(role: string | null | undefined, roles: readonly stri
   return normalizeAssignedRoles(roles, role).includes('super_admin')
 }
 
+async function backfillDirectSignupUsers(instanceId: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE "user" AS u
+    SET instance_id = ${instanceId},
+        updated_at = NOW()
+    WHERE u.instance_id IS NULL
+      AND u.deleted_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM invitations AS i
+        WHERE lower(i.email) = lower(u.email)
+          AND i.accepted_at IS NULL
+          AND i.deleted_at IS NULL
+          AND i.expires_at > NOW()
+      )
+  `)
+}
+
 export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
   const session = await getRequiredSession()
   const currentScope = resolveOptionalActionScope(session)
   if (!currentScope) return { members: [session.user], pendingInvites: [] }
   await requireInstanceAccess(currentScope)
+  await backfillDirectSignupUsers(currentScope)
 
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({

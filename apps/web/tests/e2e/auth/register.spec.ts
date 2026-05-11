@@ -89,3 +89,57 @@ test('email sign-up can continue without verification when disabled', async ({ p
   await page.goto('/dashboard')
   await page.waitForURL('**/dashboard')
 })
+
+test('direct sign-ups join the instance people list when verification is disabled', async ({ page }) => {
+  test.skip(requireEmailVerification, 'email verification is required for this run')
+
+  const suffix = Date.now()
+  const firstEmail = `direct-member-one-${suffix}@example.com`
+  const secondEmail = `direct-member-two-${suffix}@example.com`
+  const password = 'TestPassword123!'
+  const sql = getTestDb()
+
+  await page.goto('/register')
+  await page.getByLabel('Full name').fill('Direct Member One')
+  await page.getByLabel('Email').fill(firstEmail)
+  await page.getByLabel(/^Password$/).fill(password)
+  await page.getByLabel(/^Confirm password$/).fill(password)
+  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.waitForURL('**/dashboard')
+
+  const firstRows = await sql<Array<{ id: string; instance_id: string | null }>>`
+    SELECT id, instance_id
+    FROM "user"
+    WHERE email = ${firstEmail}
+    LIMIT 1
+  `
+  expect(firstRows).toHaveLength(1)
+  expect(firstRows[0]?.instance_id).toBeTruthy()
+
+  await sql`DELETE FROM "session" WHERE user_id = ${firstRows[0]!.id}`
+  await page.context().clearCookies()
+
+  await page.goto('/register')
+  await page.getByLabel('Full name').fill('Direct Member Two')
+  await page.getByLabel('Email').fill(secondEmail)
+  await page.getByLabel(/^Password$/).fill(password)
+  await page.getByLabel(/^Confirm password$/).fill(password)
+  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.waitForURL('**/dashboard')
+
+  await page.goto('/team')
+  const memberRowsLocator = page.locator('[data-testid^="team-member-row-"]')
+  await expect(memberRowsLocator.filter({ hasText: 'Direct Member One' })).toBeVisible()
+  await expect(memberRowsLocator.filter({ hasText: 'Direct Member Two' })).toBeVisible()
+
+  const memberRows = await sql<Array<{ email: string; instance_id: string | null }>>`
+    SELECT email, instance_id
+    FROM "user"
+    WHERE email IN (${firstEmail}, ${secondEmail})
+    ORDER BY email
+  `
+  expect(memberRows).toEqual([
+    { email: firstEmail, instance_id: firstRows[0]!.instance_id },
+    { email: secondEmail, instance_id: firstRows[0]!.instance_id },
+  ])
+})

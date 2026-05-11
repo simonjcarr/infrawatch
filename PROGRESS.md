@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 128 — Password Manager field copy controls
+
+**Entry dialog copy and masking hardening** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
+- Added copy-to-clipboard controls to saved Password Manager entry view/edit
+  dialog fields, including title, template fields, password values, URLs, and
+  notes, while reusing the existing copy audit hook.
+- Changed saved password-style fields in entry dialogs to show a fixed
+  `************` mask while hidden, so the hidden display no longer discloses
+  the secret length. Revealing is required before editing the stored value.
+- Extended the hosted Password Manager E2E flow to cover dialog field copying,
+  fixed hidden password masking, and the additional copy-audit events.
+
+**Validation**
+- `pnpm --dir apps/web lint 'app/(dashboard)/password-manager/password-manager-client.tsx' 'tests/e2e/tooling/password-manager.spec.ts'`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
+- `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts` (blocked locally: `testcontainers` could not find a working container runtime)
+
 ### Session 127 — Password Manager vault load resilience
 
 **Unlocked vault list safety** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/crypto-batch.ts`)

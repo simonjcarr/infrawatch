@@ -117,6 +117,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByLabel('Title').fill('Pasted deploy key')
   await page.getByLabel('Public key or certificate').fill(pastedSshPublicMaterial)
   await page.getByLabel('Private key').fill(pastedSshPrivateKey)
+  await page.getByLabel('Notes').fill('Pasted SSH deployment notes')
   await page.getByRole('button', { name: 'Create encrypted entry' }).click()
   const pastedSshEntry = page.getByTestId('password-manager-entry-entry-3')
   await expect(pastedSshEntry).toContainText('Pasted deploy key')
@@ -201,16 +202,21 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     .toBe('')
 
   await pastedSshEntry.getByRole('button', { name: 'View entry' }).click()
-  await expect(page.getByRole('dialog', { name: 'View SSH key pair' })).toBeVisible()
+  const viewSshDialog = page.getByRole('dialog', { name: 'View SSH key pair' })
+  await expect(viewSshDialog).toBeVisible()
   await expect(page.getByLabel('Title')).toBeDisabled()
   await expect(page.getByLabel('Public key or certificate')).toBeDisabled()
   await expect(page.getByLabel('Private key')).toBeDisabled()
+  await viewSshDialog.getByRole('button', { name: 'Copy title' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe('Pasted deploy key')
   await expect(page.getByRole('button', { name: 'Save encrypted entry' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Delete entry' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Copy public key or certificate' }).click()
+  await viewSshDialog.getByRole('button', { name: 'Copy public key or certificate' }).click()
   await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe(pastedSshPublicMaterial)
-  await page.getByRole('button', { name: 'Copy private key' }).click()
+  await viewSshDialog.getByRole('button', { name: 'Copy private key' }).click()
   await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe(pastedSshPrivateKey)
+  await viewSshDialog.getByRole('button', { name: 'Copy notes' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe('Pasted SSH deployment notes')
   await page.getByRole('button', { name: 'Close' }).click()
 
   const downloadPromise = page.waitForEvent('download')
@@ -224,7 +230,21 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await downloadPromise
 
   await entryCard.getByRole('button', { name: 'Edit' }).click()
-  await expect(page.getByRole('dialog', { name: 'Edit login' })).toBeVisible()
+  const editLoginDialog = page.getByRole('dialog', { name: 'Edit login' })
+  await expect(editLoginDialog).toBeVisible()
+  await expect(page.locator('#password-manager-entry-password')).toHaveAttribute('type', 'text')
+  await expect(page.locator('#password-manager-entry-password')).toHaveValue('************')
+  await editLoginDialog.getByRole('button', { name: 'Copy title' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe('Grafana admin')
+  await editLoginDialog.getByRole('button', { name: 'Copy username' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe('ops-admin')
+  await editLoginDialog.getByRole('button', { name: 'Copy password' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe(entryPassword)
+  await editLoginDialog.getByRole('button', { name: 'Copy URL' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe('https://grafana.example.test')
+  await editLoginDialog.getByRole('button', { name: 'Copy notes' }).click()
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText())).toBe(entryNotes)
+  await editLoginDialog.getByRole('button', { name: 'Show password' }).click()
   await page.getByLabel('Password', { exact: true }).fill(updatedEntryPassword)
   await page.getByRole('button', { name: 'Save encrypted entry' }).click()
   await expect(entryCard.getByRole('button', { name: 'Reveal password' })).toBeVisible()
@@ -303,7 +323,14 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     '/vaults/vault-1/entries/entry-2/copy-audit',
     '/vaults/vault-1/entries/entry-3/copy-audit',
     '/vaults/vault-1/entries/entry-3/copy-audit',
+    '/vaults/vault-1/entries/entry-3/copy-audit',
+    '/vaults/vault-1/entries/entry-3/copy-audit',
     '/vaults/vault-1/export-audit',
+    '/vaults/vault-1/entries/entry-2/copy-audit',
+    '/vaults/vault-1/entries/entry-2/copy-audit',
+    '/vaults/vault-1/entries/entry-2/copy-audit',
+    '/vaults/vault-1/entries/entry-2/copy-audit',
+    '/vaults/vault-1/entries/entry-2/copy-audit',
   ])
 
   for (const request of passwordManagerMock.auditRequests()) {
@@ -324,6 +351,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(request.rawBody).not.toContain(entryPassword)
     expect(request.rawBody).not.toContain(updatedEntryPassword)
     expect(request.rawBody).not.toContain(entryNotes)
+    expect(request.rawBody).not.toContain('Pasted SSH deployment notes')
     expect(request.rawBody).not.toContain(pastedSshPublicMaterial)
     expect(request.rawBody).not.toContain(pastedSshPrivateKey)
     expect(request.rawBody).not.toContain(uploadedSshPublicMaterial)
@@ -344,6 +372,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(message).not.toContain(entryPassword)
     expect(message).not.toContain(updatedEntryPassword)
     expect(message).not.toContain(entryNotes)
+    expect(message).not.toContain('Pasted SSH deployment notes')
     expect(message).not.toContain(pastedSshPublicMaterial)
     expect(message).not.toContain(pastedSshPrivateKey)
     expect(message).not.toContain(uploadedSshPublicMaterial)
@@ -364,6 +393,7 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(request.body).not.toContain(entryPassword)
     expect(request.body).not.toContain(updatedEntryPassword)
     expect(request.body).not.toContain(entryNotes)
+    expect(request.body).not.toContain('Pasted SSH deployment notes')
     expect(request.body).not.toContain(pastedSshPublicMaterial)
     expect(request.body).not.toContain(pastedSshPrivateKey)
     expect(request.body).not.toContain(uploadedSshPublicMaterial)

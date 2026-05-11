@@ -42,6 +42,8 @@ export const PASSWORD_MANAGER_CLIENT_ROUTE_SPECS = {
   auditCopy: { method: 'POST', path: '/vaults/{vaultID}/entries/{entryID}/copy-audit' },
   auditReveal: { method: 'POST', path: '/vaults/{vaultID}/entries/{entryID}/reveal-audit' },
   auditExport: { method: 'POST', path: '/vaults/{vaultID}/export-audit' },
+  listAuditEvents: { method: 'GET', path: '/audit-events' },
+  getAuditIntegrity: { method: 'GET', path: '/audit-events/integrity' },
   listMembers: { method: 'GET', path: '/vaults/{vaultID}/members' },
   lookupMemberRecipients: { method: 'POST', path: '/vaults/{vaultID}/member-recipients' },
   addMember: { method: 'POST', path: '/vaults/{vaultID}/members' },
@@ -127,6 +129,45 @@ export interface KeyEpochRecord {
   created_at: string
 }
 
+export interface AuditEventRecord {
+  id: string
+  created_at: string
+  actor_user_id: string
+  actor_email: string
+  actor_display_name: string
+  event_type: string
+  object_type: string
+  object_id: string
+  vault_id: string
+  outcome: string
+  summary: string
+  metadata: JsonObject
+}
+
+export interface AuditEventsResponse {
+  events: AuditEventRecord[]
+  next_cursor: string
+}
+
+export interface AuditIntegrityStatus {
+  latest_sequence_number: number
+  latest_event_hash: string
+  verified: boolean
+  checked_events: number
+}
+
+export interface AuditEventFilters {
+  vaultId?: string
+  actorUserId?: string
+  eventType?: string
+  objectType?: string
+  outcome?: string
+  from?: string
+  to?: string
+  cursor?: string
+  limit?: number
+}
+
 function normalizeApiBaseUrl(value: string): string {
   const trimmed = value.trim()
   if (!trimmed) {
@@ -141,6 +182,16 @@ function resolvePath(template: string, params: Record<string, string> = {}): str
     resolved = resolved.replace(`{${key}}`, encodeURIComponent(value))
   }
   return resolved
+}
+
+function queryString(params: Record<string, string | number | undefined>): string {
+  const searchParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === '') continue
+    searchParams.set(key, String(value))
+  }
+  const encoded = searchParams.toString()
+  return encoded ? `?${encoded}` : ''
 }
 
 function assertNoPlaintextLikeKeys(value: JsonValue, path = '$'): void {
@@ -639,6 +690,28 @@ export function createPasswordManagerClient(options: PasswordManagerClientOption
           vaultID: requireNonEmptyString(input.vaultId, 'vaultId'),
         },
       })
+    },
+
+    async listAuditEvents(filters: AuditEventFilters = {}): Promise<AuditEventsResponse> {
+      const route = PASSWORD_MANAGER_CLIENT_ROUTE_SPECS.listAuditEvents
+      return requestJson<AuditEventsResponse>(fetchImpl, apiBaseUrl, {
+        ...route,
+        path: `${route.path}${queryString({
+          vault_id: filters.vaultId,
+          actor_user_id: filters.actorUserId,
+          event_type: filters.eventType,
+          object_type: filters.objectType,
+          outcome: filters.outcome,
+          from: filters.from,
+          to: filters.to,
+          cursor: filters.cursor,
+          limit: filters.limit,
+        })}`,
+      })
+    },
+
+    async getAuditIntegrityStatus(): Promise<AuditIntegrityStatus> {
+      return requestJson<AuditIntegrityStatus>(fetchImpl, apiBaseUrl, PASSWORD_MANAGER_CLIENT_ROUTE_SPECS.getAuditIntegrity)
     },
   }
 }

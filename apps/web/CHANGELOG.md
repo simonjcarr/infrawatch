@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.134.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.133.1...web/v0.134.0) (2026-05-11)
+
+
+### Features
+
+* **password-manager:** add tenant audit view ([d990582](https://github.com/carrtech-dev/ct-ops/commit/d9905825c5c9ed959e917514460093c1eff6cb57))
+
+
+### Bug Fixes
+
+* **password-manager:** hide vault mutation UI for read-only roles ([#1300](https://github.com/carrtech-dev/ct-ops/issues/1300)) ([c33362f](https://github.com/carrtech-dev/ct-ops/commit/c33362ff96eea2f197ec77d8d8ea0f81131958eb))
+
 ## [0.133.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.133.0...web/v0.133.1) (2026-05-11)
 
 

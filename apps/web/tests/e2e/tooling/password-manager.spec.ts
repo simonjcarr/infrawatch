@@ -422,3 +422,51 @@ test('hosted password manager flow keeps plaintext and key material inside the b
     expect(request.body).not.toContain(generatedRsaPrivateKey)
   }
 })
+
+test('hosted password manager hides vault mutation UI for read-only vault roles', async ({
+  authenticatedPage: page,
+  passwordManagerMock,
+}) => {
+  const setupPassword = 'LocalUnlockPassword!42'
+
+  await page.goto('/password-manager')
+  await expect(page.getByTestId('password-manager-state-setup-required')).toBeVisible()
+
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
+  await page.getByLabel('Confirm unlock password', { exact: true }).fill(setupPassword)
+  await page.getByRole('button', { name: 'Create unlock profile' }).click()
+
+  await page.getByRole('button', { name: 'Create vault' }).click()
+  await page.getByLabel('Vault name').fill('Shared production')
+  await page.getByRole('button', { name: 'Create encrypted vault' }).click()
+
+  await page.getByRole('button', { name: 'New entry' }).click()
+  await expect(page.getByRole('dialog', { name: 'New login' })).toBeVisible()
+  await page.getByLabel('Title').fill('Grafana admin')
+  await page.getByLabel('Username').fill('ops-admin')
+  await page.getByLabel('Password', { exact: true }).fill('SuperSecretPassword!99')
+  await page.getByRole('button', { name: 'Create encrypted entry' }).click()
+  await expect(page.getByTestId('password-manager-entry-entry-1')).toContainText('Grafana admin')
+
+  passwordManagerMock.setVaultRole('vault-1', 'viewer')
+  await page.reload()
+  await expect(page.getByTestId('password-manager-state-locked')).toBeVisible()
+  await page.getByLabel('Unlock password', { exact: true }).fill(setupPassword)
+  await page.getByRole('button', { name: 'Unlock' }).click()
+
+  await expect(page.getByTestId('password-manager-workspace')).toBeVisible()
+  await expect(page.getByTestId('password-manager-vault-vault-1')).toContainText('Shared production')
+  await expect(page.getByText('viewer')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Settings' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New entry' })).toHaveCount(0)
+  await expect(page.getByTestId('password-manager-entry-template-menu')).toHaveCount(0)
+
+  const entryCard = page.getByTestId('password-manager-entry-entry-1')
+  await expect(entryCard).toContainText('Grafana admin')
+  await expect(entryCard.getByRole('button', { name: 'Reveal password' })).toBeVisible()
+  await expect(entryCard.getByRole('button', { name: 'Copy password' })).toBeVisible()
+  await expect(entryCard.getByRole('button', { name: 'Edit entry' })).toHaveCount(0)
+
+  expect(passwordManagerMock.requestsFor('POST', '/vaults/vault-1/entries')).toHaveLength(1)
+  expect(passwordManagerMock.requestsFor('PATCH', '/vaults/vault-1')).toHaveLength(0)
+})

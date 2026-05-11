@@ -21,6 +21,10 @@ const sessionSource = readFileSync(
   path.join(repoRoot, 'lib/auth/session.ts'),
   'utf8',
 )
+const defaultInstanceSource = readFileSync(
+  path.join(repoRoot, 'lib/default-instance.ts'),
+  'utf8',
+)
 const usersActionSource = readFileSync(
   path.join(repoRoot, 'lib/actions/users.ts'),
   'utf8',
@@ -136,6 +140,13 @@ test('fresh standalone sessions promote the first active user to instance admin'
   assert.match(sessionSource, /ensureInstanceHasSuperAdmin\(user\)/)
   assert.match(sessionSource, /activeUsers\[0\]\?\.id !== user\.id/)
   assert.match(sessionSource, /set\(\{ role: INSTANCE_ADMIN_ROLE, roles, updatedAt: new Date\(\) \}\)/)
+})
+
+test('configured standalone installs create a default instance scope', () => {
+  assert.match(defaultInstanceSource, /process\.env\['CT_OPS_INSTANCE_ID'\]/)
+  assert.match(defaultInstanceSource, /\.insert\(instanceSettings\)/)
+  assert.match(defaultInstanceSource, /onConflictDoNothing\(\)/)
+  assert.match(sessionSource, /user\.instanceId \?\? await getDefaultInstanceId\(\)/)
 })
 
 test('team invitations are disabled without an instance-backed scope', () => {

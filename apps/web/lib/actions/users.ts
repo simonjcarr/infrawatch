@@ -6,7 +6,7 @@ import { requireInstanceAccess, requireInstanceAdminAccess } from '@/lib/actions
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { users, invitations, sessions } from '@/lib/db/schema'
-import { eq, and, isNull, isNotNull, gt, sql } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull, gt, or, sql } from 'drizzle-orm'
 import type { User, Invitation } from '@/lib/db/schema'
 import { getBetterAuthOrigin } from '@/lib/auth/env'
 import { getRequiredSession } from '@/lib/auth/session'
@@ -32,21 +32,21 @@ function hasSuperAdminRole(role: string | null | undefined, roles: readonly stri
   return normalizeAssignedRoles(roles, role).includes('super_admin')
 }
 
-async function backfillDirectSignupUsers(instanceId: string): Promise<void> {
+async function claimDirectSignupUsers(instanceId: string): Promise<void> {
   await db.execute(sql`
     UPDATE "user" AS u
     SET instance_id = ${instanceId},
+        role = CASE
+          WHEN u.role = 'super_admin' OR u.roles ? 'super_admin' THEN 'super_admin'
+          ELSE 'pending'
+        END,
+        roles = CASE
+          WHEN u.role = 'super_admin' OR u.roles ? 'super_admin' THEN '["super_admin"]'::jsonb
+          ELSE '[]'::jsonb
+        END,
         updated_at = NOW()
     WHERE u.instance_id IS NULL
       AND u.deleted_at IS NULL
-      AND NOT EXISTS (
-        SELECT 1
-        FROM invitations AS i
-        WHERE lower(i.email) = lower(u.email)
-          AND i.accepted_at IS NULL
-          AND i.deleted_at IS NULL
-          AND i.expires_at > NOW()
-      )
   `)
 }
 
@@ -55,7 +55,7 @@ export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: 
   const currentScope = resolveOptionalActionScope(session)
   if (!currentScope) return { members: [session.user], pendingInvites: [] }
   await requireInstanceAccess(currentScope)
-  await backfillDirectSignupUsers(currentScope)
+  await claimDirectSignupUsers(currentScope)
 
   const [members, pendingInvites] = await Promise.all([
     db.query.users.findMany({
@@ -221,8 +221,12 @@ export async function updateUserRole(
 
   try {
     const session = await requireInstanceAdminAccess(instanceId)
+    const targetUserWhere = or(
+      and(eq(users.id, targetUserId), eq(users.instanceId, instanceId), isNull(users.deletedAt)),
+      and(eq(users.id, targetUserId), isNull(users.instanceId), eq(users.role, 'pending'), isNull(users.deletedAt)),
+    )
     const targetUser = await db.query.users.findFirst({
-      where: and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)),
+      where: targetUserWhere,
       columns: { id: true, email: true, role: true, roles: true },
     })
     if (!targetUser) {
@@ -245,8 +249,8 @@ export async function updateUserRole(
     await db.transaction(async (tx) => {
       await tx
         .update(users)
-        .set({ role: nextRole, roles: nextRoles, updatedAt: new Date() })
-        .where(and(eq(users.id, targetUserId), eq(users.instanceId, instanceId)))
+        .set({ instanceId, role: nextRole, roles: nextRoles, updatedAt: new Date() })
+        .where(targetUserWhere)
 
       await writeAuditEvent(tx, {
         instanceId: instanceId,

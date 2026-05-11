@@ -19,6 +19,10 @@ interface OverviewData {
   alerts: { firing: number; acknowledged: number }
 }
 
+interface DashboardClientProps {
+  instanceName: string
+}
+
 function StatRow({
   label,
   value,
@@ -43,7 +47,7 @@ function StatRow({
   )
 }
 
-export function DashboardClient() {
+export function DashboardClient({ instanceName }: DashboardClientProps) {
   const { data, isLoading, error } = useQuery<OverviewData>({
     queryKey: ['overview'],
     queryFn: () => fetch('/api/overview').then((r) => r.json()),
@@ -76,8 +80,8 @@ export function DashboardClient() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-semibold text-foreground" data-testid="dashboard-heading">Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Current state of your infrastructure
+        <p className="text-sm text-muted-foreground mt-1" data-testid="dashboard-instance-name">
+          {instanceName}
         </p>
       </div>
 

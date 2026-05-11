@@ -122,6 +122,8 @@ test('overview aggregates agent, certificate, and alert counts for the instance'
   await page.goto('/dashboard')
 
   await expect(page.getByTestId('dashboard-heading')).toBeVisible()
+  await expect(page).toHaveTitle(`Overview | ${TEST_ORG.name}`)
+  await expect(page.getByTestId('dashboard-instance-name')).toHaveText(TEST_ORG.name)
   await expect(page.getByTestId('dashboard-agents-total')).toContainText('2')
   await expect(page.getByTestId('dashboard-agents-online')).toContainText('1')
   await expect(page.getByTestId('dashboard-agents-offline')).toContainText('1')

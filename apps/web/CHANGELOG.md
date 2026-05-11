@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.133.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.133.0...web/v0.133.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **password-manager:** simplify vault member settings ([9d0b301](https://github.com/carrtech-dev/ct-ops/commit/9d0b301afacf21be740e2715316943b3ebbd443c))
+
 ## [0.133.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.132.1...web/v0.133.0) (2026-05-11)
 
 

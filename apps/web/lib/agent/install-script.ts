@@ -90,7 +90,7 @@ export function buildAgentInstallCommand(
   token?: string,
 ): string {
   const curlFlags = skipVerify ? '-fsSLk' : '-fsSL'
-  const tokenPrefix = token ? `env CT_OPS_ORG_TOKEN=${shellSingleQuote(token)} ` : ''
+  const tokenPrefix = token ? `env CT_OPS_ENROLMENT_TOKEN=${shellSingleQuote(token)} ` : ''
   return `curl ${curlFlags} "${buildAgentInstallUrl(appUrl, skipVerify)}" | ${tokenPrefix}sh`
 }
 
@@ -128,13 +128,16 @@ chmod +x ct-ops-agent
 echo "Binary downloaded."
 
 # ── Install with runtime-provided token ───────────────────────────────────────
-if [ -n "\${CT_OPS_ORG_TOKEN:-}" ]; then
-  sudo env CT_OPS_ORG_TOKEN="\$CT_OPS_ORG_TOKEN" ./ct-ops-agent --install --address ${shellSingleQuote(safeIngestAddress)}${tlsFlag}
+if [ -n "\${CT_OPS_ENROLMENT_TOKEN:-}" ]; then
+  sudo env CT_OPS_ENROLMENT_TOKEN="\$CT_OPS_ENROLMENT_TOKEN" ./ct-ops-agent --install --address ${shellSingleQuote(safeIngestAddress)}${tlsFlag}
+  exit 0
+elif [ -n "\${CT_OPS_ORG_TOKEN:-}" ]; then
+  sudo env CT_OPS_ENROLMENT_TOKEN="\$CT_OPS_ORG_TOKEN" ./ct-ops-agent --install --address ${shellSingleQuote(safeIngestAddress)}${tlsFlag}
   exit 0
 fi
 
 echo ""
-echo "Export CT_OPS_ORG_TOKEN with an enrolment token, then rerun this command:"
+echo "Export CT_OPS_ENROLMENT_TOKEN with an enrolment token, then rerun this command:"
 echo "  curl ${curlFlags} \\"${serverURL}${installPath}\\" | sh"
 echo ""
 echo "You can also install manually:"

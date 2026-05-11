@@ -81,6 +81,13 @@ func mergeTags(layers ...[]string) []*agentv1.Tag {
 	return out
 }
 
+func enrolmentTokenFromEnv() string {
+	if token := strings.TrimSpace(os.Getenv("CT_OPS_ENROLMENT_TOKEN")); token != "" {
+		return token
+	}
+	return strings.TrimSpace(os.Getenv("CT_OPS_ORG_TOKEN"))
+}
+
 func main() {
 	configPath := flag.String("config", "/etc/ct-ops/agent.toml", "Path to agent TOML config file")
 	tokenFlag := flag.String("token", "", "Enrolment token (overrides config file and CT_OPS_ENROLMENT_TOKEN)")
@@ -107,7 +114,7 @@ func main() {
 	if *installFlag {
 		token := strings.TrimSpace(*tokenFlag)
 		if token == "" {
-			token = strings.TrimSpace(os.Getenv("CT_OPS_ENROLMENT_TOKEN"))
+			token = enrolmentTokenFromEnv()
 		}
 		if token == "" {
 			slog.Error("--token or CT_OPS_ENROLMENT_TOKEN is required when using --install")

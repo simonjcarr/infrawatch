@@ -45,3 +45,21 @@ func TestLoadReadsSecureConfig(t *testing.T) {
 		t.Fatalf("unexpected enrolment token: %q", cfg.Agent.EnrolmentToken)
 	}
 }
+
+func TestLoadReadsLegacyOrgTokenEnvFallback(t *testing.T) {
+	t.Setenv("CT_OPS_ORG_TOKEN", " legacy ")
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "agent.toml")
+	if err := os.WriteFile(path, []byte("[agent]\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Agent.EnrolmentToken != "legacy" {
+		t.Fatalf("unexpected enrolment token: %q", cfg.Agent.EnrolmentToken)
+	}
+}

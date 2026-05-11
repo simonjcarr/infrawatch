@@ -90,6 +90,8 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("CT_OPS_ENROLMENT_TOKEN"); v != "" {
 		cfg.Agent.EnrolmentToken = v
+	} else if v := os.Getenv("CT_OPS_ORG_TOKEN"); v != "" {
+		cfg.Agent.EnrolmentToken = v
 	}
 	if v := os.Getenv("CT_OPS_DATA_DIR"); v != "" {
 		cfg.Agent.DataDir = v

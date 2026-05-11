@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.6...web/v0.131.7) (2026-05-11)
+
+
+### Bug Fixes
+
+* **auth:** hold direct signups for role assignment ([c553185](https://github.com/carrtech-dev/ct-ops/commit/c5531856d0fb26e8bf63647434a40f3b8bb5e19a))
+
 ## [0.131.6](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.5...web/v0.131.6) (2026-05-11)
 
 

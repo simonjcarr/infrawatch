@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.10](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.9...web/v0.131.10) (2026-05-11)
+
+
+### Bug Fixes
+
+* **web:** refresh people list after invite conflicts ([#1280](https://github.com/carrtech-dev/ct-ops/issues/1280)) ([56f571d](https://github.com/carrtech-dev/ct-ops/commit/56f571da1d5dd08838e3cff898a2da9e5b0ab16a))
+
 ## [0.131.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.8...web/v0.131.9) (2026-05-11)
 
 

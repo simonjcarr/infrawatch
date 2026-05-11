@@ -169,6 +169,13 @@ test('people administration claims unscoped direct signups as pending members', 
   assert.match(usersActionSource, /await claimDirectSignupUsers\(currentScope\)/)
 })
 
+test('people administration keeps the member list fresh after invite conflicts', () => {
+  assert.match(teamClientSource, /refetchOnMount: 'always'/)
+  assert.match(teamClientSource, /refetchOnWindowFocus: 'always'/)
+  assert.match(teamClientSource, /refetchInterval: 15_000/)
+  assert.match(teamClientSource, /onSettled: invalidate/)
+})
+
 test('role assignment can claim pending users that signed up outside the instance scope', () => {
   assert.match(usersActionSource, /const targetUserWhere = or\(/)
   assert.match(usersActionSource, /and\(eq\(users\.id, targetUserId\), isNull\(users\.instanceId\), eq\(users\.role, 'pending'\), isNull\(users\.deletedAt\)\)/)

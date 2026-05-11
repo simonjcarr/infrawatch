@@ -82,6 +82,9 @@ export function TeamClient({
     queryKey: ['org-users'],
     queryFn: () => getOrgUsers(),
     initialData: { members: initialMembers, pendingInvites: initialPendingInvites },
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+    refetchInterval: 15_000,
   })
 
   const members = data?.members ?? []
@@ -114,13 +117,12 @@ export function TeamClient({
       }
       if ('restored' in result) {
         closeInviteDialog()
-        invalidate()
         return
       }
       setInviteLink(result.inviteLink)
-      invalidate()
     },
     onError: () => setInviteError('An unexpected error occurred'),
+    onSettled: invalidate,
   })
 
   const updateRoleMutation = useMutation({

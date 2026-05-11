@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.8](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.7...web/v0.131.8) (2026-05-11)
+
+
+### Bug Fixes
+
+* **auth:** show unscoped direct signups in people ([13147cb](https://github.com/carrtech-dev/ct-ops/commit/13147cb026be0cc210d7da640a1fcf5756f54932))
+
 ## [0.131.7](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.6...web/v0.131.7) (2026-05-11)
 
 

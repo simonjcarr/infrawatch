@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DESCRIPTOR="${REPO_ROOT}/deploy/password-manager-release.json"
 CLIENT_TEST="${REPO_ROOT}/apps/web/lib/password-manager/client.test.mjs"
 
-expected_ref="ghcr.io/carrtech-dev/ct-password-manager/api@sha256:91c7e5fa77e4bf26115c0f071713856571a8873c4b4e1ab600c53ba78f80fee7"
+expected_ref="ghcr.io/carrtech-dev/ct-password-manager/api@sha256:6f5cc00a33d5df59cbca9968b178675ea45afff9b8f9c2394c2b3ae0a7d09220"
 
 python3 "${REPO_ROOT}/deploy/scripts/validate-password-manager-release.py" "$DESCRIPTOR" >/dev/null
 

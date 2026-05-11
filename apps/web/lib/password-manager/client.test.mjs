@@ -246,6 +246,64 @@ test('audit routes send empty bodies only', async () => {
   }
 })
 
+test('audit list routes use redacted read contract with filters', async () => {
+  const calls = []
+  const client = createPasswordManagerClient({
+    apiBaseUrl: 'https://ops.example.test/password-manager-api',
+    fetch: async (input, init = {}) => {
+      calls.push({
+        url: input instanceof Request ? input.url : String(input),
+        init,
+      })
+      if (String(input).endsWith('/audit-events/integrity')) {
+        return createJsonResponse(200, {
+          latest_sequence_number: 3,
+          latest_event_hash: 'abc123',
+          verified: true,
+          checked_events: 3,
+        })
+      }
+      return createJsonResponse(200, {
+        events: [
+          {
+            id: 'event-1',
+            created_at: '2026-05-05T07:30:00Z',
+            actor_user_id: 'user-1',
+            actor_email: 'user@example.test',
+            actor_display_name: 'User One',
+            event_type: 'entry.copied',
+            object_type: 'entry',
+            object_id: 'entry-1',
+            vault_id: 'vault-1',
+            outcome: 'success',
+            summary: 'User One copied a secret field.',
+            metadata: { field_type: 'password' },
+          },
+        ],
+        next_cursor: '3',
+      })
+    },
+  })
+
+  const events = await client.listAuditEvents({
+    vaultId: 'vault-1',
+    eventType: 'entry.copied',
+    outcome: 'success',
+    limit: 25,
+  })
+  const integrity = await client.getAuditIntegrityStatus()
+
+  assert.equal(events.events[0].summary, 'User One copied a secret field.')
+  assert.equal(events.next_cursor, '3')
+  assert.equal(integrity.verified, true)
+  assert.equal(calls[0].init.method, 'GET')
+  assert.equal(calls[0].init.credentials, 'include')
+  assert.match(calls[0].url, /\/audit-events\?/)
+  assert.match(calls[0].url, /vault_id=vault-1/)
+  assert.match(calls[0].url, /event_type=entry\.copied/)
+  assert.equal(calls[1].url, 'https://ops.example.test/password-manager-api/audit-events/integrity')
+})
+
 test('request payload helpers reject plaintext-shaped fields', () => {
   assert.throws(
     () =>

@@ -10,6 +10,7 @@ import {
   useState,
   type FormEvent,
   type ReactNode,
+  useCallback,
 } from 'react'
 import {
   AlertCircle,
@@ -32,7 +33,9 @@ import {
   RefreshCcw,
   Search,
   Settings,
+  ShieldCheck,
   ShieldAlert,
+  ScrollText,
   StickyNote,
   Terminal,
   Trash2,
@@ -100,6 +103,8 @@ import {
 } from '@/lib/password-manager/browser-crypto'
 import {
   PasswordManagerApiError,
+  type AuditEventRecord,
+  type AuditIntegrityStatus,
   type EntryRecord,
   type MemberRecord,
   type MemberRecipientRecord,
@@ -155,6 +160,15 @@ const PASSWORD_MANAGER_FIXED_MASK = '************'
 type PasswordManagerExportFormat = 'encrypted' | 'plaintext'
 type PasswordManagerEntryTemplateId = 'login' | 'card' | 'identity' | 'secure-note' | 'ssh-key-pair'
 type PasswordManagerEntryDialogMode = 'create' | 'edit' | 'view'
+type PasswordManagerAuditFilters = {
+  vaultId: string
+  actorUserId: string
+  eventType: string
+  objectType: string
+  outcome: string
+  from: string
+  to: string
+}
 type PasswordManagerTimedSecret = {
   durationSeconds: number
   expiresAt: number
@@ -231,6 +245,31 @@ const PASSWORD_MANAGER_ENTRY_TEMPLATES: Array<{
   },
 ]
 const DEFAULT_PASSWORD_MANAGER_ENTRY_TEMPLATE_ID: PasswordManagerEntryTemplateId = 'login'
+const PASSWORD_MANAGER_AUDIT_EVENT_TYPES = [
+  'audit.viewed',
+  'entry.copied',
+  'entry.created',
+  'entry.deleted',
+  'entry.revealed',
+  'entry.updated',
+  'session.launched',
+  'session.logged_out',
+  'session.refreshed',
+  'user_key.created',
+  'user_key.fetched',
+  'user_key.setup_status_viewed',
+  'user_key.unlock_metadata_fetched',
+  'vault.created',
+  'vault.deleted',
+  'vault.exported',
+  'vault.key_rotated',
+  'vault.member_added',
+  'vault.member_removed',
+  'vault.member_updated',
+  'vault.updated',
+] as const
+const PASSWORD_MANAGER_AUDIT_OBJECT_TYPES = ['audit_log', 'entry', 'session', 'user_key', 'vault', 'vault_member'] as const
+const PASSWORD_MANAGER_AUDIT_OUTCOMES = ['success', 'failure', 'denied', 'conflict'] as const
 
 export type PasswordManagerInstanceUser = {
   id: string
@@ -244,6 +283,24 @@ function toClientPayload<T>(value: T): T {
 
 function createIdempotencyKey() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function formatAuditTimestamp(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+function formatAuditLabel(value: string): string {
+  return value
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function shortAuditId(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
 }
 
 function isMembershipConflictError(error: unknown): boolean {
@@ -401,6 +458,7 @@ export function PasswordManagerClientShell({
   const [vaultsPending, setVaultsPending] = useState(false)
   const [entriesPending, setEntriesPending] = useState(false)
   const [membersPending, setMembersPending] = useState(false)
+  const [auditPending, setAuditPending] = useState(false)
   const [workspacePending, setWorkspacePending] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [vaultFilter, setVaultFilter] = useState('')
@@ -410,6 +468,18 @@ export function PasswordManagerClientShell({
   const [vaults, setVaults] = useState<PasswordManagerVaultSummary[]>([])
   const [entries, setEntries] = useState<PasswordManagerEntrySummary[]>([])
   const [members, setMembers] = useState<MemberRecord[]>([])
+  const [auditEvents, setAuditEvents] = useState<AuditEventRecord[]>([])
+  const [auditIntegrity, setAuditIntegrity] = useState<AuditIntegrityStatus | null>(null)
+  const [auditNextCursor, setAuditNextCursor] = useState('')
+  const [auditFilters, setAuditFilters] = useState<PasswordManagerAuditFilters>({
+    vaultId: 'all',
+    actorUserId: '',
+    eventType: 'all',
+    objectType: 'all',
+    outcome: 'all',
+    from: '',
+    to: '',
+  })
   const [createVaultName, setCreateVaultName] = useState('')
   const [createVaultDescription, setCreateVaultDescription] = useState('')
   const [renameVaultName, setRenameVaultName] = useState('')
@@ -1075,6 +1145,53 @@ export function PasswordManagerClientShell({
     setRenameRevealTimeoutSeconds(String(getVaultRevealTimeoutSeconds(selectedVault)))
     setRenameClipboardTimeoutSeconds(String(getVaultClipboardTimeoutSeconds(selectedVault)))
   }, [selectedVault])
+
+  const loadAuditEvents = useCallback(async (cursor = '') => {
+    if (state.view !== 'unlocked') {
+      return
+    }
+
+    setAuditPending(true)
+    try {
+      const [eventsResponse, integrityResponse] = await Promise.all([
+        client.listAuditEvents({
+          vaultId: auditFilters.vaultId === 'all' ? undefined : auditFilters.vaultId,
+          actorUserId: auditFilters.actorUserId.trim() || undefined,
+          eventType: auditFilters.eventType === 'all' ? undefined : auditFilters.eventType,
+          objectType: auditFilters.objectType === 'all' ? undefined : auditFilters.objectType,
+          outcome: auditFilters.outcome === 'all' ? undefined : auditFilters.outcome,
+          from: auditFilters.from ? new Date(auditFilters.from).toISOString() : undefined,
+          to: auditFilters.to ? new Date(auditFilters.to).toISOString() : undefined,
+          cursor: cursor || undefined,
+          limit: 50,
+        }),
+        client.getAuditIntegrityStatus(),
+      ])
+      setAuditEvents((current) => (cursor ? [...current, ...eventsResponse.events] : eventsResponse.events))
+      setAuditNextCursor(eventsResponse.next_cursor)
+      setAuditIntegrity(integrityResponse)
+    } catch (error) {
+      logPasswordManagerWarning('[password-manager] audit events load failed', error, {
+        ['instance' + 'Id']: currentScopeId,
+        selectedVaultId: workspaceState.selectedVaultId,
+        selectedEntryId: workspaceState.selectedEntryId,
+      })
+      handleWorkspaceUiError(error, 'Password Manager audit events could not be loaded safely.')
+    } finally {
+      setAuditPending(false)
+    }
+  }, [auditFilters, client, currentScopeId, state.view, workspaceState.selectedEntryId, workspaceState.selectedVaultId])
+
+  useEffect(() => {
+    if (state.view !== 'unlocked') {
+      setAuditEvents([])
+      setAuditIntegrity(null)
+      setAuditNextCursor('')
+      return
+    }
+
+    void loadAuditEvents()
+  }, [loadAuditEvents, state.view])
 
   useEffect(() => {
     if (entryRevealId && !revealedPasswords[entryRevealId]) {
@@ -2176,6 +2293,11 @@ export function PasswordManagerClientShell({
         <PasswordManagerWorkspace
           createVaultDescription={createVaultDescription}
           createVaultName={createVaultName}
+          auditEvents={auditEvents}
+          auditFilters={auditFilters}
+          auditIntegrity={auditIntegrity}
+          auditNextCursor={auditNextCursor}
+          auditPending={auditPending}
           currentPasswordManagerUserId={currentPasswordManagerUserId}
           deferredEntryFilter={deferredEntryFilter}
           editingEntryId={editingEntryId}
@@ -2207,6 +2329,9 @@ export function PasswordManagerClientShell({
           onCreateVault={runVaultCreate}
           onCreateVaultDescriptionChange={setCreateVaultDescription}
           onCreateVaultNameChange={setCreateVaultName}
+          onAuditFilterChange={(key, value) => setAuditFilters((current) => ({ ...current, [key]: value }))}
+          onLoadMoreAuditEvents={() => loadAuditEvents(auditNextCursor)}
+          onRefreshAuditEvents={() => loadAuditEvents()}
           onDeleteEntry={handleEntryDelete}
           onDeleteVault={handleVaultDelete}
           onEntryFilterChange={setEntryFilter}
@@ -2733,6 +2858,11 @@ function TimedSecretProgress({
 function PasswordManagerWorkspace({
   createVaultDescription,
   createVaultName,
+  auditEvents,
+  auditFilters,
+  auditIntegrity,
+  auditNextCursor,
+  auditPending,
   currentPasswordManagerUserId,
   deferredEntryFilter,
   editingEntryId,
@@ -2764,6 +2894,9 @@ function PasswordManagerWorkspace({
   onCreateVault,
   onCreateVaultDescriptionChange,
   onCreateVaultNameChange,
+  onAuditFilterChange,
+  onLoadMoreAuditEvents,
+  onRefreshAuditEvents,
   onDeleteEntry,
   onDeleteVault,
   onEntryFilterChange,
@@ -2813,6 +2946,11 @@ function PasswordManagerWorkspace({
 }: {
   createVaultDescription: string
   createVaultName: string
+  auditEvents: AuditEventRecord[]
+  auditFilters: PasswordManagerAuditFilters
+  auditIntegrity: AuditIntegrityStatus | null
+  auditNextCursor: string
+  auditPending: boolean
   currentPasswordManagerUserId: string | null
   deferredEntryFilter: string
   editingEntryId: string | null
@@ -2849,6 +2987,9 @@ function PasswordManagerWorkspace({
   onCreateVault: () => Promise<void>
   onCreateVaultDescriptionChange: (value: string) => void
   onCreateVaultNameChange: (value: string) => void
+  onAuditFilterChange: (key: keyof PasswordManagerAuditFilters, value: string) => void
+  onLoadMoreAuditEvents: () => void
+  onRefreshAuditEvents: () => void
   onDeleteEntry: () => Promise<void>
   onDeleteVault: (unlockPassword: string) => Promise<boolean>
   onEntryFilterChange: (value: string) => void
@@ -3189,6 +3330,10 @@ function PasswordManagerWorkspace({
           <TabsTrigger value="passwords">
             <KeyRound className="size-4" />
             Passwords
+          </TabsTrigger>
+          <TabsTrigger value="audit">
+            <ScrollText className="size-4" />
+            Audit
           </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings className="size-4" />
@@ -3793,6 +3938,184 @@ function PasswordManagerWorkspace({
               />
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        <TabsContent value="audit" className="space-y-4">
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Audit</CardTitle>
+                  <CardDescription>Tenant-wide Password Manager activity with public-safe details only.</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={auditIntegrity?.verified === false ? 'destructive' : 'secondary'}>
+                    <ShieldCheck className="mr-1 size-3" />
+                    {auditIntegrity
+                      ? auditIntegrity.verified
+                        ? `Verified ${auditIntegrity.checked_events}`
+                        : 'Integrity warning'
+                      : 'Integrity pending'}
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={onRefreshAuditEvents} disabled={auditPending}>
+                    <RefreshCcw className="mr-2 size-4" />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-audit-vault">Vault</Label>
+                  <Select value={auditFilters.vaultId} onValueChange={(value) => onAuditFilterChange('vaultId', value)}>
+                    <SelectTrigger id="password-manager-audit-vault">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All vaults</SelectItem>
+                      {vaults.map((vault) => (
+                        <SelectItem key={vault.id} value={vault.id}>
+                          {vault.metadata.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-audit-event-type">Event</Label>
+                  <Select value={auditFilters.eventType} onValueChange={(value) => onAuditFilterChange('eventType', value)}>
+                    <SelectTrigger id="password-manager-audit-event-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All events</SelectItem>
+                      {PASSWORD_MANAGER_AUDIT_EVENT_TYPES.map((eventType) => (
+                        <SelectItem key={eventType} value={eventType}>
+                          {formatAuditLabel(eventType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-audit-object-type">Object</Label>
+                  <Select value={auditFilters.objectType} onValueChange={(value) => onAuditFilterChange('objectType', value)}>
+                    <SelectTrigger id="password-manager-audit-object-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All objects</SelectItem>
+                      {PASSWORD_MANAGER_AUDIT_OBJECT_TYPES.map((objectType) => (
+                        <SelectItem key={objectType} value={objectType}>
+                          {formatAuditLabel(objectType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-audit-outcome">Outcome</Label>
+                  <Select value={auditFilters.outcome} onValueChange={(value) => onAuditFilterChange('outcome', value)}>
+                    <SelectTrigger id="password-manager-audit-outcome">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All outcomes</SelectItem>
+                      {PASSWORD_MANAGER_AUDIT_OUTCOMES.map((outcome) => (
+                        <SelectItem key={outcome} value={outcome}>
+                          {formatAuditLabel(outcome)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-audit-from">From</Label>
+                  <Input
+                    id="password-manager-audit-from"
+                    type="datetime-local"
+                    value={auditFilters.from}
+                    onChange={(event) => onAuditFilterChange('from', event.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password-manager-audit-to">To</Label>
+                  <Input
+                    id="password-manager-audit-to"
+                    type="datetime-local"
+                    value={auditFilters.to}
+                    onChange={(event) => onAuditFilterChange('to', event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2 md:max-w-md">
+                <Label htmlFor="password-manager-audit-actor">Actor user ID</Label>
+                <Input
+                  id="password-manager-audit-actor"
+                  value={auditFilters.actorUserId}
+                  onChange={(event) => onAuditFilterChange('actorUserId', event.target.value)}
+                  placeholder="Filter by Password Manager user ID"
+                />
+              </div>
+
+              <div className="overflow-hidden rounded-md border border-border/60" data-testid="password-manager-audit-table">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Actor</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Outcome</TableHead>
+                      <TableHead>Summary</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditEvents.map((event) => (
+                      <TableRow key={event.id} data-testid={`password-manager-audit-event-${event.id}`}>
+                        <TableCell className="whitespace-nowrap text-xs">{formatAuditTimestamp(event.created_at)}</TableCell>
+                        <TableCell>
+                          <div className="grid gap-0.5">
+                            <span>{event.actor_display_name || event.actor_email || shortAuditId(event.actor_user_id)}</span>
+                            <span className="text-xs text-muted-foreground">{event.actor_email || shortAuditId(event.actor_user_id)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatAuditLabel(event.event_type)}</TableCell>
+                        <TableCell>
+                          <div className="grid gap-0.5">
+                            <span>{formatAuditLabel(event.object_type)}</span>
+                            {event.object_id ? <span className="text-xs text-muted-foreground">{shortAuditId(event.object_id)}</span> : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={event.outcome === 'success' ? 'secondary' : 'destructive'}>
+                            {formatAuditLabel(event.outcome)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="min-w-72">{event.summary}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!auditPending && auditEvents.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                          No audit events match the current filters.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {auditIntegrity?.latest_event_hash ? `Latest hash ${shortAuditId(auditIntegrity.latest_event_hash)}` : 'Audit integrity is checked by the API.'}
+                </p>
+                <Button variant="outline" onClick={onLoadMoreAuditEvents} disabled={auditPending || !auditNextCursor}>
+                  {auditPending ? 'Loading...' : 'Load more'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

@@ -34,7 +34,7 @@ services:
       start_period: 10s
 
   password-manager-migrate:
-    image: ghcr.io/carrtech-dev/ct-password-manager/api@sha256:91c7e5fa77e4bf26115c0f071713856571a8873c4b4e1ab600c53ba78f80fee7
+    image: ghcr.io/carrtech-dev/ct-password-manager/api@sha256:6f5cc00a33d5df59cbca9968b178675ea45afff9b8f9c2394c2b3ae0a7d09220
     restart: "no"
     depends_on:
       password-manager-db:
@@ -52,7 +52,7 @@ services:
     command: ["-action", "up"]
 
   password-manager-api:
-    image: ghcr.io/carrtech-dev/ct-password-manager/api@sha256:91c7e5fa77e4bf26115c0f071713856571a8873c4b4e1ab600c53ba78f80fee7
+    image: ghcr.io/carrtech-dev/ct-password-manager/api@sha256:6f5cc00a33d5df59cbca9968b178675ea45afff9b8f9c2394c2b3ae0a7d09220
     restart: unless-stopped
     depends_on:
       password-manager-db:

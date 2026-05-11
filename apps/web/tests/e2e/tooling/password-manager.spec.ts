@@ -308,6 +308,17 @@ test('hosted password manager flow keeps plaintext and key material inside the b
   await page.getByRole('button', { name: 'Delete vault permanently' }).click()
   await expect(page.getByTestId('password-manager-vault-vault-1')).toHaveCount(0)
 
+  await page.getByRole('tab', { name: 'Audit' }).click()
+  await expect(page.getByTestId('password-manager-audit-table')).toBeVisible()
+  await expect(page.getByText('Verified 2')).toBeVisible()
+  await expect(page.getByTestId('password-manager-audit-table')).toContainText('Copied')
+  await expect(page.getByTestId('password-manager-audit-table')).not.toContainText('request_ip')
+  await expect(page.getByTestId('password-manager-audit-table')).not.toContainText('user_agent')
+  await expect(page.getByTestId('password-manager-audit-table')).not.toContainText('session_id')
+  await expect(page.getByTestId('password-manager-audit-table')).not.toContainText('ciphertext')
+  await expect(page.getByTestId('password-manager-audit-table')).not.toContainText('wrapped_vault_key_envelope')
+  await expect(page.getByTestId('password-manager-audit-table')).not.toContainText('private_key')
+
   await passwordManagerMock.switchAuthenticatedInstance()
   await page.reload()
   await expect(page.getByTestId('password-manager-state-setup-required')).toBeVisible()

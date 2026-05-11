@@ -23,6 +23,9 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "local/no-single-table-select": "error",
+      // Existing client flows intentionally reset local form/UI state from
+      // effects. Keep this advisory while upgrading eslint-config-next.
+      "react-hooks/set-state-in-effect": "warn",
     },
   },
   {

@@ -46,10 +46,10 @@ updates:
 
   # --- Node / pnpm workspaces ----------------------------------------------
   - package-ecosystem: "npm"
-    directories:
-      - "/"
-      - "/apps/web"
-      - "/apps/docs"
+    # This is a pnpm workspace with a shared root lockfile. Let Dependabot
+    # update workspace manifests through the root entry so package.json and
+    # pnpm-lock.yaml stay in sync.
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.4...web/v0.131.5) (2026-05-11)
+
+
+### Bug Fixes
+
+* **web:** guard team invites without instance scope ([8c4bebc](https://github.com/carrtech-dev/ct-ops/commit/8c4bebc58ce0a7456206518809d8d011d5a0d54e))
+
 ## [0.131.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.131.3...web/v0.131.4) (2026-05-10)
 
 

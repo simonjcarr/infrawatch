@@ -149,6 +149,21 @@ test('team invitations are disabled without an instance-backed scope', () => {
   assert.match(teamClientSource, /canManage\(currentUserRole\) && hasInstanceScope/)
 })
 
+test('people administration claims unscoped direct signups as pending members', () => {
+  assert.match(usersActionSource, /async function claimDirectSignupUsers\(instanceId: string\): Promise<void>/)
+  assert.match(usersActionSource, /WHERE u\.instance_id IS NULL/)
+  assert.match(usersActionSource, /ELSE 'pending'/)
+  assert.match(usersActionSource, /ELSE '\[\]'::jsonb/)
+  assert.doesNotMatch(usersActionSource, /NOT EXISTS \(\s*SELECT 1\s*FROM invitations AS i/)
+  assert.match(usersActionSource, /await claimDirectSignupUsers\(currentScope\)/)
+})
+
+test('role assignment can claim pending users that signed up outside the instance scope', () => {
+  assert.match(usersActionSource, /const targetUserWhere = or\(/)
+  assert.match(usersActionSource, /and\(eq\(users\.id, targetUserId\), isNull\(users\.instanceId\), eq\(users\.role, 'pending'\), isNull\(users\.deletedAt\)\)/)
+  assert.match(usersActionSource, /set\(\{ instanceId, role: nextRole, roles: nextRoles, updatedAt: new Date\(\) \}\)/)
+})
+
 test('administration pages use normalized role checks', () => {
   for (const relativePath of administrationPages) {
     const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')

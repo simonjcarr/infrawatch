@@ -7,6 +7,7 @@ test('admin can generate an activation token from settings', async ({ authentica
   await page.goto('/settings/licence')
 
   await expect(page.getByTestId('settings-heading')).toContainText('Instance')
+  await expect(page.getByTestId('licence-instance-name')).toHaveText(TEST_ORG.name)
   await page.getByTestId('activation-token-generate').click()
 
   const activationToken = page.getByTestId('activation-token')
@@ -21,6 +22,7 @@ test('admin can generate an activation token from settings', async ({ authentica
   if (firstDecoded.ok) {
     expect(firstDecoded.payload.installOrgName).toBe(TEST_ORG.name)
     expect(firstDecoded.payload.installOrgId).toBeTruthy()
+    await expect(page.getByTestId('licence-instance-id')).toHaveText(firstDecoded.payload.installOrgId)
   }
 
   await page.getByTestId('activation-token-copy').click()

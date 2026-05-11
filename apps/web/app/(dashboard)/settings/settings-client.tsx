@@ -1535,6 +1535,20 @@ export function SettingsClient({
                   licence key is bound to this install and cannot be used on another.
                 </p>
               </div>
+              <div className="grid gap-2 rounded-md border bg-background p-3 text-xs sm:grid-cols-2">
+                <div>
+                  <p className="text-muted-foreground">Instance name</p>
+                  <p className="mt-1 break-words font-medium text-foreground" data-testid="licence-instance-name">
+                    {org.name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Instance ID</p>
+                  <p className="mt-1 break-all font-mono text-foreground" data-testid="licence-instance-id">
+                    {org.id}
+                  </p>
+                </div>
+              </div>
 
               {activationToken ? (
                 <div className="space-y-2">

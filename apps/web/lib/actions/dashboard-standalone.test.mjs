@@ -13,6 +13,18 @@ const overviewRouteSource = readFileSync(
   path.join(repoRoot, 'app/api/overview/route.ts'),
   'utf8',
 )
+const dashboardPageSource = readFileSync(
+  path.join(repoRoot, 'app/(dashboard)/dashboard/page.tsx'),
+  'utf8',
+)
+const dashboardClientSource = readFileSync(
+  path.join(repoRoot, 'app/(dashboard)/dashboard/dashboard-client.tsx'),
+  'utf8',
+)
+const settingsClientSource = readFileSync(
+  path.join(repoRoot, 'app/(dashboard)/settings/settings-client.tsx'),
+  'utf8',
+)
 const licenceGuardSource = readFileSync(
   path.join(repoRoot, 'lib/actions/licence-guard.ts'),
   'utf8',
@@ -134,6 +146,20 @@ test('overview API returns empty counts for a fresh standalone instance', () => 
   assert.match(overviewRouteSource, /getApiSession\(\)/)
   assert.doesNotMatch(overviewRouteSource, /getApiInstanceSession\(\)/)
   assert.match(overviewRouteSource, /if \(!instanceId\) \{\s*return Response\.json\(emptyOverview\)\s*\}/)
+})
+
+test('dashboard overview uses the instance display name for page context', () => {
+  assert.match(dashboardPageSource, /getInstanceDisplayName\(session\.user\.instanceId\)/)
+  assert.match(dashboardPageSource, /absolute: `Overview \| \$\{instanceName\}`/)
+  assert.match(dashboardClientSource, /instanceName: string/)
+  assert.match(dashboardClientSource, /data-testid="dashboard-instance-name"/)
+})
+
+test('licence activation panel shows instance purchase context', () => {
+  assert.match(settingsClientSource, /data-testid="licence-instance-name"/)
+  assert.match(settingsClientSource, /data-testid="licence-instance-id"/)
+  assert.match(settingsClientSource, /\{org\.name\}/)
+  assert.match(settingsClientSource, /\{org\.id\}/)
 })
 
 test('sidebar-linked pages do not force an instance-backed action scope', () => {

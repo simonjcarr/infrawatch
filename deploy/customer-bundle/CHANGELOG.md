@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.4...bundle/v0.1.5) (2026-05-12)
+
+
+### Bug Fixes
+
+* **upgrade:** avoid self-overwriting running script ([7cb15a6](https://github.com/carrtech-dev/ct-ops/commit/7cb15a679ceaa4283e83d1be42dbf8ee7656392c))
+
 ## [0.1.4](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.3...bundle/v0.1.4) (2026-05-12)
 
 

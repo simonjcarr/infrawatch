@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.35.0...agent/v0.36.0) (2026-05-12)
+
+
+### Features
+
+* **agent:** collect Docker container inventory ([2f18d7b](https://github.com/carrtech-dev/ct-ops/commit/2f18d7ba67e18a2309d9a74982984cf48c88629b))
+
 ## [0.35.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.5...agent/v0.35.0) (2026-05-12)
 
 

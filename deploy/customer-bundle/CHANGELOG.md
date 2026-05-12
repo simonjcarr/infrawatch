@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.3...bundle/v0.1.4) (2026-05-12)
+
+
+### Bug Fixes
+
+* **web:** remove auth secrets from Docker build args ([#1329](https://github.com/carrtech-dev/ct-ops/issues/1329)) ([e91baf7](https://github.com/carrtech-dev/ct-ops/commit/e91baf7867e7196d34821f97bfc1bfbeb7213d1c))
+
 ## [0.1.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.2...bundle/v0.1.3) (2026-05-12)
 
 

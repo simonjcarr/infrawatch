@@ -11,6 +11,7 @@ import {
   agentEnrolmentTokens,
   revokedCertificates,
   hosts,
+  hostDockerStatus,
   hostMetrics,
   hostGroupMembers,
   checks,
@@ -38,7 +39,7 @@ import {
   pendingCertSignings,
 } from '@/lib/db/schema'
 import { eq, and, isNull, gt, gte, lte, asc, desc, sql, inArray, ilike, or, count } from 'drizzle-orm'
-import type { Agent, AgentEnrolmentToken, Host, HostMetric } from '@/lib/db/schema'
+import type { Agent, AgentEnrolmentToken, Host, HostDockerStatus, HostMetric } from '@/lib/db/schema'
 import { HOST_HIGH_USAGE_THRESHOLD, HOST_STALE_MINUTES } from '@/lib/db/schema/hosts'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { escapeLikePattern } from '@/lib/utils'
@@ -330,7 +331,7 @@ export async function rejectAgent(
   }
 }
 
-export type HostWithAgent = Host & { agent: Agent | null }
+export type HostWithAgent = Host & { agent: Agent | null; dockerStatus?: HostDockerStatus | null }
 
 export async function listHosts(instanceId?: string): Promise<HostWithAgent[]> {
   const currentScope = instanceId ?? await resolveCurrentActionScope()
@@ -1051,9 +1052,20 @@ export async function getHeartbeatHistory(
 export async function getHost(instanceId: string, hostId: string): Promise<HostWithAgent | null> {
   await requireInstanceAccess(instanceId)
   const rows = await db
-    .select()
+    .select({
+      host: hosts,
+      agent: agents,
+      dockerStatus: hostDockerStatus,
+    })
     .from(hosts)
     .leftJoin(agents, eq(hosts.agentId, agents.id))
+    .leftJoin(
+      hostDockerStatus,
+      and(
+        eq(hostDockerStatus.hostId, hosts.id),
+        eq(hostDockerStatus.instanceId, hosts.instanceId),
+      ),
+    )
     .where(
       and(
         eq(hosts.id, hostId),
@@ -1066,8 +1078,9 @@ export async function getHost(instanceId: string, hostId: string): Promise<HostW
   if (rows.length === 0) return null
   const row = rows[0]!
   return {
-    ...row.hosts,
-    agent: row.agents ?? null,
+    ...row.host,
+    agent: row.agent ?? null,
+    dockerStatus: row.dockerStatus ?? null,
   }
 }
 

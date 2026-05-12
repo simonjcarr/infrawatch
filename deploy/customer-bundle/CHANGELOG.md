@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.6...bundle/v0.1.7) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ansible:** scope ping logs by host name ([f13561f](https://github.com/carrtech-dev/ct-ops/commit/f13561f2ada5dcc3cf72a712acf42ebdd43db486))
+
 ## [0.1.6](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.5...bundle/v0.1.6) (2026-05-12)
 
 

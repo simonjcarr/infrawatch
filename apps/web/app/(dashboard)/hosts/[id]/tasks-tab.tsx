@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Trash2,
   Search,
+  KeyRound,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -43,11 +44,14 @@ import {
 import { Label } from '@/components/ui/label'
 import {
   triggerPatchRun,
+  triggerAnsiblePingRun,
   triggerCustomScriptRun,
   triggerServiceAction,
   listTaskRunsForHost,
   deleteTaskRuns,
 } from '@/lib/actions/task-runs'
+import { listAnsibleCredentialProfiles } from '@/lib/actions/automation'
+import type { AnsibleCredentialProfileSummary } from '@/lib/actions/automation'
 import type { TaskRunWithHosts } from '@/lib/actions/task-runs'
 import type {
   PatchTaskConfig,
@@ -116,6 +120,7 @@ function taskTypeLabel(taskType: string): string {
     case 'patch': return 'Patch'
     case 'custom_script': return 'Script'
     case 'service': return 'Service'
+    case 'ansible_ping': return 'Ansible ping'
     default: return taskType
   }
 }
@@ -169,6 +174,10 @@ function TaskDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: strin
     )
   }
 
+  if (run.taskType === 'ansible_ping') {
+    return <span className="text-sm text-muted-foreground">SSH connectivity check</span>
+  }
+
   return <span className="text-sm text-muted-foreground">—</span>
 }
 
@@ -192,6 +201,10 @@ export function TasksTab({ host, canRunTasks }: Props) {
   const [serviceAction, setServiceAction] = useState<'start' | 'stop' | 'restart' | 'status'>('restart')
   const [svcQueryId, setSvcQueryId] = useState<string | null>(null)
   const [svcQueryError, setSvcQueryError] = useState<string | null>(null)
+  const [ansibleOpen, setAnsibleOpen] = useState(false)
+  const [ansibleCredentialId, setAnsibleCredentialId] = useState('')
+  const [ansibleSshPort, setAnsibleSshPort] = useState('22')
+  const [ansibleError, setAnsibleError] = useState<string | null>(null)
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -203,6 +216,12 @@ export function TasksTab({ host, canRunTasks }: Props) {
       const runs = query.state.data ?? []
       return runs.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
     },
+  })
+
+  const { data: ansibleCredentials = [] } = useQuery<AnsibleCredentialProfileSummary[]>({
+    queryKey: ['ansible-credential-profiles'],
+    queryFn: () => listAnsibleCredentialProfiles(),
+    enabled: canRunTasks && ansibleOpen,
   })
 
   // Service autocomplete query polling
@@ -259,6 +278,20 @@ export function TasksTab({ host, canRunTasks }: Props) {
     },
   })
 
+  const { mutate: doAnsiblePing, isPending: isAnsiblePinging } = useMutation({
+    mutationFn: () => triggerAnsiblePingRun(host.id, ansibleCredentialId, Number(ansibleSshPort)),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setAnsibleError(result.error)
+        return
+      }
+      setAnsibleOpen(false)
+      setAnsibleError(null)
+      router.push(`/tasks/${result.taskRunId}`)
+    },
+    onError: () => setAnsibleError('Failed to run Ansible ping'),
+  })
+
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
     mutationFn: () => deleteTaskRuns([...selectedIds]),
     onSuccess: () => {
@@ -302,6 +335,10 @@ export function TasksTab({ host, canRunTasks }: Props) {
             </Button>
             {isLinux && (
               <>
+                <Button variant="outline" size="sm" onClick={() => setAnsibleOpen(true)}>
+                  <KeyRound className="size-4 mr-1.5" />
+                  Ansible Ping
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setServiceOpen(true)}>
                   <Power className="size-4 mr-1.5" />
                   Service
@@ -404,6 +441,66 @@ export function TasksTab({ host, canRunTasks }: Props) {
           </Table>
         </div>
       )}
+
+      {/* Patch dialog */}
+      <Dialog open={ansibleOpen} onOpenChange={setAnsibleOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Run Ansible Ping</DialogTitle>
+            <DialogDescription>
+              Check SSH connectivity with the Ansible ping module using a saved credential profile.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Credential profile</Label>
+              <div className="space-y-2">
+                {ansibleCredentials.length === 0 ? (
+                  <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                    Create an Ansible SSH credential in Settings → Integrations → Automation first.
+                  </p>
+                ) : ansibleCredentials.map((profile) => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => setAnsibleCredentialId(profile.id)}
+                    className={`w-full rounded-md border px-3 py-2 text-left ${
+                      ansibleCredentialId === profile.id ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{profile.name}</p>
+                    <p className="text-xs text-muted-foreground">{profile.username}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ansible-ssh-port">SSH port</Label>
+              <Input
+                id="ansible-ssh-port"
+                type="number"
+                min={1}
+                max={65535}
+                value={ansibleSshPort}
+                onChange={(event) => setAnsibleSshPort(event.target.value)}
+              />
+            </div>
+            {ansibleError && <p className="text-sm text-destructive">{ansibleError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnsibleOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => doAnsiblePing()}
+              disabled={isAnsiblePinging || !ansibleCredentialId || ansibleCredentials.length === 0}
+            >
+              {isAnsiblePinging && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Run Ping
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Patch dialog */}
       <Dialog open={patchOpen} onOpenChange={setPatchOpen}>

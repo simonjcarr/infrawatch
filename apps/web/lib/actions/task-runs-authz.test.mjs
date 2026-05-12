@@ -18,6 +18,8 @@ function getActionSegment(source, action) {
 const privilegedTaskRunActions = [
   'triggerCustomScriptRun',
   'triggerGroupCustomScriptRun',
+  'triggerAnsiblePingRun',
+  'triggerGroupAnsiblePingRun',
   'triggerServiceAction',
   'triggerGroupServiceAction',
   'triggerAgentUninstall',

@@ -56,6 +56,8 @@ const adminGuardedActions = [
   ['alerts.ts', 'deleteGlobalAlertDefault'],
   ['alerts.ts', 'applyGlobalDefaultsToHost'],
   ['automation.ts', 'updateAnsibleAutomationSettings'],
+  ['automation.ts', 'createAnsibleCredentialProfile'],
+  ['automation.ts', 'deleteAnsibleCredentialProfile'],
   ['host-settings.ts', 'updateOrgDefaultCollectionSettings'],
   ['tag-rules.ts', 'createTagRule'],
   ['tag-rules.ts', 'updateTagRule'],

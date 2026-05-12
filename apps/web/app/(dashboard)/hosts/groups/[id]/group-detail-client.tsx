@@ -22,6 +22,7 @@ import {
   SkipForward,
   Terminal,
   Power,
+  KeyRound,
 } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import Link from 'next/link'
@@ -65,11 +66,13 @@ import {
 import { listHosts } from '@/lib/actions/agents'
 import {
   triggerGroupPatchRun,
+  triggerGroupAnsiblePingRun,
   triggerGroupCustomScriptRun,
   triggerGroupServiceAction,
   listTaskRunsForGroup,
   deleteTaskRuns,
 } from '@/lib/actions/task-runs'
+import { listAnsibleCredentialProfiles, type AnsibleCredentialProfileSummary } from '@/lib/actions/automation'
 import type { HostGroupWithMembers } from '@/lib/actions/host-groups'
 import type { HostWithAgent } from '@/lib/actions/agents-core'
 import type {
@@ -191,6 +194,11 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
   const [serviceName, setServiceName] = useState('')
   const [serviceAction, setServiceAction] = useState<'start' | 'stop' | 'restart' | 'status'>('restart')
   const [serviceMaxParallel, setServiceMaxParallel] = useState(1)
+  const [ansibleOpen, setAnsibleOpen] = useState(false)
+  const [ansibleCredentialId, setAnsibleCredentialId] = useState('')
+  const [ansibleMaxParallel, setAnsibleMaxParallel] = useState(1)
+  const [ansibleSshPort, setAnsibleSshPort] = useState('22')
+  const [ansibleError, setAnsibleError] = useState<string | null>(null)
 
   // Selection state for task history
   const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set())
@@ -216,6 +224,12 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
       const runs = query.state.data ?? []
       return runs.some((r) => isRunActive(r.status)) ? 5_000 : 30_000
     },
+  })
+
+  const { data: ansibleCredentials = [] } = useQuery<AnsibleCredentialProfileSummary[]>({
+    queryKey: ['ansible-credential-profiles'],
+    queryFn: () => listAnsibleCredentialProfiles(),
+    enabled: canRunTasks && ansibleOpen,
   })
 
   const { mutate: doAdd, isPending: isAdding } = useMutation({
@@ -257,6 +271,25 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
       setServiceOpen(false)
       if ('taskRunId' in result) router.push(`/tasks/${result.taskRunId}`)
     },
+  })
+
+  const { mutate: doGroupAnsiblePing, isPending: isAnsiblePinging } = useMutation({
+    mutationFn: () => triggerGroupAnsiblePingRun(
+      initialGroup.id,
+      ansibleCredentialId,
+      ansibleMaxParallel,
+      Number(ansibleSshPort),
+    ),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setAnsibleError(result.error)
+        return
+      }
+      setAnsibleOpen(false)
+      setAnsibleError(null)
+      router.push(`/tasks/${result.taskRunId}`)
+    },
+    onError: () => setAnsibleError('Failed to run Ansible ping'),
   })
 
   const { mutate: doDeleteRuns, isPending: isDeletingRuns } = useMutation({
@@ -305,6 +338,10 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
           <div className="flex items-center gap-2">
             {canRunTasks && (
               <>
+                <Button variant="outline" onClick={() => setAnsibleOpen(true)}>
+                  <KeyRound className="size-4 mr-1" />
+                  Ansible Ping
+                </Button>
                 <Button variant="outline" onClick={() => setScriptOpen(true)}>
                   <Terminal className="size-4 mr-1" />
                   Run Script
@@ -491,6 +528,7 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
                         {run.taskType === 'patch' ? 'Patch'
                           : run.taskType === 'custom_script' ? 'Script'
                           : run.taskType === 'service' ? 'Service'
+                          : run.taskType === 'ansible_ping' ? 'Ansible ping'
                           : run.taskType}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -536,6 +574,7 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
                             </div>
                           )
                         })()}
+                        {run.taskType === 'ansible_ping' && 'SSH connectivity check'}
                       </TableCell>
                       <TableCell>
                         <RunStatusBadge status={run.status} />
@@ -583,6 +622,91 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
           </div>
         )}
       </div>
+
+      {/* Ansible Group Dialog */}
+      <Dialog open={ansibleOpen} onOpenChange={setAnsibleOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ansible Ping &quot;{group.name}&quot;</DialogTitle>
+            <DialogDescription>
+              Check SSH connectivity to Linux hosts in this group using the Ansible ping module.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Credential profile</Label>
+              <div className="space-y-2">
+                {ansibleCredentials.length === 0 ? (
+                  <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                    Create an Ansible SSH credential in Settings → Integrations → Automation first.
+                  </p>
+                ) : ansibleCredentials.map((profile) => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => setAnsibleCredentialId(profile.id)}
+                    className={`w-full rounded-md border px-3 py-2 text-left ${
+                      ansibleCredentialId === profile.id ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{profile.name}</p>
+                    <p className="text-xs text-muted-foreground">{profile.username}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="group-ansible-ssh-port">SSH port</Label>
+              <Input
+                id="group-ansible-ssh-port"
+                type="number"
+                min={1}
+                max={65535}
+                value={ansibleSshPort}
+                onChange={(event) => setAnsibleSshPort(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Max parallel hosts</Label>
+              <div className="flex flex-wrap gap-2">
+                {PARALLEL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setAnsibleMaxParallel(opt.value)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                      ansibleMaxParallel === opt.value
+                        ? 'border-primary bg-primary/5 text-foreground font-medium'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {nonLinuxCount > 0 && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+                <AlertTriangle className="size-3.5 inline mr-1" />
+                {nonLinuxCount} non-Linux host{nonLinuxCount !== 1 ? 's' : ''} will be skipped.
+                {linuxCount === 0 && ' No Linux hosts in this group.'}
+              </div>
+            )}
+            {ansibleError && <p className="text-sm text-destructive">{ansibleError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnsibleOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => doGroupAnsiblePing()}
+              disabled={isAnsiblePinging || !ansibleCredentialId || ansibleCredentials.length === 0 || linuxCount === 0}
+            >
+              {isAnsiblePinging && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Run Ping
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Script Group Dialog */}
       <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
-import { getAutomationSettings } from '@/lib/actions/automation'
+import { getAutomationSettings, listAnsibleCredentialProfiles } from '@/lib/actions/automation'
 import { hasRole } from '@/lib/auth/guards'
 import { getRequiredSession } from '@/lib/auth/session'
 import { AdminTabs } from '@/components/shared/admin-tabs'
@@ -19,12 +19,15 @@ export default async function AutomationIntegrationSettingsPage() {
     redirect('/settings')
   }
 
-  const settings = await getAutomationSettings()
+  const [settings, credentialProfiles] = await Promise.all([
+    getAutomationSettings(),
+    listAnsibleCredentialProfiles(),
+  ])
 
   return (
     <div className="space-y-6">
       <AdminTabs tabs={integrationSettingsTabs} />
-      <AutomationSettingsClient initialSettings={settings} />
+      <AutomationSettingsClient initialSettings={settings} initialCredentialProfiles={credentialProfiles} />
     </div>
   )
 }

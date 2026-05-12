@@ -4,7 +4,7 @@ import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
 import { users } from './auth.ts'
 
-export type TaskType = 'patch' | 'custom_script' | 'service' | 'agent_uninstall' | 'software_inventory'
+export type TaskType = 'patch' | 'custom_script' | 'service' | 'agent_uninstall' | 'software_inventory' | 'ansible_ping'
 export type TaskRunStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed'
 export type TaskRunHostStatus = 'pending' | 'running' | 'cancelling' | 'cancelled' | 'success' | 'failed' | 'skipped'
 
@@ -19,11 +19,22 @@ export interface ServiceTaskConfig {
   service_name: string
   action: 'start' | 'stop' | 'restart' | 'status'
 }
+export interface AnsibleInventoryHost {
+  id: string
+  name: string
+  address: string
+  port: number
+}
+export interface AnsiblePingTaskConfig {
+  credentialProfileId: string
+  sshPort?: number
+  targets: AnsibleInventoryHost[]
+}
 // agent_uninstall carries no parameters today; reserved for future flags.
 export type AgentUninstallTaskConfig = Record<string, never>
 // software_inventory carries no config; OS detection is on-agent.
 export type SoftwareInventoryTaskConfig = Record<string, never>
-export type TaskConfig = PatchTaskConfig | CustomScriptTaskConfig | ServiceTaskConfig | AgentUninstallTaskConfig | SoftwareInventoryTaskConfig
+export type TaskConfig = PatchTaskConfig | CustomScriptTaskConfig | ServiceTaskConfig | AgentUninstallTaskConfig | SoftwareInventoryTaskConfig | AnsiblePingTaskConfig
 
 // Result shapes
 export interface PackageUpdate {
@@ -43,6 +54,10 @@ export interface ServiceTaskResult {
   action: string
   is_active: boolean
 }
+export interface AnsiblePingTaskResult {
+  ok: boolean
+  elapsed_ms: number
+}
 // Agent reports "scheduled" once it has handed off to a detached uninstaller process.
 export interface AgentUninstallTaskResult {
   status: 'scheduled'
@@ -57,7 +72,7 @@ export interface SoftwareInventoryTaskResult {
   started_at: string
   completed_at: string
 }
-export type TaskResult = PatchTaskResult | CustomScriptTaskResult | ServiceTaskResult | AgentUninstallTaskResult | SoftwareInventoryTaskResult
+export type TaskResult = PatchTaskResult | CustomScriptTaskResult | ServiceTaskResult | AgentUninstallTaskResult | SoftwareInventoryTaskResult | AnsiblePingTaskResult
 
 export const taskRuns = pgTable('task_runs', {
   id: text('id').primaryKey().$defaultFn(() => createId()),

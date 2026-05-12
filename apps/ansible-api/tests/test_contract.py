@@ -69,6 +69,47 @@ class AnsibleApiContractTests(unittest.TestCase):
         self.assertEqual(payload["hosts"][0]["exitCode"], 0)
         self.assertEqual(payload["elapsedMs"], 25)
 
+    @mock.patch("server.run_ansible_ping_command")
+    def test_run_ansible_ping_returns_host_scoped_output(self, run_command):
+        run_command.return_value = server.CommandResult(
+            returncode=0,
+            stdout=json.dumps({
+                "plays": [{
+                    "tasks": [{
+                        "hosts": {
+                            "host-1": {"ping": "pong", "changed": False},
+                            "host-2": {"ping": "pong", "changed": False},
+                        },
+                    }],
+                }],
+            }),
+            stderr="\n".join([
+                "[WARNING]: Host 'host-1' is using the discovered Python interpreter at '/usr/bin/python3.12'",
+                "[WARNING]: Host 'host-2' is using the discovered Python interpreter at '/usr/bin/python3.12'",
+            ]),
+            elapsedMs=25,
+        )
+
+        payload = server.run_ansible_ping({
+            "credential": {
+                "username": "deploy",
+                "privateKey": private_key_block(),
+            },
+            "hosts": [
+                {"id": "host-1", "name": "host-1", "address": "10.0.0.10", "port": 22},
+                {"id": "host-2", "name": "host-2", "address": "10.0.0.11", "port": 22},
+            ],
+        })
+
+        self.assertIn("host-1", payload["hosts"][0]["stdout"])
+        self.assertNotIn("host-2", payload["hosts"][0]["stdout"])
+        self.assertIn("Host 'host-1'", payload["hosts"][0]["stderr"])
+        self.assertNotIn("Host 'host-2'", payload["hosts"][0]["stderr"])
+        self.assertIn("host-2", payload["hosts"][1]["stdout"])
+        self.assertNotIn("host-1", payload["hosts"][1]["stdout"])
+        self.assertIn("Host 'host-2'", payload["hosts"][1]["stderr"])
+        self.assertNotIn("Host 'host-1'", payload["hosts"][1]["stderr"])
+
 
 if __name__ == "__main__":
     unittest.main()

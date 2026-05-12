@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/carrtech-dev/ct-ops/compare/ansible-api/v0.3.0...ansible-api/v0.3.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ansible-api:** install ssh client ([#1313](https://github.com/carrtech-dev/ct-ops/issues/1313)) ([a50ee71](https://github.com/carrtech-dev/ct-ops/commit/a50ee7120a0b313a83e29ca3903d038ac315920f))
+
 ## [0.3.0](https://github.com/carrtech-dev/ct-ops/compare/ansible-api/v0.2.0...ansible-api/v0.3.0) (2026-05-12)
 
 

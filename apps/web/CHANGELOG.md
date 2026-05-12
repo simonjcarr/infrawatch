@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.135.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.135.1...web/v0.135.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **web:** cover bundle restart port guard regression ([#1307](https://github.com/carrtech-dev/ct-ops/issues/1307)) ([94c90c4](https://github.com/carrtech-dev/ct-ops/commit/94c90c4e8fc6a17d2ef4697435af938cb4c49ff6))
+
 ## [0.135.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.135.0...web/v0.135.1) (2026-05-11)
 
 

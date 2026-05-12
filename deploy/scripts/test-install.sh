@@ -79,7 +79,8 @@ run_match_case() {
   export MOCK_RELEASE_MANIFEST_JSON='{
     "agent": "9.9.9",
     "apps/ingest": "9.9.9",
-    "apps/web": "0.100.0"
+    "apps/web": "0.100.0",
+    ".": "0.100.0"
   }'
   export MOCK_CURL_LOG="${workspace}/curl.log"
   export MOCK_CHECKSUM
@@ -91,8 +92,8 @@ run_match_case() {
   )
 
   test -d "${workspace}/ct-ops"
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/bundle/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/bundle/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
   if grep -Fq "/releases/latest/" "$MOCK_CURL_LOG"; then
     echo "installer should not use GitHub's repo-wide latest release URL" >&2
     exit 1
@@ -108,7 +109,7 @@ run_mismatch_case() {
   make_mock_bin "$mockbin"
 
   export MOCK_PAYLOAD="tampered bundle payload"
-  export MOCK_RELEASE_MANIFEST_JSON='{ "apps/web": "1.2.3" }'
+  export MOCK_RELEASE_MANIFEST_JSON='{ ".": "1.2.3" }'
   export MOCK_CHECKSUM="deadbeef"
   export UNZIP_SHOULD_FAIL="1"
 
@@ -154,7 +155,7 @@ run_pinned_case() {
   )
 
   test -d "${workspace}/ct-ops"
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v4.5.6/ct-ops-single-v4.5.6.zip" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/bundle/v4.5.6/ct-ops-single-v4.5.6.zip" "$MOCK_CURL_LOG"
   if grep -Fq ".release-please-manifest.json" "$MOCK_CURL_LOG"; then
     echo "pinned installs should not query the release manifest" >&2
     exit 1

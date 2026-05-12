@@ -146,7 +146,10 @@ docker compose -f docker-compose.single.yml pull
 docker compose -f docker-compose.single.yml up -d
 ```
 
-Migrations run automatically on container start. Release bundles ship with digest-pinned `WEB_IMAGE` and `INGEST_IMAGE` values in `.env.example`; when a new CT-Ops release is published, update both values to the new release digests before pulling.
+Migrations run automatically on container start. Dedicated bundle releases ship
+with digest-pinned `WEB_IMAGE`, `INGEST_IMAGE`, and `ANSIBLE_API_IMAGE` values
+in `.env.example`; when a new CT-Ops bundle release is published, update all
+three values from that bundle before pulling.
 
 Password Manager compatibility is tracked separately in
 `deploy/password-manager-release.json`. That descriptor records the reviewed CT

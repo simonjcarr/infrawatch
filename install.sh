@@ -17,7 +17,7 @@ REPO_OWNER="carrtech-dev"
 REPO_NAME="ct-ops"
 RELEASE_MANIFEST_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/.release-please-manifest.json"
 
-latest_web_tag() {
+latest_bundle_tag() {
   local manifest_tmp version
   manifest_tmp="$(mktemp -t ct-ops.XXXXXX.release-manifest.json)"
   if ! curl -fsSL -o "$manifest_tmp" "$RELEASE_MANIFEST_URL"; then
@@ -28,17 +28,15 @@ latest_web_tag() {
     return 1
   fi
 
-  version="$(
-    awk -F '"' '$2 == "apps/web" { print $4; exit }' "$manifest_tmp"
-  )"
+  version="$(awk -F '"' '$2 == "." { print $4; exit }' "$manifest_tmp")"
   rm -f "$manifest_tmp"
 
   if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
-    echo "ERROR: could not read the latest web release from ${RELEASE_MANIFEST_URL}." >&2
+    echo "ERROR: could not read the latest bundle release from ${RELEASE_MANIFEST_URL}." >&2
     exit 1
   fi
 
-  printf 'web/v%s\n' "$version"
+  printf 'bundle/v%s\n' "$version"
 }
 
 if [ "$(id -u)" = "0" ]; then
@@ -64,18 +62,18 @@ if [ -d "ct-ops" ]; then
 fi
 
 if [ -n "${CT_OPS_VERSION:-}" ]; then
-  WEB_TAG="${CT_OPS_VERSION}"
-  if [[ "$WEB_TAG" != web/* ]]; then
-    WEB_TAG="web/${WEB_TAG}"
+  BUNDLE_TAG="${CT_OPS_VERSION}"
+  if [[ "$BUNDLE_TAG" != bundle/* ]]; then
+    BUNDLE_TAG="bundle/${BUNDLE_TAG}"
   fi
-  VERSION="${WEB_TAG#web/}"
-  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${WEB_TAG}/ct-ops-single-${VERSION}.zip"
+  VERSION="${BUNDLE_TAG#bundle/}"
+  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${BUNDLE_TAG}/ct-ops-single-${VERSION}.zip"
   CHECKSUM_URL="${URL}.sha256"
   echo "Downloading ct-ops ${VERSION}..."
 else
-  WEB_TAG="$(latest_web_tag)"
-  VERSION="${WEB_TAG#web/}"
-  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${WEB_TAG}/ct-ops-single.zip"
+  BUNDLE_TAG="$(latest_bundle_tag)"
+  VERSION="${BUNDLE_TAG#bundle/}"
+  URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${BUNDLE_TAG}/ct-ops-single.zip"
   CHECKSUM_URL="${URL}.sha256"
   echo "Downloading the latest ct-ops release (${VERSION})..."
 fi

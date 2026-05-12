@@ -9,6 +9,7 @@ on:
       - "deploy/password-manager-release.json"
       - "deploy/scripts/validate-password-manager-release.py"
       - "deploy/scripts/test-install.sh"
+      - "deploy/scripts/test-agent-release-bundle.sh"
       - "deploy/scripts/test-agent-release-password-manager-image-ref.sh"
       - "deploy/scripts/test-password-manager-compose.sh"
       - "deploy/scripts/test-password-manager-release-contract.sh"
@@ -88,6 +89,7 @@ jobs:
           set -euo pipefail
           bash -n install.sh
           bash deploy/scripts/test-install.sh
+          bash deploy/scripts/test-agent-release-bundle.sh
           bash deploy/scripts/test-agent-release-password-manager-image-ref.sh
           bash deploy/scripts/test-password-manager-compose.sh
           bash deploy/scripts/test-password-manager-release-contract.sh
@@ -109,6 +111,9 @@ jobs:
           refs="$(docker compose --profile ansible config --images)"
           echo "$refs"
           expected_password_manager_ref="$(python3 -c 'import json; print(json.load(open("password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
+          grep -Fxq "ghcr.io/carrtech-dev/ct-ops/web@sha256:1111111111111111111111111111111111111111111111111111111111111111" <<< "$refs"
+          grep -Fxq "ghcr.io/carrtech-dev/ct-ops/ingest@sha256:2222222222222222222222222222222222222222222222222222222222222222" <<< "$refs"
+          grep -Fxq "ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:3333333333333333333333333333333333333333333333333333333333333333" <<< "$refs"
           grep -Fxq "$expected_password_manager_ref" <<< "$refs"
           grep -Eq '^postgres:17-alpine@sha256:[0-9a-f]{64}$' <<< "$refs"
           while IFS= read -r ref; do

@@ -113,6 +113,7 @@ EOF
     printf 'BETTER_AUTH_URL=https://example.test\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%s\n' "$digest"
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%s\n' "$digest"
+    printf 'ANSIBLE_API_IMAGE=ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:%s\n' "$digest"
   } > "${dir}/ct-ops/.env.example"
   cat > "${dir}/ct-ops/password-manager-release.json" <<EOF
 {"schema_version":1,"repository":"carrtech-dev/ct-password-manager","git_tag":"api/${version}","source_commit_sha":"53ecd8f3cacbb8617cc05f4847ad506b1988fd99","image_repository":"ghcr.io/carrtech-dev/ct-password-manager/api","image_digest":"sha256:${digest}","digest_reference":"ghcr.io/carrtech-dev/ct-password-manager/api@sha256:${digest}","api_contract_version":"1.0.0","api_contract_checksum_sha256":"a07ffa6c4c8a6f0b57611a1a7c380a8b8ea1a889f4449c4f2ce02f914c05cf95"}
@@ -154,6 +155,7 @@ main() {
     printf 'customer-secret=true\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'ANSIBLE_API_IMAGE=ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:%064d\n' 100
     printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' 100
   } > "${old_install}/.env"
   mkdir -p "${old_install}/deploy/tls" "${old_install}/deploy/dev-tls"
@@ -178,6 +180,7 @@ main() {
   grep -q 'customer-secret=true' "${old_install}/.env"
   grep -q 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:.*999' "${old_install}/.env"
   grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env"
+  grep -q 'ANSIBLE_API_IMAGE=ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:.*999' "${old_install}/.env"
   ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "${old_install}/.env"
   grep -q '"git_tag":"api/v9.9.9"' "${old_install}/password-manager-release.json"
   grep -q 'tls-cert' "${old_install}/deploy/tls/server.crt"
@@ -203,6 +206,7 @@ main() {
     printf 'customer-secret=true\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'ANSIBLE_API_IMAGE=ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:%064d\n' 100
     printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' 100
   } > "${old_install}/.env"
 
@@ -237,6 +241,7 @@ main() {
     printf 'customer-secret=true\n'
     printf 'WEB_IMAGE=ghcr.io/carrtech-dev/ct-ops/web@sha256:%064d\n' 100
     printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'ANSIBLE_API_IMAGE=ghcr.io/carrtech-dev/ct-ops/ansible-api@sha256:%064d\n' 100
     printf 'PASSWORD_MANAGER_API_IMAGE=ghcr.io/carrtech-dev/ct-password-manager/api@sha256:%064d\n' 100
   } > "${old_install}/.env"
 
@@ -247,7 +252,8 @@ main() {
   export MOCK_RELEASE_MANIFEST_JSON='{
     "agent": "9.9.9",
     "apps/ingest": "9.9.9",
-    "apps/web": "0.100.0"
+    "apps/web": "0.100.0",
+    ".": "0.100.0"
   }'
   export MOCK_BUNDLE_ZIP="$bundle_zip"
   export MOCK_CURL_LOG="${tmpdir}/curl.log"
@@ -262,12 +268,42 @@ main() {
       ./upgrade.sh --no-start
   )
 
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
-  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/web/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/bundle/v0.100.0/ct-ops-single.zip" "$MOCK_CURL_LOG"
+  grep -Fxq "https://github.com/carrtech-dev/ct-ops/releases/download/bundle/v0.100.0/ct-ops-single.zip.sha256" "$MOCK_CURL_LOG"
   grep -q 'example/web:v0.100.0' "${old_install}/docker-compose.yml"
   ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' "${old_install}/.env"
   grep -q '"git_tag":"api/v0.100.0"' "${old_install}/password-manager-release.json"
   unset MOCK_CURL_LOG MOCK_RELEASE_MANIFEST_JSON
+
+  rm -rf "$old_install" "$new_src" "$backup_dir"
+  mkdir -p "${tmpdir}/current" "$backup_dir"
+
+  write_bundle "${tmpdir}/current" "v1.0.0"
+  {
+    printf 'customer-secret=true\n'
+    printf 'WEB_IMAGE=registry.example.test/custom-web:stable\n'
+    printf 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:%064d\n' 100
+    printf 'ANSIBLE_API_IMAGE=registry.example.test/custom-ansible-api:stable\n'
+  } > "${old_install}/.env"
+
+  write_bundle "$new_src" "v9.9.9"
+  rm -f "$bundle_zip"
+  (cd "$new_src" && zip -qr "$bundle_zip" ct-ops)
+
+  local custom_output
+  custom_output="$(
+    cd "$old_install"
+    PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" \
+      MOCK_DOCKER_LOG="$docker_log" \
+      CT_OPS_BACKUP_DIR="$backup_dir" \
+      ./upgrade.sh --from-zip "$bundle_zip" --no-start 2>&1
+  )"
+  assert_env_value "${old_install}/.env" WEB_IMAGE "registry.example.test/custom-web:stable"
+  grep -q 'INGEST_IMAGE=ghcr.io/carrtech-dev/ct-ops/ingest@sha256:.*999' "${old_install}/.env"
+  assert_env_value "${old_install}/.env" ANSIBLE_API_IMAGE "registry.example.test/custom-ansible-api:stable"
+  grep -Fq "WARN: preserving custom WEB_IMAGE override in .env." <<< "$custom_output"
+  grep -Fq "WARN: preserving custom ANSIBLE_API_IMAGE override in .env." <<< "$custom_output"
+  grep -Fq "Ensure WEB_IMAGE, INGEST_IMAGE, and ANSIBLE_API_IMAGE come from the same CT-Ops bundle release." <<< "$custom_output"
 
   echo "upgrade.sh local bundle tests passed"
 }

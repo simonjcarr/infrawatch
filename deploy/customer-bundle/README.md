@@ -107,8 +107,9 @@ For air-gapped hosts, copy the new air-gap zip to the server and run:
 ./upgrade.sh --from-zip /path/to/ct-ops-single-v0.3.0-airgap.zip
 ```
 
-Do not edit only one image reference. `web` and `ingest` are released as a
-matched pair in each bundle.
+Do not edit only one CT-Ops image reference. `WEB_IMAGE`, `INGEST_IMAGE`,
+and `ANSIBLE_API_IMAGE` are digest-pinned as a matched set in each dedicated
+bundle release.
 
 The bundle also ships `password-manager-release.json`, which pins the reviewed
 CT Password Manager API release metadata CT-Ops is expected to integrate

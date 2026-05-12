@@ -15,6 +15,40 @@
 
 ## What Has Been Built
 
+### Session 132 — Dedicated customer bundle release
+
+**First-class bundle release artifact** (`release-please-config.json`, `.release-please-manifest.json`, `.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`, `install.sh`, `deploy/customer-bundle/upgrade.sh`, `deploy/customer-bundle/start.sh`, `deploy/customer-bundle/README.md`, `apps/docs/docs/deployment/docker-compose.md`, `deploy/scripts/test-agent-release-bundle.sh`, `deploy/scripts/test-install.sh`, `deploy/scripts/test-upgrade.sh`)
+- Added a dedicated `bundle/*` release-please component for the customer
+  bundle so full-stack install assets are no longer published only from web
+  releases.
+- Updated release packaging to upload bundle zip/checksum/compose descriptors,
+  Password Manager metadata, and bundle SBOM assets to the bundle release.
+- Kept customer defaults digest-pinned by using same-run image build outputs
+  when available, otherwise resolving the latest released component version
+  tags for `WEB_IMAGE`, `INGEST_IMAGE`, and `ANSIBLE_API_IMAGE`.
+- Updated installer and upgrade scripts to download the latest bundle release,
+  refresh all three CT-Ops runtime image env refs, and preserve custom operator
+  overrides with explicit warnings.
+
+**Validation**
+- `bash -n install.sh deploy/customer-bundle/upgrade.sh deploy/customer-bundle/start.sh deploy/scripts/test-install.sh deploy/scripts/test-upgrade.sh deploy/scripts/test-agent-release-bundle.sh`
+- `bash deploy/scripts/test-agent-release-bundle.sh`
+- `bash deploy/scripts/test-install.sh`
+- `bash deploy/scripts/test-upgrade.sh`
+- `bash deploy/scripts/test-agent-release-password-manager-image-ref.sh`
+- `bash deploy/scripts/test-password-manager-compose.sh`
+- `bash deploy/scripts/test-password-manager-release-contract.sh`
+- `bash deploy/scripts/test-password-manager-nginx.sh`
+- `bash deploy/scripts/test-password-manager-startup.sh`
+- `bash deploy/scripts/test-start.sh`
+- `bash deploy/scripts/test-ansible-profile-wiring.sh`
+- `bash deploy/scripts/test-web-entrypoint.sh`
+- `bash deploy/scripts/test-support-data.sh`
+- `bash deploy/scripts/test-start-restart-port-check.sh`
+- `python3 -m json.tool release-please-config.json`
+- `python3 -m json.tool .release-please-manifest.json`
+- `ruby -e 'require "yaml"; ARGV.each { |p| YAML.load_file(p); puts "#{p} yaml parsed" }' .github/workflows/agent-release.yml .github/workflows/customer-bundle-check.yml`
+
 ### Session 131 — Password Manager vault role UI gates
 
 **Read-only vault workspace controls** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)

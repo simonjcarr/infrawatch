@@ -1,6 +1,6 @@
 {
   ".": "0.2.0",
-  "agent": "0.34.5",
+  "agent": "0.35.0",
   "apps/web": "0.136.2",
   "apps/ingest": "0.9.7",
   "apps/ansible-api": "0.3.3"

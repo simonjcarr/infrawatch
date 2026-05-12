@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.5...agent/v0.35.0) (2026-05-12)
+
+
+### Features
+
+* **agent:** report Docker runtime status ([d3a44b5](https://github.com/carrtech-dev/ct-ops/commit/d3a44b584346f417698123549a36f42cf03619f0))
+
 ## [0.34.5](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.34.4...agent/v0.34.5) (2026-05-11)
 
 

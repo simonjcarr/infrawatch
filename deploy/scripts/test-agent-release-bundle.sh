@@ -45,6 +45,7 @@ assert_contains "$WORKFLOW" "needs.release-please.outputs.bundle_release_created
 assert_contains "$WORKFLOW" "ref: \${{ needs.release-please.outputs.bundle_tag_name }}"
 assert_contains "$WORKFLOW" "tag_name: \${{ needs.release-please.outputs.bundle_tag_name }}"
 assert_contains "$WORKFLOW" "VERSION=\"\${TAG#bundle/}\""
+assert_contains "$WORKFLOW" "image_tag=\"v\${image_tag}\""
 
 assert_contains "$WORKFLOW" "resolve_released_image_ref web \"\$WEB_VERSION\""
 assert_contains "$WORKFLOW" "resolve_released_image_ref ingest \"\$INGEST_VERSION\""

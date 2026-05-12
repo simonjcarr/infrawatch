@@ -179,14 +179,19 @@ jobs:
           resolve_released_image_ref() {
             local component="$1"
             local version="$2"
+            local image_tag
             local digest
             if [ -z "$version" ] || [ "$version" = "null" ]; then
               echo "ERROR: missing release-please manifest version for ${component}" >&2
               exit 1
             fi
-            digest="$(docker buildx imagetools inspect "ghcr.io/carrtech-dev/ct-ops/${component}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            image_tag="${version}"
+            if [[ "$image_tag" != v* ]]; then
+              image_tag="v${image_tag}"
+            fi
+            digest="$(docker buildx imagetools inspect "ghcr.io/carrtech-dev/ct-ops/${component}:${image_tag}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
             if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-              echo "ERROR: could not resolve digest for ${component}:${version}" >&2
+              echo "ERROR: could not resolve digest for ${component}:${image_tag}" >&2
               exit 1
             fi
             printf 'ghcr.io/carrtech-dev/ct-ops/%s@%s\n' "$component" "$digest"

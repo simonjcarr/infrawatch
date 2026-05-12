@@ -15,6 +15,19 @@ REPO_NAME="ct-ops"
 RELEASE_MANIFEST_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/.release-please-manifest.json"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "${CT_OPS_UPGRADE_SCRIPT_DIR:-}" ]; then
+  SCRIPT_DIR="$CT_OPS_UPGRADE_SCRIPT_DIR"
+fi
+
+if [ -z "${CT_OPS_UPGRADE_SCRIPT_SNAPSHOT:-}" ]; then
+  SCRIPT_SNAPSHOT="$(mktemp -t ct-ops-upgrade.XXXXXX.sh)"
+  cp "${BASH_SOURCE[0]}" "$SCRIPT_SNAPSHOT"
+  chmod +x "$SCRIPT_SNAPSHOT"
+  CT_OPS_UPGRADE_SCRIPT_SNAPSHOT=1 \
+    CT_OPS_UPGRADE_SCRIPT_DIR="$SCRIPT_DIR" \
+    CT_OPS_UPGRADE_SCRIPT_SNAPSHOT_PATH="$SCRIPT_SNAPSHOT" \
+    exec bash "$SCRIPT_SNAPSHOT" "$@"
+fi
 cd "$SCRIPT_DIR"
 
 FROM_ZIP=""
@@ -369,6 +382,9 @@ BUNDLE_ZIP=""
 BACKUP_FILE=""
 UNPACK_DIR=""
 NEW_BUNDLE_DIR=""
+if [ -n "${CT_OPS_UPGRADE_SCRIPT_SNAPSHOT_PATH:-}" ]; then
+  TEMP_FILES+=("$CT_OPS_UPGRADE_SCRIPT_SNAPSHOT_PATH")
+fi
 trap cleanup EXIT
 
 require_existing_bundle

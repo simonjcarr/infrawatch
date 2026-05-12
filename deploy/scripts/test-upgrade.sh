@@ -136,6 +136,15 @@ EOF
     "${dir}/ct-ops/upgrade.sh"
 }
 
+write_replacement_upgrade_script() {
+  local path="$1"
+  local version="$2"
+
+  printf '#!/usr/bin/env bash\n' > "$path"
+  printf 'echo replacement upgrade helper %s\n' "$version" >> "$path"
+  chmod +x "$path"
+}
+
 main() {
   local tmpdir mockbin old_install new_src backup_dir bundle_zip docker_log
   tmpdir="$(mktemp -d)"
@@ -166,6 +175,7 @@ main() {
   chmod 500 "${old_install}/licence-keys"
 
   write_bundle "$new_src" "v9.9.9"
+  write_replacement_upgrade_script "${new_src}/ct-ops/upgrade.sh" "v9.9.9"
   (cd "$new_src" && zip -qr "$bundle_zip" ct-ops)
 
   (
@@ -186,6 +196,7 @@ main() {
   grep -q 'tls-cert' "${old_install}/deploy/tls/server.crt"
   grep -q 'dev-cert' "${old_install}/deploy/dev-tls/server.crt"
   grep -q 'public-key-v9.9.9' "${old_install}/licence-keys/current.pem"
+  grep -q 'replacement upgrade helper v9.9.9' "${old_install}/upgrade.sh"
   test -w "${old_install}/licence-keys"
   test ! -f "${old_install}/images.tar.gz"
   grep -q 'docker compose down' "$docker_log"

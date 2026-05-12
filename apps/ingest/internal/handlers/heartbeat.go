@@ -338,6 +338,14 @@ func (h *HeartbeatHandler) processHeartbeat(
 		}
 	}
 
+	if hostID != "" {
+		if report, ok := queries.DockerStatusReportFromProto(req.DockerStatus, now); ok {
+			if err := queries.UpsertHostDockerStatus(ctx, h.pool, instanceID, hostID, report); err != nil {
+				slog.Warn("recording Docker status", "host_id", hostID, "err", err)
+			}
+		}
+	}
+
 	// Sync host↔network memberships based on current IP addresses.
 	if hostID != "" && len(ipAddresses) > 0 {
 		if err := queries.SyncHostNetworks(ctx, h.pool, instanceID, hostID, ipAddresses); err != nil {

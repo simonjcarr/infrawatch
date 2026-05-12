@@ -148,7 +148,7 @@ def inventory_text(hosts: list[dict[str, Any]], username: str) -> str:
     lines = ["[ct_ops_targets]"]
     for host in hosts:
         lines.append(
-            f"{host['id']} ansible_host={host['address']} ansible_user={username} ansible_port={host['port']}"
+            f"{host['name']} ansible_host={host['address']} ansible_user={username} ansible_port={host['port']}"
         )
     return "\n".join(lines) + "\n"
 
@@ -221,7 +221,7 @@ def run_ansible_ping(payload: dict[str, Any]) -> dict[str, Any]:
     results = []
 
     for host in request["hosts"]:
-        succeeded = _host_succeeded_from_json(command.stdout, host["id"])
+        succeeded = _host_succeeded_from_json(command.stdout, host["name"])
         if succeeded is None:
             succeeded = command.returncode == 0
         results.append({

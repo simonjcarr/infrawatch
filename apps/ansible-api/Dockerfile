@@ -1,6 +1,6 @@
 FROM python:3.13-alpine
 
-RUN apk add --no-cache ansible \
+RUN apk add --no-cache ansible openssh-client \
   && addgroup -S ansible \
   && adduser -S -G ansible ansible
 

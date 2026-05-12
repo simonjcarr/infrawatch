@@ -10,7 +10,9 @@ import {
   listTaskRunsForGroup as listTaskRunsForGroupCore,
   listTaskRunsForHost as listTaskRunsForHostCore,
   triggerAgentUninstall as triggerAgentUninstallCore,
+  triggerAnsiblePingRun as triggerAnsiblePingRunCore,
   triggerCustomScriptRun as triggerCustomScriptRunCore,
+  triggerGroupAnsiblePingRun as triggerGroupAnsiblePingRunCore,
   triggerGroupCustomScriptRun as triggerGroupCustomScriptRunCore,
   triggerGroupPatchRun as triggerGroupPatchRunCore,
   triggerGroupServiceAction as triggerGroupServiceActionCore,
@@ -21,7 +23,7 @@ import {
 
 export type { TaskRunHostWithHost, TaskRunWithHosts } from './task-runs-core'
 
-const TASK_TYPES = new Set(['patch', 'custom_script', 'service', 'agent_uninstall', 'software_inventory'])
+const TASK_TYPES = new Set(['patch', 'custom_script', 'service', 'agent_uninstall', 'software_inventory', 'ansible_ping'])
 
 function isTaskType(value: string | undefined): value is string {
   return value !== undefined && TASK_TYPES.has(value)
@@ -98,6 +100,18 @@ export async function triggerCustomScriptRun(
   return triggerCustomScriptRunCore(currentScope, hostId, script, interpreter, timeoutSeconds)
 }
 
+export async function triggerAnsiblePingRun(
+  ...args: [string, string, number?] | [string, string, string, number?]
+): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  const session = await getRequiredSession()
+  if (args.length === 2 || (args.length === 3 && typeof args[2] === 'number')) {
+    const [hostId, credentialProfileId, sshPort] = args as [string, string, number?]
+    return triggerAnsiblePingRunCore(resolveCurrentActionScope(session), hostId, credentialProfileId, sshPort)
+  }
+  const [currentScope, hostId, credentialProfileId, sshPort] = args as [string, string, string, number?]
+  return triggerAnsiblePingRunCore(currentScope, hostId, credentialProfileId, sshPort)
+}
+
 export async function triggerGroupCustomScriptRun(
   ...args:
     | [string, string, 'sh' | 'bash' | 'python3', number, number?]
@@ -110,6 +124,20 @@ export async function triggerGroupCustomScriptRun(
   }
   const [currentScope, groupId, script, interpreter, maxParallel, timeoutSeconds] = args as [string, string, string, 'sh' | 'bash' | 'python3', number, number?]
   return triggerGroupCustomScriptRunCore(currentScope, groupId, script, interpreter, maxParallel, timeoutSeconds)
+}
+
+export async function triggerGroupAnsiblePingRun(
+  ...args: [string, string, number, number?] | [string, string, string, number, number?]
+): Promise<
+  { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
+> {
+  const session = await getRequiredSession()
+  if (args.length === 3 || (args.length === 4 && typeof args[3] === 'number')) {
+    const [groupId, credentialProfileId, maxParallel, sshPort] = args as [string, string, number, number?]
+    return triggerGroupAnsiblePingRunCore(resolveCurrentActionScope(session), groupId, credentialProfileId, maxParallel, sshPort)
+  }
+  const [currentScope, groupId, credentialProfileId, maxParallel, sshPort] = args as [string, string, string, number, number?]
+  return triggerGroupAnsiblePingRunCore(currentScope, groupId, credentialProfileId, maxParallel, sshPort)
 }
 
 export async function triggerServiceAction(

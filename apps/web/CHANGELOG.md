@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.136.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.135.2...web/v0.136.0) (2026-05-12)
+
+
+### Features
+
+* **automation:** add ansible ping execution ([#1311](https://github.com/carrtech-dev/ct-ops/issues/1311)) ([b52a5fe](https://github.com/carrtech-dev/ct-ops/commit/b52a5fe0b128df97e8dcc74ecf533201206b7df1))
+
 ## [0.135.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.135.1...web/v0.135.2) (2026-05-12)
 
 

@@ -15,6 +15,13 @@
       "when": 1778577403022,
       "tag": "0001_worthless_marvex",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778617200000,
+      "tag": "0002_host_docker_status",
+      "breakpoints": true
     }
   ]
 }

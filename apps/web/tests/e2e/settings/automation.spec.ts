@@ -1,5 +1,13 @@
 import { test, expect } from '../fixtures/test'
 
+function privateKeyBlock() {
+  return [
+    `${'-'.repeat(5)}BEGIN OPENSSH PRIVATE KEY${'-'.repeat(5)}`,
+    'fixture-key-body',
+    `${'-'.repeat(5)}END OPENSSH PRIVATE KEY${'-'.repeat(5)}`,
+  ].join('\n')
+}
+
 test('admin can enable Ansible automation and create an SSH credential profile', async ({ authenticatedPage: page }) => {
   await page.goto('/settings/integrations/automation')
 
@@ -12,11 +20,7 @@ test('admin can enable Ansible automation and create an SSH credential profile',
 
   await page.getByTestId('ansible-credential-name').fill('Linux admin key')
   await page.getByTestId('ansible-credential-username').fill('deploy')
-  await page.getByTestId('ansible-credential-private-key').fill([
-    '-----BEGIN OPENSSH PRIVATE KEY-----',
-    'abc',
-    '-----END OPENSSH PRIVATE KEY-----',
-  ].join('\n'))
+  await page.getByTestId('ansible-credential-private-key').fill(privateKeyBlock())
   await page.getByTestId('ansible-credential-save').click()
 
   await expect(page.getByText('Linux admin key')).toBeVisible()

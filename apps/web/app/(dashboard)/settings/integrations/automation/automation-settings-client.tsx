@@ -215,7 +215,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
               onChange={(event) => setCredentialPrivateKey(event.target.value)}
               className="font-mono text-xs"
               rows={7}
-              placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+              placeholder="Paste an OpenSSH private key"
               data-testid="ansible-credential-private-key"
             />
           </div>

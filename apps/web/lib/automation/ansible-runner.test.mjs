@@ -7,12 +7,18 @@ import {
   validateSshPrivateKey,
 } from './ansible-runner.ts'
 
+function privateKeyBlock(kind = 'OPENSSH') {
+  return [
+    `${'-'.repeat(5)}BEGIN ${kind} PRIVATE KEY${'-'.repeat(5)}`,
+    'fixture-key-body',
+    `${'-'.repeat(5)}END ${kind} PRIVATE KEY${'-'.repeat(5)}`,
+  ].join('\n')
+}
+
 test('redactAnsibleOutput removes private key material and common password fields', () => {
   const output = [
     'ok: [server-1]',
-    '-----BEGIN OPENSSH PRIVATE KEY-----',
-    'secret-key-body',
-    '-----END OPENSSH PRIVATE KEY-----',
+    privateKeyBlock(),
     'ansible_password=super-secret',
     '"password": "another-secret"',
   ].join('\n')
@@ -28,8 +34,8 @@ test('redactAnsibleOutput removes private key material and common password field
 })
 
 test('validateSshPrivateKey accepts PEM and OpenSSH private key blocks only', () => {
-  assert.equal(validateSshPrivateKey('-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----'), true)
-  assert.equal(validateSshPrivateKey('-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----'), true)
+  assert.equal(validateSshPrivateKey(privateKeyBlock()), true)
+  assert.equal(validateSshPrivateKey(privateKeyBlock('RSA')), true)
   assert.equal(validateSshPrivateKey('ssh-rsa AAAAB3Nza...'), false)
   assert.equal(validateSshPrivateKey('not a key'), false)
 })

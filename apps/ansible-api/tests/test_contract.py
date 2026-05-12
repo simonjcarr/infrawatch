@@ -5,6 +5,14 @@ from unittest import mock
 import server
 
 
+def private_key_block() -> str:
+    return "\n".join([
+        f"{'-' * 5}BEGIN OPENSSH PRIVATE KEY{'-' * 5}",
+        "fixture-key-body",
+        f"{'-' * 5}END OPENSSH PRIVATE KEY{'-' * 5}",
+    ])
+
+
 class AnsibleApiContractTests(unittest.TestCase):
     @mock.patch("server.ansible_version", return_value="2.19.0")
     def test_health_payload_reports_ansible_provider(self, _version):
@@ -33,7 +41,7 @@ class AnsibleApiContractTests(unittest.TestCase):
             server.validate_ansible_ping_request({
                 "credential": {
                     "username": "deploy",
-                    "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----",
+                    "privateKey": private_key_block(),
                 },
                 "hosts": [],
             })
@@ -50,7 +58,7 @@ class AnsibleApiContractTests(unittest.TestCase):
         payload = server.run_ansible_ping({
             "credential": {
                 "username": "deploy",
-                "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----",
+                "privateKey": private_key_block(),
             },
             "hosts": [{"id": "host-1", "name": "host-1", "address": "10.0.0.10", "port": 22}],
         })

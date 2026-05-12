@@ -91,6 +91,7 @@ interface Props {
   currentUserId: string
   userRole: string
   latestAgentVersion: string
+  ansibleAutomationEnabled: boolean
 }
 
 /**
@@ -255,7 +256,14 @@ function TabButton({
   )
 }
 
-export function HostDetailClient({ host: initialHost, scopeId, currentUserId, userRole, latestAgentVersion }: Props) {
+export function HostDetailClient({
+  host: initialHost,
+  scopeId,
+  currentUserId,
+  userRole,
+  latestAgentVersion,
+  ansibleAutomationEnabled,
+}: Props) {
   const canManageHost = canAccessTooling({ role: userRole })
   const canRunHostTasks = userRole === 'org_admin' || userRole === 'super_admin'
   const [activeParentTab, setActiveParentTab] = useState<ParentTabId>('overview')
@@ -1289,7 +1297,11 @@ export function HostDetailClient({ host: initialHost, scopeId, currentUserId, us
 
       {/* Tasks Tab */}
       {activeTab === 'tasks' && (
-        <TasksTab host={host} canRunTasks={canRunHostTasks} />
+        <TasksTab
+          host={host}
+          canRunTasks={canRunHostTasks}
+          ansibleAutomationEnabled={ansibleAutomationEnabled}
+        />
       )}
 
       {/* Logs Tab */}

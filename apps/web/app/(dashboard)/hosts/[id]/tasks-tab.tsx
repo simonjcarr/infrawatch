@@ -68,6 +68,7 @@ import { useRouter } from 'next/navigation'
 interface Props {
   host: HostWithAgent
   canRunTasks: boolean
+  ansibleAutomationEnabled: boolean
 }
 
 type AgentQueryPollResponse = {
@@ -181,10 +182,11 @@ function TaskDetailsCell({ run, hostId }: { run: TaskRunWithHosts; hostId: strin
   return <span className="text-sm text-muted-foreground">—</span>
 }
 
-export function TasksTab({ host, canRunTasks }: Props) {
+export function TasksTab({ host, canRunTasks, ansibleAutomationEnabled }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const isLinux = host.os?.toLowerCase() === 'linux'
+  const canUseAnsible = canRunTasks && ansibleAutomationEnabled
 
   // Patch dialog state
   const [patchOpen, setPatchOpen] = useState(false)
@@ -221,7 +223,7 @@ export function TasksTab({ host, canRunTasks }: Props) {
   const { data: ansibleCredentials = [] } = useQuery<AnsibleCredentialProfileSummary[]>({
     queryKey: ['ansible-credential-profiles'],
     queryFn: () => listAnsibleCredentialProfiles(),
-    enabled: canRunTasks && ansibleOpen,
+    enabled: canUseAnsible && ansibleOpen,
   })
 
   // Service autocomplete query polling
@@ -335,10 +337,12 @@ export function TasksTab({ host, canRunTasks }: Props) {
             </Button>
             {isLinux && (
               <>
-                <Button variant="outline" size="sm" onClick={() => setAnsibleOpen(true)}>
-                  <KeyRound className="size-4 mr-1.5" />
-                  Ansible Ping
-                </Button>
+                {canUseAnsible && (
+                  <Button variant="outline" size="sm" onClick={() => setAnsibleOpen(true)}>
+                    <KeyRound className="size-4 mr-1.5" />
+                    Ansible Ping
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => setServiceOpen(true)}>
                   <Power className="size-4 mr-1.5" />
                   Service
@@ -442,8 +446,9 @@ export function TasksTab({ host, canRunTasks }: Props) {
         </div>
       )}
 
-      {/* Patch dialog */}
-      <Dialog open={ansibleOpen} onOpenChange={setAnsibleOpen}>
+      {/* Ansible dialog */}
+      {canUseAnsible && (
+        <Dialog open={ansibleOpen} onOpenChange={setAnsibleOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Run Ansible Ping</DialogTitle>
@@ -500,7 +505,8 @@ export function TasksTab({ host, canRunTasks }: Props) {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+        </Dialog>
+      )}
 
       {/* Patch dialog */}
       <Dialog open={patchOpen} onOpenChange={setPatchOpen}>

@@ -11,6 +11,7 @@ import { checkAnsibleApiHealth } from '@/lib/automation/ansible-api'
 import { validateSshPrivateKey } from '@/lib/automation/ansible-runner'
 import {
   buildAutomationSettingsSnapshot,
+  isAnsibleAutomationEnabled,
   nextAutomationMetadata,
   type AutomationStatus,
 } from '@/lib/automation/settings-core'
@@ -36,6 +37,10 @@ export interface AnsibleCredentialProfileSummary {
   username: string
   createdAt: Date
   updatedAt: Date
+}
+
+export interface AnsibleAutomationAvailability {
+  enabled: boolean
 }
 
 const credentialInputSchema = z.object({
@@ -65,7 +70,7 @@ export async function getAutomationSettings(): Promise<AutomationSettingsResult>
   const metadata = parseInstanceMetadata(row?.metadata)
   const snapshot = buildAutomationSettingsSnapshot(metadata)
 
-  if (!snapshot.ansibleFeatureEnabled || snapshot.provider !== 'ansible') {
+  if (!isAnsibleAutomationEnabled(snapshot)) {
     return {
       ...snapshot,
       ansibleDescription: FEATURE_FLAG_REGISTRY['automation.ansible'].description,
@@ -91,6 +96,20 @@ export async function getAutomationSettings(): Promise<AutomationSettingsResult>
     status: 'unavailable',
     statusMessage: 'Ansible automation is enabled. Run ./start.sh on the host to start the optional Ansible service.',
   }
+}
+
+export async function getAnsibleAutomationAvailability(): Promise<AnsibleAutomationAvailability> {
+  const session = await getRequiredSession()
+  const instanceId = resolveCurrentActionScope(session)
+
+  const row = await db.query.instanceSettings.findFirst({
+    where: eq(instanceSettings.id, instanceId),
+    columns: { metadata: true },
+  })
+  const metadata = parseInstanceMetadata(row?.metadata)
+  const snapshot = buildAutomationSettingsSnapshot(metadata)
+
+  return { enabled: isAnsibleAutomationEnabled(snapshot) }
 }
 
 export async function updateAnsibleAutomationSettings(

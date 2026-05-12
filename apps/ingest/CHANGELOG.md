@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.7...ingest/v0.10.0) (2026-05-12)
+
+
+### Features
+
+* **ingest:** persist Docker runtime status ([2be7dff](https://github.com/carrtech-dev/ct-ops/commit/2be7dfffce5f70d67cd983fb7e0c31027dfb9683))
+
 ## [0.9.7](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.6...ingest/v0.9.7) (2026-05-10)
 
 

@@ -127,6 +127,47 @@ class AnsibleApiContractTests(unittest.TestCase):
         self.assertIn("Host 'host-2'", payload["hosts"][1]["stderr"])
         self.assertNotIn("Host 'host-1'", payload["hosts"][1]["stderr"])
 
+    @mock.patch("server.run_ansible_ping_command")
+    def test_run_ansible_ping_scopes_output_by_ansible_host_name_when_id_differs(self, run_command):
+        run_command.return_value = server.CommandResult(
+            returncode=0,
+            stdout=json.dumps({
+                "plays": [{
+                    "tasks": [{
+                        "hosts": {
+                            "ct-portal": {"ping": "pong", "changed": False},
+                            "ct-ops": {"ping": "pong", "changed": False},
+                        },
+                    }],
+                }],
+            }),
+            stderr="\n".join([
+                "[WARNING]: Host 'ct-portal' is using the discovered Python interpreter at '/usr/bin/python3.12'",
+                "[WARNING]: Host 'ct-ops' is using the discovered Python interpreter at '/usr/bin/python3.12'",
+            ]),
+            elapsedMs=25,
+        )
+
+        payload = server.run_ansible_ping({
+            "credential": {
+                "username": "deploy",
+                "privateKey": private_key_block(),
+            },
+            "hosts": [
+                {"id": "host-db-id-1", "name": "ct-portal", "address": "10.0.0.10", "port": 22},
+                {"id": "host-db-id-2", "name": "ct-ops", "address": "10.0.0.11", "port": 22},
+            ],
+        })
+
+        self.assertIn("ct-portal", payload["hosts"][0]["stdout"])
+        self.assertNotIn("ct-ops", payload["hosts"][0]["stdout"])
+        self.assertIn("Host 'ct-portal'", payload["hosts"][0]["stderr"])
+        self.assertNotIn("Host 'ct-ops'", payload["hosts"][0]["stderr"])
+        self.assertIn("ct-ops", payload["hosts"][1]["stdout"])
+        self.assertNotIn("ct-portal", payload["hosts"][1]["stdout"])
+        self.assertIn("Host 'ct-ops'", payload["hosts"][1]["stderr"])
+        self.assertNotIn("Host 'ct-portal'", payload["hosts"][1]["stderr"])
+
 
 if __name__ == "__main__":
     unittest.main()

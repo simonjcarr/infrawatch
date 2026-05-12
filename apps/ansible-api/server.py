@@ -260,7 +260,7 @@ def run_ansible_ping(payload: dict[str, Any]) -> dict[str, Any]:
     request = validate_ansible_ping_request(payload)
     command = run_ansible_ping_command(request)
     results = []
-    host_ids = {host["id"] for host in request["hosts"]}
+    host_names = {host["name"] for host in request["hosts"]}
 
     for host in request["hosts"]:
         succeeded = _host_succeeded_from_json(command.stdout, host["name"])
@@ -271,8 +271,8 @@ def run_ansible_ping(payload: dict[str, Any]) -> dict[str, Any]:
             "name": host["name"],
             "status": "success" if succeeded else "failed",
             "exitCode": 0 if succeeded else (command.returncode or 1),
-            "stdout": _host_stdout(command.stdout, host["id"], host_ids),
-            "stderr": _host_stderr(command.stderr, host["id"], host_ids),
+            "stdout": _host_stdout(command.stdout, host["name"], host_names),
+            "stderr": _host_stderr(command.stderr, host["name"], host_names),
         })
 
     return {

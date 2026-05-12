@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.7...bundle/v0.2.0) (2026-05-12)
+
+
+### Features
+
+* **proto:** add Docker telemetry contract ([6801f46](https://github.com/carrtech-dev/ct-ops/commit/6801f46f201cde6eb901f8784f440174d2f7ae1d))
+* **proto:** add Docker telemetry contract ([3a5251b](https://github.com/carrtech-dev/ct-ops/commit/3a5251b11d4d15c9a75c60a19756684628d65639))
+
 ## [0.1.7](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.6...bundle/v0.1.7) (2026-05-12)
 
 

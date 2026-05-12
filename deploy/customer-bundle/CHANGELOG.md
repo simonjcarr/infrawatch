@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.4.0...bundle/v0.5.0) (2026-05-12)
+
+
+### Features
+
+* **ingest:** upsert docker container inventory ([#1353](https://github.com/carrtech-dev/ct-ops/issues/1353)) ([376e81e](https://github.com/carrtech-dev/ct-ops/commit/376e81eab2fd017283bacf8b24b60cbe891d6ded))
+
 ## [0.4.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.3.0...bundle/v0.4.0) (2026-05-12)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.139.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.138.0...web/v0.139.0) (2026-05-12)
+
+
+### Features
+
+* **ingest:** upsert docker container inventory ([#1353](https://github.com/carrtech-dev/ct-ops/issues/1353)) ([376e81e](https://github.com/carrtech-dev/ct-ops/commit/376e81eab2fd017283bacf8b24b60cbe891d6ded))
+
 ## [0.138.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.137.0...web/v0.138.0) (2026-05-12)
 
 

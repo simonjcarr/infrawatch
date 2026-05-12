@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.1...bundle/v0.1.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **bundle:** resolve released image version tags ([68dd07c](https://github.com/carrtech-dev/ct-ops/commit/68dd07c1d72a8c04979c55b9a69133abc881f2ba))
+
 ## [0.1.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.0...bundle/v0.1.1) (2026-05-12)
 
 

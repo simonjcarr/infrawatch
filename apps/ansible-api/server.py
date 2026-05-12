@@ -196,7 +196,7 @@ def run_ansible_ping_command(payload: dict[str, Any]) -> CommandResult:
     )
 
 
-def _host_succeeded_from_json(stdout: str, host_id: str) -> bool | None:
+def _host_result_from_json(stdout: str, host_id: str) -> dict[str, Any] | None:
     try:
         data = json.loads(stdout)
     except Exception:
@@ -211,14 +211,56 @@ def _host_succeeded_from_json(stdout: str, host_id: str) -> bool | None:
                 continue
             result = hosts[host_id]
             if isinstance(result, dict):
-                return bool(result.get("ping") == "pong" or result.get("ok", 0)) and not bool(result.get("failed", False))
+                return result
     return None
+
+
+def _host_succeeded_from_json(stdout: str, host_id: str) -> bool | None:
+    result = _host_result_from_json(stdout, host_id)
+    if result is None:
+        return None
+    return bool(result.get("ping") == "pong" or result.get("ok", 0)) and not bool(result.get("failed", False))
+
+
+def _host_stdout(stdout: str, host_id: str, host_ids: set[str]) -> str:
+    result = _host_result_from_json(stdout, host_id)
+    if result is not None:
+        return json.dumps({host_id: result}, indent=2, sort_keys=True) + "\n"
+
+    lines = stdout.splitlines()
+    if not lines:
+        return stdout
+
+    selected: list[str] = []
+    collecting = False
+    for line in lines:
+        starts_host_block = any(line.startswith(f"{candidate} |") for candidate in host_ids)
+        if starts_host_block:
+            collecting = line.startswith(f"{host_id} |")
+        if collecting:
+            selected.append(line)
+
+    if not selected and not any(host in stdout for host in host_ids):
+        return stdout
+    return "\n".join(selected) + ("\n" if selected else "")
+
+
+def _host_stderr(stderr: str, host_id: str, host_ids: set[str]) -> str:
+    lines = stderr.splitlines()
+    if not lines:
+        return stderr
+
+    selected = [line for line in lines if host_id in line]
+    if not selected and not any(host in stderr for host in host_ids):
+        return stderr
+    return "\n".join(selected) + ("\n" if selected else "")
 
 
 def run_ansible_ping(payload: dict[str, Any]) -> dict[str, Any]:
     request = validate_ansible_ping_request(payload)
     command = run_ansible_ping_command(request)
     results = []
+    host_ids = {host["id"] for host in request["hosts"]}
 
     for host in request["hosts"]:
         succeeded = _host_succeeded_from_json(command.stdout, host["id"])
@@ -229,8 +271,8 @@ def run_ansible_ping(payload: dict[str, Any]) -> dict[str, Any]:
             "name": host["name"],
             "status": "success" if succeeded else "failed",
             "exitCode": 0 if succeeded else (command.returncode or 1),
-            "stdout": command.stdout,
-            "stderr": command.stderr,
+            "stdout": _host_stdout(command.stdout, host["id"], host_ids),
+            "stderr": _host_stderr(command.stderr, host["id"], host_ids),
         })
 
     return {

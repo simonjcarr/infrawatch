@@ -702,7 +702,6 @@ start_stack() {
   check_env
   validate_password_manager_image_pin docker-compose.yml password-manager-release.json
   warn_legacy_env
-  check_ports_free
   ensure_tls_certs
 
   if [ -f "images.tar.gz" ]; then
@@ -727,6 +726,7 @@ start_stack() {
   fi
 
   docker compose down --remove-orphans >/dev/null 2>&1 || true
+  check_ports_free
 
   echo "Running database migrations..."
   if ! docker compose up --force-recreate --abort-on-container-exit --exit-code-from migrate migrate; then
@@ -745,7 +745,7 @@ start_stack() {
     exit 1
   fi
 
-  local compose_profile_args=()
+  local -a compose_profile_args=()
   if should_start_ansible_profile; then
     echo "Ansible automation is enabled; starting optional ansible-api service."
     compose_profile_args=(--profile ansible)
@@ -759,7 +759,13 @@ start_stack() {
   fi
 
   echo "Starting CT-Ops..."
-  if ! docker compose "${compose_profile_args[@]}" up -d; then
+  if ! {
+    if [ ${#compose_profile_args[@]} -gt 0 ]; then
+      docker compose "${compose_profile_args[@]}" up -d
+    else
+      docker compose up -d
+    fi
+  }; then
     echo "" >&2
     echo "ERROR: 'docker compose up' failed." >&2
     echo "Recent logs (last 50 lines per service):" >&2

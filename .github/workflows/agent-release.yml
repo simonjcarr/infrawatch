@@ -635,7 +635,7 @@ jobs:
           PASSWORD_MANAGER_API_IMAGE_REF="$(python3 -c 'import json; print(json.load(open("deploy/password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
           export BETTER_AUTH_SECRET=verify-placeholder
           export POSTGRES_PASSWORD=verify-placeholder
-          refs="$(docker compose -f dist/ct-ops/docker-compose.yml --env-file dist/ct-ops/.env.example config --images)"
+          refs="$(docker compose -f dist/ct-ops/docker-compose.yml --env-file dist/ct-ops/.env.example --profile ansible config --images)"
           echo "$refs"
           ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' dist/ct-ops/.env.example
           ! grep -q 'PASSWORD_MANAGER_API_IMAGE' dist/ct-ops/docker-compose.yml

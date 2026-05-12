@@ -27,7 +27,9 @@
   when available, otherwise resolving the latest released component version
   tags for `WEB_IMAGE`, `INGEST_IMAGE`, and `ANSIBLE_API_IMAGE`. The fallback
   resolver normalizes release-please manifest versions to the published
-  `v<version>` image tags before reading manifest digests.
+  `v<version>` image tags before reading manifest digests, and the release
+  verification renders the ansible Compose profile so the optional
+  `ANSIBLE_API_IMAGE` pin is checked.
 - Updated installer and upgrade scripts to download the latest bundle release,
   refresh all three CT-Ops runtime image env refs, and preserve custom operator
   overrides with explicit warnings.

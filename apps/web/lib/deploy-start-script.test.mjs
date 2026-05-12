@@ -15,3 +15,23 @@ test('start scripts send the Ansible settings query to psql stdin', () => {
     assert.match(script, /metadata->'featureFlags'->>'automation\.ansible'/)
   }
 })
+
+test('customer bundle start script checks nginx ports after shutting down the old stack', () => {
+  const script = readFileSync(repoFile('deploy/customer-bundle/start.sh'), 'utf8')
+
+  const downIndex = script.indexOf('docker compose down --remove-orphans')
+  const portCheckIndex = script.lastIndexOf('check_ports_free')
+
+  assert.notEqual(downIndex, -1)
+  assert.notEqual(portCheckIndex, -1)
+  assert.ok(downIndex < portCheckIndex, 'expected port check to run after docker compose down')
+})
+
+test('customer bundle start script handles the no-profile startup path without expanding an unset array', () => {
+  const script = readFileSync(repoFile('deploy/customer-bundle/start.sh'), 'utf8')
+
+  assert.match(script, /local -a compose_profile_args=\(\)/)
+  assert.match(script, /if \[ \$\{#compose_profile_args\[@\]\} -gt 0 \]; then/)
+  assert.match(script, /docker compose up -d/)
+  assert.doesNotMatch(script, /if ! docker compose "\$\{compose_profile_args\[@\]\}" up -d; then/)
+})

@@ -57,6 +57,7 @@ import type { HeartbeatPoint, HostWithAgent, MetricsPreset, MetricsQuery } from 
 import { useHostStream } from '@/hooks/use-host-stream'
 import { useChartZoom } from '@/hooks/use-chart-zoom'
 import type { DiskInfo, NetworkInterface } from '@/lib/db/schema'
+import type { DockerRuntimeStatus, HostDockerStatus } from '@/lib/db/schema/docker'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { ChecksTab } from './checks-tab'
 import { AlertsTab } from './alerts-tab'
@@ -227,6 +228,125 @@ function VulnerabilityStatusBadge({ status }: { status: HostVulnerabilityAssessm
       <AlertTriangle className="size-3 mr-1" />
       Not assessed
     </Badge>
+  )
+}
+
+type DockerDisplayStatus = DockerRuntimeStatus | 'unknown'
+
+const dockerStatusCopy: Record<
+  DockerDisplayStatus,
+  { label: string; description: string; badgeClass: string; icon: typeof CheckCircle }
+> = {
+  unknown: {
+    label: 'Unknown',
+    description: 'No Docker status has been reported yet.',
+    badgeClass: 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-100',
+    icon: AlertTriangle,
+  },
+  installed: {
+    label: 'Installed',
+    description: 'Docker Engine is available on this host.',
+    badgeClass: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100',
+    icon: CheckCircle,
+  },
+  not_installed: {
+    label: 'Not installed',
+    description: 'Docker Engine is not installed or was not found.',
+    badgeClass: 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-100',
+    icon: WifiOff,
+  },
+  permission_denied: {
+    label: 'Permission denied',
+    description: 'The agent found Docker but cannot access it.',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100',
+    icon: ShieldAlert,
+  },
+  unreachable: {
+    label: 'Unreachable',
+    description: 'Docker was detected but did not respond to the agent.',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100',
+    icon: AlertTriangle,
+  },
+  error: {
+    label: 'Error',
+    description: 'The agent hit an unexpected Docker status check error.',
+    badgeClass: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100',
+    icon: XCircle,
+  },
+}
+
+function sanitiseDockerDiagnostic(message: string | null | undefined): string | null {
+  if (!message) return null
+  const withoutPaths = message
+    .replace(/\bunix:\/\/\/\S+/g, 'Docker socket')
+    .replace(/\b\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+/g, 'host path')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!withoutPaths) return null
+  return withoutPaths.length > 160 ? `${withoutPaths.slice(0, 157)}...` : withoutPaths
+}
+
+function DockerStatusBadge({ status }: { status: DockerDisplayStatus }) {
+  const copy = dockerStatusCopy[status]
+  const Icon = copy.icon
+  return (
+    <Badge className={copy.badgeClass}>
+      <Icon className="size-3 mr-1" />
+      {copy.label}
+    </Badge>
+  )
+}
+
+function DockerStatusCard({ dockerStatus }: { dockerStatus?: HostDockerStatus | null }) {
+  const status: DockerDisplayStatus = dockerStatus?.status ?? 'unknown'
+  const copy = dockerStatusCopy[status]
+  const diagnostic = sanitiseDockerDiagnostic(dockerStatus?.errorMessage)
+  const hasVersionDetails = dockerStatus?.runtimeVersion || dockerStatus?.apiVersion
+
+  return (
+    <Card data-testid="host-docker-status-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Layers className="size-4 text-muted-foreground" />
+          Docker Runtime
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <DockerStatusBadge status={status} />
+          <span className="text-sm text-muted-foreground">{copy.description}</span>
+        </div>
+
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground">Last checked</dt>
+            <dd className="font-medium text-foreground">
+              {dockerStatus?.checkedAt ? formatOptionalDate(dockerStatus.checkedAt) : 'Never'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Runtime</dt>
+            <dd className="font-medium text-foreground">
+              {dockerStatus?.runtimeVersion ? `Runtime ${dockerStatus.runtimeVersion}` : '-'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">API</dt>
+            <dd className="font-medium text-foreground">
+              {dockerStatus?.apiVersion ? `API ${dockerStatus.apiVersion}` : '-'}
+            </dd>
+          </div>
+        </dl>
+
+        {diagnostic ? (
+          <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            {diagnostic}
+          </p>
+        ) : !hasVersionDetails && status !== 'unknown' ? (
+          <p className="text-sm text-muted-foreground">No diagnostic details were reported.</p>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -673,6 +793,8 @@ export function HostDetailClient({
               )}
             </CardContent>
           </Card>
+
+          <DockerStatusCard dockerStatus={host.dockerStatus} />
 
           {/* Info cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/carrtech-dev/ct-ops/compare/ansible-api/v0.3.1...ansible-api/v0.3.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ansible:** scope ping output per host ([96ea431](https://github.com/carrtech-dev/ct-ops/commit/96ea4312e502862cf19ed0ae93b4b133060b364c))
+
 ## [0.3.1](https://github.com/carrtech-dev/ct-ops/compare/ansible-api/v0.3.0...ansible-api/v0.3.1) (2026-05-12)
 
 

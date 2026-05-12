@@ -1,5 +1,8 @@
 type EnvLike = Record<string, string | undefined>
 
+const PRODUCTION_BUILD_PHASE = 'phase-production-build'
+const BUILD_TIME_AUTH_URL = 'https://build-time-placeholder.invalid'
+
 function normaliseOrigin(value: string): string | null {
   try {
     return new URL(value).origin
@@ -10,6 +13,10 @@ function normaliseOrigin(value: string): string | null {
 
 function getConfiguredAuthUrl(env: EnvLike): string {
   const value = env['BETTER_AUTH_URL']?.trim()
+  if (!value && env['NEXT_PHASE'] === PRODUCTION_BUILD_PHASE) {
+    return BUILD_TIME_AUTH_URL
+  }
+
   if (!value) {
     throw new Error('BETTER_AUTH_URL must be set')
   }

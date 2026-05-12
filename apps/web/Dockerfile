@@ -73,11 +73,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PHASE=phase-production-build
 
-# Build the app (DATABASE_URL not needed at build time — only for drizzle-kit)
+# Build the app (DATABASE_URL is only needed if build-time code imports db config).
 ARG DATABASE_URL=postgresql://placeholder:placeholder@placeholder:5432/placeholder
-ARG BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime
-ARG BETTER_AUTH_URL=https://build-time-placeholder.invalid
 
 WORKDIR /app/apps/web
 RUN pnpm run build

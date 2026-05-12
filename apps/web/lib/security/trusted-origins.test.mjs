@@ -25,6 +25,13 @@ test('getTrustedOrigins rejects missing BETTER_AUTH_URL instead of silently usin
   assert.throws(() => getTrustedOrigins({}), /BETTER_AUTH_URL must be set/)
 })
 
+test('getTrustedOriginHosts uses deterministic placeholder origin during production builds only', () => {
+  assert.deepEqual(
+    getTrustedOriginHosts({ NEXT_PHASE: 'phase-production-build' }),
+    ['build-time-placeholder.invalid'],
+  )
+})
+
 test('getTrustedOriginHosts keeps the host:port values expected by Next serverActions.allowedOrigins', () => {
   const env = {
     BETTER_AUTH_URL: 'https://ct-ops.example.com',

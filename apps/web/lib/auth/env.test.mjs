@@ -21,6 +21,14 @@ test('getBetterAuthUrl rejects missing or invalid values', () => {
   )
 })
 
+test('Better Auth env uses deterministic placeholders during production builds only', () => {
+  const buildEnv = { NEXT_PHASE: 'phase-production-build' }
+
+  assert.equal(getBetterAuthSecret(buildEnv).length, 32)
+  assert.equal(getBetterAuthUrl(buildEnv), 'https://build-time-placeholder.invalid/')
+  assert.equal(getBetterAuthOrigin(buildEnv), 'https://build-time-placeholder.invalid')
+})
+
 test('getBetterAuthOrigin normalises BETTER_AUTH_URL to an origin', () => {
   assert.equal(
     getBetterAuthOrigin({ BETTER_AUTH_URL: 'https://ct-ops.example.com/login?next=%2Fdashboard' }),

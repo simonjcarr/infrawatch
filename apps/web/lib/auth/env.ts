@@ -1,5 +1,13 @@
 type EnvLike = Record<string, string | undefined>
 
+const PRODUCTION_BUILD_PHASE = 'phase-production-build'
+const BUILD_TIME_AUTH_SECRET = 'build-time-placeholder-000000000'
+const BUILD_TIME_AUTH_URL = 'https://build-time-placeholder.invalid'
+
+function isProductionBuildPhase(env: EnvLike): boolean {
+  return env['NEXT_PHASE'] === PRODUCTION_BUILD_PHASE
+}
+
 function readBooleanEnv(env: EnvLike, name: string, fallback: boolean): boolean {
   const value = env[name]?.trim().toLowerCase()
   if (!value) return fallback
@@ -10,10 +18,16 @@ function readBooleanEnv(env: EnvLike, name: string, fallback: boolean): boolean 
 
 function readRequiredEnv(env: EnvLike, name: 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL'): string {
   const value = env[name]?.trim()
-  if (!value) {
-    throw new Error(`${name} must be set`)
+  if (value) {
+    return value
   }
-  return value
+
+  if (isProductionBuildPhase(env)) {
+    if (name === 'BETTER_AUTH_SECRET') return BUILD_TIME_AUTH_SECRET
+    return BUILD_TIME_AUTH_URL
+  }
+
+  throw new Error(`${name} must be set`)
 }
 
 export function getBetterAuthSecret(env: EnvLike = process.env): string {

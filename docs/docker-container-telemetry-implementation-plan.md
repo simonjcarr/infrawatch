@@ -47,9 +47,106 @@ Purpose: define the cross-component contract before parallel implementation star
 | Task | Owner | Status | Files / Areas | Dependencies | Acceptance Criteria | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Define Docker telemetry protobuf contract | Codex | done | `proto/agent/v1/*.proto`, generated Go protobufs | None | Messages represent Docker status, container inventory, metric samples, batch ids, dropped sample counts, and payload limits. Existing agents remain compatible. | [#1338](https://github.com/carrtech-dev/ct-ops/pull/1338) | Merged in #1338. Added heartbeat Docker status/config and dedicated Docker telemetry upload RPC. |
-| Define database schema contract | unclaimed | pending | `apps/web/lib/db/schema/*`, migrations | Protobuf contract | Schema covers Docker container inventory and time-series metrics with tenant/host scoping and query indexes. | TBD | Avoid storing only current values. |
-| Define settings and retention contract | unclaimed | pending | instance settings, host metadata/settings, docs | Database schema contract | Global default is 30 days; host override is nullable; effective retention behavior is documented. | TBD | Per-host retention probably needs a sweeper, not only Timescale table retention. |
-| Define UI information architecture | unclaimed | pending | host detail UI, Administration settings | Schema/settings contract | Host Docker status, Containers tab, settings locations, and empty states are documented. | TBD | UI should distinguish not installed from permission denied. |
+| Define database schema contract | Codex | done | `apps/web/lib/db/schema/*`, migrations | Protobuf contract | Schema covers Docker container inventory and time-series metrics with tenant/host scoping and query indexes. | TBD | Contract documented below in `Database Schema Contract`. Avoid storing only current values. |
+| Define settings and retention contract | Codex | done | instance settings, host metadata/settings, docs | Database schema contract | Global default is 30 days; host override is nullable; effective retention behavior is documented. | TBD | Contract documented below in `Settings And Retention Contract`. Per-host retention uses a sweeper. |
+| Define UI information architecture | Codex | done | host detail UI, Administration settings | Schema/settings contract | Host Docker status, Containers tab, settings locations, and empty states are documented. | TBD | Contract documented below in `UI Information Architecture`. UI distinguishes not installed from permission denied. |
+
+## Resolved Phase 0 Decisions
+
+- Docker telemetry uses the dedicated `SubmitDockerTelemetry` client-streaming RPC added in [#1338](https://github.com/carrtech-dev/ct-ops/pull/1338). Heartbeat keeps only lightweight Docker capability/config fields.
+- Server-controlled agent limits are delivered in `HeartbeatResponse.docker_telemetry_config`. Agent-side defaults remain 2-second sampling and bounded in-memory buffering unless the server overrides them.
+- The first release targets Docker Engine compatibility only. Podman/containerd support can be added later behind separate contract work once the Docker path is stable.
+- The first release uses an in-memory bounded buffer. Disk spooling is explicitly deferred unless field evidence shows restart resilience is required.
+- Docker retention uses a Docker-specific global setting instead of reusing host metric retention. Container telemetry volume and per-host override semantics differ enough that it should not share the existing `metricRetentionDays` field.
+
+## Database Schema Contract
+
+### Host runtime status
+
+- Add a dedicated `host_docker_status` table instead of storing runtime status only in `hosts.metadata`.
+- Columns:
+  `id`, `instance_id`, `host_id`, `status`, `checked_at`, `runtime_version`, `api_version`, `error_message`, `created_at`, `updated_at`.
+- Constraints and indexes:
+  unique on `host_id`; index on `(instance_id, status, checked_at desc)`.
+- Notes:
+  `error_message` must be bounded before persistence. Old agents can continue to leave this table empty, which the UI treats as `unknown`.
+
+### Container inventory
+
+- Add a `docker_containers` table keyed by host-scoped Docker identity.
+- Columns:
+  `id`, `instance_id`, `host_id`, `docker_container_id`, `primary_name`, `names_json`, `image`, `image_id`, `labels_json`, `state`, `status`, `created_at_source`, `started_at_source`, `finished_at_source`, `first_seen_at`, `last_seen_at`, `last_inventory_at`, `restart_count`, `is_present`, `created_at`, `updated_at`.
+- Constraints and indexes:
+  unique on `(host_id, docker_container_id)`; indexes on `(instance_id, host_id, is_present, last_seen_at desc)` and `(instance_id, image)`.
+- Notes:
+  `primary_name` is the first normalized name used for table display and search. `names_json` and `labels_json` keep the full bounded payload. Missing containers are marked `is_present = false`; rows are not hard-deleted on disappearance.
+
+### Metric samples
+
+- Add a `docker_container_metrics` hypertable for raw samples.
+- Columns:
+  `id`, `instance_id`, `host_id`, `docker_container_row_id`, `docker_container_id`, `recorded_at`, `cpu_percent`, `memory_usage_bytes`, `memory_limit_bytes`, `memory_percent`, `network_rx_bytes`, `network_tx_bytes`, `block_read_bytes`, `block_write_bytes`, `pids_current`, `restart_count`, `created_at`.
+- Constraints and indexes:
+  primary key `(id, recorded_at)` to match the current time-series pattern; indexes on `(instance_id, host_id, recorded_at desc)` and `(instance_id, docker_container_row_id, recorded_at desc)`.
+- Notes:
+  Store both `docker_container_row_id` and `docker_container_id` so historical samples remain queryable even if inventory rows are later migrated or rehydrated.
+
+### Batch idempotency
+
+- Add a small `docker_telemetry_batches` table for retry safety.
+- Columns:
+  `instance_id`, `host_id`, `agent_id`, `batch_id`, `sequence`, `received_at`, `sample_count`, `inventory_count`.
+- Constraints and indexes:
+  unique on `(host_id, batch_id)`; index on `received_at`.
+- Notes:
+  Ingest should ack duplicate batches without re-inserting metrics. This table can be purged on a short retention window such as 7 days.
+
+## Settings And Retention Contract
+
+- Add `dockerMetricRetentionDays integer not null default 30` to `instance_settings`.
+- Add `dockerTelemetrySettings` under `InstanceMetadata` for server-controlled defaults sent to agents:
+  `enabled`, `sampleIntervalSeconds`, `maxBatchBytes`, `maxSamplesPerBatch`, `maxInventoryItemsPerBatch`, `maxLabelBytesPerContainer`.
+- Add `dockerSettings` under `HostMetadata` with:
+  `retentionDaysOverride?: number | null`.
+- Effective retention remains:
+  `host override ?? global docker default ?? 30`.
+- Validation bounds:
+  global and host Docker retention values must be whole days in the range `1..365`. `null` clears the host override.
+- Admin UI writes the global value. Host settings writes only the nullable override.
+- The retention sweeper is the source of truth for correctness:
+  it deletes `docker_container_metrics` rows by host-effective retention and may also age out long-stale `docker_telemetry_batches`.
+- A coarse Timescale policy may still be applied to `docker_container_metrics`, but only as an upper bound. It must never be the only retention mechanism because it cannot express per-host overrides.
+
+## UI Information Architecture
+
+### Host detail
+
+- Add a Docker runtime status card in the host overview area of [`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`](/Volumes/MacBookStorage-Dev/dev/carrtech/ct-ops-docker-project/apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx).
+- Status presentation rules:
+  `unknown` for old agents or not-yet-seen data; `installed`; `not_installed`; `permission_denied`; `unreachable`; `error`.
+- Display `last checked` and a short bounded diagnostic when available. Do not expose raw socket paths or internal stack traces.
+
+### Host tabs
+
+- Add a top-level `Containers` tab on the host detail page after the current inventory-oriented tabs.
+- Phase 2 list view columns:
+  name, image, state, status text, last seen, started at, restart count.
+- Empty states:
+  separate copy for Docker not installed, permission denied, unavailable/error, and installed-but-no-containers.
+- Phase 3 extends the same tab with per-container charts rather than creating a second Docker-specific top-level area.
+
+### Settings locations
+
+- Administration:
+  extend [`apps/web/app/(dashboard)/settings/monitoring/retention/page.tsx`](/Volumes/MacBookStorage-Dev/dev/carrtech/ct-ops-docker-project/apps/web/app/(dashboard)/settings/monitoring/retention/page.tsx) and the shared settings client to show a distinct Docker retention control next to existing host metric retention.
+- Host settings:
+  extend [`apps/web/app/(dashboard)/hosts/[id]/settings-tab.tsx`](/Volumes/MacBookStorage-Dev/dev/carrtech/ct-ops-docker-project/apps/web/app/(dashboard)/hosts/[id]/settings-tab.tsx) with a Docker retention override card that shows inherited/default/effective state and allows clearing the override.
+
+### Query and filtering expectations
+
+- Host detail queries must authorize by `instance_id` and `host_id`.
+- Container list filtering in Phase 2 should support state, image, and text search over normalized name plus image.
+- Fleet-wide container search remains Phase 5 work and should build on the same normalized fields rather than ad hoc JSON search.
 
 ## Phase 1: Docker Presence And UI Status
 
@@ -124,8 +221,4 @@ Purpose: make the feature operationally useful beyond basic charts.
 
 ## Open Decisions
 
-- Should Docker telemetry use a dedicated client-streaming RPC or extend heartbeat initially?
-- Should Docker retention reuse the existing global metric retention field or use a separate Docker-specific field?
-- Should the first release use only in-memory buffering, or include a disk-backed spool for outage tolerance?
-- What are the supported Docker-compatible runtimes for the first release: Docker Engine only, or Docker plus containerd/Podman later?
 - What default maximum local buffer size should agents use for large hosts with hundreds of containers?

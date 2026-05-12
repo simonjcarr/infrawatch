@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.138.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.137.0...web/v0.138.0) (2026-05-12)
+
+
+### Features
+
+* **hosts:** display docker runtime status ([#1347](https://github.com/carrtech-dev/ct-ops/issues/1347)) ([f0b0deb](https://github.com/carrtech-dev/ct-ops/commit/f0b0deba7dc054bec74a2a26d7e4c400ac8e63b2))
+
 ## [0.137.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.136.2...web/v0.137.0) (2026-05-12)
 
 

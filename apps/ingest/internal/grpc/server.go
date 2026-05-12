@@ -42,6 +42,10 @@ func (s *ingestService) SubmitSoftwareInventory(stream agentv1.IngestService_Sub
 	return s.inv.SubmitSoftwareInventory(stream)
 }
 
+func (s *ingestService) SubmitDockerTelemetry(stream agentv1.IngestService_SubmitDockerTelemetryServer) error {
+	return s.inv.SubmitDockerTelemetry(stream)
+}
+
 func (s *ingestService) RenewCertificate(ctx context.Context, req *agentv1.RenewCertificateRequest) (*agentv1.RenewCertificateResponse, error) {
 	return s.renew.Renew(ctx, req)
 }

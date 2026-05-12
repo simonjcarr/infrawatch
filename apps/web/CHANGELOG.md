@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.136.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.136.1...web/v0.136.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **automation:** hide ansible controls when disabled ([0250e35](https://github.com/carrtech-dev/ct-ops/commit/0250e35d0b799781343fbe3f669c4c6f27e00236))
+
 ## [0.136.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.136.0...web/v0.136.1) (2026-05-12)
 
 

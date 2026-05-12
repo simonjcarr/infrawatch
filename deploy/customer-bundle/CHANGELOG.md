@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.5...bundle/v0.1.6) (2026-05-12)
+
+
+### Bug Fixes
+
+* **automation:** hide ansible controls when disabled ([0250e35](https://github.com/carrtech-dev/ct-ops/commit/0250e35d0b799781343fbe3f669c4c6f27e00236))
+
 ## [0.1.5](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.4...bundle/v0.1.5) (2026-05-12)
 
 

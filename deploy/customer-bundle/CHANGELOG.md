@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.2...bundle/v0.1.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* **bundle:** verify ansible profile image pin ([1db8184](https://github.com/carrtech-dev/ct-ops/commit/1db8184f0ca834b40ff349fbfdffa1ac3d82501e))
+
 ## [0.1.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.1...bundle/v0.1.2) (2026-05-12)
 
 

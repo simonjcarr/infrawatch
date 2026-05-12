@@ -10,7 +10,7 @@ MANIFEST="${REPO_ROOT}/.release-please-manifest.json"
 assert_contains() {
   local file="$1"
   local needle="$2"
-  if ! grep -Fq "$needle" "$file"; then
+  if ! grep -Fq -- "$needle" "$file"; then
     echo "expected ${file} to contain: ${needle}" >&2
     exit 1
   fi
@@ -19,7 +19,7 @@ assert_contains() {
 assert_not_contains() {
   local file="$1"
   local needle="$2"
-  if grep -Fq "$needle" "$file"; then
+  if grep -Fq -- "$needle" "$file"; then
     echo "expected ${file} not to contain: ${needle}" >&2
     exit 1
   fi
@@ -60,6 +60,7 @@ assert_contains "$WORKFLOW" "ANSIBLE_API_IMAGE_REF="
 assert_contains "$WORKFLOW" "grep -Fxq \"\${WEB_IMAGE_REF}\" <<< \"\$refs\""
 assert_contains "$WORKFLOW" "grep -Fxq \"\${INGEST_IMAGE_REF}\" <<< \"\$refs\""
 assert_contains "$WORKFLOW" "grep -Fxq \"\${ANSIBLE_API_IMAGE_REF}\" <<< \"\$refs\""
+assert_contains "$WORKFLOW" "--profile ansible config --images"
 assert_not_contains "$WORKFLOW" "imagetools inspect ghcr.io/carrtech-dev/ct-ops/ingest:latest"
 assert_not_contains "$WORKFLOW" "imagetools inspect ghcr.io/carrtech-dev/ct-ops/ansible-api:latest"
 

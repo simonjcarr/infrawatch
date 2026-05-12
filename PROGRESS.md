@@ -2894,6 +2894,7 @@ Notification data hygiene is complete. Suggested next steps:
 ### Phase 5 — Infrastructure Tooling
 - [x] Custom script runner — run arbitrary scripts on hosts/groups with streaming output
 - [x] Service management — start/stop/restart/status with live service autocomplete
+- [x] Ansible automation MVP — feature-gated SSH private-key credential profiles plus host/group `ansible_ping` task runs via the optional `ansible-api` container
 - [x] Interactive terminal — WebSocket PTY terminal with persistent panel, tabs, per-user auth
 - [x] Chart zoom and smart bucketing — click-drag zoom, adaptive time_bucket, reusable chart components
 - [ ] Jenkins plugin bundler (port existing)

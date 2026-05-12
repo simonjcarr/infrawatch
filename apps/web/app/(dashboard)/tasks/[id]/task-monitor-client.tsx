@@ -37,6 +37,7 @@ import type {
   CustomScriptTaskConfig,
   ServiceTaskConfig,
   ServiceTaskResult,
+  AnsiblePingTaskConfig,
 } from '@/lib/db/schema'
 
 interface Props {
@@ -368,6 +369,10 @@ export function TaskMonitorClient({ initialTaskRun }: Props) {
     if (taskRun.taskType === 'service') {
       const config = taskRun.config as ServiceTaskConfig
       return `Service — ${config.action} ${config.service_name}`
+    }
+    if (taskRun.taskType === 'ansible_ping') {
+      const config = taskRun.config as AnsiblePingTaskConfig
+      return `Ansible ping — ${config.targets.length} host${config.targets.length === 1 ? '' : 's'}`
     }
     return taskRun.taskType
   })()

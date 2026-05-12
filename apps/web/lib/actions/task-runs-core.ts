@@ -2,13 +2,21 @@
 
 import { logError } from '@/lib/logging'
 import { requireInstanceAdminAccess, requireInstanceToolingAccess } from '@/lib/actions/action-auth'
+import { writeAuditEvent } from '@/lib/audit/events'
+import { checkAnsibleApiHealth, runAnsiblePing } from '@/lib/automation/ansible-api'
+import { buildAnsibleInventoryHost, redactAnsibleOutput } from '@/lib/automation/ansible-runner'
+import { buildAutomationSettingsSnapshot } from '@/lib/automation/settings-core'
+import { decrypt } from '@/lib/crypto/encrypt'
 
 import { db } from '@/lib/db'
 import {
+  ansibleCredentialProfiles,
+  instanceSettings,
   taskRuns,
   taskRunHosts,
   hosts,
   hostGroupMembers,
+  parseInstanceMetadata,
 } from '@/lib/db/schema'
 import { eq, and, isNull, isNotNull, desc, inArray } from 'drizzle-orm'
 import type {
@@ -20,6 +28,7 @@ import type {
   CustomScriptTaskConfig,
   ServiceTaskConfig,
   AgentUninstallTaskConfig,
+  AnsiblePingTaskConfig,
   Host,
 } from '@/lib/db/schema'
 
@@ -279,6 +288,205 @@ const MAX_SCRIPT_LENGTH: Record<'sh' | 'bash' | 'python3', number> = {
   python3: 65_536,
 }
 
+async function requireAnsibleAutomationReady(currentScope: string): Promise<{ ok: true } | { error: string }> {
+  const row = await db.query.instanceSettings.findFirst({
+    where: and(eq(instanceSettings.id, currentScope), isNull(instanceSettings.deletedAt)),
+    columns: { metadata: true },
+  })
+  if (!row) return { error: 'Instance not found' }
+
+  const snapshot = buildAutomationSettingsSnapshot(parseInstanceMetadata(row.metadata))
+  if (!snapshot.ansibleFeatureEnabled || snapshot.provider !== 'ansible') {
+    return { error: 'Ansible automation is disabled for this instance' }
+  }
+
+  const health = await checkAnsibleApiHealth()
+  if (!health) return { error: 'Ansible automation API is unavailable. Run ./start.sh on the host and try again.' }
+
+  return { ok: true }
+}
+
+async function completeAnsiblePingRun(input: {
+  currentScope: string
+  taskRunId: string
+  inventoryHosts: AnsiblePingTaskConfig['targets']
+  username: string
+  privateKey: string
+}): Promise<void> {
+  const now = new Date()
+  await db
+    .update(taskRunHosts)
+    .set({ status: 'running', startedAt: now, updatedAt: now })
+    .where(and(
+      eq(taskRunHosts.taskRunId, input.taskRunId),
+      eq(taskRunHosts.instanceId, input.currentScope),
+      eq(taskRunHosts.status, 'pending'),
+      isNull(taskRunHosts.deletedAt),
+    ))
+  await db
+    .update(taskRuns)
+    .set({ status: 'running', startedAt: now, updatedAt: now })
+    .where(and(eq(taskRuns.id, input.taskRunId), eq(taskRuns.instanceId, input.currentScope), isNull(taskRuns.deletedAt)))
+
+  try {
+    const result = await runAnsiblePing({
+      credential: { username: input.username, privateKey: input.privateKey },
+      hosts: input.inventoryHosts,
+    })
+    const resultByHostId = new Map(result.hosts.map((host) => [host.id, host]))
+
+    await db.transaction(async (tx) => {
+      for (const inventoryHost of input.inventoryHosts) {
+        const hostResult = resultByHostId.get(inventoryHost.id)
+        const stdout = redactAnsibleOutput(hostResult?.stdout ?? '')
+        const stderr = redactAnsibleOutput(hostResult?.stderr ?? '')
+        const rawOutput = [stdout, stderr].filter(Boolean).join('\n')
+        await tx
+          .update(taskRunHosts)
+          .set({
+            status: hostResult?.status === 'success' ? 'success' : 'failed',
+            exitCode: hostResult?.exitCode ?? 1,
+            rawOutput,
+            errorMessage: hostResult?.status === 'success' ? null : (stderr || 'Ansible ping failed'),
+            result: { ok: hostResult?.status === 'success', elapsed_ms: result.elapsedMs },
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(taskRunHosts.taskRunId, input.taskRunId),
+            eq(taskRunHosts.hostId, inventoryHost.id),
+            eq(taskRunHosts.instanceId, input.currentScope),
+            isNull(taskRunHosts.deletedAt),
+          ))
+      }
+
+      await tx
+        .update(taskRuns)
+        .set({
+          status: result.ok ? 'completed' : 'failed',
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(taskRuns.id, input.taskRunId), eq(taskRuns.instanceId, input.currentScope), isNull(taskRuns.deletedAt)))
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Ansible API request failed'
+    await db.transaction(async (tx) => {
+      await tx
+        .update(taskRunHosts)
+        .set({
+          status: 'failed',
+          exitCode: 1,
+          rawOutput: redactAnsibleOutput(message),
+          errorMessage: 'Ansible API request failed',
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(taskRunHosts.taskRunId, input.taskRunId),
+          eq(taskRunHosts.instanceId, input.currentScope),
+          isNull(taskRunHosts.deletedAt),
+        ))
+      await tx
+        .update(taskRuns)
+        .set({ status: 'failed', completedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(taskRuns.id, input.taskRunId), eq(taskRuns.instanceId, input.currentScope), isNull(taskRuns.deletedAt)))
+    })
+  }
+}
+
+async function loadAnsibleCredential(currentScope: string, credentialProfileId: string) {
+  const profile = await db.query.ansibleCredentialProfiles.findFirst({
+    where: and(
+      eq(ansibleCredentialProfiles.id, credentialProfileId),
+      eq(ansibleCredentialProfiles.instanceId, currentScope),
+      isNull(ansibleCredentialProfiles.deletedAt),
+    ),
+  })
+  if (!profile) return null
+
+  return {
+    id: profile.id,
+    name: profile.name,
+    username: profile.username,
+    privateKey: decrypt(profile.privateKeyEncrypted),
+  }
+}
+
+async function triggerAnsiblePingForHosts(input: {
+  currentScope: string
+  userId: string
+  targetType: 'host' | 'group'
+  targetId: string
+  hostsToRun: Host[]
+  credentialProfileId: string
+  sshPort: number
+  maxParallel: number
+}): Promise<{ success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }> {
+  const ready = await requireAnsibleAutomationReady(input.currentScope)
+  if ('error' in ready) return ready
+
+  const credential = await loadAnsibleCredential(input.currentScope, input.credentialProfileId)
+  if (!credential) return { error: 'Ansible credential profile not found' }
+
+  const linuxHosts = input.hostsToRun.filter((host) => host.os?.toLowerCase() === 'linux')
+  const skipHosts = input.hostsToRun
+    .filter((host) => host.os?.toLowerCase() !== 'linux')
+    .map((host) => ({ hostId: host.id, reason: `non-Linux host (os: ${host.os ?? 'unknown'})` }))
+
+  if (linuxHosts.length === 0) return { error: 'Ansible ping is only supported on Linux hosts' }
+
+  const inventoryHosts = linuxHosts.map((host) => buildAnsibleInventoryHost(host, input.sshPort))
+  const config: AnsiblePingTaskConfig = {
+    credentialProfileId: credential.id,
+    ...(input.sshPort !== 22 ? { sshPort: input.sshPort } : {}),
+    targets: inventoryHosts,
+  }
+
+  const created = await createTaskRun(
+    input.currentScope,
+    input.userId,
+    input.targetType,
+    input.targetId,
+    'ansible_ping',
+    config,
+    input.maxParallel,
+    linuxHosts.map((host) => host.id),
+    skipHosts,
+  )
+  if ('error' in created) return created
+
+  await writeAuditEvent(db, {
+    instanceId: input.currentScope,
+    actorUserId: input.userId,
+    action: 'automation.ansible.ping.started',
+    targetType: input.targetType,
+    targetId: input.targetId,
+    summary: `Started Ansible ping against ${linuxHosts.length} host${linuxHosts.length === 1 ? '' : 's'}`,
+    metadata: {
+      taskRunId: created.taskRunId,
+      credentialProfileId: credential.id,
+      targetedCount: linuxHosts.length,
+      skippedCount: skipHosts.length,
+    },
+  })
+
+  await completeAnsiblePingRun({
+    currentScope: input.currentScope,
+    taskRunId: created.taskRunId,
+    inventoryHosts,
+    username: credential.username,
+    privateKey: credential.privateKey,
+  })
+
+  return {
+    success: true,
+    taskRunId: created.taskRunId,
+    targetedCount: linuxHosts.length,
+    skippedCount: skipHosts.length,
+  }
+}
+
 export async function triggerCustomScriptRun(
   currentScope: string,
   hostId: string,
@@ -298,6 +506,36 @@ export async function triggerCustomScriptRun(
 
   const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
   return createTaskRun(currentScope, session.user.id, 'host', hostId, 'custom_script', config, 1, [hostId], [])
+}
+
+export async function triggerAnsiblePingRun(
+  currentScope: string,
+  hostId: string,
+  credentialProfileId: string,
+  sshPort = 22,
+): Promise<{ success: true; taskRunId: string } | { error: string }> {
+  const session = await requireInstanceAdminAccess(currentScope)
+  const parsedPort = Number.isInteger(sshPort) && sshPort >= 1 && sshPort <= 65535 ? sshPort : null
+  if (parsedPort === null) return { error: 'SSH port must be between 1 and 65535' }
+
+  const host = await db.query.hosts.findFirst({
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
+  })
+  if (!host) return { error: 'Host not found' }
+
+  const result = await triggerAnsiblePingForHosts({
+    currentScope,
+    userId: session.user.id,
+    targetType: 'host',
+    targetId: hostId,
+    hostsToRun: [host],
+    credentialProfileId,
+    sshPort: parsedPort,
+    maxParallel: 1,
+  })
+
+  if ('error' in result) return result
+  return { success: true, taskRunId: result.taskRunId }
 }
 
 export async function triggerGroupCustomScriptRun(
@@ -325,6 +563,54 @@ export async function triggerGroupCustomScriptRun(
   const hostIds = members.map((m) => m.hostId)
   const config: CustomScriptTaskConfig = { script, interpreter, ...(timeoutSeconds ? { timeout_seconds: timeoutSeconds } : {}) }
   return createTaskRun(currentScope, session.user.id, 'group', groupId, 'custom_script', config, maxParallel, hostIds, [])
+}
+
+export async function triggerGroupAnsiblePingRun(
+  currentScope: string,
+  groupId: string,
+  credentialProfileId: string,
+  maxParallel: number,
+  sshPort = 22,
+): Promise<
+  { success: true; taskRunId: string; targetedCount: number; skippedCount: number } | { error: string }
+> {
+  const session = await requireInstanceAdminAccess(currentScope)
+  const parsedPort = Number.isInteger(sshPort) && sshPort >= 1 && sshPort <= 65535 ? sshPort : null
+  if (parsedPort === null) return { error: 'SSH port must be between 1 and 65535' }
+  if (!Number.isInteger(maxParallel) || maxParallel < 0 || maxParallel > 100) {
+    return { error: 'Max parallel must be between 0 and 100' }
+  }
+
+  const members = await db.query.hostGroupMembers.findMany({
+    where: and(
+      eq(hostGroupMembers.groupId, groupId),
+      eq(hostGroupMembers.instanceId, currentScope),
+      isNull(hostGroupMembers.deletedAt),
+    ),
+    columns: { hostId: true },
+  })
+  if (members.length === 0) return { error: 'Group has no members' }
+
+  const hostIds = members.map((m) => m.hostId)
+  const groupHosts = await db.query.hosts.findMany({
+    where: and(
+      inArray(hosts.id, hostIds),
+      eq(hosts.instanceId, currentScope),
+      isNull(hosts.deletedAt),
+    ),
+  })
+  if (groupHosts.length === 0) return { error: 'No hosts found in group' }
+
+  return triggerAnsiblePingForHosts({
+    currentScope,
+    userId: session.user.id,
+    targetType: 'group',
+    targetId: groupId,
+    hostsToRun: groupHosts,
+    credentialProfileId,
+    sshPort: parsedPort,
+    maxParallel,
+  })
 }
 
 export async function triggerServiceAction(

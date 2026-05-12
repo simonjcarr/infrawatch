@@ -40,3 +40,5 @@ CT-Ops does not start Docker containers from the web app. After enabling or disa
 ```
 
 The start script reads the database after migrations and starts the optional `ansible-api` Compose profile only when both the flag and provider are enabled.
+
+When the API is healthy, administrators can save encrypted SSH private-key credential profiles and run an Ansible ping task from host or host-group task views. CT-Ops stores task state and redacted output in its task history; the Ansible container only executes the requested ping operation.

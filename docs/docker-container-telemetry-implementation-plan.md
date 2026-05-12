@@ -154,7 +154,7 @@ Purpose: prove the agent-to-ingest-to-UI path before adding high-volume telemetr
 
 | Task | Owner | Status | Files / Areas | Dependencies | Acceptance Criteria | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Add agent Docker capability detection | unclaimed | pending | `agent/internal/...`, agent tests | Phase 0 protobuf contract | Agent reports Docker status without shelling out where possible and sends no container metrics when Docker is unavailable. | TBD | Statuses: `not_installed`, `installed`, `permission_denied`, `unreachable`, `error`. |
+| Add agent Docker capability detection | Codex | review | `agent/internal/...`, agent tests | Phase 0 protobuf contract | Agent reports Docker status without shelling out where possible and sends no container metrics when Docker is unavailable. | [#1342](https://github.com/carrtech-dev/ct-ops/pull/1342) | Reports Docker socket status on heartbeat via `/version`; statuses: `not_installed`, `installed`, `permission_denied`, `unreachable`, `error`. |
 | Persist Docker capability status | unclaimed | pending | `apps/ingest/internal/...`, DB queries, tests | Agent status contract | Ingest validates and stores Docker status by host without breaking old agents. | TBD | Include last checked timestamp and optional error message with bounded length. |
 | Display Docker status in host UI | unclaimed | pending | `apps/web/app/(dashboard)/hosts/...`, components, tests | Persisted status | Host detail shows clear Docker status and empty states. | TBD | Avoid implying Docker is installed when status is unknown. |
 

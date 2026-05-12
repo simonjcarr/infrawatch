@@ -761,13 +761,14 @@ func minInt(a, b int) int {
 
 // hostMetricsSnapshot holds a point-in-time snapshot of system metrics.
 type hostMetricsSnapshot struct {
-	cpu       float32
-	memory    float32
-	disk      float32
-	uptime    int64
-	osVersion string
-	disks     []*agentv1.DiskInfo
-	nets      []*agentv1.NetworkInterface
+	cpu          float32
+	memory       float32
+	disk         float32
+	uptime       int64
+	osVersion    string
+	disks        []*agentv1.DiskInfo
+	nets         []*agentv1.NetworkInterface
+	dockerStatus *agentv1.DockerStatus
 }
 
 // refreshMetrics collects fresh system metrics and stores them in the cache.
@@ -778,13 +779,14 @@ type hostMetricsSnapshot struct {
 func (r *Runner) refreshMetrics() {
 	cpu, mem, disk, uptime, osVersion, disks, nets := r.collectMetrics()
 	r.cachedMetrics = hostMetricsSnapshot{
-		cpu:       cpu,
-		memory:    mem,
-		disk:      disk,
-		uptime:    uptime,
-		osVersion: osVersion,
-		disks:     disks,
-		nets:      nets,
+		cpu:          cpu,
+		memory:       mem,
+		disk:         disk,
+		uptime:       uptime,
+		osVersion:    osVersion,
+		disks:        disks,
+		nets:         nets,
+		dockerStatus: detectDockerStatus(context.Background(), defaultDockerSocketPath),
 	}
 }
 
@@ -813,6 +815,7 @@ func (r *Runner) sendHeartbeatWithAgentID(stream agentv1.IngestService_Heartbeat
 		TaskResults:                 r.drainTaskResults(),
 		PinnedServerCertFingerprint: r.currentPinnedFingerprint(),
 		SshHostKeys:                 collectSSHHostKeys(),
+		DockerStatus:                m.dockerStatus,
 	}
 
 	if err := stream.Send(req); err != nil {

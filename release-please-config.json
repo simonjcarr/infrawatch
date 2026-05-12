@@ -1,6 +1,19 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "3a07f49955814e7b8c949d50cc462c54fd060dff",
   "packages": {
+    ".": {
+      "release-type": "simple",
+      "component": "bundle",
+      "tag-separator": "/",
+      "include-component-in-tag": true,
+      "changelog-path": "deploy/customer-bundle/CHANGELOG.md",
+      "exclude-paths": [
+        "agent",
+        "apps/docs",
+        "docs"
+      ]
+    },
     "agent": {
       "release-type": "simple",
       "component": "agent",

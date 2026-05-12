@@ -718,7 +718,7 @@ start_stack() {
       echo "" >&2
       echo "ERROR: failed to pull one or more images from GHCR." >&2
       echo "  - Check your network access to ghcr.io" >&2
-      echo "  - If you pinned WEB_IMAGE/INGEST_IMAGE in .env, verify the tag exists" >&2
+      echo "  - If you pinned WEB_IMAGE, INGEST_IMAGE, or ANSIBLE_API_IMAGE in .env, verify the tag exists" >&2
       echo "  - For air-gapped installs, run ./build-offline-installer.sh on a" >&2
       echo "    connected host and ship the resulting *-airgap.zip to this host" >&2
       exit 1

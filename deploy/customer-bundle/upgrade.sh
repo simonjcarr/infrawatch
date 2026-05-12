@@ -104,7 +104,7 @@ require_docker() {
   fi
 }
 
-latest_web_tag() {
+latest_bundle_tag() {
   local manifest_tmp version
   manifest_tmp="$(mktemp -t ct-ops.XXXXXX.release-manifest.json)"
   if ! curl -fsSL -o "$manifest_tmp" "$RELEASE_MANIFEST_URL"; then
@@ -115,35 +115,33 @@ latest_web_tag() {
     return 1
   fi
 
-  version="$(
-    awk -F '"' '$2 == "apps/web" { print $4; exit }' "$manifest_tmp"
-  )"
+  version="$(awk -F '"' '$2 == "." { print $4; exit }' "$manifest_tmp")"
   rm -f "$manifest_tmp"
 
   if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
-    echo "ERROR: could not read the latest web release from ${RELEASE_MANIFEST_URL}." >&2
+    echo "ERROR: could not read the latest bundle release from ${RELEASE_MANIFEST_URL}." >&2
     exit 1
   fi
 
-  printf 'web/v%s\n' "$version"
+  printf 'bundle/v%s\n' "$version"
 }
 
 download_bundle() {
   need curl
   need openssl
 
-  local web_tag version url checksum_url checksum_tmp expected actual
+  local bundle_tag version url checksum_url checksum_tmp expected actual
   if [ -n "$VERSION_OVERRIDE" ]; then
-    web_tag="$VERSION_OVERRIDE"
-    if [[ "$web_tag" != web/* ]]; then
-      web_tag="web/$web_tag"
+    bundle_tag="$VERSION_OVERRIDE"
+    if [[ "$bundle_tag" != bundle/* ]]; then
+      bundle_tag="bundle/$bundle_tag"
     fi
-    version="${web_tag#web/}"
-    url="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${web_tag}/ct-ops-single-${version}.zip"
+    version="${bundle_tag#bundle/}"
+    url="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${bundle_tag}/ct-ops-single-${version}.zip"
   else
-    web_tag="$(latest_web_tag)"
-    version="${web_tag#web/}"
-    url="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${web_tag}/ct-ops-single.zip"
+    bundle_tag="$(latest_bundle_tag)"
+    version="${bundle_tag#bundle/}"
+    url="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${bundle_tag}/ct-ops-single.zip"
   fi
   checksum_url="${url}.sha256"
 
@@ -302,9 +300,15 @@ install_new_bundle_files() {
 }
 
 refresh_release_image_env_refs() {
-  local var new_value current_value
+  local var image new_value current_value
 
-  for var in WEB_IMAGE INGEST_IMAGE; do
+  for var in WEB_IMAGE INGEST_IMAGE ANSIBLE_API_IMAGE; do
+    case "$var" in
+      WEB_IMAGE) image="web" ;;
+      INGEST_IMAGE) image="ingest" ;;
+      ANSIBLE_API_IMAGE) image="ansible-api" ;;
+      *) echo "ERROR: unsupported image env var: $var" >&2; exit 1 ;;
+    esac
     new_value="$(sed -n "s/^${var}=//p" .env.example | head -n1)"
     if [ -z "$new_value" ] || ! grep -q "^${var}=" .env; then
       continue
@@ -312,7 +316,7 @@ refresh_release_image_env_refs() {
 
     current_value="$(sed -n "s/^${var}=//p" .env | head -n1)"
     case "$current_value" in
-      ghcr.io/carrtech-dev/ct-ops/web@sha256:*|ghcr.io/carrtech-dev/ct-ops/ingest@sha256:*|ghcr.io/carrtech-dev/ct-password-manager/api@sha256:*)
+      ghcr.io/carrtech-dev/ct-ops/${image}@sha256:*)
         awk -v key="$var" -v value="$new_value" '
           $0 ~ "^" key "=" { print key "=" value; next }
           { print }
@@ -322,7 +326,7 @@ refresh_release_image_env_refs() {
         ;;
       *)
         echo "WARN: preserving custom ${var} override in .env." >&2
-        echo "      Ensure WEB_IMAGE and INGEST_IMAGE come from the same CT-Ops release." >&2
+        echo "      Ensure WEB_IMAGE, INGEST_IMAGE, and ANSIBLE_API_IMAGE come from the same CT-Ops bundle release." >&2
         ;;
     esac
   done

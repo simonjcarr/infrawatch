@@ -42,6 +42,8 @@ jobs:
     name: Create or update release PR
     runs-on: ubuntu-latest
     outputs:
+      bundle_release_created: ${{ steps.release.outputs.release_created }}
+      bundle_tag_name:        ${{ steps.release.outputs.tag_name }}
       release_created:        ${{ steps.release.outputs['agent--release_created'] }}
       tag_name:               ${{ steps.release.outputs['agent--tag_name'] }}
       web_release_created:    ${{ steps.release.outputs['apps/web--release_created'] }}
@@ -144,18 +146,18 @@ jobs:
           docker system prune -f --filter "until=1h" 2>/dev/null || true
           exit 0
 
-  # ── Customer bundle for web releases ─────────────────────────────────────
+  # ── Customer bundle release artifact ─────────────────────────────────────
   # Runs in the same workflow run as release-please so the GITHUB_TOKEN
   # anti-recursion rule does not apply (a separate workflow listening on
   # `push: tags` would never fire because release-please uses GITHUB_TOKEN).
   bundle-web:
-    name: Customer bundle (web)
+    name: Customer bundle
     needs:
       - release-please
       - build-web-image
       - build-ingest-image
       - build-ansible-api-image
-    if: always() && needs.release-please.outputs.web_release_created == 'true'
+    if: always() && needs.release-please.outputs.bundle_release_created == 'true'
     runs-on: self-hosted
     steps:
       - name: Reset workspace ownership
@@ -165,32 +167,52 @@ jobs:
 
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.release-please.outputs.web_tag_name }}
+          ref: ${{ needs.release-please.outputs.bundle_tag_name }}
 
       - name: Stage bundle files
         run: |
           set -euo pipefail
-          TAG="${{ needs.release-please.outputs.web_tag_name }}"
-          VERSION="${TAG#web/}"
+          TAG="${{ needs.release-please.outputs.bundle_tag_name }}"
+          VERSION="${TAG#bundle/}"
           python3 deploy/scripts/validate-password-manager-release.py deploy/password-manager-release.json
           bash deploy/scripts/test-password-manager-release-contract.sh
+          resolve_released_image_ref() {
+            local component="$1"
+            local version="$2"
+            local digest
+            if [ -z "$version" ] || [ "$version" = "null" ]; then
+              echo "ERROR: missing release-please manifest version for ${component}" >&2
+              exit 1
+            fi
+            digest="$(docker buildx imagetools inspect "ghcr.io/carrtech-dev/ct-ops/${component}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "ERROR: could not resolve digest for ${component}:${version}" >&2
+              exit 1
+            fi
+            printf 'ghcr.io/carrtech-dev/ct-ops/%s@%s\n' "$component" "$digest"
+          }
           WEB_IMAGE_REF="${{ needs.build-web-image.outputs.image_ref }}"
           if [ -z "${WEB_IMAGE_REF}" ]; then
-            echo "ERROR: missing web image digest output from build-web-image" >&2
-            exit 1
+            WEB_VERSION="$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json", encoding="utf-8"))["apps/web"])')"
+            WEB_IMAGE_REF="$(resolve_released_image_ref web "$WEB_VERSION")"
           fi
           INGEST_IMAGE_REF="${{ needs.build-ingest-image.outputs.image_ref }}"
           if [ -z "${INGEST_IMAGE_REF}" ]; then
-            INGEST_IMAGE_REF="$(docker buildx imagetools inspect ghcr.io/carrtech-dev/ct-ops/ingest:latest --format '{{json .Manifest.Digest}}' | tr -d '"')"
-            INGEST_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ingest@${INGEST_IMAGE_REF}"
+            INGEST_VERSION="$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json", encoding="utf-8"))["apps/ingest"])')"
+            INGEST_IMAGE_REF="$(resolve_released_image_ref ingest "$INGEST_VERSION")"
           fi
           ANSIBLE_API_IMAGE_REF="${{ needs.build-ansible-api-image.outputs.image_ref }}"
           if [ -z "${ANSIBLE_API_IMAGE_REF}" ]; then
-            ANSIBLE_API_IMAGE_REF="$(docker buildx imagetools inspect ghcr.io/carrtech-dev/ct-ops/ansible-api:latest --format '{{json .Manifest.Digest}}' | tr -d '"')"
-            ANSIBLE_API_IMAGE_REF="ghcr.io/carrtech-dev/ct-ops/ansible-api@${ANSIBLE_API_IMAGE_REF}"
+            ANSIBLE_API_VERSION="$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json", encoding="utf-8"))["apps/ansible-api"])')"
+            ANSIBLE_API_IMAGE_REF="$(resolve_released_image_ref ansible-api "$ANSIBLE_API_VERSION")"
           fi
           PASSWORD_MANAGER_API_IMAGE_REF="$(python3 -c 'import json; print(json.load(open("deploy/password-manager-release.json", encoding="utf-8"))["digest_reference"])')"
           export WEB_IMAGE_REF INGEST_IMAGE_REF ANSIBLE_API_IMAGE_REF
+          {
+            echo "WEB_IMAGE_REF=${WEB_IMAGE_REF}"
+            echo "INGEST_IMAGE_REF=${INGEST_IMAGE_REF}"
+            echo "ANSIBLE_API_IMAGE_REF=${ANSIBLE_API_IMAGE_REF}"
+          } >> "$GITHUB_ENV"
           echo "PASSWORD_MANAGER_API_IMAGE_REF=${PASSWORD_MANAGER_API_IMAGE_REF}" >> "$GITHUB_ENV"
           mkdir -p dist/ct-ops/deploy/nginx
           cp docker-compose.single.yml        dist/ct-ops/docker-compose.yml
@@ -400,7 +422,7 @@ jobs:
               echo "" >&2
               echo "ERROR: failed to pull one or more images from GHCR." >&2
               echo "  - Check network access to ghcr.io" >&2
-              echo "  - If you pinned WEB_IMAGE/INGEST_IMAGE in .env, verify the tag exists" >&2
+              echo "  - If you pinned WEB_IMAGE, INGEST_IMAGE, or ANSIBLE_API_IMAGE in .env, verify the tag exists" >&2
               echo "  - For air-gapped installs, run ./build-offline-installer.sh on a" >&2
               echo "    connected host and ship the resulting *-airgap.zip to this host" >&2
               exit 1
@@ -576,21 +598,24 @@ jobs:
           (cd dist && zip -r "../ct-ops-single-${VERSION}.zip" ct-ops)
           cp "ct-ops-single-${VERSION}.zip" ct-ops-single.zip
 
-      - name: Generate SBOM for web bundle source
+      - name: Generate SBOM for bundle contents
         uses: anchore/sbom-action@v0
         with:
-          path: apps/web
+          path: dist/ct-ops
           format: spdx-json
-          output-file: ct-ops-web.spdx.json
+          output-file: ct-ops-bundle.spdx.json
           upload-artifact: false
           upload-release-assets: false
+
+      - name: Preserve legacy bundle SBOM asset name
+        run: cp ct-ops-bundle.spdx.json ct-ops-web.spdx.json
 
       - name: Resolve bundle filename
         id: bundle
         run: |
           set -euo pipefail
-          TAG="${{ needs.release-please.outputs.web_tag_name }}"
-          VERSION="${TAG#web/}"
+          TAG="${{ needs.release-please.outputs.bundle_tag_name }}"
+          VERSION="${TAG#bundle/}"
           echo "versioned=ct-ops-single-${VERSION}.zip" >> "$GITHUB_OUTPUT"
           echo "versioned_checksum=ct-ops-single-${VERSION}.zip.sha256" >> "$GITHUB_OUTPUT"
           echo "compose_versioned=docker-compose.single-${VERSION}.yml" >> "$GITHUB_OUTPUT"
@@ -609,6 +634,12 @@ jobs:
           echo "$refs"
           ! grep -q '^PASSWORD_MANAGER_API_IMAGE=' dist/ct-ops/.env.example
           ! grep -q 'PASSWORD_MANAGER_API_IMAGE' dist/ct-ops/docker-compose.yml
+          grep -Fxq "${WEB_IMAGE_REF}" <<< "$refs"
+          grep -Fxq "${INGEST_IMAGE_REF}" <<< "$refs"
+          grep -Fxq "${ANSIBLE_API_IMAGE_REF}" <<< "$refs"
+          grep -Fxq "WEB_IMAGE=${WEB_IMAGE_REF}" dist/ct-ops/.env.example
+          grep -Fxq "INGEST_IMAGE=${INGEST_IMAGE_REF}" dist/ct-ops/.env.example
+          grep -Fxq "ANSIBLE_API_IMAGE=${ANSIBLE_API_IMAGE_REF}" dist/ct-ops/.env.example
           grep -Fxq "${PASSWORD_MANAGER_API_IMAGE_REF}" <<< "$refs"
           grep -Eq '^postgres:17-alpine@sha256:[0-9a-f]{64}$' <<< "$refs"
           while IFS= read -r ref; do
@@ -624,7 +655,7 @@ jobs:
       - name: Upload to release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ needs.release-please.outputs.web_tag_name }}
+          tag_name: ${{ needs.release-please.outputs.bundle_tag_name }}
           files: |
             ${{ steps.bundle.outputs.versioned }}
             ${{ steps.bundle.outputs.versioned_checksum }}
@@ -633,6 +664,7 @@ jobs:
             ${{ steps.bundle.outputs.compose_versioned }}
             docker-compose.single.yml
             dist/ct-ops/password-manager-release.json
+            ct-ops-bundle.spdx.json
             ct-ops-web.spdx.json
 
       - name: Clean up runner disk
@@ -677,10 +709,10 @@ jobs:
   build-ansible-api-image:
     name: Build ansible-api image
     needs: release-please
-    if: needs.release-please.outputs.ansible_api_release_created == 'true' || needs.release-please.outputs.web_release_created == 'true'
+    if: needs.release-please.outputs.ansible_api_release_created == 'true'
     uses: ./.github/workflows/docker-publish-ansible-api.yml
     permissions:
       contents: read
       packages: write
     with:
-      tag_name: ${{ needs.release-please.outputs.ansible_api_release_created == 'true' && needs.release-please.outputs.ansible_api_tag_name || needs.release-please.outputs.web_tag_name }}
+      tag_name: ${{ needs.release-please.outputs.ansible_api_tag_name }}

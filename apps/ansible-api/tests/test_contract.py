@@ -46,11 +46,27 @@ class AnsibleApiContractTests(unittest.TestCase):
                 "hosts": [],
             })
 
+    def test_inventory_text_uses_hostname_as_ansible_alias(self):
+        inventory = server.inventory_text([
+            {
+                "id": "faspa3cinwzc10930aa1rqra",
+                "name": "web-01.example.test",
+                "address": "10.0.0.10",
+                "port": 2222,
+            }
+        ], "deploy")
+
+        self.assertIn(
+            "web-01.example.test ansible_host=10.0.0.10 ansible_user=deploy ansible_port=2222",
+            inventory,
+        )
+        self.assertNotIn("faspa3cinwzc10930aa1rqra ansible_host=", inventory)
+
     @mock.patch("server.run_ansible_ping_command")
     def test_run_ansible_ping_shapes_per_host_results(self, run_command):
         run_command.return_value = server.CommandResult(
-            returncode=0,
-            stdout='{"plays":[{"tasks":[{"hosts":{"host-1":{"ok":1,"failed":0}}}]}]}',
+            returncode=1,
+            stdout='{"plays":[{"tasks":[{"hosts":{"server-1.example.test":{"ok":1,"failed":0}}}]}]}',
             stderr="",
             elapsedMs=25,
         )
@@ -60,11 +76,12 @@ class AnsibleApiContractTests(unittest.TestCase):
                 "username": "deploy",
                 "privateKey": private_key_block(),
             },
-            "hosts": [{"id": "host-1", "name": "host-1", "address": "10.0.0.10", "port": 22}],
+            "hosts": [{"id": "host-1", "name": "server-1.example.test", "address": "10.0.0.10", "port": 22}],
         })
 
         self.assertEqual(payload["ok"], True)
         self.assertEqual(payload["hosts"][0]["id"], "host-1")
+        self.assertEqual(payload["hosts"][0]["name"], "server-1.example.test")
         self.assertEqual(payload["hosts"][0]["status"], "success")
         self.assertEqual(payload["hosts"][0]["exitCode"], 0)
         self.assertEqual(payload["elapsedMs"], 25)

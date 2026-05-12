@@ -29,6 +29,10 @@ export function buildAutomationSettingsSnapshot(input: {
   }
 }
 
+export function isAnsibleAutomationEnabled(snapshot: AutomationSettingsSnapshot): boolean {
+  return snapshot.ansibleFeatureEnabled && snapshot.provider === 'ansible'
+}
+
 export function nextAutomationMetadata(input: {
   featureFlags?: FeatureFlagOverrides
   enableAnsible: boolean

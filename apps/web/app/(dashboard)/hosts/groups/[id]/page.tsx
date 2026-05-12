@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getRequiredSession } from '@/lib/auth/session'
 import { getGroup } from '@/lib/actions/host-groups'
 import { listHosts } from '@/lib/actions/agents'
+import { getAnsibleAutomationAvailability } from '@/lib/actions/automation'
 import { GroupDetailClient } from './group-detail-client'
 
 export const metadata: Metadata = {
@@ -18,9 +19,10 @@ export default async function GroupDetailPage({ params }: Props) {
   const session = await getRequiredSession()
   const instanceId = session.user.instanceId!
 
-  const [group, allHosts] = await Promise.all([
+  const [group, allHosts, ansibleAutomation] = await Promise.all([
     getGroup(instanceId, id),
     listHosts(instanceId),
+    getAnsibleAutomationAvailability(),
   ])
 
   if (!group) notFound()
@@ -31,6 +33,7 @@ export default async function GroupDetailPage({ params }: Props) {
       userRole={session.user.role}
       initialGroup={group}
       initialAllHosts={allHosts}
+      ansibleAutomationEnabled={ansibleAutomation.enabled}
     />
   )
 }

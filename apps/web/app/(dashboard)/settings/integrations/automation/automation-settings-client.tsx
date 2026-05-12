@@ -174,7 +174,8 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
         </CardContent>
       </Card>
 
-      <Card>
+      {enabled && (
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <KeyRound className="h-4 w-4" />
@@ -259,7 +260,8 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
             )}
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
     </div>
   )
 }

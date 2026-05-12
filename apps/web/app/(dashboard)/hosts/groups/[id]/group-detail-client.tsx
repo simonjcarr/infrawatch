@@ -102,6 +102,7 @@ interface Props {
   userRole: string
   initialGroup: HostGroupWithMembers
   initialAllHosts: HostWithAgent[]
+  ansibleAutomationEnabled: boolean
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -170,10 +171,17 @@ function RunStatusBadge({ status }: { status: string }) {
   }
 }
 
-export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllHosts }: Props) {
+export function GroupDetailClient({
+  scopeId,
+  userRole,
+  initialGroup,
+  initialAllHosts,
+  ansibleAutomationEnabled,
+}: Props) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const canRunTasks = userRole === 'org_admin' || userRole === 'super_admin'
+  const canUseAnsible = canRunTasks && ansibleAutomationEnabled
   const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Host | null>(null)
@@ -229,7 +237,7 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
   const { data: ansibleCredentials = [] } = useQuery<AnsibleCredentialProfileSummary[]>({
     queryKey: ['ansible-credential-profiles'],
     queryFn: () => listAnsibleCredentialProfiles(),
-    enabled: canRunTasks && ansibleOpen,
+    enabled: canUseAnsible && ansibleOpen,
   })
 
   const { mutate: doAdd, isPending: isAdding } = useMutation({
@@ -338,10 +346,12 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
           <div className="flex items-center gap-2">
             {canRunTasks && (
               <>
-                <Button variant="outline" onClick={() => setAnsibleOpen(true)}>
-                  <KeyRound className="size-4 mr-1" />
-                  Ansible Ping
-                </Button>
+                {canUseAnsible && (
+                  <Button variant="outline" onClick={() => setAnsibleOpen(true)}>
+                    <KeyRound className="size-4 mr-1" />
+                    Ansible Ping
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setScriptOpen(true)}>
                   <Terminal className="size-4 mr-1" />
                   Run Script
@@ -624,7 +634,8 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
       </div>
 
       {/* Ansible Group Dialog */}
-      <Dialog open={ansibleOpen} onOpenChange={setAnsibleOpen}>
+      {canUseAnsible && (
+        <Dialog open={ansibleOpen} onOpenChange={setAnsibleOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ansible Ping &quot;{group.name}&quot;</DialogTitle>
@@ -706,7 +717,8 @@ export function GroupDetailClient({ scopeId, userRole, initialGroup, initialAllH
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+        </Dialog>
+      )}
 
       {/* Script Group Dialog */}
       <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>

@@ -4,6 +4,7 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { getHost } from '@/lib/actions/agents'
 import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { REQUIRED_AGENT_VERSION } from '@/lib/agent/version'
+import { getAnsibleAutomationAvailability } from '@/lib/actions/automation'
 import { HostDetailClient } from './host-detail-client'
 
 export const metadata: Metadata = {
@@ -19,7 +20,10 @@ export default async function HostDetailPage({ params }: Props) {
   const session = await getRequiredSession()
   const scopeId = resolveCurrentActionScope(session)
 
-  const host = await getHost(id)
+  const [host, ansibleAutomation] = await Promise.all([
+    getHost(id),
+    getAnsibleAutomationAvailability(),
+  ])
   if (!host) notFound()
 
   return (
@@ -29,6 +33,7 @@ export default async function HostDetailPage({ params }: Props) {
       currentUserId={session.user.id}
       userRole={session.user.role}
       latestAgentVersion={REQUIRED_AGENT_VERSION}
+      ansibleAutomationEnabled={ansibleAutomation.enabled}
     />
   )
 }

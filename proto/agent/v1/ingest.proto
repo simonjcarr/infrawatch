@@ -5,6 +5,7 @@ package agent.v1;
 import "agent/v1/registration.proto";
 import "agent/v1/heartbeat.proto";
 import "agent/v1/terminal.proto";
+import "agent/v1/docker.proto";
 
 option go_package = "github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1";
 
@@ -27,6 +28,11 @@ service IngestService {
   // stream, sends chunks of 500 packages each, and signals completion with
   // is_last=true. The server upserts packages and responds with a final ack.
   rpc SubmitSoftwareInventory(stream SoftwareInventoryChunk) returns (SoftwareInventoryAck);
+
+  // SubmitDockerTelemetry carries Docker container inventory and metric batches
+  // outside the heartbeat stream so high-frequency local sampling does not make
+  // heartbeat delivery fragile.
+  rpc SubmitDockerTelemetry(stream DockerTelemetryBatch) returns (DockerTelemetryAck);
 
   // RenewCertificate is called by an agent whose client cert is approaching
   // expiry. The agent sends a fresh CSR signed by the same Ed25519 identity

@@ -3,6 +3,7 @@ syntax = "proto3";
 package agent.v1;
 
 import "agent/v1/terminal.proto";
+import "agent/v1/docker.proto";
 
 option go_package = "github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1";
 
@@ -125,6 +126,7 @@ message HeartbeatRequest {
   // without manual CA distribution on each agent host.
   string pinned_server_cert_fingerprint = 17;
   repeated SSHHostKey ssh_host_keys = 18;
+  DockerStatus docker_status = 19;
 }
 
 message HeartbeatResponse {
@@ -153,4 +155,5 @@ message HeartbeatResponse {
   // from the live cert. The agent persists this to its data dir and appends
   // it to the trust roots used by the self-update HTTP client.
   string pending_server_cert_pem = 16;
+  DockerTelemetryConfig docker_telemetry_config = 17;
 }

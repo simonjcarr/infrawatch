@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1";
+
+// DockerRuntimeStatus is reported on the normal heartbeat path so the UI can
+// distinguish absent Docker from access or runtime failures without waiting for
+// high-volume telemetry uploads.
+enum DockerRuntimeStatus {
+  DOCKER_RUNTIME_STATUS_UNSPECIFIED = 0;
+  DOCKER_RUNTIME_STATUS_NOT_INSTALLED = 1;
+  DOCKER_RUNTIME_STATUS_INSTALLED = 2;
+  DOCKER_RUNTIME_STATUS_PERMISSION_DENIED = 3;
+  DOCKER_RUNTIME_STATUS_UNREACHABLE = 4;
+  DOCKER_RUNTIME_STATUS_ERROR = 5;
+}
+
+message DockerStatus {
+  DockerRuntimeStatus status = 1;
+  int64 checked_at_unix = 2;
+  string runtime_version = 3;
+  string api_version = 4;
+  // Bounded human-readable diagnostic. Ingest must truncate or reject values
+  // over its configured limit before persisting or displaying this field.
+  string error_message = 5;
+}
+
+message DockerTelemetryConfig {
+  bool enabled = 1;
+  int32 sample_interval_seconds = 2;
+  int32 max_batch_bytes = 3;
+  int32 max_samples_per_batch = 4;
+  int32 max_inventory_items_per_batch = 5;
+  int32 max_label_bytes_per_container = 6;
+}
+
+message DockerContainerLabel {
+  string key = 1;
+  string value = 2;
+}
+
+message DockerContainerInventory {
+  string docker_container_id = 1;
+  repeated string names = 2;
+  string image = 3;
+  string image_id = 4;
+  repeated DockerContainerLabel labels = 5;
+  string state = 6;
+  string status = 7;
+  int64 created_at_unix = 8;
+  int64 started_at_unix = 9;
+  int64 finished_at_unix = 10;
+  int64 observed_at_unix = 11;
+  int32 restart_count = 12;
+}
+
+message DockerContainerMetricSample {
+  string docker_container_id = 1;
+  int64 recorded_at_unix = 2;
+  double cpu_percent = 3;
+  uint64 memory_usage_bytes = 4;
+  uint64 memory_limit_bytes = 5;
+  double memory_percent = 6;
+  uint64 network_rx_bytes = 7;
+  uint64 network_tx_bytes = 8;
+  uint64 block_read_bytes = 9;
+  uint64 block_write_bytes = 10;
+  uint32 pids_current = 11;
+  int32 restart_count = 12;
+}
+
+message DockerTelemetryBatch {
+  string agent_id = 1;
+  string batch_id = 2;
+  int64 flushed_at_unix = 3;
+  repeated DockerContainerInventory inventory = 4;
+  repeated DockerContainerMetricSample samples = 5;
+  uint32 dropped_sample_count = 6;
+  uint32 dropped_inventory_count = 7;
+  uint32 payload_bytes = 8;
+  uint32 sequence = 9;
+}
+
+message DockerTelemetryAck {
+  bool ok = 1;
+  string batch_id = 2;
+  uint32 accepted_inventory_count = 3;
+  uint32 accepted_sample_count = 4;
+  string error = 5;
+}

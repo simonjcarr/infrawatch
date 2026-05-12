@@ -859,6 +859,7 @@ type HeartbeatRequest struct {
 	// without manual CA distribution on each agent host.
 	PinnedServerCertFingerprint string        `protobuf:"bytes,17,opt,name=pinned_server_cert_fingerprint,json=pinnedServerCertFingerprint,proto3" json:"pinned_server_cert_fingerprint,omitempty"`
 	SshHostKeys                 []*SSHHostKey `protobuf:"bytes,18,rep,name=ssh_host_keys,json=sshHostKeys,proto3" json:"ssh_host_keys,omitempty"`
+	DockerStatus                *DockerStatus `protobuf:"bytes,19,opt,name=docker_status,json=dockerStatus,proto3" json:"docker_status,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
 }
@@ -1019,6 +1020,13 @@ func (x *HeartbeatRequest) GetSshHostKeys() []*SSHHostKey {
 	return nil
 }
 
+func (x *HeartbeatRequest) GetDockerStatus() *DockerStatus {
+	if x != nil {
+		return x.DockerStatus
+	}
+	return nil
+}
+
 type HeartbeatResponse struct {
 	state                   protoimpl.MessageState    `protogen:"open.v1"`
 	Ok                      bool                      `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
@@ -1045,9 +1053,10 @@ type HeartbeatResponse struct {
 	// Populated only when the agent's pinned_server_cert_fingerprint differs
 	// from the live cert. The agent persists this to its data dir and appends
 	// it to the trust roots used by the self-update HTTP client.
-	PendingServerCertPem string `protobuf:"bytes,16,opt,name=pending_server_cert_pem,json=pendingServerCertPem,proto3" json:"pending_server_cert_pem,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	PendingServerCertPem  string                 `protobuf:"bytes,16,opt,name=pending_server_cert_pem,json=pendingServerCertPem,proto3" json:"pending_server_cert_pem,omitempty"`
+	DockerTelemetryConfig *DockerTelemetryConfig `protobuf:"bytes,17,opt,name=docker_telemetry_config,json=dockerTelemetryConfig,proto3" json:"docker_telemetry_config,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *HeartbeatResponse) Reset() {
@@ -1192,11 +1201,18 @@ func (x *HeartbeatResponse) GetPendingServerCertPem() string {
 	return ""
 }
 
+func (x *HeartbeatResponse) GetDockerTelemetryConfig() *DockerTelemetryConfig {
+	if x != nil {
+		return x.DockerTelemetryConfig
+	}
+	return nil
+}
+
 var File_agent_v1_heartbeat_proto protoreflect.FileDescriptor
 
 const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\n" +
-	"\x18agent/v1/heartbeat.proto\x12\bagent.v1\x1a\x17agent/v1/terminal.proto\"\xde\x01\n" +
+	"\x18agent/v1/heartbeat.proto\x12\bagent.v1\x1a\x17agent/v1/terminal.proto\x1a\x15agent/v1/docker.proto\"\xde\x01\n" +
 	"\bDiskInfo\x12\x1f\n" +
 	"\vmount_point\x18\x01 \x01(\tR\n" +
 	"mountPoint\x12\x16\n" +
@@ -1270,7 +1286,7 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\n" +
 	"SSHHostKey\x12\x1c\n" +
 	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12-\n" +
-	"\x12fingerprint_sha256\x18\x02 \x01(\tR\x11fingerprintSha256\"\xbf\x06\n" +
+	"\x12fingerprint_sha256\x18\x02 \x01(\tR\x11fingerprintSha256\"\xfc\x06\n" +
 	"\x10HeartbeatRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1f\n" +
 	"\vcpu_percent\x18\x02 \x01(\x02R\n" +
@@ -1292,7 +1308,8 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\rtask_progress\x18\x0f \x03(\v2\x1b.agent.v1.AgentTaskProgressR\ftaskProgress\x12<\n" +
 	"\ftask_results\x18\x10 \x03(\v2\x19.agent.v1.AgentTaskResultR\vtaskResults\x12C\n" +
 	"\x1epinned_server_cert_fingerprint\x18\x11 \x01(\tR\x1bpinnedServerCertFingerprint\x128\n" +
-	"\rssh_host_keys\x18\x12 \x03(\v2\x14.agent.v1.SSHHostKeyR\vsshHostKeys\"\xa9\x06\n" +
+	"\rssh_host_keys\x18\x12 \x03(\v2\x14.agent.v1.SSHHostKeyR\vsshHostKeys\x12;\n" +
+	"\rdocker_status\x18\x13 \x01(\v2\x16.agent.v1.DockerStatusR\fdockerStatus\"\x82\a\n" +
 	"\x11HeartbeatResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12'\n" +
@@ -1310,7 +1327,8 @@ const file_agent_v1_heartbeat_proto_rawDesc = "" +
 	"\x17pending_client_cert_pem\x18\r \x01(\tR\x14pendingClientCertPem\x12I\n" +
 	"\"pending_client_cert_not_after_unix\x18\x0e \x01(\x03R\x1dpendingClientCertNotAfterUnix\x12)\n" +
 	"\x11agent_ca_cert_pem\x18\x0f \x01(\tR\x0eagentCaCertPem\x125\n" +
-	"\x17pending_server_cert_pem\x18\x10 \x01(\tR\x14pendingServerCertPemB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
+	"\x17pending_server_cert_pem\x18\x10 \x01(\tR\x14pendingServerCertPem\x12W\n" +
+	"\x17docker_telemetry_config\x18\x11 \x01(\v2\x1f.agent.v1.DockerTelemetryConfigR\x15dockerTelemetryConfigB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_agent_v1_heartbeat_proto_rawDescOnce sync.Once
@@ -1340,7 +1358,9 @@ var file_agent_v1_heartbeat_proto_goTypes = []any{
 	(*SSHHostKey)(nil),             // 11: agent.v1.SSHHostKey
 	(*HeartbeatRequest)(nil),       // 12: agent.v1.HeartbeatRequest
 	(*HeartbeatResponse)(nil),      // 13: agent.v1.HeartbeatResponse
-	(*TerminalSessionRequest)(nil), // 14: agent.v1.TerminalSessionRequest
+	(*DockerStatus)(nil),           // 14: agent.v1.DockerStatus
+	(*TerminalSessionRequest)(nil), // 15: agent.v1.TerminalSessionRequest
+	(*DockerTelemetryConfig)(nil),  // 16: agent.v1.DockerTelemetryConfig
 }
 var file_agent_v1_heartbeat_proto_depIdxs = []int32{
 	5,  // 0: agent.v1.AgentQueryResult.ports:type_name -> agent.v1.PortInfo
@@ -1352,15 +1372,17 @@ var file_agent_v1_heartbeat_proto_depIdxs = []int32{
 	9,  // 6: agent.v1.HeartbeatRequest.task_progress:type_name -> agent.v1.AgentTaskProgress
 	10, // 7: agent.v1.HeartbeatRequest.task_results:type_name -> agent.v1.AgentTaskResult
 	11, // 8: agent.v1.HeartbeatRequest.ssh_host_keys:type_name -> agent.v1.SSHHostKey
-	2,  // 9: agent.v1.HeartbeatResponse.checks:type_name -> agent.v1.CheckDefinition
-	4,  // 10: agent.v1.HeartbeatResponse.pending_queries:type_name -> agent.v1.AgentQuery
-	8,  // 11: agent.v1.HeartbeatResponse.pending_task:type_name -> agent.v1.AgentTask
-	14, // 12: agent.v1.HeartbeatResponse.pending_terminal_sessions:type_name -> agent.v1.TerminalSessionRequest
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	14, // 9: agent.v1.HeartbeatRequest.docker_status:type_name -> agent.v1.DockerStatus
+	2,  // 10: agent.v1.HeartbeatResponse.checks:type_name -> agent.v1.CheckDefinition
+	4,  // 11: agent.v1.HeartbeatResponse.pending_queries:type_name -> agent.v1.AgentQuery
+	8,  // 12: agent.v1.HeartbeatResponse.pending_task:type_name -> agent.v1.AgentTask
+	15, // 13: agent.v1.HeartbeatResponse.pending_terminal_sessions:type_name -> agent.v1.TerminalSessionRequest
+	16, // 14: agent.v1.HeartbeatResponse.docker_telemetry_config:type_name -> agent.v1.DockerTelemetryConfig
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_heartbeat_proto_init() }
@@ -1369,6 +1391,7 @@ func file_agent_v1_heartbeat_proto_init() {
 		return
 	}
 	file_agent_v1_terminal_proto_init()
+	file_agent_v1_docker_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

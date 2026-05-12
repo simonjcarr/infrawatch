@@ -424,7 +424,7 @@ var File_agent_v1_ingest_proto protoreflect.FileDescriptor
 
 const file_agent_v1_ingest_proto_rawDesc = "" +
 	"\n" +
-	"\x15agent/v1/ingest.proto\x12\bagent.v1\x1a\x1bagent/v1/registration.proto\x1a\x18agent/v1/heartbeat.proto\x1a\x17agent/v1/terminal.proto\"M\n" +
+	"\x15agent/v1/ingest.proto\x12\bagent.v1\x1a\x1bagent/v1/registration.proto\x1a\x18agent/v1/heartbeat.proto\x1a\x17agent/v1/terminal.proto\x1a\x15agent/v1/docker.proto\"M\n" +
 	"\x17RenewCertificateRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x17\n" +
 	"\acsr_der\x18\x02 \x01(\fR\x06csrDer\"\xa9\x01\n" +
@@ -461,12 +461,13 @@ const file_agent_v1_ingest_proto_rawDesc = "" +
 	"repository\x12\x16\n" +
 	"\x06origin\x18\x0f \x01(\tR\x06origin\"2\n" +
 	"\x14SoftwareInventoryAck\x12\x1a\n" +
-	"\breceived\x18\x01 \x01(\x05R\breceived2\xa7\x03\n" +
+	"\breceived\x18\x01 \x01(\x05R\breceived2\x80\x04\n" +
 	"\rIngestService\x12A\n" +
 	"\bRegister\x12\x19.agent.v1.RegisterRequest\x1a\x1a.agent.v1.RegisterResponse\x12H\n" +
 	"\tHeartbeat\x12\x1a.agent.v1.HeartbeatRequest\x1a\x1b.agent.v1.HeartbeatResponse(\x010\x01\x12O\n" +
 	"\bTerminal\x12\x1e.agent.v1.TerminalAgentMessage\x1a\x1f.agent.v1.TerminalServerMessage(\x010\x01\x12]\n" +
-	"\x17SubmitSoftwareInventory\x12 .agent.v1.SoftwareInventoryChunk\x1a\x1e.agent.v1.SoftwareInventoryAck(\x01\x12Y\n" +
+	"\x17SubmitSoftwareInventory\x12 .agent.v1.SoftwareInventoryChunk\x1a\x1e.agent.v1.SoftwareInventoryAck(\x01\x12W\n" +
+	"\x15SubmitDockerTelemetry\x12\x1e.agent.v1.DockerTelemetryBatch\x1a\x1c.agent.v1.DockerTelemetryAck(\x01\x12Y\n" +
 	"\x10RenewCertificate\x12!.agent.v1.RenewCertificateRequest\x1a\".agent.v1.RenewCertificateResponseB7Z5github.com/carrtech-dev/ct-ops/proto/agent/v1;agentv1b\x06proto3"
 
 var (
@@ -491,9 +492,11 @@ var file_agent_v1_ingest_proto_goTypes = []any{
 	(*RegisterRequest)(nil),          // 5: agent.v1.RegisterRequest
 	(*HeartbeatRequest)(nil),         // 6: agent.v1.HeartbeatRequest
 	(*TerminalAgentMessage)(nil),     // 7: agent.v1.TerminalAgentMessage
-	(*RegisterResponse)(nil),         // 8: agent.v1.RegisterResponse
-	(*HeartbeatResponse)(nil),        // 9: agent.v1.HeartbeatResponse
-	(*TerminalServerMessage)(nil),    // 10: agent.v1.TerminalServerMessage
+	(*DockerTelemetryBatch)(nil),     // 8: agent.v1.DockerTelemetryBatch
+	(*RegisterResponse)(nil),         // 9: agent.v1.RegisterResponse
+	(*HeartbeatResponse)(nil),        // 10: agent.v1.HeartbeatResponse
+	(*TerminalServerMessage)(nil),    // 11: agent.v1.TerminalServerMessage
+	(*DockerTelemetryAck)(nil),       // 12: agent.v1.DockerTelemetryAck
 }
 var file_agent_v1_ingest_proto_depIdxs = []int32{
 	3,  // 0: agent.v1.SoftwareInventoryChunk.packages:type_name -> agent.v1.SoftwarePackage
@@ -501,14 +504,16 @@ var file_agent_v1_ingest_proto_depIdxs = []int32{
 	6,  // 2: agent.v1.IngestService.Heartbeat:input_type -> agent.v1.HeartbeatRequest
 	7,  // 3: agent.v1.IngestService.Terminal:input_type -> agent.v1.TerminalAgentMessage
 	2,  // 4: agent.v1.IngestService.SubmitSoftwareInventory:input_type -> agent.v1.SoftwareInventoryChunk
-	0,  // 5: agent.v1.IngestService.RenewCertificate:input_type -> agent.v1.RenewCertificateRequest
-	8,  // 6: agent.v1.IngestService.Register:output_type -> agent.v1.RegisterResponse
-	9,  // 7: agent.v1.IngestService.Heartbeat:output_type -> agent.v1.HeartbeatResponse
-	10, // 8: agent.v1.IngestService.Terminal:output_type -> agent.v1.TerminalServerMessage
-	4,  // 9: agent.v1.IngestService.SubmitSoftwareInventory:output_type -> agent.v1.SoftwareInventoryAck
-	1,  // 10: agent.v1.IngestService.RenewCertificate:output_type -> agent.v1.RenewCertificateResponse
-	6,  // [6:11] is the sub-list for method output_type
-	1,  // [1:6] is the sub-list for method input_type
+	8,  // 5: agent.v1.IngestService.SubmitDockerTelemetry:input_type -> agent.v1.DockerTelemetryBatch
+	0,  // 6: agent.v1.IngestService.RenewCertificate:input_type -> agent.v1.RenewCertificateRequest
+	9,  // 7: agent.v1.IngestService.Register:output_type -> agent.v1.RegisterResponse
+	10, // 8: agent.v1.IngestService.Heartbeat:output_type -> agent.v1.HeartbeatResponse
+	11, // 9: agent.v1.IngestService.Terminal:output_type -> agent.v1.TerminalServerMessage
+	4,  // 10: agent.v1.IngestService.SubmitSoftwareInventory:output_type -> agent.v1.SoftwareInventoryAck
+	12, // 11: agent.v1.IngestService.SubmitDockerTelemetry:output_type -> agent.v1.DockerTelemetryAck
+	1,  // 12: agent.v1.IngestService.RenewCertificate:output_type -> agent.v1.RenewCertificateResponse
+	7,  // [7:13] is the sub-list for method output_type
+	1,  // [1:7] is the sub-list for method input_type
 	1,  // [1:1] is the sub-list for extension type_name
 	1,  // [1:1] is the sub-list for extension extendee
 	0,  // [0:1] is the sub-list for field type_name
@@ -522,6 +527,7 @@ func file_agent_v1_ingest_proto_init() {
 	file_agent_v1_registration_proto_init()
 	file_agent_v1_heartbeat_proto_init()
 	file_agent_v1_terminal_proto_init()
+	file_agent_v1_docker_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

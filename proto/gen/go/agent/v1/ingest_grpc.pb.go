@@ -23,6 +23,7 @@ const (
 	IngestService_Heartbeat_FullMethodName               = "/agent.v1.IngestService/Heartbeat"
 	IngestService_Terminal_FullMethodName                = "/agent.v1.IngestService/Terminal"
 	IngestService_SubmitSoftwareInventory_FullMethodName = "/agent.v1.IngestService/SubmitSoftwareInventory"
+	IngestService_SubmitDockerTelemetry_FullMethodName   = "/agent.v1.IngestService/SubmitDockerTelemetry"
 	IngestService_RenewCertificate_FullMethodName        = "/agent.v1.IngestService/RenewCertificate"
 )
 
@@ -45,6 +46,10 @@ type IngestServiceClient interface {
 	// stream, sends chunks of 500 packages each, and signals completion with
 	// is_last=true. The server upserts packages and responds with a final ack.
 	SubmitSoftwareInventory(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[SoftwareInventoryChunk, SoftwareInventoryAck], error)
+	// SubmitDockerTelemetry carries Docker container inventory and metric batches
+	// outside the heartbeat stream so high-frequency local sampling does not make
+	// heartbeat delivery fragile.
+	SubmitDockerTelemetry(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[DockerTelemetryBatch, DockerTelemetryAck], error)
 	// RenewCertificate is called by an agent whose client cert is approaching
 	// expiry. The agent sends a fresh CSR signed by the same Ed25519 identity
 	// key. The server signs with the current agent CA and returns a new leaf.
@@ -110,6 +115,19 @@ func (c *ingestServiceClient) SubmitSoftwareInventory(ctx context.Context, opts 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type IngestService_SubmitSoftwareInventoryClient = grpc.ClientStreamingClient[SoftwareInventoryChunk, SoftwareInventoryAck]
 
+func (c *ingestServiceClient) SubmitDockerTelemetry(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[DockerTelemetryBatch, DockerTelemetryAck], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &IngestService_ServiceDesc.Streams[3], IngestService_SubmitDockerTelemetry_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DockerTelemetryBatch, DockerTelemetryAck]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IngestService_SubmitDockerTelemetryClient = grpc.ClientStreamingClient[DockerTelemetryBatch, DockerTelemetryAck]
+
 func (c *ingestServiceClient) RenewCertificate(ctx context.Context, in *RenewCertificateRequest, opts ...grpc.CallOption) (*RenewCertificateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RenewCertificateResponse)
@@ -139,6 +157,10 @@ type IngestServiceServer interface {
 	// stream, sends chunks of 500 packages each, and signals completion with
 	// is_last=true. The server upserts packages and responds with a final ack.
 	SubmitSoftwareInventory(grpc.ClientStreamingServer[SoftwareInventoryChunk, SoftwareInventoryAck]) error
+	// SubmitDockerTelemetry carries Docker container inventory and metric batches
+	// outside the heartbeat stream so high-frequency local sampling does not make
+	// heartbeat delivery fragile.
+	SubmitDockerTelemetry(grpc.ClientStreamingServer[DockerTelemetryBatch, DockerTelemetryAck]) error
 	// RenewCertificate is called by an agent whose client cert is approaching
 	// expiry. The agent sends a fresh CSR signed by the same Ed25519 identity
 	// key. The server signs with the current agent CA and returns a new leaf.
@@ -166,6 +188,9 @@ func (UnimplementedIngestServiceServer) Terminal(grpc.BidiStreamingServer[Termin
 }
 func (UnimplementedIngestServiceServer) SubmitSoftwareInventory(grpc.ClientStreamingServer[SoftwareInventoryChunk, SoftwareInventoryAck]) error {
 	return status.Error(codes.Unimplemented, "method SubmitSoftwareInventory not implemented")
+}
+func (UnimplementedIngestServiceServer) SubmitDockerTelemetry(grpc.ClientStreamingServer[DockerTelemetryBatch, DockerTelemetryAck]) error {
+	return status.Error(codes.Unimplemented, "method SubmitDockerTelemetry not implemented")
 }
 func (UnimplementedIngestServiceServer) RenewCertificate(context.Context, *RenewCertificateRequest) (*RenewCertificateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenewCertificate not implemented")
@@ -230,6 +255,13 @@ func _IngestService_SubmitSoftwareInventory_Handler(srv interface{}, stream grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type IngestService_SubmitSoftwareInventoryServer = grpc.ClientStreamingServer[SoftwareInventoryChunk, SoftwareInventoryAck]
 
+func _IngestService_SubmitDockerTelemetry_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(IngestServiceServer).SubmitDockerTelemetry(&grpc.GenericServerStream[DockerTelemetryBatch, DockerTelemetryAck]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IngestService_SubmitDockerTelemetryServer = grpc.ClientStreamingServer[DockerTelemetryBatch, DockerTelemetryAck]
+
 func _IngestService_RenewCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RenewCertificateRequest)
 	if err := dec(in); err != nil {
@@ -280,6 +312,11 @@ var IngestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "SubmitSoftwareInventory",
 			Handler:       _IngestService_SubmitSoftwareInventory_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "SubmitDockerTelemetry",
+			Handler:       _IngestService_SubmitDockerTelemetry_Handler,
 			ClientStreams: true,
 		},
 	},

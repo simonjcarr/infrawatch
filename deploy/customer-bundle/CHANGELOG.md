@@ -1,0 +1,10 @@
+# Changelog
+
+## [0.1.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.1.0...bundle/v0.1.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ansible-api:** report hostnames in ping output ([1af0cb6](https://github.com/carrtech-dev/ct-ops/commit/1af0cb6a933e6adf2cb9d83b6221343b0265af4c)), closes [#1316](https://github.com/carrtech-dev/ct-ops/issues/1316)
+* **ansible:** scope ping output per host ([96ea431](https://github.com/carrtech-dev/ct-ops/commit/96ea4312e502862cf19ed0ae93b4b133060b364c))
+* **bundle:** release customer bundle independently ([026dbdb](https://github.com/carrtech-dev/ct-ops/commit/026dbdbc563df20154320148083579e19bffcad7))

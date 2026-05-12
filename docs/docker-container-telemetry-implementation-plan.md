@@ -164,7 +164,7 @@ Purpose: list containers per host and track their lifecycle before storing high-
 
 | Task | Owner | Status | Files / Areas | Dependencies | Acceptance Criteria | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Collect container inventory in agent | unclaimed | pending | agent Docker collector package, tests | Phase 1 agent detection | Agent reports container id, names, image, labels, state, created/started timestamps, and restart count where available. | TBD | Bound label payload size. |
+| Collect container inventory in agent | Codex | review | agent Docker collector package, tests | Phase 1 agent detection | Agent reports container id, names, image, labels, state, created/started timestamps, and restart count where available. | [#1350](https://github.com/carrtech-dev/ct-ops/pull/1350) | PR #1350 adds Docker Engine API inventory collection with bounded labels. Upload remains dependent on ingest inventory upsert work. |
 | Upsert container inventory in ingest | unclaimed | pending | ingest handlers, DB queries, schema | Inventory protobuf and schema | Inventory is upserted by `host_id + docker_container_id`; missing containers are marked not currently seen rather than immediately deleted. | TBD | Preserve historical identity for charts after container exits. |
 | Add Containers tab/list UI | unclaimed | pending | host detail page/components/actions | Inventory persistence | Users can see current and recently seen containers, image, state, last seen, and restart count. | TBD | Include filters for state, image, and name if feasible in this phase. |
 

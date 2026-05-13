@@ -1,6 +1,7 @@
 package queries
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,35 @@ func TestDockerContainerInventoryReportsFromProtoNormalizesInventory(t *testing.
 	}
 	if got.RestartCount != 3 {
 		t.Fatalf("RestartCount = %d, want 3", got.RestartCount)
+	}
+}
+
+func TestSyncDockerContainerInventoryClosesMarkMissingRowsBeforeLifecycleInserts(t *testing.T) {
+	t.Parallel()
+
+	source, err := os.ReadFile("docker_inventory.go")
+	if err != nil {
+		t.Fatalf("reading docker_inventory.go: %v", err)
+	}
+	markMissingStart := strings.Index(string(source), "if markMissing {")
+	if markMissingStart < 0 {
+		t.Fatal("markMissing block not found")
+	}
+	markMissingBlock := string(source[markMissingStart:])
+	insertIndex := strings.Index(markMissingBlock, "insertDockerLifecycleEvent")
+	closeIndex := strings.Index(markMissingBlock, "rows.Close()")
+	errIndex := strings.Index(markMissingBlock, "rows.Err()")
+	if insertIndex < 0 {
+		t.Fatal("markMissing lifecycle insert not found")
+	}
+	if closeIndex < 0 {
+		t.Fatal("markMissing rows.Close() not found")
+	}
+	if errIndex < 0 {
+		t.Fatal("markMissing rows.Err() check not found")
+	}
+	if closeIndex > insertIndex || errIndex > insertIndex {
+		t.Fatalf("markMissing rows must be closed and checked before lifecycle inserts to avoid pgx conn busy: close=%d err=%d insert=%d", closeIndex, errIndex, insertIndex)
 	}
 }
 

@@ -15,11 +15,11 @@ import (
 func TestCollectDockerMetricSamplesCalculatesStats(t *testing.T) {
 	handler := http.NewServeMux()
 	handler.HandleFunc("/containers/json", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("all") != "1" {
-			t.Fatalf("all query = %q, want 1", r.URL.Query().Get("all"))
+		if r.URL.Query().Has("all") {
+			t.Fatalf("all query = %q, want omitted so Docker returns running containers", r.URL.Query().Get("all"))
 		}
 		_ = json.NewEncoder(w).Encode([]dockerContainerListItem{
-			{ID: "abcdef123456"},
+			{ID: "abcdef123456", State: "running"},
 		})
 	})
 	handler.HandleFunc("/containers/abcdef123456/stats", func(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +93,48 @@ func TestCollectDockerMetricSamplesCalculatesStats(t *testing.T) {
 	}
 	if got.PidsCurrent != 7 || got.RestartCount != 4 {
 		t.Fatalf("pids/restarts = %d/%d", got.PidsCurrent, got.RestartCount)
+	}
+}
+
+func TestCollectDockerMetricSamplesSkipsNonRunningContainers(t *testing.T) {
+	handler := http.NewServeMux()
+	handler.HandleFunc("/containers/json", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]dockerContainerListItem{
+			{ID: "exited-container", State: "exited"},
+			{ID: "running-container", State: "running"},
+		})
+	})
+	handler.HandleFunc("/containers/exited-container/stats", func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("stats endpoint should not be called for exited containers")
+	})
+	handler.HandleFunc("/containers/running-container/stats", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(dockerContainerStats{
+			CPUStats: dockerCPUStats{
+				CPUUsage:       dockerCPUUsage{TotalUsage: 2},
+				SystemCPUUsage: 2,
+				OnlineCPUs:     1,
+			},
+			PreCPUStats: dockerCPUStats{
+				CPUUsage:       dockerCPUUsage{TotalUsage: 1},
+				SystemCPUUsage: 1,
+			},
+		})
+	})
+	handler.HandleFunc("/containers/running-container/json", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(dockerContainerInspect{})
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	samples, err := collectDockerMetricSamplesWithClient(context.Background(), server.Client(), server.URL)
+	if err != nil {
+		t.Fatalf("collectDockerMetricSamplesWithClient() error = %v", err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("samples length = %d, want 1", len(samples))
+	}
+	if samples[0].DockerContainerId != "running-container" {
+		t.Fatalf("sample container = %q, want running-container", samples[0].DockerContainerId)
 	}
 }
 

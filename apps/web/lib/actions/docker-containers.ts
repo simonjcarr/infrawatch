@@ -52,6 +52,30 @@ export interface HostDockerContainerMetricsResult {
   points: DockerContainerMetricPoint[]
 }
 
+export type DockerTopContainerMetric = 'cpu' | 'memory' | 'network' | 'block'
+export type DockerTopContainerStatistic = 'max' | 'p95'
+
+export interface DockerTopContainersQuery {
+  range?: DockerContainerMetricsPreset
+  metric?: DockerTopContainerMetric
+  statistic?: DockerTopContainerStatistic
+}
+
+export interface DockerTopContainerRow {
+  dockerContainerId: string
+  primaryName: string | null
+  image: string | null
+  state: string | null
+  isPresent: boolean
+  lastSeenAt: Date | null
+  value: number | null
+  sampleCount: number
+}
+
+export interface HostDockerTopContainersResult {
+  containers: DockerTopContainerRow[]
+}
+
 function cleanFilter(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   if (!trimmed || trimmed === 'all') return undefined
@@ -75,6 +99,34 @@ function resolveMetricRange(range: DockerContainerMetricsPreset | undefined): { 
   const to = new Date()
   const from = new Date(to.getTime() - hours[selected] * 3_600_000)
   return { from, to, bucketInterval: bucketIntervals[selected] }
+}
+
+function resolveTopMetric(metric: DockerTopContainerMetric | undefined): DockerTopContainerMetric {
+  return metric === 'memory' || metric === 'network' || metric === 'block' ? metric : 'cpu'
+}
+
+function resolveTopStatistic(statistic: DockerTopContainerStatistic | undefined): DockerTopContainerStatistic {
+  return statistic === 'p95' ? 'p95' : 'max'
+}
+
+function topMetricExpression(metric: DockerTopContainerMetric): string {
+  switch (metric) {
+    case 'memory':
+      return 'm.memory_percent'
+    case 'network':
+      return `CASE
+        WHEN m.network_rx_bytes IS NULL AND m.network_tx_bytes IS NULL THEN NULL
+        ELSE COALESCE(m.network_rx_bytes, 0) + COALESCE(m.network_tx_bytes, 0)
+      END`
+    case 'block':
+      return `CASE
+        WHEN m.block_read_bytes IS NULL AND m.block_write_bytes IS NULL THEN NULL
+        ELSE COALESCE(m.block_read_bytes, 0) + COALESCE(m.block_write_bytes, 0)
+      END`
+    case 'cpu':
+    default:
+      return 'm.cpu_percent'
+  }
 }
 
 export async function getHostDockerContainers(
@@ -235,6 +287,87 @@ export async function getHostDockerContainerMetrics(
       blockWriteMax: row.block_write_max,
       pidsAvg: row.pids_avg,
       pidsMax: row.pids_max,
+    })),
+  }
+}
+
+export async function getHostDockerTopContainers(
+  instanceId: string,
+  hostId: string,
+  query: DockerTopContainersQuery = {},
+): Promise<HostDockerTopContainersResult> {
+  await requireInstanceAccess(instanceId)
+
+  const host = await db.query.hosts.findFirst({
+    columns: { id: true },
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
+  })
+  if (!host) return { containers: [] }
+
+  const range = resolveMetricRange(query.range)
+  const metric = resolveTopMetric(query.metric)
+  const statistic = resolveTopStatistic(query.statistic)
+  const metricSql = topMetricExpression(metric)
+  const aggregateSql = statistic === 'p95'
+    ? `(percentile_cont(0.95) WITHIN GROUP (ORDER BY metric_value))::double precision`
+    : `MAX(metric_value)::double precision`
+
+  const rows = await db.execute<{
+    docker_container_id: string
+    primary_name: string | null
+    image: string | null
+    state: string | null
+    is_present: boolean
+    last_seen_at: Date | null
+    value: number | null
+    sample_count: number
+  }>(sql`
+    WITH metric_values AS (
+      SELECT
+        dc.docker_container_id,
+        dc.primary_name,
+        dc.image,
+        dc.state,
+        dc.is_present,
+        dc.last_seen_at,
+        ${sql.raw(metricSql)}::double precision AS metric_value
+      FROM docker_container_metrics m
+      INNER JOIN docker_containers dc
+        ON dc.id = m.docker_container_row_id
+       AND dc.instance_id = m.instance_id
+       AND dc.host_id = m.host_id
+       AND dc.docker_container_id = m.docker_container_id
+      WHERE m.instance_id = ${instanceId}
+        AND m.host_id = ${hostId}
+        AND m.recorded_at >= ${range.from.toISOString()}
+        AND m.recorded_at <= ${range.to.toISOString()}
+    )
+    SELECT
+      docker_container_id,
+      primary_name,
+      image,
+      state,
+      is_present,
+      last_seen_at,
+      ${sql.raw(aggregateSql)} AS value,
+      COUNT(metric_value)::integer AS sample_count
+    FROM metric_values
+    WHERE metric_value IS NOT NULL
+    GROUP BY docker_container_id, primary_name, image, state, is_present, last_seen_at
+    ORDER BY value DESC NULLS LAST, primary_name ASC NULLS LAST, docker_container_id ASC
+    LIMIT 10
+  `)
+
+  return {
+    containers: Array.from(rows).map((row) => ({
+      dockerContainerId: row.docker_container_id,
+      primaryName: row.primary_name,
+      image: row.image,
+      state: row.state,
+      isPresent: row.is_present,
+      lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at) : null,
+      value: row.value,
+      sampleCount: row.sample_count,
     })),
   }
 }

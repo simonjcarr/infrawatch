@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, formatDistanceToNow } from 'date-fns'
-import { Box, Search, X, ShieldAlert, WifiOff, AlertTriangle, Loader2, Activity } from 'lucide-react'
+import { Box, Search, X, ShieldAlert, WifiOff, AlertTriangle, Loader2, Activity, BarChart3 } from 'lucide-react'
 import {
   CartesianGrid,
   Legend,
@@ -30,8 +30,11 @@ import {
 import {
   getHostDockerContainerMetrics,
   getHostDockerContainers,
+  getHostDockerTopContainers,
   type DockerContainerMetricPoint,
   type DockerContainerMetricsPreset,
+  type DockerTopContainerMetric,
+  type DockerTopContainerStatistic,
 } from '@/lib/actions/docker-containers'
 import type { DockerRuntimeStatus, HostDockerStatus } from '@/lib/db/schema/docker'
 
@@ -59,6 +62,18 @@ const metricRangeOptions: Array<{ value: DockerContainerMetricsPreset; label: st
   { value: '6h', label: 'Last 6h' },
   { value: '24h', label: 'Last 24h' },
   { value: '7d', label: 'Last 7 days' },
+]
+
+const topMetricOptions: Array<{ value: DockerTopContainerMetric; label: string }> = [
+  { value: 'cpu', label: 'CPU' },
+  { value: 'memory', label: 'Memory' },
+  { value: 'network', label: 'Network I/O' },
+  { value: 'block', label: 'Block I/O' },
+]
+
+const topStatisticOptions: Array<{ value: DockerTopContainerStatistic; label: string }> = [
+  { value: 'max', label: 'Max' },
+  { value: 'p95', label: 'P95' },
 ]
 
 const unavailableCopy: Record<Exclude<DisplayStatus, 'installed'>, { title: string; body: string; icon: typeof AlertTriangle }> = {
@@ -185,6 +200,13 @@ function MetricSummary({ label, value }: { label: string; value: string }) {
   )
 }
 
+function formatTopContainerValue(metric: DockerTopContainerMetric, value: number | null | undefined): string {
+  if (metric === 'network' || metric === 'block') {
+    return formatBytes(value)
+  }
+  return formatPercent(value)
+}
+
 function ContainerMetricChart({
   title,
   data,
@@ -253,6 +275,9 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
   const [image, setImage] = useState('all')
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
   const [metricsRange, setMetricsRange] = useState<DockerContainerMetricsPreset>('1h')
+  const [topRange, setTopRange] = useState<DockerContainerMetricsPreset>('1h')
+  const [topMetric, setTopMetric] = useState<DockerTopContainerMetric>('cpu')
+  const [topStatistic, setTopStatistic] = useState<DockerTopContainerStatistic>('max')
   const status: DisplayStatus = dockerStatus?.status ?? 'unknown'
   const dockerUnavailable = status !== 'installed'
 
@@ -271,6 +296,16 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
     queryFn: () => getHostDockerContainerMetrics(scopeId, hostId, effectiveSelectedContainerId!, { range: metricsRange }),
     enabled: !dockerUnavailable && effectiveSelectedContainerId != null,
   })
+  const { data: topContainersData, isLoading: topContainersLoading } = useQuery({
+    queryKey: ['host-docker-top-containers', scopeId, hostId, topRange, topMetric, topStatistic],
+    queryFn: () => getHostDockerTopContainers(scopeId, hostId, {
+      range: topRange,
+      metric: topMetric,
+      statistic: topStatistic,
+    }),
+    enabled: !dockerUnavailable,
+  })
+  const topContainers = topContainersData?.containers ?? []
   const metricPoints = useMemo(() => metricsData?.points ?? [], [metricsData?.points])
   const chartData = useMemo(() => metricPoints.map((point) => ({
     time: new Date(point.recordedAt).getTime(),
@@ -355,6 +390,110 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
           )}
         </div>
       </div>
+
+      <Card data-testid="host-docker-top-containers">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="size-4 text-muted-foreground" />
+              Top containers
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={topMetric} onValueChange={(value) => setTopMetric(value as DockerTopContainerMetric)}>
+                <SelectTrigger className="w-36" data-testid="host-docker-top-metric-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {topMetricOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={topStatistic} onValueChange={(value) => setTopStatistic(value as DockerTopContainerStatistic)}>
+                <SelectTrigger className="w-28" data-testid="host-docker-top-stat-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {topStatisticOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={topRange} onValueChange={(value) => setTopRange(value as DockerContainerMetricsPreset)}>
+                <SelectTrigger className="w-36" data-testid="host-docker-top-range-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {metricRangeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {topContainersLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
+              Loading top containers...
+            </div>
+          ) : topContainers.length === 0 ? (
+            <EmptyState title="No ranked containers" body="Rankings will appear after the agent uploads container metrics for this range." icon={BarChart3} />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">Rank</TableHead>
+                  <TableHead>Container</TableHead>
+                  <TableHead>Image</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead className="text-right">{topStatistic === 'p95' ? 'P95' : 'Max'}</TableHead>
+                  <TableHead className="text-right">Samples</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topContainers.map((container, index) => (
+                  <TableRow
+                    key={container.dockerContainerId}
+                    data-testid={`host-docker-top-container-row-${container.dockerContainerId}`}
+                    className={container.dockerContainerId === effectiveSelectedContainerId ? 'bg-muted/50' : 'cursor-pointer'}
+                    onClick={() => setSelectedContainerId(container.dockerContainerId)}
+                  >
+                    <TableCell className="text-sm text-muted-foreground">{index + 1}</TableCell>
+                    <TableCell>
+                      <div className="font-medium text-foreground">
+                        {container.primaryName || container.dockerContainerId.slice(0, 12)}
+                      </div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {container.dockerContainerId.slice(0, 12)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[260px] truncate text-sm">
+                      {container.image || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <ContainerStateBadge state={container.state} present={container.isPresent} />
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-semibold tabular-nums">
+                      {formatTopContainerValue(topMetric, container.value)}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                      {container.sampleCount.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

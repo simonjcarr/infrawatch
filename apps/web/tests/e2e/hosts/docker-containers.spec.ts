@@ -263,6 +263,78 @@ test('host Containers tab shows per-container metric charts with max spike value
   await expect(metrics.getByText('Block I/O')).toBeVisible()
 })
 
+test('host Containers tab ranks top containers by selected metric and statistic', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const instanceId = await getOrgId(sql)
+  await seedHost(sql, instanceId, 'docker-top-containers-host')
+  await seedDockerStatus(sql, instanceId, 'docker-top-containers-host', 'installed')
+
+  await sql`
+    INSERT INTO docker_containers (
+      id,
+      instance_id,
+      host_id,
+      docker_container_id,
+      primary_name,
+      names_json,
+      image,
+      image_id,
+      labels_json,
+      state,
+      status,
+      first_seen_at,
+      last_seen_at,
+      last_inventory_at,
+      restart_count,
+      is_present
+    )
+    VALUES
+      ('docker-top-api-row', ${instanceId}, 'docker-top-containers-host', 'top-api-container-id', 'api', '["api"]'::jsonb, 'api:latest', 'sha256:api', '{}'::jsonb, 'running', 'Up 9 minutes', NOW() - INTERVAL '20 minutes', NOW() - INTERVAL '30 seconds', NOW() - INTERVAL '30 seconds', 0, true),
+      ('docker-top-worker-row', ${instanceId}, 'docker-top-containers-host', 'top-worker-container-id', 'worker', '["worker"]'::jsonb, 'worker:latest', 'sha256:worker', '{}'::jsonb, 'running', 'Up 9 minutes', NOW() - INTERVAL '20 minutes', NOW() - INTERVAL '30 seconds', NOW() - INTERVAL '30 seconds', 0, true)
+  `
+
+  await sql`
+    INSERT INTO docker_container_metrics (
+      id,
+      instance_id,
+      host_id,
+      docker_container_row_id,
+      docker_container_id,
+      recorded_at,
+      cpu_percent,
+      memory_usage_bytes,
+      memory_limit_bytes,
+      memory_percent,
+      network_rx_bytes,
+      network_tx_bytes,
+      block_read_bytes,
+      block_write_bytes,
+      pids_current,
+      restart_count
+    )
+    VALUES
+      ('docker-top-api-sample-1', ${instanceId}, 'docker-top-containers-host', 'docker-top-api-row', 'top-api-container-id', NOW() - INTERVAL '15 minutes', 55.0, 1000, 4000, 25.0, 1000, 1200, 100, 200, 4, 0),
+      ('docker-top-api-sample-2', ${instanceId}, 'docker-top-containers-host', 'docker-top-api-row', 'top-api-container-id', NOW() - INTERVAL '10 minutes', 82.4, 2400, 4000, 60.0, 8000, 7000, 300, 500, 6, 0),
+      ('docker-top-worker-sample-1', ${instanceId}, 'docker-top-containers-host', 'docker-top-worker-row', 'top-worker-container-id', NOW() - INTERVAL '15 minutes', 12.0, 3200, 4000, 80.0, 1200, 1400, 9000, 8000, 3, 0),
+      ('docker-top-worker-sample-2', ${instanceId}, 'docker-top-containers-host', 'docker-top-worker-row', 'top-worker-container-id', NOW() - INTERVAL '10 minutes', 16.0, 3600, 4000, 90.0, 1800, 1800, 12000, 11000, 4, 0)
+  `
+
+  await page.goto('/hosts/docker-top-containers-host')
+  await page.getByTestId('host-parent-tab-containers').click()
+
+  const topContainers = page.getByTestId('host-docker-top-containers')
+  await expect(topContainers).toContainText('Top containers')
+  await expect(page.getByTestId('host-docker-top-container-row-top-api-container-id')).toContainText('82.4%')
+
+  await page.getByTestId('host-docker-top-metric-select').click()
+  await page.getByRole('option', { name: 'Memory' }).click()
+  await expect(page.getByTestId('host-docker-top-container-row-top-worker-container-id')).toContainText('90.0%')
+
+  await page.getByTestId('host-docker-top-stat-select').click()
+  await page.getByRole('option', { name: 'P95' }).click()
+  await expect(topContainers).toContainText('P95')
+})
+
 test('host Containers tab explains Docker unavailable states', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const instanceId = await getOrgId(sql)

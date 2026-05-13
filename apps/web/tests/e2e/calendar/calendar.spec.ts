@@ -248,6 +248,21 @@ test('calendar views use operational calendar labels and grid structure', async 
     return labels.find((label) => label.getBoundingClientRect().top >= scrollerTop - 1)?.textContent
   })
   expect(firstVisibleTimeLabel).toBe('09:00')
+  await expect.poll(async () =>
+    page.locator('main').evaluate((main) => main.scrollHeight - main.clientHeight),
+  ).toBeLessThanOrEqual(1)
+
+  const controlsTop = await page.getByTestId('calendar-view-work-week').evaluate((button) => button.getBoundingClientRect().top)
+  const headerTop = await page.locator('[data-testid^="calendar-time-header-"]').first().evaluate((header) => header.getBoundingClientRect().top)
+  const scrollerTopBefore = await page.getByTestId('calendar-time-scroll').evaluate((scroller) => scroller.scrollTop)
+  const scrollerBox = await page.getByTestId('calendar-time-scroll').boundingBox()
+  expect(scrollerBox).not.toBeNull()
+  await page.mouse.move(scrollerBox!.x + scrollerBox!.width / 2, scrollerBox!.y + scrollerBox!.height / 2)
+  await page.mouse.wheel(0, 420)
+  await expect.poll(async () => page.getByTestId('calendar-time-scroll').evaluate((scroller) => scroller.scrollTop)).toBeGreaterThan(scrollerTopBefore)
+  expect(await page.locator('main').evaluate((main) => main.scrollTop)).toBe(0)
+  expect(await page.getByTestId('calendar-view-work-week').evaluate((button) => button.getBoundingClientRect().top)).toBeCloseTo(controlsTop, 0)
+  expect(await page.locator('[data-testid^="calendar-time-header-"]').first().evaluate((header) => header.getBoundingClientRect().top)).toBeCloseTo(headerTop, 0)
 
   await page.getByTestId('calendar-view-full-week').click()
   await expect(page.locator('[data-testid^="calendar-time-header-"]').filter({ hasText: /^Mon, \d{1,2} [A-Z][a-z]{2}$/ }).first()).toBeVisible()

@@ -800,7 +800,7 @@ export function OperationsCalendarClient({
   }
 
   return (
-    <div className="flex min-h-[calc(100svh-3rem)] flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground" data-testid="operations-calendar-heading">

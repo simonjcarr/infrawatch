@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.9.0...bundle/v0.10.0) (2026-05-13)
+
+
+### Features
+
+* **web:** add host docker retention override ([11dd597](https://github.com/carrtech-dev/ct-ops/commit/11dd597bfa569b478a4d11f694611a941ef37bfe))
+
 ## [0.9.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.8.0...bundle/v0.9.0) (2026-05-13)
 
 

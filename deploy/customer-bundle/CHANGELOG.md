@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.8.0...bundle/v0.9.0) (2026-05-13)
+
+
+### Features
+
+* **settings:** add Docker metric retention setting ([0231f78](https://github.com/carrtech-dev/ct-ops/commit/0231f78f5ba3fa44e45fa58fa760c4b1a752bab9))
+
 ## [0.8.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.7.0...bundle/v0.8.0) (2026-05-13)
 
 

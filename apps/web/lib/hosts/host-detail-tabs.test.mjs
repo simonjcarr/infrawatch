@@ -12,3 +12,13 @@ test('host network membership tab belongs under infrastructure', () => {
   assert.ok(infrastructure.children?.includes('host-networks'))
   assert.equal(management.children?.includes('host-networks'), false)
 })
+
+test('container inventory is available as a top-level host tab', () => {
+  const containers = PARENT_TABS.find((tab) => tab.id === 'containers')
+  const inventory = PARENT_TABS.find((tab) => tab.id === 'inventory')
+
+  assert.ok(containers)
+  assert.equal(containers.defaultTab, 'containers')
+  assert.equal(containers.children, null)
+  assert.equal(inventory?.children?.includes('containers'), false)
+})

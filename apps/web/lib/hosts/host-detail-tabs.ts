@@ -3,6 +3,7 @@ export type ParentTabId =
   | 'monitoring'
   | 'infrastructure'
   | 'inventory'
+  | 'containers'
   | 'notes'
   | 'management'
   | 'tools'
@@ -24,6 +25,7 @@ export type Tab =
   | 'logs'
   | 'terminal'
   | 'packages'
+  | 'containers'
   | 'notes'
 
 export const TAB_LABELS: Record<Tab, string> = {
@@ -43,6 +45,7 @@ export const TAB_LABELS: Record<Tab, string> = {
   logs: 'Logs',
   terminal: 'Terminal',
   packages: 'Packages',
+  containers: 'Containers',
   notes: 'Notes',
 }
 
@@ -56,6 +59,7 @@ export const PARENT_TABS: Array<{
   { id: 'monitoring', label: 'Monitoring', defaultTab: 'metrics', children: ['metrics', 'checks', 'alerts'] },
   { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network', 'host-networks', 'patch-status'] },
   { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages', 'vulnerabilities'] },
+  { id: 'containers', label: 'Containers', defaultTab: 'containers', children: null },
   { id: 'notes', label: 'Notes', defaultTab: 'notes', children: null },
   { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'settings'] },
   { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'logs', 'terminal'] },

@@ -4,6 +4,7 @@ import { logError } from '@/lib/logging'
 import { requireInstanceAccess, requireInstanceAdminAccess, requireInstanceWriteAccess } from '@/lib/actions/action-auth'
 import { getRequiredSession } from '@/lib/auth/session'
 
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { hosts, instanceSettings, checks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
@@ -13,6 +14,16 @@ import { parseHostMetadata } from '@/lib/db/schema/hosts'
 import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import { resolveCurrentActionScope } from './action-scope'
 import { createCheck, updateCheck } from '@/lib/actions/checks'
+
+export interface HostDockerRetentionSettings {
+  globalRetentionDays: number
+  retentionDaysOverride: number | null
+  effectiveRetentionDays: number
+}
+
+const hostDockerRetentionOverrideSchema = z.object({
+  days: z.number().int().min(1).max(365).nullable(),
+})
 
 export async function getHostCollectionSettings(
   ...args: [string] | [string, string]
@@ -66,6 +77,77 @@ export async function updateHostCollectionSettings(
     return { success: true }
   } catch (err) {
     logError('Failed to update host collection settings:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
+export async function getHostDockerRetentionSettings(
+  ...args: [string] | [string, string]
+): Promise<HostDockerRetentionSettings> {
+  const session = await getRequiredSession()
+  const [currentScope, hostId] =
+    args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
+  await requireInstanceAccess(currentScope)
+
+  const [host, org] = await Promise.all([
+    db.query.hosts.findFirst({
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
+      columns: { metadata: true },
+    }),
+    db.query.instanceSettings.findFirst({
+      where: eq(instanceSettings.id, currentScope),
+      columns: { dockerMetricRetentionDays: true },
+    }),
+  ])
+
+  const metadata = parseHostMetadata(host?.metadata)
+  const globalRetentionDays = org?.dockerMetricRetentionDays ?? 30
+  const retentionDaysOverride = metadata.dockerSettings?.retentionDaysOverride ?? null
+
+  return {
+    globalRetentionDays,
+    retentionDaysOverride,
+    effectiveRetentionDays: retentionDaysOverride ?? globalRetentionDays,
+  }
+}
+
+export async function updateHostDockerRetentionOverride(
+  ...args: [string, number | null] | [string, string, number | null]
+): Promise<{ success: true } | { error: string }> {
+  const session = await getRequiredSession()
+  const [currentScope, hostId, days] =
+    args.length === 3 ? args : [resolveCurrentActionScope(session), args[0], args[1]]
+  await requireInstanceWriteAccess(currentScope)
+
+  const parsed = hostDockerRetentionOverrideSchema.safeParse({ days })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid value' }
+  }
+
+  try {
+    const host = await db.query.hosts.findFirst({
+      where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
+      columns: { id: true, metadata: true },
+    })
+    if (!host) return { error: 'Host not found' }
+
+    const currentMetadata = parseHostMetadata(host.metadata)
+    const updatedMetadata = {
+      ...currentMetadata,
+      dockerSettings: {
+        ...(currentMetadata.dockerSettings ?? {}),
+        retentionDaysOverride: parsed.data.days,
+      },
+    }
+
+    await db
+      .update(hosts)
+      .set({ metadata: updatedMetadata, updatedAt: new Date() })
+      .where(and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope)))
+
+    return { success: true }
+  } catch (err) {
+    logError('Failed to update host Docker retention override:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

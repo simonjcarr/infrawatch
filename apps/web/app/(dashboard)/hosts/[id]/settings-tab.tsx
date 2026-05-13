@@ -2,14 +2,20 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, KeyRound, Settings, Users, Cpu, HardDrive, MemoryStick, Plus, X, TerminalSquare, Tag as TagIcon } from 'lucide-react'
+import { AlertTriangle, KeyRound, Settings, Users, Cpu, HardDrive, MemoryStick, Plus, X, TerminalSquare, Tag as TagIcon, Boxes } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CheckCircle2 } from 'lucide-react'
-import { getHostCollectionSettings, updateHostCollectionSettings } from '@/lib/actions/host-settings'
+import {
+  getHostCollectionSettings,
+  getHostDockerRetentionSettings,
+  updateHostCollectionSettings,
+  updateHostDockerRetentionOverride,
+} from '@/lib/actions/host-settings'
 import { getHostTerminalSettings, trustPendingSshHostKeys, updateHostTerminalSettings } from '@/lib/actions/terminal'
 import type { HostTerminalSettings } from '@/lib/actions/terminal-core'
 import { getOrgUsers } from '@/lib/actions/users'
@@ -22,10 +28,22 @@ interface SettingsTabProps {
   isAdmin: boolean
 }
 
+const RETENTION_OPTIONS = [
+  { value: '7', label: '7 days' },
+  { value: '14', label: '14 days' },
+  { value: '30', label: '30 days' },
+  { value: '60', label: '60 days' },
+  { value: '90', label: '90 days' },
+  { value: '180', label: '180 days' },
+  { value: '365', label: '1 year' },
+]
+
 export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
   const queryClient = useQueryClient()
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [newUsername, setNewUsername] = useState('')
+  const [dockerRetentionSaveSuccess, setDockerRetentionSaveSuccess] = useState(false)
+  const [localDockerRetentionOverride, setLocalDockerRetentionOverride] = useState<number | null | undefined>(undefined)
 
   // Terminal settings state
   const [terminalSaveSuccess, setTerminalSaveSuccess] = useState(false)
@@ -39,6 +57,11 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
   const { data: terminalSettings } = useQuery({
     queryKey: ['host-terminal-settings', hostId],
     queryFn: () => getHostTerminalSettings(hostId),
+  })
+
+  const { data: dockerRetentionSettings } = useQuery({
+    queryKey: ['host-docker-retention-settings', hostId],
+    queryFn: () => getHostDockerRetentionSettings(hostId),
   })
 
   const { data: orgUsers } = useQuery({
@@ -141,6 +164,17 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
     },
   })
 
+  const dockerRetentionMutation = useMutation({
+    mutationFn: (days: number | null) => updateHostDockerRetentionOverride(hostId, days),
+    onSuccess: (result) => {
+      if ('error' in result) return
+      setDockerRetentionSaveSuccess(true)
+      setLocalDockerRetentionOverride(undefined)
+      queryClient.invalidateQueries({ queryKey: ['host-docker-retention-settings', hostId] })
+      setTimeout(() => setDockerRetentionSaveSuccess(false), 3000)
+    },
+  })
+
   function updateSetting(patch: Partial<HostCollectionSettings>) {
     const base = currentSettings ?? { cpu: true, memory: true, disk: true, localUsers: false }
     setLocalSettings({ ...base, ...patch })
@@ -182,6 +216,16 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
   }
 
   const isDirty = localSettings !== null
+  const currentDockerRetentionOverride =
+    localDockerRetentionOverride === undefined
+      ? dockerRetentionSettings?.retentionDaysOverride ?? null
+      : localDockerRetentionOverride
+  const dockerRetentionValue = currentDockerRetentionOverride === null ? 'inherit' : String(currentDockerRetentionOverride)
+  const dockerRetentionDirty =
+    localDockerRetentionOverride !== undefined &&
+    localDockerRetentionOverride !== (dockerRetentionSettings?.retentionDaysOverride ?? null)
+  const effectiveDockerRetentionDays =
+    currentDockerRetentionOverride ?? dockerRetentionSettings?.globalRetentionDays ?? 30
 
   return (
     <div className="space-y-6">
@@ -378,6 +422,94 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {dockerRetentionSettings && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Boxes className="size-4 text-muted-foreground" />
+              Docker Retention
+            </CardTitle>
+            <CardDescription>
+              Override how long Docker container metrics are kept for this host.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Inherited default</p>
+                <p className="text-sm font-medium" data-testid="settings-docker-retention-inherited">
+                  {dockerRetentionSettings.globalRetentionDays} days
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Host override</p>
+                <p className="text-sm font-medium">
+                  {currentDockerRetentionOverride === null ? 'None' : `${currentDockerRetentionOverride} days`}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Effective retention</p>
+                <p className="text-sm font-medium">{effectiveDockerRetentionDays} days</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="docker-retention-override-select">Retention override</Label>
+              <Select
+                value={dockerRetentionValue}
+                onValueChange={(value) =>
+                  setLocalDockerRetentionOverride(value === 'inherit' ? null : Number(value))
+                }
+                disabled={dockerRetentionMutation.isPending}
+              >
+                <SelectTrigger
+                  id="docker-retention-override-select"
+                  className="w-56"
+                  data-testid="settings-docker-retention-override-select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inherit">Inherit default</SelectItem>
+                  {RETENTION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-3 pt-2 border-t">
+              <Button
+                size="sm"
+                disabled={!dockerRetentionDirty || dockerRetentionMutation.isPending}
+                onClick={() => dockerRetentionMutation.mutate(currentDockerRetentionOverride)}
+                data-testid="settings-docker-retention-save"
+              >
+                {dockerRetentionMutation.isPending ? 'Saving...' : 'Save'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentDockerRetentionOverride === null || dockerRetentionMutation.isPending}
+                onClick={() => dockerRetentionMutation.mutate(null)}
+                data-testid="settings-docker-retention-clear"
+              >
+                Clear override
+              </Button>
+              {dockerRetentionSaveSuccess && (
+                <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-docker-retention-success">
+                  <CheckCircle2 className="size-4" />
+                  Saved
+                </span>
+              )}
+              {dockerRetentionMutation.isError && (
+                <span className="text-sm text-destructive">Failed to save Docker retention</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tags Card */}
       <Card>

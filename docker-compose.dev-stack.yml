@@ -84,7 +84,7 @@ services:
       start_period: 10s
 
   web-migrate:
-    image: node:20-bookworm-slim
+    image: node:24-bookworm-slim
     restart: "no"
     working_dir: /workspace
     depends_on:
@@ -112,7 +112,7 @@ services:
         pnpm run db:migrate
 
   web-dev:
-    image: node:20-bookworm-slim
+    image: node:24-bookworm-slim
     restart: unless-stopped
     working_dir: /workspace
     depends_on:

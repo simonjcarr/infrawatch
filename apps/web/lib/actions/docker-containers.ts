@@ -21,6 +21,7 @@ const MAX_CONTAINER_ROWS = 200
 const MAX_FILTER_LENGTH = 256
 const MAX_METRIC_POINTS = 300
 const MAX_LIFECYCLE_EVENTS = 100
+const MAX_SPARKLINE_CONTAINERS = 200
 
 export type DockerContainerMetricsPreset = '1h' | '6h' | '24h' | '7d'
 
@@ -93,6 +94,15 @@ export interface DockerContainerLifecycleEventRow {
 
 export interface HostDockerContainerLifecycleEventsResult {
   events: DockerContainerLifecycleEventRow[]
+}
+
+export interface DockerContainerMetricSparklinePoint {
+  recordedAt: Date
+  cpuMax: number | null
+}
+
+export interface HostDockerContainerMetricSparklinesResult {
+  sparklines: Record<string, DockerContainerMetricSparklinePoint[]>
 }
 
 function cleanFilter(value: string | undefined): string | undefined {
@@ -394,6 +404,7 @@ export async function getHostDockerTopContainers(
 export async function getHostDockerContainerLifecycleEvents(
   instanceId: string,
   hostId: string,
+  dockerContainerId?: string,
 ): Promise<HostDockerContainerLifecycleEventsResult> {
   await requireInstanceAccess(instanceId)
 
@@ -402,6 +413,9 @@ export async function getHostDockerContainerLifecycleEvents(
     where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
   })
   if (!host) return { events: [] }
+
+  const containerId = cleanFilter(dockerContainerId)
+  const containerFilter = containerId ? sql`AND e.docker_container_id = ${containerId}` : sql``
 
   const rows = await db.execute<{
     id: string
@@ -432,6 +446,7 @@ export async function getHostDockerContainerLifecycleEvents(
      AND dc.docker_container_id = e.docker_container_id
     WHERE e.instance_id = ${instanceId}
       AND e.host_id = ${hostId}
+      ${containerFilter}
     ORDER BY e.occurred_at DESC, e.created_at DESC
     LIMIT ${MAX_LIFECYCLE_EVENTS}
   `)
@@ -449,4 +464,57 @@ export async function getHostDockerContainerLifecycleEvents(
       restartCount: row.restart_count,
     })),
   }
+}
+
+export async function getHostDockerContainerMetricSparklines(
+  instanceId: string,
+  hostId: string,
+  dockerContainerIds: string[],
+): Promise<HostDockerContainerMetricSparklinesResult> {
+  await requireInstanceAccess(instanceId)
+
+  const host = await db.query.hosts.findFirst({
+    columns: { id: true },
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
+  })
+  if (!host) return { sparklines: {} }
+
+  const selectedContainerIds = Array.from(new Set(dockerContainerIds
+    .map((id) => cleanFilter(id))
+    .filter((id): id is string => Boolean(id))))
+    .slice(0, MAX_SPARKLINE_CONTAINERS)
+
+  if (selectedContainerIds.length === 0) return { sparklines: {} }
+
+  const range = resolveMetricRange('1h')
+  const bucket = sql.raw(`time_bucket('5 minutes'::interval, m.recorded_at)`)
+  const rows = await db.execute<{
+    docker_container_id: string
+    recorded_at: Date
+    cpu_max: number | null
+  }>(sql`
+    SELECT
+      m.docker_container_id,
+      ${bucket} AS recorded_at,
+      MAX(m.cpu_percent)::double precision AS cpu_max
+    FROM docker_container_metrics m
+    WHERE m.instance_id = ${instanceId}
+      AND m.host_id = ${hostId}
+      AND m.docker_container_id IN (${sql.join(selectedContainerIds.map((id) => sql`${id}`), sql`, `)})
+      AND m.recorded_at >= ${range.from.toISOString()}
+      AND m.recorded_at <= ${range.to.toISOString()}
+    GROUP BY m.docker_container_id, ${bucket}
+    ORDER BY m.docker_container_id ASC, recorded_at ASC
+  `)
+
+  const sparklines: HostDockerContainerMetricSparklinesResult['sparklines'] = {}
+  for (const row of Array.from(rows)) {
+    sparklines[row.docker_container_id] ??= []
+    sparklines[row.docker_container_id]!.push({
+      recordedAt: new Date(row.recorded_at),
+      cpuMax: row.cpu_max,
+    })
+  }
+
+  return { sparklines }
 }

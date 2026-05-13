@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.14.0...bundle/v0.14.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **docker:** collect running container metrics ([8e5dca4](https://github.com/carrtech-dev/ct-ops/commit/8e5dca40c5053729cfee2dfb55bf6d7ea7045f18))
+
 ## [0.14.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.13.0...bundle/v0.14.0) (2026-05-13)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.38.1](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.38.0...agent/v0.38.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **docker:** collect running container metrics ([8e5dca4](https://github.com/carrtech-dev/ct-ops/commit/8e5dca40c5053729cfee2dfb55bf6d7ea7045f18))
+
 ## [0.38.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.37.0...agent/v0.38.0) (2026-05-13)
 
 

@@ -44,6 +44,52 @@ The dev proxy forwards:
 - `/password-manager-api/` to the bundled Password Manager API container
 - `/ws/terminal/` to the local ingest container
 
+## Connect Agents
+
+Use public mode when you need real hosts or VMs to connect agents back to your
+local development stack:
+
+```bash
+./dev-stack.sh --public-host 100.x.y.z
+```
+
+Use your Tailscale IP for `100.x.y.z` when possible. It is more reliable than a
+changing Wi-Fi address and avoids exposing your development laptop to the public
+internet. If you omit the host, `./dev-stack.sh --public` tries to pick a
+Tailscale IP first, then a local network IP.
+
+Public mode changes only the externally required ports:
+
+- web proxy: `0.0.0.0:3000`
+- ingest HTTP health/JWKS: `0.0.0.0:8080`
+- ingest gRPC for agents: `0.0.0.0:9443`
+- Postgres remains private on `127.0.0.1:55432`
+
+The script updates `.dev/dev.env`, regenerates the development ingest TLS cert
+when the public host changes, and prints the agent connection details:
+
+```text
+Agent ingest address: 100.x.y.z:9443
+Agent CA cert:        deploy/dev-tls/server.crt
+```
+
+Validate the reachable endpoints from your laptop:
+
+```bash
+./dev-stack.sh --check-public
+```
+
+Agents must be able to reach `100.x.y.z:9443` and trust the generated CA cert.
+For browser-based agent install bundles, the app will use
+`AGENT_DOWNLOAD_BASE_URL=http://100.x.y.z:3000`, so the remote host must also be
+able to reach port `3000`.
+
+Switch back to loopback-only mode with:
+
+```bash
+./dev-stack.sh --local
+```
+
 ## Stop Or Reset
 
 Stop the stack while preserving local database volumes:

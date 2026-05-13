@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.15.0...ingest/v0.15.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **ingest:** close docker inventory rows before lifecycle inserts ([#1392](https://github.com/carrtech-dev/ct-ops/issues/1392)) ([cba037a](https://github.com/carrtech-dev/ct-ops/commit/cba037ace68e229f0d1d721ca6a444ab2b0f4a5b))
+
 ## [0.15.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.14.0...ingest/v0.15.0) (2026-05-13)
 
 

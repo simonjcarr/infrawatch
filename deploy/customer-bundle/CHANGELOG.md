@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.17.0...bundle/v0.18.0) (2026-05-13)
+
+
+### Features
+
+* **dev:** expose local stack for agent testing ([fb3d5dc](https://github.com/carrtech-dev/ct-ops/commit/fb3d5dc2f82f0fe7087ef4227d145df16a586041))
+
 ## [0.17.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.16.0...bundle/v0.17.0) (2026-05-13)
 
 

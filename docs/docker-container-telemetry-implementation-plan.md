@@ -58,6 +58,7 @@ Purpose: define the cross-component contract before parallel implementation star
 - The first release targets Docker Engine compatibility only. Podman/containerd support can be added later behind separate contract work once the Docker path is stable.
 - The first release uses an in-memory bounded buffer. Disk spooling is explicitly deferred unless field evidence shows restart resilience is required.
 - Docker retention uses a Docker-specific global setting instead of reusing host metric retention. Container telemetry volume and per-host override semantics differ enough that it should not share the existing `metricRetentionDays` field.
+- Phase 3 agent sampling uses a 10,000-sample in-memory buffer by default. At a 2-second sampling interval this gives a single-container host several hours of headroom, while large hosts shed oldest samples and report the dropped count for the upload task.
 
 ## Database Schema Contract
 
@@ -174,7 +175,7 @@ Purpose: capture short spikes locally while keeping CT-Ops ingest traffic manage
 
 | Task | Owner | Status | Files / Areas | Dependencies | Acceptance Criteria | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Implement agent sampler and buffer | unclaimed | pending | agent Docker sampler/buffer, tests | Phase 2 inventory | Agent samples every 2 seconds by default, stores bounded buffered samples, and records dropped sample counts when full. | TBD | Consider in-memory first; add disk spool only if needed for restart resilience. |
+| Implement agent sampler and buffer | Codex | in_progress | agent Docker sampler/buffer, tests | Phase 2 inventory | Agent samples every 2 seconds by default, stores bounded buffered samples, and records dropped sample counts when full. | TBD | Claimed 2026-05-13. Implementing in-memory sampler/buffer first; upload remains a separate task. |
 | Implement batched telemetry upload | unclaimed | pending | protobuf RPC/heartbeat integration, agent sender, ingest handler | Sampler/buffer | Agent flushes batches on normal interval; ingest enforces max payload size, timestamp bounds, and idempotency. | TBD | Include batch id or sequence for safe retries. |
 | Store container metric samples | unclaimed | pending | `docker_container_metrics` schema, ingest DB queries, tests | Batched upload | Metrics are stored with instance, host, container, recorded_at, CPU, memory, network, block I/O, pids, and restart count. | TBD | Add composite indexes for time-range queries. |
 | Add per-container metric charts | unclaimed | pending | web actions, chart components, e2e/component tests | Stored metrics | UI shows CPU, memory, network, block I/O, and pids over time with avg and max where bucketed. | TBD | Max line/area is required to preserve spike visibility. |
@@ -221,4 +222,4 @@ Purpose: make the feature operationally useful beyond basic charts.
 
 ## Open Decisions
 
-- What default maximum local buffer size should agents use for large hosts with hundreds of containers?
+- None currently.

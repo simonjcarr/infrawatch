@@ -66,6 +66,9 @@ type Runner struct {
 	// rather than a near-zero window that would inflate the reading to 100%.
 	cachedMetrics hostMetricsSnapshot
 
+	dockerMetricBuffer      *dockerMetricBuffer
+	dockerMetricSamplerOnce sync.Once
+
 	// Buffered ad-hoc query results, drained on each heartbeat send.
 	queryResultsMu sync.Mutex
 	queryResults   []*agentv1.AgentQueryResult
@@ -134,19 +137,20 @@ type Runner struct {
 // the runner skips cert-related work (useful for tests and load-test paths).
 func New(dialFunc func() (*grpc.ClientConn, error), agentID, jwtToken, version string, intervalSecs int, executor *checks.Executor, dataDir string, keypair *identity.Keypair) *Runner {
 	r := &Runner{
-		dialFunc:     dialFunc,
-		agentID:      agentID,
-		jwtToken:     jwtToken,
-		version:      version,
-		interval:     time.Duration(intervalSecs) * time.Second,
-		executor:     executor,
-		seenQueryIDs: make(map[string]struct{}),
-		seenTaskIDs:  make(map[string]struct{}),
-		resultsReady: make(chan struct{}, 1),
-		certRotated:  make(chan struct{}, 1),
-		dataDir:      dataDir,
-		keypair:      keypair,
-		updateFunc:   updater.Update,
+		dialFunc:           dialFunc,
+		agentID:            agentID,
+		jwtToken:           jwtToken,
+		version:            version,
+		interval:           time.Duration(intervalSecs) * time.Second,
+		executor:           executor,
+		seenQueryIDs:       make(map[string]struct{}),
+		seenTaskIDs:        make(map[string]struct{}),
+		resultsReady:       make(chan struct{}, 1),
+		certRotated:        make(chan struct{}, 1),
+		dockerMetricBuffer: newDockerMetricBuffer(defaultDockerMetricBufferSamples),
+		dataDir:            dataDir,
+		keypair:            keypair,
+		updateFunc:         updater.Update,
 	}
 	// Prime the pinned server cert from disk so the first heartbeat sends the
 	// correct fingerprint and preserves any previously pushed trust material.
@@ -170,6 +174,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	const minStableTime = 10 * time.Second
 	backoff := time.Second
 	maxBackoff := 60 * time.Second
+
+	r.startDockerMetricSampler(ctx)
 
 	for {
 		if ctx.Err() != nil {
@@ -202,6 +208,26 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		backoff = time.Duration(math.Min(float64(backoff*2), float64(maxBackoff)))
 	}
+}
+
+func (r *Runner) startDockerMetricSampler(ctx context.Context) {
+	r.dockerMetricSamplerOnce.Do(func() {
+		sampler := newDockerMetricSampler(
+			dockerMetricSamplerConfig{},
+			r.dockerMetricBuffer,
+			func(sampleCtx context.Context) ([]*agentv1.DockerContainerMetricSample, error) {
+				return collectDockerMetricSamples(sampleCtx, defaultDockerSocketPath)
+			},
+		)
+		go sampler.Run(ctx)
+	})
+}
+
+func (r *Runner) drainDockerMetricSamples() ([]*agentv1.DockerContainerMetricSample, uint32) {
+	if r == nil || r.dockerMetricBuffer == nil {
+		return nil, 0
+	}
+	return r.dockerMetricBuffer.Drain()
 }
 
 func (r *Runner) runStream(ctx context.Context) error {

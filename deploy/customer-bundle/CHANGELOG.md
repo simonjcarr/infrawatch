@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.12.0...bundle/v0.13.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add container lifecycle timeline ([a527cb6](https://github.com/carrtech-dev/ct-ops/commit/a527cb6867d76517c015cb9907e4744701474b9d))
+
 ## [0.12.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.11.0...bundle/v0.12.0) (2026-05-13)
 
 

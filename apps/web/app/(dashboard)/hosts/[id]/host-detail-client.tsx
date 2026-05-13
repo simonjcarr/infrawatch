@@ -70,6 +70,7 @@ import { InventoryTab } from './inventory-tab'
 import { ContainersTab } from './containers-tab'
 import { PatchStatusTab } from './patch-status-tab'
 import { VulnerabilitiesTab } from './vulnerabilities-tab'
+import { HostCalendarTab } from './host-calendar-tab'
 import { HostTerminalLauncher } from './host-terminal-launcher'
 import { NotesTab } from '@/components/notes/notes-tab'
 import { PinnedNotesCard } from '@/components/notes/pinned-notes-card'
@@ -1421,6 +1422,11 @@ export function HostDetailClient({
           currentUserId={currentUserId}
           userRole={userRole}
         />
+      )}
+
+      {/* Calendar Tab */}
+      {activeTab === 'calendar' && (
+        <HostCalendarTab scopeId={scopeId} hostId={initialHost.id} />
       )}
 
       {/* Tasks Tab */}

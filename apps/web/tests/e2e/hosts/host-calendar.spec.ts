@@ -1,0 +1,90 @@
+import { test, expect } from '../fixtures/test'
+import { getTestDb } from '../fixtures/db'
+import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+
+async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+  const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
+    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    FROM instance_settings
+    JOIN "user" ON "user".instance_id = instanceSettings.id
+    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+      AND "user".email = ${TEST_USER.email}
+    LIMIT 1
+  `
+  expect(rows).toHaveLength(1)
+  return {
+    instanceId: rows[0]!.instance_id,
+    userId: rows[0]!.user_id,
+  }
+}
+
+test('host admin calendar shows only events linked to the current host', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId, userId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
+    VALUES
+      ('host-calendar-1', ${instanceId}, 'host-calendar-1', 'Host Calendar One', 'Ubuntu 24.04', 'x86_64', '["10.70.0.10"]'::jsonb, 'online', NOW()),
+      ('host-calendar-2', ${instanceId}, 'host-calendar-2', 'Host Calendar Two', 'Ubuntu 24.04', 'x86_64', '["10.70.0.11"]'::jsonb, 'online', NOW())
+  `
+
+  await sql`
+    INSERT INTO calendar_events (
+      id,
+      instance_id,
+      created_by,
+      title,
+      description,
+      starts_at,
+      ends_at,
+      all_day,
+      timezone,
+      status,
+      category
+    )
+    VALUES
+      ('host-calendar-event-1', ${instanceId}, ${userId}, 'Host kernel patch', 'Patch the current host.', '2026-05-20T09:00:00Z', '2026-05-20T10:00:00Z', false, 'UTC', 'confirmed', 'patching'),
+      ('host-calendar-event-2', ${instanceId}, ${userId}, 'Host maintenance window', NULL, '2026-05-22T13:30:00Z', '2026-05-22T15:00:00Z', false, 'UTC', 'planned', 'maintenance'),
+      ('host-calendar-event-other', ${instanceId}, ${userId}, 'Other host outage', NULL, '2026-05-21T09:00:00Z', '2026-05-21T10:00:00Z', false, 'UTC', 'planned', 'maintenance')
+  `
+
+  await sql`
+    INSERT INTO calendar_event_hosts (instance_id, event_id, host_id)
+    VALUES
+      (${instanceId}, 'host-calendar-event-1', 'host-calendar-1'),
+      (${instanceId}, 'host-calendar-event-2', 'host-calendar-1'),
+      (${instanceId}, 'host-calendar-event-other', 'host-calendar-2')
+  `
+
+  await page.goto('/hosts/host-calendar-1')
+  await expect(page.getByRole('heading', { name: 'Host Calendar One' })).toBeVisible()
+
+  await page.getByTestId('host-parent-tab-admin').click()
+  await page.getByTestId('host-tab-calendar').click()
+
+  await expect(page.getByTestId('host-calendar-tab')).toBeVisible()
+  await expect(page.getByTestId('host-calendar-event-host-calendar-event-1')).toContainText('Host kernel patch')
+  await expect(page.getByTestId('host-calendar-event-host-calendar-event-1')).toContainText('Confirmed')
+  await expect(page.getByTestId('host-calendar-event-host-calendar-event-1')).toContainText('Patching')
+  await expect(page.getByTestId('host-calendar-event-host-calendar-event-2')).toContainText('Host maintenance window')
+  await expect(page.getByText('Other host outage')).toHaveCount(0)
+})
+
+test('host admin calendar shows an empty state when no events are linked', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId } = await getOrgAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
+    VALUES ('host-calendar-empty', ${instanceId}, 'host-calendar-empty', 'Host Calendar Empty', 'Ubuntu 24.04', 'x86_64', '["10.70.0.12"]'::jsonb, 'online', NOW())
+  `
+
+  await page.goto('/hosts/host-calendar-empty')
+  await expect(page.getByRole('heading', { name: 'Host Calendar Empty' })).toBeVisible()
+
+  await page.getByTestId('host-parent-tab-admin').click()
+  await page.getByTestId('host-tab-calendar').click()
+
+  await expect(page.getByTestId('host-calendar-tab')).toContainText('No calendar events linked to this host')
+})

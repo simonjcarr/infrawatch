@@ -143,6 +143,19 @@ export interface CalendarEventInstanceView {
   participants: CalendarParticipantView[]
 }
 
+export interface HostCalendarEventView {
+  id: string
+  title: string
+  description: string | null
+  startsAt: string
+  endsAt: string
+  allDay: boolean
+  timezone: string
+  status: CalendarEventStatus
+  category: CalendarEventCategory
+  isRecurring: boolean
+}
+
 type ParsedCalendarInput = Omit<CalendarEventInput, 'startsAt' | 'endsAt' | 'recurrenceRule'> & {
   startsAt: Date
   endsAt: Date
@@ -514,6 +527,72 @@ export async function listCalendarEvents(
   } catch (err) {
     logError('Failed to list calendar events:', err)
     return { error: err instanceof Error ? err.message : 'Failed to load calendar events' }
+  }
+}
+
+export async function listCalendarEventsForHost(
+  instanceId: string,
+  hostId: string,
+): Promise<{ events: HostCalendarEventView[] } | { error: string }> {
+  await requireInstanceAccess(instanceId)
+  const parsedHostId = z.string().min(1).safeParse(hostId)
+  if (!parsedHostId.success) return { error: 'Host is required' }
+
+  try {
+    const rows = await db
+      .select({
+        id: calendarEvents.id,
+        title: calendarEvents.title,
+        description: calendarEvents.description,
+        startsAt: calendarEvents.startsAt,
+        endsAt: calendarEvents.endsAt,
+        allDay: calendarEvents.allDay,
+        timezone: calendarEvents.timezone,
+        status: calendarEvents.status,
+        category: calendarEvents.category,
+        recurrenceRule: calendarEvents.recurrenceRule,
+      })
+      .from(calendarEventHosts)
+      .innerJoin(
+        calendarEvents,
+        and(
+          eq(calendarEventHosts.eventId, calendarEvents.id),
+          eq(calendarEvents.instanceId, instanceId),
+          isNull(calendarEvents.deletedAt),
+        ),
+      )
+      .innerJoin(
+        hosts,
+        and(
+          eq(calendarEventHosts.hostId, hosts.id),
+          eq(hosts.instanceId, instanceId),
+          isNull(hosts.deletedAt),
+        ),
+      )
+      .where(and(
+        eq(calendarEventHosts.instanceId, instanceId),
+        eq(calendarEventHosts.hostId, parsedHostId.data),
+      ))
+      .orderBy(asc(calendarEvents.startsAt))
+      .limit(250)
+
+    return {
+      events: rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        startsAt: row.startsAt.toISOString(),
+        endsAt: row.endsAt.toISOString(),
+        allDay: row.allDay,
+        timezone: row.timezone,
+        status: row.status,
+        category: row.category,
+        isRecurring: Boolean(row.recurrenceRule),
+      })),
+    }
+  } catch (err) {
+    logError('Failed to list host calendar events:', err)
+    return { error: 'Failed to load host calendar events' }
   }
 }
 

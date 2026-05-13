@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.148.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.147.1...web/v0.148.0) (2026-05-13)
+
+
+### Features
+
+* **web:** add host admin tab for notes ([9c1fd6d](https://github.com/carrtech-dev/ct-ops/commit/9c1fd6dc1d327316671933e83c6c1eea962a3df3))
+
 ## [0.147.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.147.0...web/v0.147.1) (2026-05-13)
 
 

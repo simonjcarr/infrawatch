@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.143.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.142.0...web/v0.143.0) (2026-05-13)
+
+
+### Features
+
+* **settings:** add Docker metric retention setting ([0231f78](https://github.com/carrtech-dev/ct-ops/commit/0231f78f5ba3fa44e45fa58fa760c4b1a752bab9))
+
 ## [0.142.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.141.0...web/v0.142.0) (2026-05-13)
 
 

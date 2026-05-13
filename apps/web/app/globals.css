@@ -189,8 +189,7 @@
 .ct-ops-calendar {
   --ct-ops-calendar-time-gutter: 4.75rem;
   --ct-ops-calendar-time-slot-height: max(2rem, calc((100svh - 18rem) / 16));
-  height: calc(100svh - 12rem);
-  min-height: 560px;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
@@ -257,6 +256,7 @@
 .ct-ops-calendar-time-scroll {
   flex: 1;
   min-height: 0;
+  overscroll-behavior: contain;
   overflow: auto;
 }
 

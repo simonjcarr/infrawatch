@@ -1,9 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
-import { Box, Search, X, ShieldAlert, WifiOff, AlertTriangle, Loader2 } from 'lucide-react'
+import { format, formatDistanceToNow } from 'date-fns'
+import { Box, Search, X, ShieldAlert, WifiOff, AlertTriangle, Loader2, Activity } from 'lucide-react'
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,7 +27,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getHostDockerContainers } from '@/lib/actions/docker-containers'
+import {
+  getHostDockerContainerMetrics,
+  getHostDockerContainers,
+  type DockerContainerMetricPoint,
+  type DockerContainerMetricsPreset,
+} from '@/lib/actions/docker-containers'
 import type { DockerRuntimeStatus, HostDockerStatus } from '@/lib/db/schema/docker'
 
 interface Props {
@@ -37,6 +52,13 @@ const stateOptions = [
   { value: 'restarting', label: 'Restarting' },
   { value: 'removing', label: 'Removing' },
   { value: 'dead', label: 'Dead' },
+]
+
+const metricRangeOptions: Array<{ value: DockerContainerMetricsPreset; label: string }> = [
+  { value: '1h', label: 'Last hour' },
+  { value: '6h', label: 'Last 6h' },
+  { value: '24h', label: 'Last 24h' },
+  { value: '7d', label: 'Last 7 days' },
 ]
 
 const unavailableCopy: Record<Exclude<DisplayStatus, 'installed'>, { title: string; body: string; icon: typeof AlertTriangle }> = {
@@ -75,6 +97,26 @@ function formatRelative(date: Date | string | null | undefined): string {
 function formatAbsolute(date: Date | string | null | undefined): string {
   if (!date) return '-'
   return new Date(date).toLocaleString()
+}
+
+function formatPercent(value: number | null | undefined): string {
+  return value == null ? '-' : `${value.toFixed(1)}%`
+}
+
+function formatNumber(value: number | null | undefined): string {
+  return value == null ? '-' : Math.round(value).toLocaleString()
+}
+
+function formatBytes(value: number | null | undefined): string {
+  if (value == null) return '-'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = value
+  let unit = 0
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024
+    unit += 1
+  }
+  return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`
 }
 
 function ContainerStateBadge({ state, present }: { state: string | null; present: boolean }) {
@@ -123,10 +165,94 @@ function EmptyState({ title, body, icon: Icon = Box }: { title: string; body: st
   )
 }
 
+function latestMax(points: DockerContainerMetricPoint[], key: keyof DockerContainerMetricPoint): number | null {
+  let max: number | null = null
+  for (const point of points) {
+    const value = point[key]
+    if (typeof value === 'number') {
+      max = max == null ? value : Math.max(max, value)
+    }
+  }
+  return max
+}
+
+function MetricSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold tabular-nums text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function ContainerMetricChart({
+  title,
+  data,
+  lines,
+  yFormatter,
+}: {
+  title: string
+  data: Array<Record<string, number | null>>
+  lines: Array<{ key: string; name: string; color: string }>
+  yFormatter?: (value: number) => string
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <div className="h-52 text-muted-foreground">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis
+              dataKey="time"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              tick={{ fontSize: 12, fill: 'currentColor' }}
+              tickLine={false}
+              tickFormatter={(ts: number) => format(new Date(ts), 'HH:mm')}
+            />
+            <YAxis
+              tick={{ fontSize: 12, fill: 'currentColor' }}
+              tickLine={false}
+              width={48}
+              tickFormatter={yFormatter}
+            />
+            <Tooltip
+              formatter={(value, name) => [typeof value === 'number' && yFormatter ? yFormatter(value) : value, name]}
+              labelFormatter={(ts) => format(new Date(Number(ts)), 'MMM d HH:mm:ss')}
+              contentStyle={{
+                backgroundColor: 'hsl(var(--popover))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '6px',
+                color: 'hsl(var(--popover-foreground))',
+                fontSize: '12px',
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+            {lines.map((line) => (
+              <Line
+                key={line.key}
+                type="monotone"
+                dataKey={line.key}
+                name={line.name}
+                stroke={line.color}
+                dot={false}
+                strokeWidth={line.name.includes('max') ? 2 : 1.5}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
 export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
   const [search, setSearch] = useState('')
   const [state, setState] = useState('all')
   const [image, setImage] = useState('all')
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
+  const [metricsRange, setMetricsRange] = useState<DockerContainerMetricsPreset>('1h')
   const status: DisplayStatus = dockerStatus?.status ?? 'unknown'
   const dockerUnavailable = status !== 'installed'
 
@@ -136,8 +262,33 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
     enabled: !dockerUnavailable,
   })
 
-  const containers = data?.containers ?? []
+  const containers = useMemo(() => data?.containers ?? [], [data?.containers])
   const imageOptions = data?.imageOptions ?? []
+  const selectedContainer = containers.find((container) => container.dockerContainerId === selectedContainerId) ?? containers[0] ?? null
+  const effectiveSelectedContainerId = selectedContainer?.dockerContainerId ?? null
+  const { data: metricsData, isLoading: metricsLoading } = useQuery({
+    queryKey: ['host-docker-container-metrics', scopeId, hostId, effectiveSelectedContainerId, metricsRange],
+    queryFn: () => getHostDockerContainerMetrics(scopeId, hostId, effectiveSelectedContainerId!, { range: metricsRange }),
+    enabled: !dockerUnavailable && effectiveSelectedContainerId != null,
+  })
+  const metricPoints = useMemo(() => metricsData?.points ?? [], [metricsData?.points])
+  const chartData = useMemo(() => metricPoints.map((point) => ({
+    time: new Date(point.recordedAt).getTime(),
+    cpuAvg: point.cpuAvg,
+    cpuMax: point.cpuMax,
+    memoryAvg: point.memoryAvg,
+    memoryMax: point.memoryMax,
+    networkRxAvg: point.networkRxAvg,
+    networkRxMax: point.networkRxMax,
+    networkTxAvg: point.networkTxAvg,
+    networkTxMax: point.networkTxMax,
+    blockReadAvg: point.blockReadAvg,
+    blockReadMax: point.blockReadMax,
+    blockWriteAvg: point.blockWriteAvg,
+    blockWriteMax: point.blockWriteMax,
+    pidsAvg: point.pidsAvg,
+    pidsMax: point.pidsMax,
+  })), [metricPoints])
   const hasActiveFilters = search.trim() !== '' || state !== 'all' || image !== 'all'
   const clearFilters = () => {
     setSearch('')
@@ -242,6 +393,8 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
                   <TableRow
                     key={container.id}
                     data-testid={`host-docker-container-row-${container.dockerContainerId}`}
+                    className={container.dockerContainerId === effectiveSelectedContainerId ? 'bg-muted/50' : 'cursor-pointer'}
+                    onClick={() => setSelectedContainerId(container.dockerContainerId)}
                   >
                     <TableCell>
                       <div className="font-medium text-foreground">
@@ -272,6 +425,106 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {selectedContainer && (
+        <Card data-testid="host-docker-container-metrics">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Activity className="size-4 text-muted-foreground" />
+                Container Metrics
+                <span className="font-mono text-xs font-normal text-muted-foreground">
+                  {selectedContainer.primaryName || selectedContainer.dockerContainerId.slice(0, 12)}
+                </span>
+              </CardTitle>
+              <div className="flex flex-wrap items-center gap-1">
+                {metricRangeOptions.map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant={metricsRange === option.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setMetricsRange(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {metricsLoading ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
+                Loading container metrics...
+              </div>
+            ) : metricPoints.length === 0 ? (
+              <EmptyState title="No metrics reported" body="Metric charts will appear after the agent uploads container samples for this container." icon={Activity} />
+            ) : (
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                  <MetricSummary label="CPU max" value={formatPercent(latestMax(metricPoints, 'cpuMax'))} />
+                  <MetricSummary label="Memory max" value={formatPercent(latestMax(metricPoints, 'memoryMax'))} />
+                  <MetricSummary label="Network RX max" value={formatBytes(latestMax(metricPoints, 'networkRxMax'))} />
+                  <MetricSummary label="Block read max" value={formatBytes(latestMax(metricPoints, 'blockReadMax'))} />
+                  <MetricSummary label="PIDs max" value={formatNumber(latestMax(metricPoints, 'pidsMax'))} />
+                </div>
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <ContainerMetricChart
+                    title="CPU avg/max"
+                    data={chartData}
+                    yFormatter={(value) => `${value.toFixed(0)}%`}
+                    lines={[
+                      { key: 'cpuAvg', name: 'CPU avg', color: 'hsl(221, 83%, 53%)' },
+                      { key: 'cpuMax', name: 'CPU max', color: 'hsl(0, 84%, 60%)' },
+                    ]}
+                  />
+                  <ContainerMetricChart
+                    title="Memory avg/max"
+                    data={chartData}
+                    yFormatter={(value) => `${value.toFixed(0)}%`}
+                    lines={[
+                      { key: 'memoryAvg', name: 'Memory avg', color: 'hsl(142, 71%, 45%)' },
+                      { key: 'memoryMax', name: 'Memory max', color: 'hsl(38, 92%, 50%)' },
+                    ]}
+                  />
+                  <ContainerMetricChart
+                    title="Network I/O"
+                    data={chartData}
+                    yFormatter={formatBytes}
+                    lines={[
+                      { key: 'networkRxAvg', name: 'RX avg', color: 'hsl(221, 83%, 53%)' },
+                      { key: 'networkRxMax', name: 'RX max', color: 'hsl(0, 84%, 60%)' },
+                      { key: 'networkTxAvg', name: 'TX avg', color: 'hsl(142, 71%, 45%)' },
+                      { key: 'networkTxMax', name: 'TX max', color: 'hsl(38, 92%, 50%)' },
+                    ]}
+                  />
+                  <ContainerMetricChart
+                    title="Block I/O"
+                    data={chartData}
+                    yFormatter={formatBytes}
+                    lines={[
+                      { key: 'blockReadAvg', name: 'Read avg', color: 'hsl(221, 83%, 53%)' },
+                      { key: 'blockReadMax', name: 'Read max', color: 'hsl(0, 84%, 60%)' },
+                      { key: 'blockWriteAvg', name: 'Write avg', color: 'hsl(142, 71%, 45%)' },
+                      { key: 'blockWriteMax', name: 'Write max', color: 'hsl(38, 92%, 50%)' },
+                    ]}
+                  />
+                  <ContainerMetricChart
+                    title="PIDs"
+                    data={chartData}
+                    yFormatter={(value) => Math.round(value).toLocaleString()}
+                    lines={[
+                      { key: 'pidsAvg', name: 'PIDs avg', color: 'hsl(221, 83%, 53%)' },
+                      { key: 'pidsMax', name: 'PIDs max', color: 'hsl(0, 84%, 60%)' },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

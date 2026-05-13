@@ -18,6 +18,7 @@ import (
 const (
 	dockerInventoryTimeout          = 5 * time.Second
 	defaultMaxDockerLabelBytes      = 16 * 1024
+	MaxDockerInventoryItemsPerBatch = 1000
 	maxDockerContainerIDBytes       = 128
 	maxDockerContainerNameBytes     = 256
 	maxDockerContainerImageBytes    = 512

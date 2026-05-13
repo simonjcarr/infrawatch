@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { bigint, boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 import { instanceSettings } from './instance-settings.ts'
 import { hosts } from './hosts.ts'
@@ -75,3 +75,65 @@ export const dockerContainers = pgTable(
 
 export type DockerContainer = typeof dockerContainers.$inferSelect
 export type NewDockerContainer = typeof dockerContainers.$inferInsert
+
+export const dockerContainerMetrics = pgTable(
+  'docker_container_metrics',
+  {
+    id: text('id').notNull().$defaultFn(() => createId()),
+    instanceId: text('instance_id')
+      .notNull()
+      .references(() => instanceSettings.id),
+    hostId: text('host_id')
+      .notNull()
+      .references(() => hosts.id),
+    dockerContainerRowId: text('docker_container_row_id')
+      .notNull()
+      .references(() => dockerContainers.id),
+    dockerContainerId: text('docker_container_id').notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+    cpuPercent: doublePrecision('cpu_percent'),
+    memoryUsageBytes: bigint('memory_usage_bytes', { mode: 'number' }),
+    memoryLimitBytes: bigint('memory_limit_bytes', { mode: 'number' }),
+    memoryPercent: doublePrecision('memory_percent'),
+    networkRxBytes: bigint('network_rx_bytes', { mode: 'number' }),
+    networkTxBytes: bigint('network_tx_bytes', { mode: 'number' }),
+    blockReadBytes: bigint('block_read_bytes', { mode: 'number' }),
+    blockWriteBytes: bigint('block_write_bytes', { mode: 'number' }),
+    pidsCurrent: integer('pids_current'),
+    restartCount: integer('restart_count'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.id, t.recordedAt] }),
+    index('docker_container_metrics_org_host_time_idx').on(t.instanceId, t.hostId, t.recordedAt),
+    index('docker_container_metrics_org_container_time_idx').on(t.instanceId, t.dockerContainerRowId, t.recordedAt),
+  ],
+)
+
+export type DockerContainerMetric = typeof dockerContainerMetrics.$inferSelect
+export type NewDockerContainerMetric = typeof dockerContainerMetrics.$inferInsert
+
+export const dockerTelemetryBatches = pgTable(
+  'docker_telemetry_batches',
+  {
+    instanceId: text('instance_id')
+      .notNull()
+      .references(() => instanceSettings.id),
+    hostId: text('host_id')
+      .notNull()
+      .references(() => hosts.id),
+    agentId: text('agent_id').notNull(),
+    batchId: text('batch_id').notNull(),
+    sequence: integer('sequence'),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    sampleCount: integer('sample_count').notNull().default(0),
+    inventoryCount: integer('inventory_count').notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('docker_telemetry_batches_host_batch_uidx').on(t.hostId, t.batchId),
+    index('docker_telemetry_batches_received_idx').on(t.receivedAt),
+  ],
+)
+
+export type DockerTelemetryBatch = typeof dockerTelemetryBatches.$inferSelect
+export type NewDockerTelemetryBatch = typeof dockerTelemetryBatches.$inferInsert

@@ -68,6 +68,9 @@ type Runner struct {
 
 	dockerMetricBuffer      *dockerMetricBuffer
 	dockerMetricSamplerOnce sync.Once
+	dockerTelemetryConfigMu sync.Mutex
+	dockerTelemetryConfig   *agentv1.DockerTelemetryConfig
+	dockerTelemetrySequence uint32
 
 	// Buffered ad-hoc query results, drained on each heartbeat send.
 	queryResultsMu sync.Mutex
@@ -284,6 +287,7 @@ func (r *Runner) runStream(ctx context.Context) error {
 	if err := r.sendHeartbeatWithAgentID(stream, r.jwtToken); err != nil {
 		return err
 	}
+	r.flushDockerTelemetry(ctx, client)
 
 	for {
 		select {
@@ -301,6 +305,7 @@ func (r *Runner) runStream(ctx context.Context) error {
 			if err := r.sendHeartbeat(stream); err != nil {
 				return err
 			}
+			r.flushDockerTelemetry(ctx, client)
 
 		case <-r.resultsReady:
 			// A check/task result is ready — fire an immediate heartbeat to
@@ -401,6 +406,9 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 	if resp.PendingServerCertPem != "" {
 		r.applyServerCertRotation(resp.PendingServerCertPem)
 	}
+	if resp.DockerTelemetryConfig != nil {
+		r.setDockerTelemetryConfig(resp.DockerTelemetryConfig)
+	}
 	if resp.PendingClientCertPem != "" && r.dataDir != "" {
 		if err := identity.SaveClientCert(r.dataDir, []byte(resp.PendingClientCertPem)); err != nil {
 			slog.Warn("saving pushed client cert", "err", err)
@@ -420,6 +428,38 @@ func (r *Runner) handleResponse(ctx context.Context, resp *agentv1.HeartbeatResp
 	if resp.UpdateAvailable && resp.DownloadUrl != "" {
 		r.startSelfUpdate(resp.LatestVersion, resp.DownloadUrl)
 	}
+}
+
+func (r *Runner) setDockerTelemetryConfig(config *agentv1.DockerTelemetryConfig) {
+	r.dockerTelemetryConfigMu.Lock()
+	defer r.dockerTelemetryConfigMu.Unlock()
+	if config == nil {
+		r.dockerTelemetryConfig = nil
+		return
+	}
+	clone := *config
+	r.dockerTelemetryConfig = &clone
+}
+
+func (r *Runner) currentDockerTelemetryLimits() dockerTelemetryLimits {
+	r.dockerTelemetryConfigMu.Lock()
+	defer r.dockerTelemetryConfigMu.Unlock()
+	return dockerTelemetryLimitsFromConfig(r.dockerTelemetryConfig)
+}
+
+func (r *Runner) nextDockerTelemetrySequence() uint32 {
+	r.dockerTelemetryConfigMu.Lock()
+	defer r.dockerTelemetryConfigMu.Unlock()
+	return r.dockerTelemetrySequence + 1
+}
+
+func (r *Runner) advanceDockerTelemetrySequence(count uint32) {
+	if count == 0 {
+		return
+	}
+	r.dockerTelemetryConfigMu.Lock()
+	defer r.dockerTelemetryConfigMu.Unlock()
+	r.dockerTelemetrySequence += count
 }
 
 func (r *Runner) startSelfUpdate(latestVersion, downloadURL string) {

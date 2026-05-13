@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,6 +93,71 @@ func TestCollectDockerMetricSamplesCalculatesStats(t *testing.T) {
 	}
 	if got.PidsCurrent != 7 || got.RestartCount != 4 {
 		t.Fatalf("pids/restarts = %d/%d", got.PidsCurrent, got.RestartCount)
+	}
+}
+
+func TestBuildDockerTelemetryBatchesSplitsSamplesAndSetsPayload(t *testing.T) {
+	samples := []*agentv1.DockerContainerMetricSample{
+		{DockerContainerId: "one", RecordedAtUnix: 1},
+		{DockerContainerId: "two", RecordedAtUnix: 2},
+		{DockerContainerId: "three", RecordedAtUnix: 3},
+	}
+	inventory := []*agentv1.DockerContainerInventory{{DockerContainerId: "one"}}
+
+	batches := buildDockerTelemetryBatches("agent-1", 7, inventory, samples, 4, dockerTelemetryLimits{
+		maxSamplesPerBatch:   2,
+		maxInventoryPerBatch: 10,
+		maxBatchBytes:        defaultDockerTelemetryMaxBatchBytes,
+	})
+
+	if len(batches) != 2 {
+		t.Fatalf("len(batches) = %d, want 2", len(batches))
+	}
+	if batches[0].BatchId == "" || batches[0].BatchId == batches[1].BatchId {
+		t.Fatalf("batch ids were not unique: %q / %q", batches[0].BatchId, batches[1].BatchId)
+	}
+	if batches[0].AgentId != "agent-1" || batches[0].Sequence != 7 || batches[1].Sequence != 8 {
+		t.Fatalf("agent/sequence fields = %q/%d/%d", batches[0].AgentId, batches[0].Sequence, batches[1].Sequence)
+	}
+	if got := len(batches[0].Inventory); got != 1 {
+		t.Fatalf("first batch inventory length = %d, want 1", got)
+	}
+	if got := len(batches[0].Samples); got != 2 {
+		t.Fatalf("first batch sample length = %d, want 2", got)
+	}
+	if got := len(batches[1].Samples); got != 1 {
+		t.Fatalf("second batch sample length = %d, want 1", got)
+	}
+	if batches[0].DroppedSampleCount != 4 || batches[1].DroppedSampleCount != 0 {
+		t.Fatalf("dropped sample counts = %d/%d, want first batch only", batches[0].DroppedSampleCount, batches[1].DroppedSampleCount)
+	}
+	if batches[0].PayloadBytes == 0 || batches[1].PayloadBytes == 0 {
+		t.Fatalf("payload bytes were not set: %d/%d", batches[0].PayloadBytes, batches[1].PayloadBytes)
+	}
+}
+
+func TestBuildDockerTelemetryBatchesRespectsPayloadBytes(t *testing.T) {
+	samples := []*agentv1.DockerContainerMetricSample{
+		{DockerContainerId: strings.Repeat("a", 80), RecordedAtUnix: 1},
+		{DockerContainerId: strings.Repeat("b", 80), RecordedAtUnix: 2},
+	}
+
+	batches := buildDockerTelemetryBatches("agent-1", 1, nil, samples, 0, dockerTelemetryLimits{
+		maxSamplesPerBatch:   100,
+		maxInventoryPerBatch: 100,
+		maxBatchBytes:        150,
+	})
+
+	if len(batches) != 2 {
+		t.Fatalf("len(batches) = %d, want payload split into 2", len(batches))
+	}
+	for i, batch := range batches {
+		if len(batch.Samples) != 1 {
+			t.Fatalf("batch %d has %d samples, want 1", i, len(batch.Samples))
+		}
+		if batch.PayloadBytes > 150 {
+			t.Fatalf("batch %d payload = %d, want <= 150", i, batch.PayloadBytes)
+		}
 	}
 }
 

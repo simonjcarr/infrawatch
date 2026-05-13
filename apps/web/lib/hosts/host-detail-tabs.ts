@@ -27,6 +27,7 @@ export type Tab =
   | 'packages'
   | 'containers'
   | 'notes'
+  | 'calendar'
 
 export const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -47,6 +48,7 @@ export const TAB_LABELS: Record<Tab, string> = {
   packages: 'Packages',
   containers: 'Containers',
   notes: 'Notes',
+  calendar: 'Calendar',
 }
 
 export const PARENT_TABS: Array<{
@@ -60,7 +62,7 @@ export const PARENT_TABS: Array<{
   { id: 'infrastructure', label: 'Infrastructure', defaultTab: 'storage', children: ['storage', 'network', 'host-networks', 'patch-status'] },
   { id: 'inventory', label: 'Inventory', defaultTab: 'packages', children: ['packages', 'vulnerabilities'] },
   { id: 'containers', label: 'Containers', defaultTab: 'containers', children: null },
-  { id: 'admin', label: 'Admin', defaultTab: 'notes', children: ['notes'] },
+  { id: 'admin', label: 'Admin', defaultTab: 'notes', children: ['notes', 'calendar'] },
   { id: 'management', label: 'Management', defaultTab: 'groups', children: ['users', 'groups', 'settings'] },
   { id: 'tools', label: 'Tools', defaultTab: 'tasks', children: ['tasks', 'logs', 'terminal'] },
 ]

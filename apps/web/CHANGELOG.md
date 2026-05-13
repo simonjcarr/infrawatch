@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.147.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.146.0...web/v0.147.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add container alert rules ([b76feb2](https://github.com/carrtech-dev/ct-ops/commit/b76feb26449cf8a88d4de72fb7b85b211f19895e))
+
 ## [0.146.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.145.0...web/v0.146.0) (2026-05-13)
 
 

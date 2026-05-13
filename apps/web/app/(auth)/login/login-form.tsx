@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -62,6 +62,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
   const inviteAcceptPath = getInviteAcceptPath(inviteToken)
   const ldapLoginEnabled = ldapLoginOptions.length > 0
   const defaultLdapLoginOption = ldapLoginOptions[0] ?? null
+  const [isHydrated, setIsHydrated] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [canResendVerification, setCanResendVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
@@ -86,6 +87,10 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
       ldapConfigurationId: defaultLdapLoginOption?.id ?? '',
     },
   })
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   async function onLocalSubmit(values: LocalLoginValues) {
     setServerError(null)
@@ -280,7 +285,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
       )}
 
       {loginMode === 'local' && localTwoFactorRequired ? (
-        <form onSubmit={onLocalTwoFactorSubmit}>
+        <form method="post" onSubmit={onLocalTwoFactorSubmit}>
           <CardContent className="space-y-4">
             {serverError && (
               <p className="text-sm text-destructive" data-testid="login-error">{serverError}</p>
@@ -345,7 +350,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
             <Button
               type="submit"
               className="w-full"
-              disabled={localTwoFactorSubmitting || !cleanTwoFactorCode(localTwoFactorCode, localTwoFactorMethod)}
+              disabled={!isHydrated || localTwoFactorSubmitting || !cleanTwoFactorCode(localTwoFactorCode, localTwoFactorMethod)}
               data-testid="login-2fa-submit"
             >
               {localTwoFactorSubmitting ? 'Verifying...' : 'Verify code'}
@@ -364,7 +369,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
           </CardFooter>
         </form>
       ) : loginMode === 'local' ? (
-        <form onSubmit={localForm.handleSubmit(onLocalSubmit)}>
+        <form method="post" onSubmit={localForm.handleSubmit(onLocalSubmit)}>
           <CardContent className="space-y-4">
             {notice && (
               <p className="text-sm text-foreground" data-testid="login-notice">{notice}</p>
@@ -436,7 +441,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
             <Button
               type="submit"
               className="w-full"
-              disabled={localForm.formState.isSubmitting}
+              disabled={!isHydrated || localForm.formState.isSubmitting}
               data-testid="login-submit"
             >
               {localForm.formState.isSubmitting ? 'Signing in...' : 'Sign in'}
@@ -453,7 +458,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
           </CardFooter>
         </form>
       ) : (
-        <form onSubmit={ldapTwoFactorRequired ? onDomainTwoFactorSubmit : domainForm.handleSubmit(onDomainSubmit)}>
+        <form method="post" onSubmit={ldapTwoFactorRequired ? onDomainTwoFactorSubmit : domainForm.handleSubmit(onDomainSubmit)}>
           <CardContent className="space-y-4">
             {serverError && (
               <p className="text-sm text-destructive">{serverError}</p>
@@ -572,7 +577,7 @@ export function LoginForm({ ldapLoginOptions = [], inviteToken = null, notice = 
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={domainForm.formState.isSubmitting || (ldapTwoFactorRequired && !ldapTwoFactorCode.trim())}>
+            <Button type="submit" className="w-full" disabled={!isHydrated || domainForm.formState.isSubmitting || (ldapTwoFactorRequired && !ldapTwoFactorCode.trim())}>
               {domainForm.formState.isSubmitting
                 ? (ldapTwoFactorRequired ? 'Verifying...' : 'Signing in...')
                 : (ldapTwoFactorRequired ? 'Verify code' : 'Sign in with Domain Account')}

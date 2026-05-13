@@ -142,3 +142,79 @@ func TestDockerContainerInventoryReportsFromProtoClampsFutureObservation(t *test
 		t.Fatalf("StartedAtSource = %v, want nil for far-future source timestamp", reports[0].StartedAtSource)
 	}
 }
+
+func TestInferDockerLifecycleEventsCoversTransitions(t *testing.T) {
+	t.Parallel()
+
+	previousStarted := time.Date(2026, 5, 13, 9, 0, 0, 0, time.UTC)
+	currentStarted := time.Date(2026, 5, 13, 9, 30, 0, 0, time.UTC)
+	finishedAt := time.Date(2026, 5, 13, 9, 45, 0, 0, time.UTC)
+	observedAt := time.Date(2026, 5, 13, 9, 46, 0, 0, time.UTC)
+
+	events := inferDockerLifecycleEvents(&dockerContainerLifecycleSnapshot{
+		DockerContainerID: "container-1",
+		PrimaryName:       "api",
+		Image:             "example/api:latest",
+		State:             "running",
+		Status:            "Up 45 minutes",
+		StartedAtSource:   &previousStarted,
+		RestartCount:      1,
+		IsPresent:         true,
+	}, DockerContainerInventoryReport{
+		DockerContainerID: "container-1",
+		PrimaryName:       "api",
+		Image:             "example/api:latest",
+		State:             "exited",
+		Status:            "Exited (0)",
+		StartedAtSource:   &currentStarted,
+		FinishedAtSource:  &finishedAt,
+		ObservedAt:        observedAt,
+		RestartCount:      3,
+	})
+
+	if len(events) != 3 {
+		t.Fatalf("len(events) = %d, want 3: %#v", len(events), events)
+	}
+	if events[0].EventType != DockerContainerLifecycleEventRestarted || !events[0].OccurredAt.Equal(observedAt) {
+		t.Fatalf("events[0] = %#v, want restarted at observedAt", events[0])
+	}
+	if events[1].EventType != DockerContainerLifecycleEventStarted || !events[1].OccurredAt.Equal(currentStarted) {
+		t.Fatalf("events[1] = %#v, want started at currentStarted", events[1])
+	}
+	if events[2].EventType != DockerContainerLifecycleEventStopped || !events[2].OccurredAt.Equal(finishedAt) {
+		t.Fatalf("events[2] = %#v, want stopped at finishedAt", events[2])
+	}
+}
+
+func TestInferDockerLifecycleEventsCoversNewAndReappearedContainers(t *testing.T) {
+	t.Parallel()
+
+	startedAt := time.Date(2026, 5, 13, 10, 0, 0, 0, time.UTC)
+	observedAt := time.Date(2026, 5, 13, 10, 1, 0, 0, time.UTC)
+	report := DockerContainerInventoryReport{
+		DockerContainerID: "container-1",
+		PrimaryName:       "worker",
+		Image:             "example/worker:latest",
+		State:             "running",
+		Status:            "Up 1 minute",
+		StartedAtSource:   &startedAt,
+		ObservedAt:        observedAt,
+	}
+
+	newEvents := inferDockerLifecycleEvents(nil, report)
+	if len(newEvents) != 1 || newEvents[0].EventType != DockerContainerLifecycleEventStarted || !newEvents[0].OccurredAt.Equal(startedAt) {
+		t.Fatalf("newEvents = %#v, want one started event", newEvents)
+	}
+
+	reappearedEvents := inferDockerLifecycleEvents(&dockerContainerLifecycleSnapshot{
+		DockerContainerID: "container-1",
+		PrimaryName:       "worker",
+		Image:             "example/worker:latest",
+		State:             "exited",
+		Status:            "Exited",
+		IsPresent:         false,
+	}, report)
+	if len(reappearedEvents) != 1 || reappearedEvents[0].EventType != DockerContainerLifecycleEventStarted || !reappearedEvents[0].OccurredAt.Equal(startedAt) {
+		t.Fatalf("reappearedEvents = %#v, want one started event", reappearedEvents)
+	}
+}

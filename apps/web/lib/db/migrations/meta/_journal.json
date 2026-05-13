@@ -43,6 +43,13 @@
       "when": 1778645300907,
       "tag": "0005_docker_metric_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778659600000,
+      "tag": "0006_docker_container_lifecycle_events",
+      "breakpoints": true
     }
   ]
 }

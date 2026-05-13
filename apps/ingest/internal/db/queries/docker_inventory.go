@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -28,6 +29,13 @@ const (
 	maxDockerContainerLabels          = 128
 )
 
+const (
+	DockerContainerLifecycleEventStarted     = "started"
+	DockerContainerLifecycleEventStopped     = "stopped"
+	DockerContainerLifecycleEventRestarted   = "restarted"
+	DockerContainerLifecycleEventDisappeared = "disappeared"
+)
+
 type DockerContainerInventoryReport struct {
 	DockerContainerID string
 	Names             []string
@@ -42,6 +50,30 @@ type DockerContainerInventoryReport struct {
 	FinishedAtSource  *time.Time
 	ObservedAt        time.Time
 	RestartCount      int32
+}
+
+type DockerContainerLifecycleEvent struct {
+	DockerContainerID string
+	PrimaryName       string
+	Image             string
+	State             string
+	Status            string
+	EventType         string
+	OccurredAt        time.Time
+	RestartCount      int32
+}
+
+type dockerContainerLifecycleSnapshot struct {
+	RowID             string
+	DockerContainerID string
+	PrimaryName       string
+	Image             string
+	State             string
+	Status            string
+	StartedAtSource   *time.Time
+	FinishedAtSource  *time.Time
+	RestartCount      int32
+	IsPresent         bool
 }
 
 func DockerContainerInventoryReportsFromProto(items []*agentv1.DockerContainerInventory, receivedAt time.Time) []DockerContainerInventoryReport {
@@ -102,6 +134,10 @@ func SyncDockerContainerInventory(ctx context.Context, pool *pgxpool.Pool, insta
 		if err != nil {
 			return err
 		}
+		previous, err := getDockerContainerLifecycleSnapshot(ctx, tx, instanceID, hostID, report.DockerContainerID)
+		if err != nil {
+			return err
+		}
 		const upsert = `
 			INSERT INTO docker_containers (
 				id,
@@ -145,8 +181,10 @@ func SyncDockerContainerInventory(ctx context.Context, pool *pgxpool.Pool, insta
 			    restart_count     = EXCLUDED.restart_count,
 			    is_present        = true,
 			    updated_at        = NOW()
+			RETURNING id
 		`
-		if _, err := tx.Exec(ctx, upsert,
+		var rowID string
+		if err := tx.QueryRow(ctx, upsert,
 			newCUID(),
 			instanceID,
 			hostID,
@@ -165,8 +203,13 @@ func SyncDockerContainerInventory(ctx context.Context, pool *pgxpool.Pool, insta
 			report.ObservedAt,
 			inventoryAt,
 			report.RestartCount,
-		); err != nil {
+		).Scan(&rowID); err != nil {
 			return err
+		}
+		for _, event := range inferDockerLifecycleEvents(previous, report) {
+			if err := insertDockerLifecycleEvent(ctx, tx, instanceID, hostID, rowID, event); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -180,13 +223,194 @@ func SyncDockerContainerInventory(ctx context.Context, pool *pgxpool.Pool, insta
 			  AND host_id = $2
 			  AND is_present = true
 			  AND NOT (docker_container_id = ANY($4::text[]))
+			RETURNING id, docker_container_id, primary_name, image, state, status, restart_count
 		`
-		if _, err := tx.Exec(ctx, markMissingQuery, instanceID, hostID, inventoryAt, seenIDs); err != nil {
+		rows, err := tx.Query(ctx, markMissingQuery, instanceID, hostID, inventoryAt, seenIDs)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var rowID string
+			var containerID string
+			var primaryName sql.NullString
+			var image sql.NullString
+			var state sql.NullString
+			var status sql.NullString
+			var restartCount sql.NullInt32
+			if err := rows.Scan(&rowID, &containerID, &primaryName, &image, &state, &status, &restartCount); err != nil {
+				return err
+			}
+			event := DockerContainerLifecycleEvent{
+				DockerContainerID: containerID,
+				PrimaryName:       primaryName.String,
+				Image:             image.String,
+				State:             state.String,
+				Status:            status.String,
+				EventType:         DockerContainerLifecycleEventDisappeared,
+				OccurredAt:        inventoryAt.UTC(),
+				RestartCount:      restartCount.Int32,
+			}
+			if err := insertDockerLifecycleEvent(ctx, tx, instanceID, hostID, rowID, event); err != nil {
+				return err
+			}
+		}
+		if err := rows.Err(); err != nil {
 			return err
 		}
 	}
 
 	return tx.Commit(ctx)
+}
+
+func getDockerContainerLifecycleSnapshot(ctx context.Context, tx pgx.Tx, instanceID, hostID, containerID string) (*dockerContainerLifecycleSnapshot, error) {
+	const query = `
+		SELECT id, docker_container_id, primary_name, image, state, status, started_at_source, finished_at_source, restart_count, is_present
+		FROM docker_containers
+		WHERE instance_id = $1
+		  AND host_id = $2
+		  AND docker_container_id = $3
+	`
+	var rowID string
+	var dockerContainerID string
+	var primaryName sql.NullString
+	var image sql.NullString
+	var state sql.NullString
+	var status sql.NullString
+	var startedAt sql.NullTime
+	var finishedAt sql.NullTime
+	var restartCount sql.NullInt32
+	var isPresent bool
+	err := tx.QueryRow(ctx, query, instanceID, hostID, containerID).Scan(
+		&rowID,
+		&dockerContainerID,
+		&primaryName,
+		&image,
+		&state,
+		&status,
+		&startedAt,
+		&finishedAt,
+		&restartCount,
+		&isPresent,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var startedPtr *time.Time
+	if startedAt.Valid {
+		t := startedAt.Time.UTC()
+		startedPtr = &t
+	}
+	var finishedPtr *time.Time
+	if finishedAt.Valid {
+		t := finishedAt.Time.UTC()
+		finishedPtr = &t
+	}
+	return &dockerContainerLifecycleSnapshot{
+		RowID:             rowID,
+		DockerContainerID: dockerContainerID,
+		PrimaryName:       primaryName.String,
+		Image:             image.String,
+		State:             state.String,
+		Status:            status.String,
+		StartedAtSource:   startedPtr,
+		FinishedAtSource:  finishedPtr,
+		RestartCount:      restartCount.Int32,
+		IsPresent:         isPresent,
+	}, nil
+}
+
+func inferDockerLifecycleEvents(previous *dockerContainerLifecycleSnapshot, report DockerContainerInventoryReport) []DockerContainerLifecycleEvent {
+	events := make([]DockerContainerLifecycleEvent, 0, 3)
+	if previous == nil || !previous.IsPresent {
+		if report.StartedAtSource != nil || strings.EqualFold(report.State, "running") {
+			events = append(events, dockerLifecycleEventFromReport(report, DockerContainerLifecycleEventStarted, eventTimeOrObserved(report.StartedAtSource, report.ObservedAt)))
+		}
+		if report.FinishedAtSource != nil {
+			events = append(events, dockerLifecycleEventFromReport(report, DockerContainerLifecycleEventStopped, eventTimeOrObserved(report.FinishedAtSource, report.ObservedAt)))
+		}
+		return events
+	}
+
+	if report.RestartCount > previous.RestartCount {
+		events = append(events, dockerLifecycleEventFromReport(report, DockerContainerLifecycleEventRestarted, report.ObservedAt))
+	}
+	if report.StartedAtSource != nil && !sameTimePtr(previous.StartedAtSource, report.StartedAtSource) {
+		events = append(events, dockerLifecycleEventFromReport(report, DockerContainerLifecycleEventStarted, eventTimeOrObserved(report.StartedAtSource, report.ObservedAt)))
+	}
+	if report.FinishedAtSource != nil && !sameTimePtr(previous.FinishedAtSource, report.FinishedAtSource) {
+		events = append(events, dockerLifecycleEventFromReport(report, DockerContainerLifecycleEventStopped, eventTimeOrObserved(report.FinishedAtSource, report.ObservedAt)))
+	}
+	return events
+}
+
+func dockerLifecycleEventFromReport(report DockerContainerInventoryReport, eventType string, occurredAt time.Time) DockerContainerLifecycleEvent {
+	return DockerContainerLifecycleEvent{
+		DockerContainerID: report.DockerContainerID,
+		PrimaryName:       report.PrimaryName,
+		Image:             report.Image,
+		State:             report.State,
+		Status:            report.Status,
+		EventType:         eventType,
+		OccurredAt:        occurredAt.UTC(),
+		RestartCount:      report.RestartCount,
+	}
+}
+
+func eventTimeOrObserved(value *time.Time, observedAt time.Time) time.Time {
+	if value == nil {
+		return observedAt.UTC()
+	}
+	return value.UTC()
+}
+
+func sameTimePtr(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
+}
+
+func insertDockerLifecycleEvent(ctx context.Context, tx pgx.Tx, instanceID, hostID, rowID string, event DockerContainerLifecycleEvent) error {
+	if event.DockerContainerID == "" || event.EventType == "" || event.OccurredAt.IsZero() {
+		return nil
+	}
+	const insert = `
+		INSERT INTO docker_container_lifecycle_events (
+			id,
+			instance_id,
+			host_id,
+			docker_container_row_id,
+			docker_container_id,
+			event_type,
+			occurred_at,
+			primary_name,
+			image,
+			state,
+			status,
+			restart_count
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), NULLIF($9, ''), NULLIF($10, ''), NULLIF($11, ''), $12)
+		ON CONFLICT (host_id, docker_container_id, event_type, occurred_at) DO NOTHING
+	`
+	_, err := tx.Exec(ctx, insert,
+		newCUID(),
+		instanceID,
+		hostID,
+		rowID,
+		event.DockerContainerID,
+		event.EventType,
+		event.OccurredAt.UTC(),
+		event.PrimaryName,
+		event.Image,
+		event.State,
+		event.Status,
+		event.RestartCount,
+	)
+	return err
 }
 
 func normalizeDockerInventoryNames(names []string) []string {

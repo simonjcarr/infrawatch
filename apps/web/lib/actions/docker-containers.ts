@@ -20,6 +20,7 @@ export interface HostDockerContainersResult {
 const MAX_CONTAINER_ROWS = 200
 const MAX_FILTER_LENGTH = 256
 const MAX_METRIC_POINTS = 300
+const MAX_LIFECYCLE_EVENTS = 100
 
 export type DockerContainerMetricsPreset = '1h' | '6h' | '24h' | '7d'
 
@@ -74,6 +75,24 @@ export interface DockerTopContainerRow {
 
 export interface HostDockerTopContainersResult {
   containers: DockerTopContainerRow[]
+}
+
+export type DockerContainerLifecycleEventType = 'started' | 'stopped' | 'restarted' | 'disappeared'
+
+export interface DockerContainerLifecycleEventRow {
+  id: string
+  dockerContainerId: string
+  primaryName: string | null
+  image: string | null
+  state: string | null
+  status: string | null
+  eventType: DockerContainerLifecycleEventType
+  occurredAt: Date
+  restartCount: number | null
+}
+
+export interface HostDockerContainerLifecycleEventsResult {
+  events: DockerContainerLifecycleEventRow[]
 }
 
 function cleanFilter(value: string | undefined): string | undefined {
@@ -368,6 +387,61 @@ export async function getHostDockerTopContainers(
       lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at) : null,
       value: row.value,
       sampleCount: row.sample_count,
+    })),
+  }
+}
+
+export async function getHostDockerContainerLifecycleEvents(
+  instanceId: string,
+  hostId: string,
+): Promise<HostDockerContainerLifecycleEventsResult> {
+  await requireInstanceAccess(instanceId)
+
+  const host = await db.query.hosts.findFirst({
+    columns: { id: true },
+    where: and(eq(hosts.id, hostId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
+  })
+  if (!host) return { events: [] }
+
+  const rows = await db.execute<{
+    id: string
+    docker_container_id: string
+    primary_name: string | null
+    image: string | null
+    state: string | null
+    status: string | null
+    event_type: DockerContainerLifecycleEventType
+    occurred_at: Date
+    restart_count: number | null
+  }>(sql`
+    SELECT
+      e.id,
+      e.docker_container_id,
+      e.primary_name,
+      e.image,
+      e.state,
+      e.status,
+      e.event_type,
+      e.occurred_at,
+      e.restart_count
+    FROM docker_container_lifecycle_events e
+    WHERE e.instance_id = ${instanceId}
+      AND e.host_id = ${hostId}
+    ORDER BY e.occurred_at DESC, e.created_at DESC
+    LIMIT ${MAX_LIFECYCLE_EVENTS}
+  `)
+
+  return {
+    events: Array.from(rows).map((row) => ({
+      id: row.id,
+      dockerContainerId: row.docker_container_id,
+      primaryName: row.primary_name,
+      image: row.image,
+      state: row.state,
+      status: row.status,
+      eventType: row.event_type,
+      occurredAt: new Date(row.occurred_at),
+      restartCount: row.restart_count,
     })),
   }
 }

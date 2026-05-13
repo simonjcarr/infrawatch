@@ -45,3 +45,18 @@ test('getHostDockerContainerMetrics returns bucketed averages and maxima for spi
   assert.match(segment, /MAX\(pids_current\).*AS pids_max/s)
   assert.match(segment, /LIMIT \$\{MAX_METRIC_POINTS\}/, 'metric query must cap returned points')
 })
+
+test('getHostDockerContainerLifecycleEvents validates host scope before querying timeline', () => {
+  const segment = getActionSegment('getHostDockerContainerLifecycleEvents')
+  const hostLookupIndex = segment.indexOf('db.query.hosts.findFirst')
+  const eventQueryIndex = segment.indexOf('FROM docker_container_lifecycle_events')
+
+  assert.notEqual(hostLookupIndex, -1, 'host ownership must be validated')
+  assert.notEqual(eventQueryIndex, -1, 'timeline query must exist')
+  assert.ok(hostLookupIndex < eventQueryIndex, 'host validation must run before timeline query')
+  assert.match(segment, /eq\(hosts\.id, hostId\)/, 'host lookup must include host id')
+  assert.match(segment, /eq\(hosts\.instanceId, instanceId\)/, 'host lookup must be scoped to the caller instance')
+  assert.match(segment, /WHERE e\.instance_id = \$\{instanceId\}/, 'timeline query must be scoped to instance')
+  assert.match(segment, /AND e\.host_id = \$\{hostId\}/, 'timeline query must be scoped to host')
+  assert.match(segment, /LIMIT \$\{MAX_LIFECYCLE_EVENTS\}/, 'timeline query must cap returned events')
+})

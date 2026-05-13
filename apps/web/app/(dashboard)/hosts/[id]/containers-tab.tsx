@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, formatDistanceToNow } from 'date-fns'
-import { Box, Search, X, ShieldAlert, WifiOff, AlertTriangle, Loader2, Activity, BarChart3 } from 'lucide-react'
+import { Box, Search, X, ShieldAlert, WifiOff, AlertTriangle, Loader2, Activity, BarChart3, History, Play, Square, RotateCw, EyeOff } from 'lucide-react'
 import {
   CartesianGrid,
   Legend,
@@ -29,8 +29,10 @@ import {
 } from '@/components/ui/table'
 import {
   getHostDockerContainerMetrics,
+  getHostDockerContainerLifecycleEvents,
   getHostDockerContainers,
   getHostDockerTopContainers,
+  type DockerContainerLifecycleEventType,
   type DockerContainerMetricPoint,
   type DockerContainerMetricsPreset,
   type DockerTopContainerMetric,
@@ -75,6 +77,27 @@ const topStatisticOptions: Array<{ value: DockerTopContainerStatistic; label: st
   { value: 'max', label: 'Max' },
   { value: 'p95', label: 'P95' },
 ]
+
+const lifecycleEventLabels: Record<DockerContainerLifecycleEventType, string> = {
+  started: 'Started',
+  stopped: 'Stopped',
+  restarted: 'Restarted',
+  disappeared: 'Disappeared',
+}
+
+const lifecycleEventStyles: Record<DockerContainerLifecycleEventType, string> = {
+  started: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
+  stopped: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300',
+  restarted: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  disappeared: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300',
+}
+
+const lifecycleEventIcons: Record<DockerContainerLifecycleEventType, typeof Play> = {
+  started: Play,
+  stopped: Square,
+  restarted: RotateCw,
+  disappeared: EyeOff,
+}
 
 const unavailableCopy: Record<Exclude<DisplayStatus, 'installed'>, { title: string; body: string; icon: typeof AlertTriangle }> = {
   unknown: {
@@ -166,6 +189,16 @@ function ContainerStateBadge({ state, present }: { state: string | null; present
   return (
     <Badge className="bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-100">
       {state || 'Unknown'}
+    </Badge>
+  )
+}
+
+function LifecycleEventBadge({ eventType }: { eventType: DockerContainerLifecycleEventType }) {
+  const Icon = lifecycleEventIcons[eventType]
+  return (
+    <Badge variant="outline" className={`gap-1 ${lifecycleEventStyles[eventType]}`}>
+      <Icon className="size-3" />
+      {lifecycleEventLabels[eventType]}
     </Badge>
   )
 }
@@ -305,7 +338,13 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
     }),
     enabled: !dockerUnavailable,
   })
+  const { data: lifecycleData, isLoading: lifecycleLoading } = useQuery({
+    queryKey: ['host-docker-container-lifecycle-events', scopeId, hostId],
+    queryFn: () => getHostDockerContainerLifecycleEvents(scopeId, hostId),
+    enabled: !dockerUnavailable,
+  })
   const topContainers = topContainersData?.containers ?? []
+  const lifecycleEvents = lifecycleData?.events ?? []
   const metricPoints = useMemo(() => metricsData?.points ?? [], [metricsData?.points])
   const chartData = useMemo(() => metricPoints.map((point) => ({
     time: new Date(point.recordedAt).getTime(),
@@ -486,6 +525,72 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                       {container.sampleCount.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="host-docker-container-lifecycle">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <History className="size-4 text-muted-foreground" />
+            Lifecycle timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {lifecycleLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
+              Loading lifecycle events...
+            </div>
+          ) : lifecycleEvents.length === 0 ? (
+            <EmptyState title="No lifecycle events" body="Starts, stops, restarts and disappeared containers will appear after new inventory changes are reported." icon={History} />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Container</TableHead>
+                  <TableHead>Image</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Restarts</TableHead>
+                  <TableHead>Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lifecycleEvents.map((event) => (
+                  <TableRow key={event.id} data-testid={`host-docker-lifecycle-event-${event.id}`}>
+                    <TableCell>
+                      <LifecycleEventBadge eventType={event.eventType} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-foreground">
+                        {event.primaryName || event.dockerContainerId.slice(0, 12)}
+                      </div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {event.dockerContainerId.slice(0, 12)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[260px] truncate text-sm">
+                      {event.image || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <ContainerStateBadge state={event.state} present={event.eventType !== 'disappeared'} />
+                    </TableCell>
+                    <TableCell className="max-w-[280px] truncate text-sm text-muted-foreground">
+                      {event.status || '-'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {event.restartCount ?? '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{formatRelative(event.occurredAt)}</div>
+                      <div className="text-xs text-muted-foreground">{formatAbsolute(event.occurredAt)}</div>
                     </TableCell>
                   </TableRow>
                 ))}

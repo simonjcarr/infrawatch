@@ -76,6 +76,45 @@ export const dockerContainers = pgTable(
 export type DockerContainer = typeof dockerContainers.$inferSelect
 export type NewDockerContainer = typeof dockerContainers.$inferInsert
 
+export type DockerContainerLifecycleEventType =
+  | 'started'
+  | 'stopped'
+  | 'restarted'
+  | 'disappeared'
+
+export const dockerContainerLifecycleEvents = pgTable(
+  'docker_container_lifecycle_events',
+  {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    instanceId: text('instance_id')
+      .notNull()
+      .references(() => instanceSettings.id),
+    hostId: text('host_id')
+      .notNull()
+      .references(() => hosts.id),
+    dockerContainerRowId: text('docker_container_row_id')
+      .notNull()
+      .references(() => dockerContainers.id),
+    dockerContainerId: text('docker_container_id').notNull(),
+    eventType: text('event_type').notNull().$type<DockerContainerLifecycleEventType>(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    primaryName: text('primary_name'),
+    image: text('image'),
+    state: text('state'),
+    status: text('status'),
+    restartCount: integer('restart_count'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('docker_container_lifecycle_events_host_event_uidx').on(t.hostId, t.dockerContainerId, t.eventType, t.occurredAt),
+    index('docker_container_lifecycle_events_org_host_time_idx').on(t.instanceId, t.hostId, t.occurredAt),
+    index('docker_container_lifecycle_events_org_container_time_idx').on(t.instanceId, t.dockerContainerRowId, t.occurredAt),
+  ],
+)
+
+export type DockerContainerLifecycleEvent = typeof dockerContainerLifecycleEvents.$inferSelect
+export type NewDockerContainerLifecycleEvent = typeof dockerContainerLifecycleEvents.$inferInsert
+
 export const dockerContainerMetrics = pgTable(
   'docker_container_metrics',
   {

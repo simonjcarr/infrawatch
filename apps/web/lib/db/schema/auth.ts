@@ -24,7 +24,7 @@ export const users = pgTable(
     notificationsEnabled: boolean('notifications_enabled').notNull().default(true),
   },
   (table) => [
-    index('users_org_active_deleted_name_email_idx').on(
+    index('users_instance_active_deleted_name_email_idx').on(
       table.instanceId,
       table.isActive,
       table.deletedAt,

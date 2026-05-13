@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { getRequiredSession } from '@/lib/auth/session'
-import { getOrgUsers } from '@/lib/actions/users'
+import { getInstanceUsers } from '@/lib/actions/users'
 import { TeamClient } from './team-client'
 
 export const metadata: Metadata = {
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default async function TeamPage() {
   const session = await getRequiredSession()
-  const { members, pendingInvites } = await getOrgUsers()
+  const { members, pendingInvites } = await getInstanceUsers()
 
   return (
     <TeamClient

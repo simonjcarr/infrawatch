@@ -1,13 +1,13 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 import { issueTestLicence } from '../fixtures/licence'
 
-async function getOrg(sql: ReturnType<typeof getTestDb>): Promise<{ id: string; licence_tier: string }> {
+async function getInstance(sql: ReturnType<typeof getTestDb>): Promise<{ id: string; licence_tier: string }> {
   const rows = await sql<Array<{ id: string; licence_tier: string }>>`
     SELECT id, licence_tier
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
@@ -16,9 +16,9 @@ async function getOrg(sql: ReturnType<typeof getTestDb>): Promise<{ id: string; 
 
 test('admin can validate and save a seat-capacity licence key from licence settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const org = await getOrg(sql)
+  const instance = await getInstance(sql)
   const licenceKey = await issueTestLicence({
-    instanceId: org.id,
+    instanceId: instance.id,
     tier: 'community',
     maxUsers: 8,
   })
@@ -46,7 +46,7 @@ test('admin can validate and save a seat-capacity licence key from licence setti
       const rows = await sql<Array<{ licence_tier: string; licence_key: string | null }>>`
         SELECT licence_tier, licence_key
         FROM instance_settings
-        WHERE id = ${org.id}
+        WHERE id = ${instance.id}
         LIMIT 1
       `
       return rows[0] ?? null

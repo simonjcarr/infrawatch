@@ -61,7 +61,7 @@
 
 ### Bug Fixes
 
-* **ingest:** remove org-scoped agent identity ([#1248](https://github.com/carrtech-dev/ct-ops/issues/1248)) ([3be0471](https://github.com/carrtech-dev/ct-ops/commit/3be047199c6e96c3fe1bd6f5320f8911991dbc35))
+* **ingest:** remove instance-scoped agent identity ([#1248](https://github.com/carrtech-dev/ct-ops/issues/1248)) ([3be0471](https://github.com/carrtech-dev/ct-ops/commit/3be047199c6e96c3fe1bd6f5320f8911991dbc35))
 
 ## [0.9.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.9.5...ingest/v0.9.6) (2026-05-09)
 
@@ -131,7 +131,7 @@
 
 ### Bug Fixes
 
-* **security:** scope host checks to tenant ([#1059](https://github.com/carrtech-dev/ct-ops/issues/1059)) ([c137203](https://github.com/carrtech-dev/ct-ops/commit/c137203ebec8acfc36156f50cf3587896ac3b845))
+* **security:** scope host checks to instance ([#1059](https://github.com/carrtech-dev/ct-ops/issues/1059)) ([c137203](https://github.com/carrtech-dev/ct-ops/commit/c137203ebec8acfc36156f50cf3587896ac3b845))
 
 ## [0.8.6](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.8.5...ingest/v0.8.6) (2026-05-05)
 

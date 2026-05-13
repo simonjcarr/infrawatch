@@ -58,7 +58,7 @@ export async function GET() {
     })
   }
 
-  const [agentRows, org, agentVersionRows, ingestLatestRows, ingestHistoryRows, agentErrorRows] = await Promise.all([
+  const [agentRows, instance, agentVersionRows, ingestLatestRows, ingestHistoryRows, agentErrorRows] = await Promise.all([
     db
       .select({ status: agents.status, count: count() })
       .from(agents)
@@ -235,9 +235,9 @@ export async function GET() {
 
   return Response.json({
     version: pkg.version,
-    licenceTier: org?.licenceTier ?? 'community',
-    metricRetentionDays: org?.metricRetentionDays ?? 30,
-    dockerMetricRetentionDays: org?.dockerMetricRetentionDays ?? 30,
+    licenceTier: instance?.licenceTier ?? 'community',
+    metricRetentionDays: instance?.metricRetentionDays ?? 30,
+    dockerMetricRetentionDays: instance?.dockerMetricRetentionDays ?? 30,
     database: { connected: true },
     agents: {
       online: agentOnline,

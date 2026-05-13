@@ -131,9 +131,6 @@ echo "Binary downloaded."
 if [ -n "\${CT_OPS_ENROLMENT_TOKEN:-}" ]; then
   sudo env CT_OPS_ENROLMENT_TOKEN="\$CT_OPS_ENROLMENT_TOKEN" ./ct-ops-agent --install --address ${shellSingleQuote(safeIngestAddress)}${tlsFlag}
   exit 0
-elif [ -n "\${CT_OPS_ORG_TOKEN:-}" ]; then
-  sudo env CT_OPS_ENROLMENT_TOKEN="\$CT_OPS_ORG_TOKEN" ./ct-ops-agent --install --address ${shellSingleQuote(safeIngestAddress)}${tlsFlag}
-  exit 0
 fi
 
 echo ""

@@ -42,8 +42,8 @@ export async function getHostCollectionSettings(
     return metadata.collectionSettings
   }
 
-  // Fall back to org defaults
-  return getOrgDefaultCollectionSettings(currentScope)
+  // Fall back to instance defaults
+  return getInstanceDefaultCollectionSettings(currentScope)
 }
 
 export async function updateHostCollectionSettings(
@@ -89,7 +89,7 @@ export async function getHostDockerRetentionSettings(
     args.length === 2 ? args : [resolveCurrentActionScope(session), args[0]]
   await requireInstanceAccess(currentScope)
 
-  const [host, org] = await Promise.all([
+  const [host, instance] = await Promise.all([
     db.query.hosts.findFirst({
       where: and(eq(hosts.id, hostId), eq(hosts.instanceId, currentScope), isNull(hosts.deletedAt)),
       columns: { metadata: true },
@@ -101,7 +101,7 @@ export async function getHostDockerRetentionSettings(
   ])
 
   const metadata = parseHostMetadata(host?.metadata)
-  const globalRetentionDays = org?.dockerMetricRetentionDays ?? 30
+  const globalRetentionDays = instance?.dockerMetricRetentionDays ?? 30
   const retentionDaysOverride = metadata.dockerSettings?.retentionDaysOverride ?? null
 
   return {
@@ -152,16 +152,16 @@ export async function updateHostDockerRetentionOverride(
   }
 }
 
-export async function getOrgDefaultCollectionSettings(
+export async function getInstanceDefaultCollectionSettings(
   instanceId: string,
 ): Promise<HostCollectionSettings> {
   await requireInstanceAccess(instanceId)
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
 
-  const meta = parseInstanceMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(instance?.metadata)
   if (meta?.defaultCollectionSettings) {
     return meta.defaultCollectionSettings
   }
@@ -169,19 +169,19 @@ export async function getOrgDefaultCollectionSettings(
   return { ...DEFAULT_COLLECTION_SETTINGS }
 }
 
-export async function updateOrgDefaultCollectionSettings(
+export async function updateInstanceDefaultCollectionSettings(
   instanceId: string,
   settings: HostCollectionSettings,
 ): Promise<{ success: true } | { error: string }> {
   await requireInstanceAdminAccess(instanceId)
   try {
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { id: true, metadata: true },
     })
-    if (!org) return { error: 'Instance not found' }
+    if (!instance) return { error: 'Instance not found' }
 
-    const currentMetadata = parseInstanceMetadata(org.metadata)
+    const currentMetadata = parseInstanceMetadata(instance.metadata)
     const updatedMetadata = {
       ...currentMetadata,
       defaultCollectionSettings: settings,
@@ -194,7 +194,7 @@ export async function updateOrgDefaultCollectionSettings(
 
     return { success: true }
   } catch (err) {
-    logError('Failed to update org default collection settings:', err)
+    logError('Failed to update instance default collection settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

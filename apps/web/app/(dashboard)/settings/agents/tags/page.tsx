@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default async function AgentTagRulesPage() {
   const session = await getRequiredSession()
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const rules = await listTagRules()

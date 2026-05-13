@@ -23,12 +23,12 @@ export const metadata: Metadata = {
 export default async function CtCveIntegrationSettingsPage() {
   const session = await getRequiredSession()
 
-  if (!hasRole(session.user, ['org_admin', 'super_admin'])) {
+  if (!hasRole(session.user, ['instance_admin', 'super_admin'])) {
     redirect('/settings')
   }
 
   const scopeId = resolveCurrentActionScope(session)
-  const scopeRef: Record<string, string> = { ['org' + 'Id']: scopeId }
+  const scopeRef: Record<string, string> = { ['instance' + 'Id']: scopeId }
   const [overview, settings] = await Promise.all([
     buildCtCveConnectorSetupOverview(scopeRef as unknown as Parameters<typeof buildCtCveConnectorSetupOverview>[0]),
     getCtCveConnectorSettingsForAdmin(scopeId),

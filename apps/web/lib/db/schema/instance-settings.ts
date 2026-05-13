@@ -8,7 +8,7 @@ import { normaliseFeatureFlagOverrides, type FeatureFlagOverrides } from '../../
 
 export interface InstanceNotificationSettings {
   inAppEnabled?: boolean      // default true — master switch for in-app notifications
-  inAppRoles?: string[]       // default ['super_admin','org_admin','engineer']
+  inAppRoles?: string[]       // default ['super_admin','instance_admin','engineer']
   allowUserOptOut?: boolean   // default true — whether users can individually opt out
   smtpRelay?: SmtpRelaySettings
 }

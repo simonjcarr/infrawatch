@@ -1098,19 +1098,42 @@ and deploy validation scope.
 
 ## Task 16 - Final Residue Sweep And Validation
 
-Status: Not started
+Status: Completed
 
-Completed by:
+Completed by: Codex
 
-PR:
+PR: Pending
 
-Summary:
+Summary: Removed the remaining old organisation naming from active web, agent,
+ingest, workflow, docs, tests, integration contracts, and launch assertions.
+Renamed the remaining role/string residue to instance terminology, added a data
+migration for existing `org_admin` values, changed CT-CVE and password-manager
+contracts to instance-shaped claims, removed the legacy
+`CT_OPS_ORG_TOKEN` fallback, and corrected stale test/doc residue found by the
+final scan.
 
-Files changed:
+Files changed: `.github/workflows/agent-release.yml`; `agent/**`;
+`apps/ingest/**`; `apps/web/**`; `apps/docs/**`; `docs/**`; top-level project
+docs and trackers.
 
 Validation:
 
-Follow-up:
+- `pnpm --dir apps/web db:validate` — passed.
+- `pnpm --dir apps/web type-check` — passed.
+- `pnpm --dir apps/web lint` — passed with existing warnings only.
+- `pnpm --dir apps/web test:unit` — passed, 348 tests.
+- `pnpm --dir apps/web exec playwright test --list` — passed, 125 tests listed.
+- `BETTER_AUTH_URL=http://localhost:3100 E2E_DISABLE_AGENT_CACHE_PREWARM=1 pnpm --dir apps/web exec playwright test settings/activation-token.spec.ts settings/agent-enrolment.spec.ts --project=chromium` — blocked by local environment: `POSTGRES_PASSWORD environment variable is required when DATABASE_URL is not set`.
+- `pnpm --dir apps/docs build` — passed.
+- `go test ./...` in `agent` — passed.
+- `go test ./...` in `apps/ingest` — passed.
+- `rg -n "orgId|organisationId|organisation_id|org_id|organisations|org_admin|CT_OPS_ORG_TOKEN|installOrg|installOrganisation|ct_ops_organization|org_scope_mismatch|orgSlug|tenant" apps/web apps/ingest agent .github docs apps/docs README.md SECURITY.md CLAUDE.md TASK.md PROGRESS.md PENTEST.md --glob '!**/node_modules/**' --glob '!apps/web/lib/db/migrations/0007_instance_role_residue.sql' --glob '!apps/web/lib/db/migrations/meta/**'` — no matches.
+- Broad residue scan excluding the tracker and the transitional migration only
+  reports the allowed matches recorded below.
+
+Follow-up: Coordinate the activation-token field rename with `ct-portal` before
+shipping the purchase flow if the portal has not already been updated to accept
+`installInstanceId` / `installInstanceName`.
 
 ### Required work
 
@@ -1144,7 +1167,9 @@ Follow-up:
 
 ## Remaining Allowed Matches
 
-Record any allowed residue here during Task 4. Leave this empty until then.
-
 | Path | Match | Reason |
 | --- | --- | --- |
+| `apps/web/lib/db/migrations/0007_instance_role_residue.sql` | `org_admin` | Transitional data migration that converts persisted legacy roles to `instance_admin`. |
+| `apps/web/lib/certificates/fetch.ts`, certificate checker UI/tests | `organization`, `organizationalUnit`, `issuerOrganization`, `Organization` | X.509 certificate subject/issuer field names and UI labels, unrelated to CT-Ops legacy organisations. |
+| `pnpm-lock.yaml` | `Org` inside integrity hashes | Base64 package integrity data, not source or product terminology. |
+| `apps/web/app/(dashboard)/hosts/groups/groups-client.tsx` | `Organise` | Plain English UI copy, not organisation identity or schema. |

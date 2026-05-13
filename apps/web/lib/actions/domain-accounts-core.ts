@@ -164,7 +164,7 @@ export async function createDomainAccount(
     return { success: true, id: row.id }
   } catch (err) {
     const message = err instanceof Error ? err.message : ''
-    if (message.includes('domain_accounts_org_username_idx')) {
+    if (message.includes('domain_accounts_instance_username_idx')) {
       return { error: 'An account with this username already exists' }
     }
     logError('Failed to create service account:', err)

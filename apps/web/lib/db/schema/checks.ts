@@ -65,7 +65,7 @@ export const checks = pgTable('checks', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('checks_org_host_idx').on(table.instanceId, table.hostId),
+  index('checks_instance_host_idx').on(table.instanceId, table.hostId),
 ])
 
 export const checkResults = pgTable('check_results', {

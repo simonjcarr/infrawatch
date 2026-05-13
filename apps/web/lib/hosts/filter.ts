@@ -22,7 +22,7 @@ export interface HostFilterResult {
 }
 
 // Builds a Drizzle WHERE clause for a host filter. All supplied fields AND
-// together. Returned SQL is always org-scoped and excludes soft-deleted hosts.
+// together. Returned SQL is always instance-scoped and excludes soft-deleted hosts.
 export function buildHostFilterWhere(instanceId: string, filter: HostFilter): SQL | undefined {
   const conditions: SQL[] = [
     eq(hosts.instanceId, instanceId),

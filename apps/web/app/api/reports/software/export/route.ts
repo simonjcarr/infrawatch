@@ -210,10 +210,10 @@ export async function GET(req: NextRequest) {
   }
 
   // ── PDF ──────────────────────────────────────────────────────────────────────
-  const orgName = 'CT-Ops'
+  const instanceName = 'CT-Ops'
 
   const pdfElement = createElement(SoftwareReportPDF, {
-    orgName,
+    instanceName,
     packageName,
     versionFilter: vm && vm !== 'any' ? { mode: vm, exact: ve, prefix: vp, low: vl, high: vh } : undefined,
     osFamily,

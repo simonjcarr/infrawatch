@@ -5,7 +5,7 @@ import {
   verifyCtCveServiceRequest,
   type CtCveServiceAuthError,
 } from '@/lib/integrations/ct-cve/service-token'
-import { getCtCveServiceTokensForOrg } from '@/lib/integrations/ct-cve/connector-settings'
+import { getCtCveServiceTokensForInstance } from '@/lib/integrations/ct-cve/connector-settings'
 import {
   CtCveFindingBatchValidationError,
   ingestCtCveFindingBatch,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }, 400)
   }
 
-  const tokens = await getCtCveServiceTokensForOrg(instanceId)
+  const tokens = await getCtCveServiceTokensForInstance(instanceId)
   if (tokens.length === 0) {
     return errorResponse({
       code: 'ct_cve_not_configured',

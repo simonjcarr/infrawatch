@@ -46,8 +46,8 @@ func TestLoadReadsSecureConfig(t *testing.T) {
 	}
 }
 
-func TestLoadReadsLegacyOrgTokenEnvFallback(t *testing.T) {
-	t.Setenv("CT_OPS_ORG_TOKEN", " legacy ")
+func TestLoadTrimsCanonicalEnrolmentTokenEnv(t *testing.T) {
+	t.Setenv("CT_OPS_ENROLMENT_TOKEN", " canonical ")
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "agent.toml")
@@ -59,7 +59,7 @@ func TestLoadReadsLegacyOrgTokenEnvFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if cfg.Agent.EnrolmentToken != "legacy" {
+	if cfg.Agent.EnrolmentToken != "canonical" {
 		t.Fatalf("unexpected enrolment token: %q", cfg.Agent.EnrolmentToken)
 	}
 }

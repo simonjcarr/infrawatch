@@ -5,7 +5,7 @@ import {
   verifyCtCveServiceRequest,
   type CtCveServiceAuthError,
 } from '@/lib/integrations/ct-cve/service-token'
-import { getCtCveServiceTokensForOrg } from '@/lib/integrations/ct-cve/connector-settings'
+import { getCtCveServiceTokensForInstance } from '@/lib/integrations/ct-cve/connector-settings'
 import { recordCtCveConnectionHealth } from '@/lib/integrations/ct-cve/connection-status'
 
 export const dynamic = 'force-dynamic'
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const tokens = await getCtCveServiceTokensForOrg(instanceId)
+  const tokens = await getCtCveServiceTokensForInstance(instanceId)
   if (tokens.length === 0) {
     return NextResponse.json(
       {

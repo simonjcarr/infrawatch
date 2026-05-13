@@ -1,12 +1,12 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
@@ -15,7 +15,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('overview aggregates agent, certificate, and alert counts for the instance', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
 
   await sql`
     INSERT INTO agents (id, instance_id, hostname, public_key, status, os, arch)
@@ -122,8 +122,8 @@ test('overview aggregates agent, certificate, and alert counts for the instance'
   await page.goto('/dashboard')
 
   await expect(page.getByTestId('dashboard-heading')).toBeVisible()
-  await expect(page).toHaveTitle(`Overview | ${TEST_ORG.name}`)
-  await expect(page.getByTestId('dashboard-instance-name')).toHaveText(TEST_ORG.name)
+  await expect(page).toHaveTitle(`Overview | ${TEST_INSTANCE.name}`)
+  await expect(page.getByTestId('dashboard-instance-name')).toHaveText(TEST_INSTANCE.name)
   await expect(page.getByTestId('dashboard-agents-total')).toContainText('2')
   await expect(page.getByTestId('dashboard-agents-online')).toContainText('1')
   await expect(page.getByTestId('dashboard-agents-offline')).toContainText('1')

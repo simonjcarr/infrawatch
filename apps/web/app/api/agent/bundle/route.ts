@@ -63,7 +63,7 @@ const requestSchema = z.object({
  * and embeds a single-use, short-lived enrolment token — this is recorded
  * in the `agent_enrolment_tokens` table (the audit trail).
  *
- * Gated on org_admin / super_admin. Scoped by instanceId.
+ * Gated on instance_admin / super_admin. Scoped by instanceId.
  */
 export async function POST(request: NextRequest) {
   try {

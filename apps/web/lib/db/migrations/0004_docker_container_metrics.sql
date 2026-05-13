@@ -35,7 +35,7 @@ ALTER TABLE "docker_container_metrics" ADD CONSTRAINT "docker_container_metrics_
 ALTER TABLE "docker_container_metrics" ADD CONSTRAINT "docker_container_metrics_docker_container_row_id_docker_containers_id_fk" FOREIGN KEY ("docker_container_row_id") REFERENCES "public"."docker_containers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "docker_telemetry_batches" ADD CONSTRAINT "docker_telemetry_batches_instance_id_instance_settings_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."instance_settings"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "docker_telemetry_batches" ADD CONSTRAINT "docker_telemetry_batches_host_id_hosts_id_fk" FOREIGN KEY ("host_id") REFERENCES "public"."hosts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "docker_container_metrics_org_host_time_idx" ON "docker_container_metrics" USING btree ("instance_id","host_id","recorded_at");--> statement-breakpoint
-CREATE INDEX "docker_container_metrics_org_container_time_idx" ON "docker_container_metrics" USING btree ("instance_id","docker_container_row_id","recorded_at");--> statement-breakpoint
+CREATE INDEX "docker_container_metrics_instance_host_time_idx" ON "docker_container_metrics" USING btree ("instance_id","host_id","recorded_at");--> statement-breakpoint
+CREATE INDEX "docker_container_metrics_instance_container_time_idx" ON "docker_container_metrics" USING btree ("instance_id","docker_container_row_id","recorded_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "docker_telemetry_batches_host_batch_uidx" ON "docker_telemetry_batches" USING btree ("host_id","batch_id");--> statement-breakpoint
 CREATE INDEX "docker_telemetry_batches_received_idx" ON "docker_telemetry_batches" USING btree ("received_at");

@@ -23,7 +23,7 @@ export const terminalSessions = pgTable('terminal_sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index('terminal_sessions_org_host_idx').on(t.instanceId, t.hostId),
+  index('terminal_sessions_instance_host_idx').on(t.instanceId, t.hostId),
   index('terminal_sessions_session_id_idx').on(t.sessionId),
 ])
 

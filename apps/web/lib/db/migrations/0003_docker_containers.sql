@@ -25,5 +25,5 @@ CREATE TABLE "docker_containers" (
 ALTER TABLE "docker_containers" ADD CONSTRAINT "docker_containers_instance_id_instance_settings_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."instance_settings"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "docker_containers" ADD CONSTRAINT "docker_containers_host_id_hosts_id_fk" FOREIGN KEY ("host_id") REFERENCES "public"."hosts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "docker_containers_host_container_uidx" ON "docker_containers" USING btree ("host_id","docker_container_id");--> statement-breakpoint
-CREATE INDEX "docker_containers_org_host_present_seen_idx" ON "docker_containers" USING btree ("instance_id","host_id","is_present","last_seen_at");--> statement-breakpoint
-CREATE INDEX "docker_containers_org_image_idx" ON "docker_containers" USING btree ("instance_id","image");
+CREATE INDEX "docker_containers_instance_host_present_seen_idx" ON "docker_containers" USING btree ("instance_id","host_id","is_present","last_seen_at");--> statement-breakpoint
+CREATE INDEX "docker_containers_instance_image_idx" ON "docker_containers" USING btree ("instance_id","image");

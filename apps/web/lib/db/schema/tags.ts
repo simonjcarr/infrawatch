@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { instanceSettings } from './instance-settings.ts'
 
-// Normalised tag catalogue. One row per distinct (org, key, value) — resource
+// Normalised tag catalogue. One row per distinct (instance, key, value) — resource
 // assignments reference this table via resource_tags.tag_id. The case-insensitive
 // unique index prevents near-duplicate spellings ("prod" vs "Prod") from
 // coexisting; the UI powers autocomplete off these rows so users are nudged
@@ -21,12 +21,12 @@ export const tags = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('tags_org_key_value_ci_uidx').on(
+    uniqueIndex('tags_instance_key_value_ci_uidx').on(
       table.instanceId,
       sql`lower(${table.key})`,
       sql`lower(${table.value})`,
     ),
-    index('tags_org_key_idx').on(table.instanceId, table.key),
+    index('tags_instance_key_idx').on(table.instanceId, table.key),
   ],
 )
 

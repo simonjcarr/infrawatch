@@ -30,7 +30,7 @@ export const hostPatchStatuses = pgTable(
   },
   (t) => [
     uniqueIndex('host_patch_statuses_check_uniq').on(t.checkId),
-    index('host_patch_statuses_org_status_idx').on(t.instanceId, t.status),
+    index('host_patch_statuses_instance_status_idx').on(t.instanceId, t.status),
     index('host_patch_statuses_host_checked_idx').on(t.hostId, t.checkedAt),
   ],
 )
@@ -64,7 +64,7 @@ export const hostPackageUpdates = pgTable(
       t.architecture,
       t.packageManager,
     ),
-    index('host_package_updates_org_status_idx').on(t.instanceId, t.status),
+    index('host_package_updates_instance_status_idx').on(t.instanceId, t.status),
     index('host_package_updates_host_status_idx').on(t.hostId, t.status),
   ],
 )

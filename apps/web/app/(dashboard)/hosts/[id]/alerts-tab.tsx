@@ -266,7 +266,7 @@ function AddRuleDialog({
     queryFn: () => getChecksWithHistory(scopeId, hostId),
   })
 
-  const { data: orgCerts = [] } = useQuery({
+  const { data: instanceCerts = [] } = useQuery({
     queryKey: ['certificates', scopeId],
     queryFn: () => getCertificates({ limit: 200 }),
     enabled: conditionType === 'cert_expiry' && certScope === 'specific',
@@ -538,7 +538,7 @@ function AddRuleDialog({
                           <SelectValue placeholder="Select a certificate…" />
                         </SelectTrigger>
                         <SelectContent>
-                          {orgCerts.map((c) => (
+                          {instanceCerts.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.commonName} ({c.host}:{c.port})
                             </SelectItem>

@@ -49,4 +49,4 @@ This is intentional for environments where the directory contains tens of thousa
 
 ## Permissions
 
-Any authenticated user in the CT-Ops instance can run directory lookups. Managing LDAP configurations (adding, editing, deleting) is restricted to `org_admin` and `super_admin`.
+Any authenticated user in the CT-Ops instance can run directory lookups. Managing LDAP configurations (adding, editing, deleting) is restricted to `instance_admin` and `super_admin`.

@@ -222,7 +222,7 @@ function uniqueValues(values: readonly string[]): string[] {
   return Array.from(new Set(values.filter((value) => value.trim().length > 0)))
 }
 
-async function ensureHostsBelongToOrg(instanceId: string, hostIds: readonly string[]): Promise<{ ok: true; hostIds: string[] } | { error: string }> {
+async function ensureHostsBelongToInstance(instanceId: string, hostIds: readonly string[]): Promise<{ ok: true; hostIds: string[] } | { error: string }> {
   const uniqueHostIds = uniqueValues(hostIds)
   if (uniqueHostIds.length === 0) return { ok: true, hostIds: [] }
 
@@ -236,7 +236,7 @@ async function ensureHostsBelongToOrg(instanceId: string, hostIds: readonly stri
   return { ok: true, hostIds: uniqueHostIds }
 }
 
-async function ensureUsersBelongToOrg(
+async function ensureUsersBelongToInstance(
   instanceId: string,
   participants: readonly z.infer<typeof participantInputSchema>[],
 ): Promise<{ ok: true; participants: Array<{ userId: string; role: CalendarParticipantRole }> } | { error: string }> {
@@ -663,9 +663,9 @@ export async function createCalendarEvent(
   const parsed = parseCalendarInput(input)
   if ('error' in parsed) return parsed
 
-  const hostCheck = await ensureHostsBelongToOrg(instanceId, parsed.data.hostIds)
+  const hostCheck = await ensureHostsBelongToInstance(instanceId, parsed.data.hostIds)
   if ('error' in hostCheck) return hostCheck
-  const participantCheck = await ensureUsersBelongToOrg(instanceId, parsed.data.participants)
+  const participantCheck = await ensureUsersBelongToInstance(instanceId, parsed.data.participants)
   if ('error' in participantCheck) return participantCheck
 
   try {
@@ -742,9 +742,9 @@ export async function updateCalendarEvent(
   const parsed = parseCalendarInput(input)
   if ('error' in parsed) return parsed
 
-  const hostCheck = await ensureHostsBelongToOrg(instanceId, parsed.data.hostIds)
+  const hostCheck = await ensureHostsBelongToInstance(instanceId, parsed.data.hostIds)
   if ('error' in hostCheck) return hostCheck
-  const participantCheck = await ensureUsersBelongToOrg(instanceId, parsed.data.participants)
+  const participantCheck = await ensureUsersBelongToInstance(instanceId, parsed.data.participants)
   if ('error' in participantCheck) return participantCheck
 
   const existing = await db.query.calendarEvents.findFirst({

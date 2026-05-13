@@ -133,7 +133,7 @@ const administrationPages = [
   'app/(dashboard)/settings/system/page.tsx',
 ]
 
-test('dashboard shell falls back to community licence without org-backed scope', () => {
+test('dashboard shell falls back to community licence without instance-backed scope', () => {
   assert.match(
     dashboardLayoutSource,
     /getInstanceEffectiveLicence\(session\.user\.instanceId\)/,
@@ -158,8 +158,8 @@ test('dashboard overview uses the instance display name for page context', () =>
 test('licence activation panel shows instance purchase context', () => {
   assert.match(settingsClientSource, /data-testid="licence-instance-name"/)
   assert.match(settingsClientSource, /data-testid="licence-instance-id"/)
-  assert.match(settingsClientSource, /\{org\.name\}/)
-  assert.match(settingsClientSource, /\{org\.id\}/)
+  assert.match(settingsClientSource, /\{instance\.name\}/)
+  assert.match(settingsClientSource, /\{instance\.id\}/)
 })
 
 test('sidebar-linked pages do not force an instance-backed action scope', () => {
@@ -178,11 +178,11 @@ test('sidebar-linked pages do not force an instance-backed action scope', () => 
   }
 })
 
-test('standalone sidebar APIs use regular session auth and empty no-org fallbacks', () => {
+test('standalone sidebar APIs use regular session auth and empty no-instance fallbacks', () => {
   for (const relativePath of standaloneApiRoutes) {
     const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')
-    assert.match(source, /getApiSession\(/, `${relativePath} should allow no-org sessions`)
-    assert.doesNotMatch(source, /getApiOrg(Admin)?Session\(/)
+    assert.match(source, /getApiSession\(/, `${relativePath} should allow no-instance sessions`)
+    assert.doesNotMatch(source, /getApiInstance(Admin)?Session\(/)
   }
 })
 
@@ -253,10 +253,10 @@ test('role assignment can claim pending users that signed up outside the instanc
 test('administration pages use normalized role checks', () => {
   for (const relativePath of administrationPages) {
     const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')
-    assert.match(source, /hasRole\(session\.user, \['org_admin', 'super_admin'\]\)/)
+    assert.match(source, /hasRole\(session\.user, \['instance_admin', 'super_admin'\]\)/)
     assert.doesNotMatch(
       source,
-      /ADMIN_ROLES\.includes\(session\.user\.role\)|session\.user\.role === 'super_admin'|\['org_admin', 'super_admin'\]\.includes\(session\.user\.role\)/,
+      /ADMIN_ROLES\.includes\(session\.user\.role\)|session\.user\.role === 'super_admin'|\['instance_admin', 'super_admin'\]\.includes\(session\.user\.role\)/,
       `${relativePath} should not depend on the primary legacy role string`,
     )
   }

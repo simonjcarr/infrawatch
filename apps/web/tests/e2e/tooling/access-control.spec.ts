@@ -51,6 +51,6 @@ test('read-only users cannot access tooling pages or certificate checker API', a
     expect(launchAssertionResponse.status()).toBe(403)
     await expect(launchAssertionResponse.json()).resolves.toMatchObject({ error: 'Forbidden' })
   } finally {
-    await sql`UPDATE "user" SET role = 'org_admin', updated_at = NOW() WHERE id = ${userId}`
+    await sql`UPDATE "user" SET role = 'instance_admin', updated_at = NOW() WHERE id = ${userId}`
   }
 })

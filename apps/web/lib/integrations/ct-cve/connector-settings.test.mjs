@@ -19,14 +19,14 @@ test('normalises CT-CVE connector settings and generates missing first-save secr
   ]
 
   const saved = normaliseCtCveConnectorSettingsForSave({
-    instanceId: 'org_123',
+    instanceId: 'instance_123',
     input: {
       enabled: true,
       name: '  Production CT-CVE  ',
       baseUrl: 'https://ct-cve.example.invalid/api/?ignored=1#section',
-      inventoryTokenId: '  ctops_inventory_org_123  ',
+      inventoryTokenId: '  ctops_inventory_instance_123  ',
       inventoryTokenSecret: '',
-      ctCveTokenId: ' ctcve_findings_org_123 ',
+      ctCveTokenId: ' ctcve_findings_instance_123 ',
       ctCveTokenSecret: '',
     },
     generateSecret: () => generated.shift() ?? 'unexpected',
@@ -34,27 +34,27 @@ test('normalises CT-CVE connector settings and generates missing first-save secr
   })
 
   assert.deepEqual(saved, {
-    instanceId: 'org_123',
+    instanceId: 'instance_123',
     enabled: true,
     name: 'Production CT-CVE',
     baseUrl: 'https://ct-cve.example.invalid/api',
-    inventoryTokenId: 'ctops_inventory_org_123',
+    inventoryTokenId: 'ctops_inventory_instance_123',
     inventoryTokenSecretEncrypted: `enc:${Buffer.from('generated inventory secret for first save').toString('base64url')}`,
-    ctCveTokenId: 'ctcve_findings_org_123',
+    ctCveTokenId: 'ctcve_findings_instance_123',
     ctCveTokenSecretEncrypted: `enc:${Buffer.from('generated ct-cve secret for first save').toString('base64url')}`,
   })
 })
 
 test('preserves stored secrets when update form leaves secret fields blank', () => {
   const saved = normaliseCtCveConnectorSettingsForSave({
-    instanceId: 'org_123',
+    instanceId: 'instance_123',
     input: {
       enabled: false,
       name: 'Primary CT-CVE',
       baseUrl: 'https://ct-cve.example.invalid/',
-      inventoryTokenId: 'ctops_inventory_org_123',
+      inventoryTokenId: 'ctops_inventory_instance_123',
       inventoryTokenSecret: '   ',
-      ctCveTokenId: 'ctcve_findings_org_123',
+      ctCveTokenId: 'ctcve_findings_instance_123',
       ctCveTokenSecret: '',
     },
     existing: {
@@ -80,14 +80,14 @@ test('rejects invalid connector URL, token IDs, and weak secrets', () => {
   )
   assert.throws(
     () => normaliseCtCveConnectorSettingsForSave({
-      instanceId: 'org_123',
+      instanceId: 'instance_123',
       input: {
         enabled: true,
         name: 'Primary CT-CVE',
         baseUrl: 'https://ct-cve.example.invalid',
         inventoryTokenId: 'not a token id',
         inventoryTokenSecret: inventorySecret,
-        ctCveTokenId: 'ctcve_findings_org_123',
+        ctCveTokenId: 'ctcve_findings_instance_123',
         ctCveTokenSecret: ctCveSecret,
       },
       encryptSecret: (value) => value,
@@ -96,14 +96,14 @@ test('rejects invalid connector URL, token IDs, and weak secrets', () => {
   )
   assert.throws(
     () => normaliseCtCveConnectorSettingsForSave({
-      instanceId: 'org_123',
+      instanceId: 'instance_123',
       input: {
         enabled: true,
         name: 'Primary CT-CVE',
         baseUrl: 'https://ct-cve.example.invalid',
-        inventoryTokenId: 'ctops_inventory_org_123',
+        inventoryTokenId: 'ctops_inventory_instance_123',
         inventoryTokenSecret: 'short',
-        ctCveTokenId: 'ctcve_findings_org_123',
+        ctCveTokenId: 'ctcve_findings_instance_123',
         ctCveTokenSecret: ctCveSecret,
       },
       encryptSecret: (value) => value,
@@ -114,13 +114,13 @@ test('rejects invalid connector URL, token IDs, and weak secrets', () => {
 
 test('converts stored connector settings into both CTOPS runtime tokens and CT-CVE config', () => {
   const settings = {
-    instanceId: 'org_123',
+    instanceId: 'instance_123',
     enabled: true,
     name: 'Primary CT-CVE',
     baseUrl: 'https://ct-cve.example.invalid',
-    inventoryTokenId: 'ctops_inventory_org_123',
+    inventoryTokenId: 'ctops_inventory_instance_123',
     inventoryTokenSecret: inventorySecret,
-    ctCveTokenId: 'ctcve_findings_org_123',
+    ctCveTokenId: 'ctcve_findings_instance_123',
     ctCveTokenSecret: ctCveSecret,
   }
 
@@ -129,32 +129,32 @@ test('converts stored connector settings into both CTOPS runtime tokens and CT-C
     enabled: true,
     baseUrl: 'https://ct-cve.example.invalid',
     token: {
-      id: 'ctops_inventory_org_123',
+      id: 'ctops_inventory_instance_123',
       secret: inventorySecret,
-      instanceId: 'org_123',
+      instanceId: 'instance_123',
       scopes: ['inventory:write', 'connection:read'],
     },
   })
 
   assert.deepEqual(toCtCveServiceToken(settings), {
-    id: 'ctcve_findings_org_123',
+    id: 'ctcve_findings_instance_123',
     secret: ctCveSecret,
-    instanceId: 'org_123',
+    instanceId: 'instance_123',
     scopes: ['findings:write', 'connection:read'],
     revoked: false,
   })
 
   assert.deepEqual(buildCtCveCtOpsConnectionConfig(settings, 'https://ct-ops.example.invalid/settings'), {
     name: 'Primary CT-CVE',
-    instanceId: 'org_123',
+    instanceId: 'instance_123',
     ctOpsBaseUrl: 'https://ct-ops.example.invalid',
     inventoryTokens: [{
-      id: 'ctops_inventory_org_123',
+      id: 'ctops_inventory_instance_123',
       secret: inventorySecret,
       scopes: ['inventory:write', 'connection:read'],
     }],
     ctOpsToken: {
-      id: 'ctcve_findings_org_123',
+      id: 'ctcve_findings_instance_123',
       secret: ctCveSecret,
       scopes: ['findings:write', 'connection:read'],
     },

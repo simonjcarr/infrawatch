@@ -81,7 +81,7 @@ import { compareVersions } from '@/lib/version-compare'
 import type { HostGroup } from '@/lib/db/schema'
 
 interface Props {
-  orgName: string
+  instanceName: string
   hostGroups: Pick<HostGroup, 'id' | 'name'>[]
 }
 
@@ -107,7 +107,9 @@ const OS_OPTIONS = [
 ]
 
 
-export function SoftwareReportClient({ orgName, hostGroups }: Props) {
+export function SoftwareReportClient(props: Props) {
+  void props
+
   const queryClient = useQueryClient()
   const [activeView, setActiveView] = useState<ActiveView>('search')
 

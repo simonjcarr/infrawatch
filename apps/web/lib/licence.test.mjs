@@ -49,7 +49,7 @@ async function signLicence(privateKeyPem, claims = {}, options = {}) {
         name: 'Example Corp',
         email: 'ops@example.com',
       },
-      sub: 'org_123',
+      sub: 'instance_123',
       jti: 'lic_123',
       ...claims,
     },

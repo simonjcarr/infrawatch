@@ -18,7 +18,7 @@ test('host Docker retention reads inherited and effective retention values', () 
   const segment = getActionSegment('getHostDockerRetentionSettings')
 
   assert.match(segment, /parseHostMetadata\(host\?\.metadata\)/)
-  assert.match(segment, /org\?\.dockerMetricRetentionDays \?\? 30/)
+  assert.match(segment, /instance\?\.dockerMetricRetentionDays \?\? 30/)
   assert.match(segment, /retentionDaysOverride \?\? globalRetentionDays/)
 })
 

@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ChevronDown, UserPlus, Link2, X, UserX, UserCheck, Trash2, Check } from 'lucide-react'
-import { getOrgUsers, inviteUser, updateUserRole, deactivateUser, reactivateUser, removeUser, cancelInvite } from '@/lib/actions/users'
+import { getInstanceUsers, inviteUser, updateUserRole, deactivateUser, reactivateUser, removeUser, cancelInvite } from '@/lib/actions/users'
 import { INVITABLE_ROLES, ASSIGNED_ROLES, normalizeAssignedRoles } from '@/lib/auth/roles'
 import type { User, Invitation } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 function roleBadgeVariant(role: string): 'destructive' | 'default' | 'secondary' | 'outline' {
   switch (role) {
     case 'super_admin': return 'destructive'
-    case 'org_admin': return 'default'
+    case 'instance_admin': return 'default'
     case 'engineer': return 'secondary'
     case 'pending': return 'outline'
     default: return 'outline'
@@ -58,7 +58,7 @@ interface TeamClientProps {
   initialPendingInvites: Invitation[]
 }
 
-const canManage = (role: string) => role === 'super_admin' || role === 'org_admin'
+const canManage = (role: string) => role === 'super_admin' || role === 'instance_admin'
 
 function getDisplayedRoles(entity: Pick<User | Invitation, 'role' | 'roles'>): string[] {
   const roles = normalizeAssignedRoles(entity.roles, entity.role)
@@ -79,8 +79,8 @@ export function TeamClient({
   const [copiedLink, setCopiedLink] = useState(false)
 
   const { data } = useQuery({
-    queryKey: ['org-users'],
-    queryFn: () => getOrgUsers(),
+    queryKey: ['instance-users'],
+    queryFn: () => getInstanceUsers(),
     initialData: { members: initialMembers, pendingInvites: initialPendingInvites },
     refetchOnMount: 'always',
     refetchOnWindowFocus: 'always',
@@ -90,7 +90,7 @@ export function TeamClient({
   const members = data?.members ?? []
   const pendingInvites = data?.pendingInvites ?? []
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['org-users'] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['instance-users'] })
 
   const {
     handleSubmit,

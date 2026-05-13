@@ -31,7 +31,7 @@ export function selectAdmittedSeatUserIds(
   const seen = new Set<string>()
 
   const firstAdmin = sortedUsers.find((user) => hasRole(user, 'super_admin'))
-    ?? sortedUsers.find((user) => hasRole(user, 'org_admin'))
+    ?? sortedUsers.find((user) => hasRole(user, 'instance_admin'))
   if (firstAdmin) {
     pushUnique(admitted, seen, firstAdmin.id, maxUsers)
   }
@@ -43,7 +43,7 @@ export function selectAdmittedSeatUserIds(
   }
 
   for (const user of sortedUsers) {
-    if (hasRole(user, ['super_admin', 'org_admin'])) {
+    if (hasRole(user, ['super_admin', 'instance_admin'])) {
       pushUnique(admitted, seen, user.id, maxUsers)
     }
   }

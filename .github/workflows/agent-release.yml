@@ -309,9 +309,9 @@ jobs:
             : "${POSTGRES_USER:=ctops}"
             : "${POSTGRES_DB:=ctops}"
             TIERS=$(docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At \
-              -c "SELECT name || ': ' || licence_tier FROM organisations WHERE deleted_at IS NULL ORDER BY created_at;" 2>/dev/null || true)
+              -c "SELECT name || ': ' || licence_tier FROM instance_settings WHERE deleted_at IS NULL ORDER BY created_at;" 2>/dev/null || true)
             if [ -z "$TIERS" ]; then
-              echo "Licence tier:     unknown (no organisation configured yet)"
+              echo "Licence tier:     unknown (no instance configured yet)"
             else
               echo "Licence tier:"
               while IFS= read -r line; do printf '  %s\n' "$line"; done <<< "$TIERS"

@@ -75,7 +75,7 @@ export const notes = pgTable(
     metadata: jsonb('metadata').$type<NoteMetadata>(),
   },
   (t) => [
-    index('notes_org_active_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
+    index('notes_instance_active_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
     index('notes_author_idx').on(t.authorId),
     index('notes_search_vector_idx').using('gin', t.searchVector),
   ],

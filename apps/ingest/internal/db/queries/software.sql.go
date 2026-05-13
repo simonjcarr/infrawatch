@@ -8,16 +8,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// HostOrgForTaskRunHost returns the host_id and instance_id for a given
+// HostInstanceForTaskRunHost returns the host_id and instance_id for a given
 // task_run_hosts row, also checking that the row belongs to the given agent.
-type HostOrgForTask struct {
+type HostInstanceForTask struct {
 	HostID     string
 	InstanceID string
 }
 
-// GetHostOrgForTaskRunHost looks up the host and org for a task_run_hosts row,
+// GetHostInstanceForTaskRunHost looks up the host and instance for a task_run_hosts row,
 // validating that the host's agent matches the caller.
-func GetHostOrgForTaskRunHost(ctx context.Context, pool *pgxpool.Pool, taskRunHostID, agentID string) (*HostOrgForTask, error) {
+func GetHostInstanceForTaskRunHost(ctx context.Context, pool *pgxpool.Pool, taskRunHostID, agentID string) (*HostInstanceForTask, error) {
 	const q = `
 		SELECT h.id, h.instance_id
 		FROM task_run_hosts trh
@@ -28,7 +28,7 @@ func GetHostOrgForTaskRunHost(ctx context.Context, pool *pgxpool.Pool, taskRunHo
 		  AND h.deleted_at   IS NULL
 		LIMIT 1
 	`
-	var r HostOrgForTask
+	var r HostInstanceForTask
 	err := pool.QueryRow(ctx, q, taskRunHostID, agentID).Scan(&r.HostID, &r.InstanceID)
 	return &r, err
 }
@@ -248,14 +248,14 @@ type SoftwareSweeperHost struct {
 	InstanceID string
 }
 
-// GetHostsDueForSoftwareScan returns hosts belonging to instances that have
+// GetHostsDueForSoftwareScan returns hosts belonging to instance_settings that have
 // software inventory enabled and whose last scan is older than the configured
 // interval (or who have never been scanned).
 func GetHostsDueForSoftwareScan(ctx context.Context, pool *pgxpool.Pool) ([]SoftwareSweeperHost, error) {
 	const q = `
 		SELECT h.id, h.instance_id
 		FROM hosts h
-		JOIN instances o ON o.id = h.instance_id
+		JOIN instance_settings o ON o.id = h.instance_id
 		WHERE h.deleted_at IS NULL
 		  AND o.deleted_at IS NULL
 		  AND h.status     = 'online'

@@ -1,20 +1,20 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 import { issueTestLicence } from '../fixtures/licence'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
 }
 
-async function setOrgSeatLimit(sql: ReturnType<typeof getTestDb>, instanceId: string, maxUsers: number): Promise<void> {
+async function setInstanceSeatLimit(sql: ReturnType<typeof getTestDb>, instanceId: string, maxUsers: number): Promise<void> {
   const licenceKey = await issueTestLicence({ instanceId, tier: 'community', maxUsers })
   await sql`
     UPDATE instance_settings
@@ -24,7 +24,7 @@ async function setOrgSeatLimit(sql: ReturnType<typeof getTestDb>, instanceId: st
   `
 }
 
-async function clearOrgLicence(sql: ReturnType<typeof getTestDb>, instanceId: string): Promise<void> {
+async function clearInstanceLicence(sql: ReturnType<typeof getTestDb>, instanceId: string): Promise<void> {
   await sql`
     UPDATE instance_settings
     SET licence_key = NULL,
@@ -93,7 +93,7 @@ async function ensureAtLeastActiveMembers(
 
 test('admin can create and cancel a team invitation', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   const inviteeEmail = 'teammate@example.com'
 
   await page.goto('/team')
@@ -101,7 +101,7 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
   await expect(page.getByTestId('team-heading')).toBeVisible()
   await page.getByTestId('team-invite-open').click()
   await page.getByTestId('team-invite-email').fill(inviteeEmail)
-  await page.getByTestId('team-invite-role-org_admin').click()
+  await page.getByTestId('team-invite-role-instance_admin').click()
   await page.getByTestId('team-invite-role-read_only').click()
   await page.getByTestId('team-invite-submit').click()
 
@@ -112,7 +112,7 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
 
   const pendingInviteRow = page.getByTestId('team-pending-invite-row').filter({ hasText: inviteeEmail })
   await expect(pendingInviteRow).toBeVisible()
-  await expect(pendingInviteRow).toContainText('Org Admin')
+  await expect(pendingInviteRow).toContainText('Instance Admin')
   await expect(pendingInviteRow).toContainText('Read Only')
 
   const inviteRows = await sql<Array<{ id: string; role: string; roles: string[]; deleted_at: Date | null }>>`
@@ -125,8 +125,8 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
   `
 
   expect(inviteRows).toHaveLength(1)
-  expect(inviteRows[0]?.role).toBe('org_admin')
-  expect(inviteRows[0]?.roles).toEqual(['org_admin', 'read_only'])
+  expect(inviteRows[0]?.role).toBe('instance_admin')
+  expect(inviteRows[0]?.roles).toEqual(['instance_admin', 'read_only'])
   expect(inviteRows[0]?.deleted_at).toBeNull()
 
   await pendingInviteRow.getByTestId('team-pending-invite-cancel').click()
@@ -145,7 +145,7 @@ test('admin can create and cancel a team invitation', async ({ authenticatedPage
 
 test('admin cannot create a duplicate pending invitation for the same email address', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   const inviteeEmail = 'duplicate-teammate@example.com'
 
   await page.goto('/team')
@@ -160,7 +160,7 @@ test('admin cannot create a duplicate pending invitation for the same email addr
 
   await page.getByTestId('team-invite-open').click()
   await page.getByTestId('team-invite-email').fill(inviteeEmail)
-  await page.getByTestId('team-invite-role-org_admin').click()
+  await page.getByTestId('team-invite-role-instance_admin').click()
   await page.getByTestId('team-invite-submit').click()
 
   await expect(page.getByText('An invitation has already been sent to this email address')).toBeVisible()
@@ -182,11 +182,11 @@ test('admin cannot create a duplicate pending invitation for the same email addr
 
 test('admin cannot create a fourth user invite on free Community seats', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   const suffix = Date.now().toString()
   const inviteeEmail = `community-fourth-seat-${suffix}@example.com`
 
-  await clearOrgLicence(sql, instanceId)
+  await clearInstanceLicence(sql, instanceId)
   await ensureAtLeastActiveMembers(sql, instanceId, 3, `community-seat-member-${suffix}`)
 
   await page.goto('/team')
@@ -203,13 +203,13 @@ test('admin cannot create a fourth user invite on free Community seats', async (
 
 test('an extra paid seat allows one more active user invitation', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   const suffix = Date.now().toString()
   const inviteeEmail = `paid-fourth-seat-${suffix}@example.com`
 
   try {
     const activeCount = await ensureAtLeastActiveMembers(sql, instanceId, 3, `paid-seat-member-${suffix}`)
-    await setOrgSeatLimit(sql, instanceId, activeCount + 1)
+    await setInstanceSeatLimit(sql, instanceId, activeCount + 1)
 
     await page.goto('/team')
 
@@ -223,16 +223,16 @@ test('an extra paid seat allows one more active user invitation', async ({ authe
     await page.getByTestId('team-invite-done').click()
     await expect(page.getByTestId('team-pending-invite-row').filter({ hasText: inviteeEmail })).toBeVisible()
   } finally {
-    await clearOrgLicence(sql, instanceId)
+    await clearInstanceLicence(sql, instanceId)
   }
 })
 
 test('admin cannot create an invitation when user seats are exhausted', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
 
   try {
-    await setOrgSeatLimit(sql, instanceId, 1)
+    await setInstanceSeatLimit(sql, instanceId, 1)
 
     await page.goto('/team')
 
@@ -253,19 +253,19 @@ test('admin cannot create an invitation when user seats are exhausted', async ({
     `
     expect(inviteRows).toHaveLength(0)
   } finally {
-    await clearOrgLicence(sql, instanceId)
+    await clearInstanceLicence(sql, instanceId)
   }
 })
 
 test('admin re-inviting a removed user restores their membership instead of creating a pending invite', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   const removedEmail = 'restored-member@example.com'
 
   const activeCount = await countActiveMembers(sql, instanceId)
 
   try {
-    await setOrgSeatLimit(sql, instanceId, activeCount + 1)
+    await setInstanceSeatLimit(sql, instanceId, activeCount + 1)
 
     await sql`
       INSERT INTO "user" (
@@ -332,6 +332,6 @@ test('admin re-inviting a removed user restores their membership instead of crea
 
     expect(inviteRows).toHaveLength(0)
   } finally {
-    await clearOrgLicence(sql, instanceId)
+    await clearInstanceLicence(sql, instanceId)
   }
 })

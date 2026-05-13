@@ -140,7 +140,7 @@ export interface HostMetadata {
   lastSoftwareScanAt?: string    // ISO timestamp; avoid Date in JSONB (use .toISOString())
   dockerSettings?: HostDockerSettings
   // Tags supplied via the agent CLI --tag flag / token metadata at register
-  // time. Stashed here until approveAgent merges them with org defaults and
+  // time. Stashed here until approveAgent merges them with instance defaults and
   // writes canonical rows into resource_tags.
   pendingTags?: Array<{ key: string; value: string }>
 }

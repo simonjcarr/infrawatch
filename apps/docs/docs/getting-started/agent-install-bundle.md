@@ -16,7 +16,7 @@ Each zip contains everything needed to install the agent on one OS / architectur
 
 ## Who can generate a bundle
 
-Bundle generation is gated to **`super_admin`** and **`org_admin`** roles. Every bundle is scoped to the CT-Ops instance of the requesting user.
+Bundle generation is gated to **`super_admin`** and **`instance_admin`** roles. Every bundle is scoped to the CT-Ops instance of the requesting user.
 
 ## Generate and download
 

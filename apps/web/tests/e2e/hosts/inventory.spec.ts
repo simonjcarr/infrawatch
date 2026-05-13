@@ -1,13 +1,13 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
     SELECT instanceSettings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
     JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+    WHERE instanceSettings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = 'e2e@example.com'
     LIMIT 1
   `
@@ -20,7 +20,7 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ in
 
 test('authenticated user can search and filter the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
@@ -101,7 +101,7 @@ test('authenticated user can search and filter the host inventory', async ({ aut
 
 test('authenticated user can paginate through the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO hosts (
@@ -167,7 +167,7 @@ test('authenticated user can paginate through the host inventory', async ({ auth
 
 test('admin can approve a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO agents (
@@ -239,7 +239,7 @@ test('admin can approve a pending agent from the host inventory page', async ({ 
 
 test('admin can reject a pending agent from the host inventory page', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO agents (
@@ -337,7 +337,7 @@ test('admin can reject a pending agent from the host inventory page', async ({ a
 
 test('authenticated user can sort and paginate the host inventory', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getInstanceAndUserIds(sql)
 
   for (let index = 1; index <= 55; index += 1) {
     const hostNumber = String(index).padStart(3, '0')

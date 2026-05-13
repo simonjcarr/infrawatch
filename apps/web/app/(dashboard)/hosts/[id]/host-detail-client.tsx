@@ -893,7 +893,7 @@ export function HostDetailClient({
             currentUserId={currentUserId}
             userRole={userRole}
             onViewAll={() => {
-              setActiveParentTab('notes')
+              setActiveParentTab('admin')
               setActiveTab('notes')
             }}
           />

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.149.0...web/v0.150.0) (2026-05-13)
+
+
+### Features
+
+* **dev:** add local full-stack dev launcher ([3b3d96c](https://github.com/carrtech-dev/ct-ops/commit/3b3d96c95cc8a42087a867b2d62c074ff2fcc2af))
+
 ## [0.149.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.148.0...web/v0.149.0) (2026-05-13)
 
 

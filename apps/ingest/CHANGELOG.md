@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.15.1...ingest/v0.16.0) (2026-05-13)
+
+
+### Features
+
+* **dev:** add local full-stack dev launcher ([3b3d96c](https://github.com/carrtech-dev/ct-ops/commit/3b3d96c95cc8a42087a867b2d62c074ff2fcc2af))
+
 ## [0.15.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.15.0...ingest/v0.15.1) (2026-05-13)
 
 

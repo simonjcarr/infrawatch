@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.5.0...bundle/v0.6.0) (2026-05-13)
+
+
+### Features
+
+* **hosts:** add docker containers tab ([#1356](https://github.com/carrtech-dev/ct-ops/issues/1356)) ([145ecd7](https://github.com/carrtech-dev/ct-ops/commit/145ecd7574f8b15e940a0cd0cb5cbd078da6527b))
+
 ## [0.5.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.4.0...bundle/v0.5.0) (2026-05-12)
 
 

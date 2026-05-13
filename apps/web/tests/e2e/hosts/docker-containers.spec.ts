@@ -144,6 +144,125 @@ test('host Containers tab lists containers and filters by name and state', async
   await expect(page.getByTestId('host-docker-container-row-worker-container-id')).toHaveCount(0)
 })
 
+test('host Containers tab shows per-container metric charts with max spike values', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const instanceId = await getOrgId(sql)
+  await seedHost(sql, instanceId, 'docker-container-metrics-host')
+  await seedDockerStatus(sql, instanceId, 'docker-container-metrics-host', 'installed')
+
+  await sql`
+    INSERT INTO docker_containers (
+      id,
+      instance_id,
+      host_id,
+      docker_container_id,
+      primary_name,
+      names_json,
+      image,
+      image_id,
+      labels_json,
+      state,
+      status,
+      first_seen_at,
+      last_seen_at,
+      last_inventory_at,
+      restart_count,
+      is_present
+    )
+    VALUES (
+      'docker-metrics-row',
+      ${instanceId},
+      'docker-container-metrics-host',
+      'metrics-container-id',
+      'metrics-web',
+      '["metrics-web"]'::jsonb,
+      'nginx:metrics',
+      'sha256:metrics',
+      '{}'::jsonb,
+      'running',
+      'Up 8 minutes',
+      NOW() - INTERVAL '10 minutes',
+      NOW() - INTERVAL '30 seconds',
+      NOW() - INTERVAL '30 seconds',
+      1,
+      true
+    )
+  `
+
+  await sql`
+    INSERT INTO docker_container_metrics (
+      id,
+      instance_id,
+      host_id,
+      docker_container_row_id,
+      docker_container_id,
+      recorded_at,
+      cpu_percent,
+      memory_usage_bytes,
+      memory_limit_bytes,
+      memory_percent,
+      network_rx_bytes,
+      network_tx_bytes,
+      block_read_bytes,
+      block_write_bytes,
+      pids_current,
+      restart_count
+    )
+    VALUES
+      (
+        'docker-metrics-sample-1',
+        ${instanceId},
+        'docker-container-metrics-host',
+        'docker-metrics-row',
+        'metrics-container-id',
+        NOW() - INTERVAL '20 minutes',
+        12.5,
+        268435456,
+        1073741824,
+        25.0,
+        1000,
+        2000,
+        4096,
+        8192,
+        4,
+        1
+      ),
+      (
+        'docker-metrics-sample-2',
+        ${instanceId},
+        'docker-container-metrics-host',
+        'docker-metrics-row',
+        'metrics-container-id',
+        NOW() - INTERVAL '10 minutes',
+        96.4,
+        805306368,
+        1073741824,
+        75.0,
+        9000,
+        12000,
+        16384,
+        32768,
+        18,
+        1
+      )
+  `
+
+  await page.goto('/hosts/docker-container-metrics-host')
+  await page.getByTestId('host-parent-tab-containers').click()
+
+  const metrics = page.getByTestId('host-docker-container-metrics')
+  await expect(metrics).toContainText('metrics-web')
+  await expect(metrics).toContainText('CPU max')
+  await expect(metrics).toContainText('96.4%')
+  await expect(metrics).toContainText('Memory max')
+  await expect(metrics).toContainText('75.0%')
+  await expect(metrics).toContainText('PIDs max')
+  await expect(metrics).toContainText('18')
+  await expect(metrics.getByText('CPU avg/max')).toBeVisible()
+  await expect(metrics.getByText('Network I/O')).toBeVisible()
+  await expect(metrics.getByText('Block I/O')).toBeVisible()
+})
+
 test('host Containers tab explains Docker unavailable states', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const instanceId = await getOrgId(sql)

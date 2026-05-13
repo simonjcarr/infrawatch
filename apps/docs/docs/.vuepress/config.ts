@@ -94,6 +94,7 @@ export default defineUserConfig({
         text: 'Development',
         collapsible: true,
         children: [
+          '/development/dev-stack.md',
           '/development/testing.md',
         ],
       },

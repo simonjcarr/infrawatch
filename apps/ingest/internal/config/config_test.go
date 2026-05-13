@@ -22,6 +22,19 @@ func TestLoadAppliesTerminalTrustedOriginsEnv(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesHTTPPortEnv(t *testing.T) {
+	t.Setenv("INGEST_HTTP_PORT", "18080")
+
+	cfg, err := Load("/tmp/does-not-exist.yaml")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.HTTPPort != 18080 {
+		t.Fatalf("cfg.HTTPPort = %d, want 18080", cfg.HTTPPort)
+	}
+}
+
 func TestLoadBuildsEncodedDatabaseURLFromPostgresEnv(t *testing.T) {
 	t.Setenv("POSTGRES_USER", "ctops")
 	t.Setenv("POSTGRES_PASSWORD", "Pyth)n2475##")

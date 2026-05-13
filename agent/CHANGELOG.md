@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.37.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.36.0...agent/v0.37.0) (2026-05-13)
+
+
+### Features
+
+* **agent:** add docker metric sampler buffer ([#1359](https://github.com/carrtech-dev/ct-ops/issues/1359)) ([1b2b477](https://github.com/carrtech-dev/ct-ops/commit/1b2b477dbdb31249fe5fc3dfcaffdce23e8ba6ab))
+
 ## [0.36.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.35.0...agent/v0.36.0) (2026-05-12)
 
 

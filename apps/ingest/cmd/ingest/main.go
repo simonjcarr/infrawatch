@@ -166,6 +166,9 @@ func main() {
 	// Start notification purge sweeper goroutine
 	go handlers.RunNotificationPurgeSweeper(ctx, pool, 24*time.Hour)
 
+	// Start Docker telemetry retention sweeper goroutine
+	go handlers.RunDockerTelemetryRetentionSweeper(ctx, pool, 24*time.Hour)
+
 	// Start gRPC server in goroutine
 	grpcErr := make(chan error, 1)
 	go func() {

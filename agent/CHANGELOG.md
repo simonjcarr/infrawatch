@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.38.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.37.0...agent/v0.38.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** upload container telemetry batches ([83a9de4](https://github.com/carrtech-dev/ct-ops/commit/83a9de407249a963a35671b647ee6bed7514f006))
+
 ## [0.37.0](https://github.com/carrtech-dev/ct-ops/compare/agent/v0.36.0...agent/v0.37.0) (2026-05-13)
 
 

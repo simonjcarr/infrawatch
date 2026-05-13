@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.10.0...bundle/v0.11.0) (2026-05-13)
+
+
+### Features
+
+* **ingest:** add docker telemetry retention sweeper ([3e236b5](https://github.com/carrtech-dev/ct-ops/commit/3e236b5face55375c53287e2c767b2dabae53f3b))
+
 ## [0.10.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.9.0...bundle/v0.10.0) (2026-05-13)
 
 

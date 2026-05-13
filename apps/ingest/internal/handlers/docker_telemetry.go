@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
 	"github.com/carrtech-dev/ct-ops/ingest/internal/pki"
@@ -18,8 +19,7 @@ import (
 
 const maxDockerTelemetryPayloadBytes = 5 * 1024 * 1024
 
-// SubmitDockerTelemetry receives Docker inventory batches from the agent.
-// Metric sample ingestion is intentionally left for the Phase 3 sampler work.
+// SubmitDockerTelemetry receives Docker inventory and metric batches from the agent.
 func (h *InventoryHandler) SubmitDockerTelemetry(stream agentv1.IngestService_SubmitDockerTelemetryServer) error {
 	ctx := stream.Context()
 	agentID, err := h.authenticateDockerTelemetryStream(stream)
@@ -49,6 +49,7 @@ func (h *InventoryHandler) SubmitDockerTelemetry(stream agentv1.IngestService_Su
 	}
 
 	totalInventory := 0
+	totalSamples := 0
 	batches := 0
 	lastBatchID := ""
 
@@ -62,7 +63,7 @@ func (h *InventoryHandler) SubmitDockerTelemetry(stream agentv1.IngestService_Su
 				Ok:                     true,
 				BatchId:                lastBatchID,
 				AcceptedInventoryCount: uint32(totalInventory),
-				AcceptedSampleCount:    0,
+				AcceptedSampleCount:    uint32(totalSamples),
 			})
 		}
 		if recvErr != nil {
@@ -73,14 +74,31 @@ func (h *InventoryHandler) SubmitDockerTelemetry(stream agentv1.IngestService_Su
 		}
 
 		now := time.Now()
+		recorded, err := queries.RecordDockerTelemetryBatch(ctx, h.pool, agent.InstanceID, hostID, agentID, batch, now)
+		if err != nil {
+			slog.Error("docker telemetry: recording batch", "host_id", hostID, "batch_id", batch.BatchId, "err", err)
+			return status.Error(codes.Internal, "failed to record Docker telemetry batch")
+		}
+		if !recorded {
+			batches++
+			lastBatchID = strings.TrimSpace(batch.BatchId)
+			continue
+		}
+
 		reports := queries.DockerContainerInventoryReportsFromProto(batch.Inventory, now)
 		markMissing := batch.DroppedInventoryCount == 0
 		if err := queries.SyncDockerContainerInventory(ctx, h.pool, agent.InstanceID, hostID, reports, now, markMissing); err != nil {
 			slog.Error("docker telemetry: syncing container inventory", "host_id", hostID, "err", err)
 			return status.Error(codes.Internal, "failed to persist Docker inventory")
 		}
+		metricReports := queries.DockerMetricReportsFromProto(batch.Samples, now)
+		if err := queries.InsertDockerMetricReports(ctx, h.pool, agent.InstanceID, hostID, metricReports); err != nil {
+			slog.Error("docker telemetry: inserting container metrics", "host_id", hostID, "err", err)
+			return status.Error(codes.Internal, "failed to persist Docker metrics")
+		}
 
 		totalInventory += len(reports)
+		totalSamples += len(metricReports)
 		batches++
 		lastBatchID = strings.TrimSpace(batch.BatchId)
 	}
@@ -101,8 +119,11 @@ func validateDockerTelemetryBatch(batch *agentv1.DockerTelemetryBatch, agentID s
 	if batch.AgentId != "" && batch.AgentId != agentID {
 		return status.Error(codes.Unauthenticated, "client identity mismatch")
 	}
-	if batch.PayloadBytes > maxDockerTelemetryPayloadBytes {
+	if batch.PayloadBytes > maxDockerTelemetryPayloadBytes || proto.Size(batch) > maxDockerTelemetryPayloadBytes {
 		return status.Errorf(codes.InvalidArgument, "Docker telemetry payload exceeds maximum of %d bytes", maxDockerTelemetryPayloadBytes)
+	}
+	if strings.TrimSpace(batch.BatchId) == "" && (len(batch.Inventory) > 0 || len(batch.Samples) > 0 || batch.DroppedSampleCount > 0 || batch.DroppedInventoryCount > 0) {
+		return status.Error(codes.InvalidArgument, "Docker telemetry batch id is required")
 	}
 	if len(batch.Inventory) > queries.MaxDockerInventoryItemsPerBatch {
 		return status.Errorf(
@@ -111,8 +132,21 @@ func validateDockerTelemetryBatch(batch *agentv1.DockerTelemetryBatch, agentID s
 			queries.MaxDockerInventoryItemsPerBatch,
 		)
 	}
-	if len(batch.Samples) > 0 {
-		return status.Error(codes.Unimplemented, "Docker metric samples are not yet supported")
+	if len(batch.Samples) > queries.MaxDockerMetricSamplesPerBatch {
+		return status.Errorf(
+			codes.InvalidArgument,
+			"Docker metric sample batch exceeds maximum of %d samples",
+			queries.MaxDockerMetricSamplesPerBatch,
+		)
+	}
+	now := time.Now()
+	for _, sample := range batch.Samples {
+		if sample == nil {
+			continue
+		}
+		if !queries.DockerMetricTimestampInRange(sample.RecordedAtUnix, now) {
+			return status.Error(codes.InvalidArgument, "Docker metric sample timestamp is outside the accepted range")
+		}
 	}
 	return nil
 }

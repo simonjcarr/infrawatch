@@ -186,7 +186,7 @@ Purpose: support 30-day default retention with global and per-host controls.
 
 | Task | Owner | Status | Files / Areas | Dependencies | Acceptance Criteria | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Add global Docker retention setting | Codex | in_progress | Administration/settings UI and actions | Phase 0 settings contract | Admin can configure Docker metric retention days; default is 30. | TBD | Implementing as dedicated `dockerMetricRetentionDays` / `docker_metric_retention_days` setting bounded to 1..365 days. |
+| Add global Docker retention setting | Codex | review | Administration/settings UI and actions | Phase 0 settings contract | Admin can configure Docker metric retention days; default is 30. | [#1371](https://github.com/carrtech-dev/ct-ops/pull/1371) | Implements dedicated `dockerMetricRetentionDays` / `docker_metric_retention_days` setting bounded to 1..365 days. |
 | Add host retention override | unclaimed | pending | host settings UI/actions/schema | Global setting | Host settings can set or clear a local Docker retention override. | TBD | Display effective value and inherited/default state. |
 | Implement retention sweeper | unclaimed | pending | ingest sweeper or web maintenance job, tests | Global and host settings | Rows are deleted according to each host's effective retention. | TBD | Timescale table retention alone cannot express per-host overrides. |
 | Document retention behavior | unclaimed | pending | docs site, feature docs | Retention implementation | Docs explain defaults, overrides, storage impact, and cleanup timing. | TBD | Include sizing caveats for large fleets. |

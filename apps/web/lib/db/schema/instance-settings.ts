@@ -112,6 +112,7 @@ export const instanceSettings = pgTable('instance_settings', {
   licenceVerifierPublicKey: text('licence_verifier_public_key'),
   licenceVerifierPublicKeyFingerprint: text('licence_verifier_public_key_fingerprint'),
   metricRetentionDays: integer('metric_retention_days').notNull().default(30),
+  dockerMetricRetentionDays: integer('docker_metric_retention_days').notNull().default(30),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

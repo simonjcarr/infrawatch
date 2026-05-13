@@ -27,6 +27,31 @@ test('admin can update metric retention from monitoring settings', async ({ auth
     .toBe(14)
 })
 
+test('admin can update Docker metric retention from monitoring settings', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+
+  await page.goto('/settings/monitoring/retention')
+  await expect(page.getByTestId('settings-heading')).toBeVisible()
+
+  await page.getByTestId('settings-docker-retention-select').click()
+  await page.getByRole('option', { name: '90 days' }).click()
+  await page.getByTestId('settings-docker-retention-save').click()
+  await expect(page.getByTestId('settings-docker-retention-success')).toHaveText('Saved')
+
+  await expect
+    .poll(async () => {
+      const rows = await sql<Array<{ docker_metric_retention_days: number }>>`
+        SELECT docker_metric_retention_days
+        FROM instance_settings
+        WHERE slug = ${TEST_ORG.slug}
+        LIMIT 1
+      `
+
+      return rows[0]?.docker_metric_retention_days ?? null
+    })
+    .toBe(90)
+})
+
 test('admin can update default host collection settings from agent defaults', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
 

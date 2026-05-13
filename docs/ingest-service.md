@@ -11,6 +11,7 @@ The ingest service is the gRPC server that sits between agents and the database.
 - Accept heartbeat streams from active agents
 - Write agent status and host vitals to PostgreSQL
 - Publish metrics to the internal queue (for future consumer processing)
+- Sweep expired Docker container telemetry according to global and per-host retention settings
 - Expose a JWKS endpoint for JWT public key distribution
 
 ---
@@ -153,6 +154,19 @@ time=... level=INFO msg="grpc stream opened" method=/agent.v1.IngestService/Hear
 time=... level=INFO msg="agent registered" agent_id=abc123 hostname=web-01 auto_approve=true
 time=... level=INFO msg="heartbeat stream ended, agent marked offline" agent_id=abc123
 ```
+
+---
+
+## Docker telemetry retention
+
+Ingest runs the Docker telemetry retention sweeper at startup and then every 24
+hours. The sweeper deletes Docker container metric rows using each host's
+effective retention setting, where a host override takes priority over the
+global Docker metric retention value and the default is 30 days.
+
+The same sweeper removes Docker telemetry batch idempotency records after 7
+days. See [Docker Container Telemetry](docker-container-telemetry.md) for
+operator-facing configuration, cleanup timing, and storage sizing guidance.
 
 ---
 

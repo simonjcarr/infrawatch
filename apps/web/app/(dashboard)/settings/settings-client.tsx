@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { updateOrgName, saveLicenceKey, updateMetricRetention, generateActivationToken, updateFreeSeatUsers } from '@/lib/actions/settings'
+import { updateOrgName, saveLicenceKey, updateMetricRetention, updateDockerMetricRetention, generateActivationToken, updateFreeSeatUsers } from '@/lib/actions/settings'
 import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
 import {
@@ -212,6 +212,9 @@ export function SettingsClient({
   const [retentionDays, setRetentionDays] = useState(String(org.metricRetentionDays ?? 30))
   const [retentionSaveSuccess, setRetentionSaveSuccess] = useState(false)
   const [retentionError, setRetentionError] = useState<string | null>(null)
+  const [dockerRetentionDays, setDockerRetentionDays] = useState(String(org.dockerMetricRetentionDays ?? 30))
+  const [dockerRetentionSaveSuccess, setDockerRetentionSaveSuccess] = useState(false)
+  const [dockerRetentionError, setDockerRetentionError] = useState<string | null>(null)
   const [selectedFreeSeatUserIds, setSelectedFreeSeatUserIds] = useState(
     freeSeatUsers?.selectedUserIds ?? [],
   )
@@ -321,6 +324,19 @@ export function SettingsClient({
       setRetentionSaveSuccess(true)
       setRetentionError(null)
       setTimeout(() => setRetentionSaveSuccess(false), 3000)
+    },
+  })
+
+  const dockerRetentionMutation = useMutation({
+    mutationFn: (days: number) => updateDockerMetricRetention(org.id, days),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setDockerRetentionError(result.error)
+        return
+      }
+      setDockerRetentionSaveSuccess(true)
+      setDockerRetentionError(null)
+      setTimeout(() => setDockerRetentionSaveSuccess(false), 3000)
     },
   })
 
@@ -580,14 +596,14 @@ export function SettingsClient({
             Metric Retention
           </CardTitle>
           <CardDescription>
-            How long raw metric data is stored. Older data is automatically purged.
+            How long raw host and Docker container metric data is stored. Older data is automatically purged.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {isAdmin ? (
-            <div className="space-y-3">
+            <div className="space-y-6">
               <div className="space-y-1.5">
-                <Label htmlFor="retention-select">Retention period</Label>
+                <Label htmlFor="retention-select">Host metric retention period</Label>
                 <Select
                   value={retentionDays}
                   onValueChange={setRetentionDays}
@@ -624,11 +640,61 @@ export function SettingsClient({
                   </span>
                 )}
               </div>
+              <div className="space-y-3 border-t pt-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="docker-retention-select">Docker metric retention period</Label>
+                  <Select
+                    value={dockerRetentionDays}
+                    onValueChange={setDockerRetentionDays}
+                    disabled={dockerRetentionMutation.isPending}
+                  >
+                    <SelectTrigger id="docker-retention-select" className="w-48" data-testid="settings-docker-retention-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RETENTION_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {dockerRetentionError && (
+                  <p className="text-sm text-destructive">{dockerRetentionError}</p>
+                )}
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    disabled={
+                      dockerRetentionMutation.isPending ||
+                      dockerRetentionDays === String(org.dockerMetricRetentionDays ?? 30)
+                    }
+                    onClick={() => dockerRetentionMutation.mutate(Number(dockerRetentionDays))}
+                    data-testid="settings-docker-retention-save"
+                  >
+                    {dockerRetentionMutation.isPending ? 'Saving…' : 'Save'}
+                  </Button>
+                  {dockerRetentionSaveSuccess && (
+                    <span className="flex items-center gap-1 text-sm text-green-700" data-testid="settings-docker-retention-success">
+                      <CheckCircle2 className="size-4" />
+                      Saved
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
-            <p className="text-sm text-foreground">
-              {RETENTION_OPTIONS.find((o) => o.value === String(org.metricRetentionDays ?? 30))?.label ?? `${org.metricRetentionDays ?? 30} days`}
-            </p>
+            <div className="space-y-2 text-sm text-foreground">
+              <p>
+                Host metrics:{' '}
+                {RETENTION_OPTIONS.find((o) => o.value === String(org.metricRetentionDays ?? 30))?.label ?? `${org.metricRetentionDays ?? 30} days`}
+              </p>
+              <p>
+                Docker metrics:{' '}
+                {RETENTION_OPTIONS.find((o) => o.value === String(org.dockerMetricRetentionDays ?? 30))?.label ?? `${org.dockerMetricRetentionDays ?? 30} days`}
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>

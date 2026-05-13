@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.6.0...bundle/v0.7.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** upload container telemetry batches ([83a9de4](https://github.com/carrtech-dev/ct-ops/commit/83a9de407249a963a35671b647ee6bed7514f006))
+
 ## [0.6.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.5.0...bundle/v0.6.0) (2026-05-13)
 
 

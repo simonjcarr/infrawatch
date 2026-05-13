@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.11.0...ingest/v0.12.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** upload container telemetry batches ([83a9de4](https://github.com/carrtech-dev/ct-ops/commit/83a9de407249a963a35671b647ee6bed7514f006))
+
 ## [0.11.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.10.0...ingest/v0.11.0) (2026-05-12)
 
 

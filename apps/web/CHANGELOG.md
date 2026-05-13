@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.149.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.148.0...web/v0.149.0) (2026-05-13)
+
+
+### Features
+
+* **web:** show host calendar events ([#1394](https://github.com/carrtech-dev/ct-ops/issues/1394)) ([7c900e8](https://github.com/carrtech-dev/ct-ops/commit/7c900e878be2b2d8dba9787e1b9f37c9ebaae698))
+
 ## [0.148.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.147.1...web/v0.148.0) (2026-05-13)
 
 

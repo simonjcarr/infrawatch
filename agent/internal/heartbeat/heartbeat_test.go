@@ -166,3 +166,16 @@ func TestDrainTaskResultsPreservesOverflowForNextHeartbeat(t *testing.T) {
 		t.Fatalf("len(second) = %d, want 1", len(second))
 	}
 }
+
+func TestNewInitializesDockerMetricBuffer(t *testing.T) {
+	runner := New(nil, "agent-id", "jwt", "v1.0.0", 30, checks.NewExecutor(), "", nil)
+	runner.dockerMetricBuffer.Add([]*agentv1.DockerContainerMetricSample{{DockerContainerId: "container-1"}})
+
+	samples, dropped := runner.drainDockerMetricSamples()
+	if dropped != 0 {
+		t.Fatalf("dropped = %d, want 0", dropped)
+	}
+	if len(samples) != 1 || samples[0].DockerContainerId != "container-1" {
+		t.Fatalf("samples = %#v, want buffered Docker metric sample", samples)
+	}
+}

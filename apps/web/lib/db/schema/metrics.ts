@@ -22,10 +22,10 @@ export const hostMetrics = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.id, t.recordedAt] }),
-    // Composite index for the most common query pattern: org + host within a time range.
+    // Composite index for the most common query pattern: instance + host within a time range.
     // Critical for TimescaleDB hypertables — without this every time-series query falls
     // back to a full table scan, which degrades the entire cluster for all instances.
-    index('host_metrics_org_host_time_idx').on(
+    index('host_metrics_instance_host_time_idx').on(
       t.instanceId,
       t.hostId,
       t.recordedAt,

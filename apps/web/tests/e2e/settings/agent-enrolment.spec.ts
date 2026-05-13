@@ -1,13 +1,13 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+import { TEST_INSTANCE, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
-    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    SELECT instance_settings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
-    JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+    JOIN "user" ON "user".instance_id = instance_settings.id
+    WHERE instance_settings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
@@ -20,7 +20,7 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ in
 
 test('admin can create and revoke an enrolment token from agent settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await page.goto('/settings/agents')
 
@@ -109,7 +109,7 @@ test('admin can create and revoke an enrolment token from agent settings', async
 
 test('admin cannot create an auto-approved token without super admin privileges', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getInstanceAndUserIds(sql)
 
   await page.goto('/settings/agents')
 
@@ -137,7 +137,7 @@ test('admin cannot create an auto-approved token without super admin privileges'
 
 test('admin can generate an install bundle with an existing token and bundle tags', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
   let capturedBody: Record<string, unknown> | null = null
 
   await sql`

@@ -71,7 +71,7 @@ From the Scheduled Tasks list, click the **Play** icon next to a schedule to tri
 | Role | Create / Edit / Delete | Toggle enabled | Run now |
 |---|---|---|---|
 | `super_admin` | ✅ | ✅ | ✅ |
-| `org_admin` | ✅ | ✅ | ✅ |
+| `instance_admin` | ✅ | ✅ | ✅ |
 | `engineer` | ✅ | ✅ | ✅ |
 | `read_only` | ❌ | ❌ | ❌ |
 

@@ -14,18 +14,18 @@ export const metadata: Metadata = {
 
 export default async function TerminalAccessSettingsPage() {
   const session = await getRequiredSession()
-  if (!hasRole(session.user, ['org_admin', 'super_admin'])) {
+  if (!hasRole(session.user, ['instance_admin', 'super_admin'])) {
     redirect('/settings')
   }
 
   const instanceId = session.user.instanceId
   if (!instanceId) return null
 
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
   })
 
-  if (!org) return null
+  if (!instance) return null
 
   return (
     <div className="space-y-6">
@@ -36,7 +36,7 @@ export default async function TerminalAccessSettingsPage() {
         ]}
       />
       <SettingsClient
-        org={org}
+        instance={instance}
         isAdmin
         sections={['terminal']}
         title="Terminal Access"

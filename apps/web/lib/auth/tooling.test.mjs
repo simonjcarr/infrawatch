@@ -4,14 +4,14 @@ import assert from 'node:assert/strict'
 import { canAccessTooling, requireToolingAccess } from './tooling.ts'
 
 const baseUser = {
-  instanceId: 'org-1',
+  instanceId: 'instance-1',
   isActive: true,
   deletedAt: null,
 }
 
 test('canAccessTooling allows engineer and admin roles', () => {
   assert.equal(canAccessTooling({ ...baseUser, role: 'engineer', roles: ['engineer'] }), true)
-  assert.equal(canAccessTooling({ ...baseUser, role: 'org_admin', roles: ['org_admin'] }), true)
+  assert.equal(canAccessTooling({ ...baseUser, role: 'instance_admin', roles: ['instance_admin'] }), true)
   assert.equal(canAccessTooling({ ...baseUser, role: 'super_admin', roles: ['super_admin'] }), true)
   assert.equal(canAccessTooling({ ...baseUser, role: 'engineer', roles: ['read_only', 'engineer'] }), true)
 })

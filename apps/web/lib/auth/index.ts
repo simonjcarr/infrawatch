@@ -7,7 +7,7 @@ import { authDb, db } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 import { parseInstanceMetadata } from '@/lib/db/schema/instance-settings'
 import {
-  getAuthEmailConfigFromOrgSettings,
+  getAuthEmailConfigFromInstanceSettings,
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from './email'
@@ -44,7 +44,7 @@ async function getAuthEmailConfigForUser(userId: string) {
   if (!instance) return null
 
   const metadata = parseInstanceMetadata(instance.metadata)
-  return getAuthEmailConfigFromOrgSettings(metadata.notificationSettings)
+  return getAuthEmailConfigFromInstanceSettings(metadata.notificationSettings)
 }
 
 export const auth = betterAuth({

@@ -47,7 +47,7 @@ Purpose: define the cross-component contract before parallel implementation star
 | Task | Owner | Status | Files / Areas | Dependencies | Acceptance Criteria | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Define Docker telemetry protobuf contract | Codex | done | `proto/agent/v1/*.proto`, generated Go protobufs | None | Messages represent Docker status, container inventory, metric samples, batch ids, dropped sample counts, and payload limits. Existing agents remain compatible. | [#1338](https://github.com/carrtech-dev/ct-ops/pull/1338) | Merged in #1338. Added heartbeat Docker status/config and dedicated Docker telemetry upload RPC. |
-| Define database schema contract | Codex | done | `apps/web/lib/db/schema/*`, migrations | Protobuf contract | Schema covers Docker container inventory and time-series metrics with tenant/host scoping and query indexes. | TBD | Contract documented below in `Database Schema Contract`. Avoid storing only current values. |
+| Define database schema contract | Codex | done | `apps/web/lib/db/schema/*`, migrations | Protobuf contract | Schema covers Docker container inventory and time-series metrics with instance/host scoping and query indexes. | TBD | Contract documented below in `Database Schema Contract`. Avoid storing only current values. |
 | Define settings and retention contract | Codex | done | instance settings, host metadata/settings, docs | Database schema contract | Global default is 30 days; host override is nullable; effective retention behavior is documented. | TBD | Contract documented below in `Settings And Retention Contract`. Per-host retention uses a sweeper. |
 | Define UI information architecture | Codex | done | host detail UI, Administration settings | Schema/settings contract | Host Docker status, Containers tab, settings locations, and empty states are documented. | TBD | Contract documented below in `UI Information Architecture`. UI distinguishes not installed from permission denied. |
 
@@ -206,7 +206,7 @@ Purpose: make the feature operationally useful beyond basic charts.
 
 - Agent Docker detection tests should cover not installed, permission denied, Docker API error, and installed states.
 - Agent sampler tests should cover CPU/memory calculations, bounded buffering, dropped sample counts, and flush behavior.
-- Ingest tests should cover old agents, malformed payloads, excessive payloads, idempotent retries, and tenant/host scoping.
+- Ingest tests should cover old agents, malformed payloads, excessive payloads, idempotent retries, and instance/host scoping.
 - Retention tests should cover global default, host override, clearing override, and mixed-host deletion behavior.
 - UI tests should cover Docker status empty states, container list rendering, chart rendering, and settings updates.
 

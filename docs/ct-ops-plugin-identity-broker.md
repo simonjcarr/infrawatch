@@ -110,7 +110,7 @@ Registry invariants:
 - The `product` claim and the registered plugin instance must agree.
 - A plugin instance belongs to exactly one CT Ops installation scope.
 - Revoked or disabled instances cannot receive fresh user assertions.
-- Trust material changes are auditable and require org-admin or super-admin
+- Trust material changes are auditable and require instance-admin or super-admin
   authority.
 
 ## Pairing And Trust Exchange

@@ -6,7 +6,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm'
 import { SettingsClient } from '../settings-client'
 import { AdminTabs } from '@/components/shared/admin-tabs'
 import { getEffectiveLicence } from '@/lib/actions/licence-guard'
-import { getOrgSeatUsage } from '@/lib/actions/seat-enforcement'
+import { getInstanceSeatUsage } from '@/lib/actions/seat-enforcement'
 import { createCommunityLicence } from '@/lib/standalone-empty-state'
 import { hasRole } from '@/lib/auth/guards'
 
@@ -45,7 +45,7 @@ export default async function LicenceSettingsPage() {
     )
   }
 
-  const [org, activeUsers, effectiveLicence, seatUsage] = await Promise.all([
+  const [instance, activeUsers, effectiveLicence, seatUsage] = await Promise.all([
     db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
     }),
@@ -55,12 +55,12 @@ export default async function LicenceSettingsPage() {
       orderBy: [asc(users.createdAt), asc(users.email)],
     }),
     getEffectiveLicence(instanceId),
-    getOrgSeatUsage(instanceId),
+    getInstanceSeatUsage(instanceId),
   ])
 
-  if (!org) return null
+  if (!instance) return null
 
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
 
   return (
     <div className="space-y-6">
@@ -71,7 +71,7 @@ export default async function LicenceSettingsPage() {
         ]}
       />
       <SettingsClient
-        org={org}
+        instance={instance}
         isAdmin={isAdmin}
         sections={['licence']}
         title="Licence"
@@ -84,7 +84,7 @@ export default async function LicenceSettingsPage() {
         seatUsage={seatUsage}
         freeSeatUsers={{
           users: activeUsers,
-          selectedUserIds: parseInstanceMetadata(org.metadata).freeSeatUserIds ?? [],
+          selectedUserIds: parseInstanceMetadata(instance.metadata).freeSeatUserIds ?? [],
         }}
       />
     </div>

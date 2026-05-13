@@ -14,11 +14,11 @@ function repo(initial = null) {
   return {
     repository: {
       async get(instanceId) {
-        assert.equal(instanceId, 'org_1')
+        assert.equal(instanceId, 'instance_1')
         return stored
       },
       async save(status) {
-        assert.equal(status.instanceId, 'org_1')
+        assert.equal(status.instanceId, 'instance_1')
         stored = status
       },
     },
@@ -29,11 +29,11 @@ function repo(initial = null) {
 test('returns default CT-CVE connection status when no durable row exists', async () => {
   const { repository } = repo()
 
-  const status = await getCtCveConnectionStatus('org_1', { configured: false, repository })
+  const status = await getCtCveConnectionStatus('instance_1', { configured: false, repository })
 
   assert.deepEqual(status, {
     contractVersion: '2026-04-30',
-    instanceId: 'org_1',
+    instanceId: 'instance_1',
     configured: false,
     enabled: true,
     lastInventoryPushAt: null,
@@ -47,26 +47,26 @@ test('returns default CT-CVE connection status when no durable row exists', asyn
 test('records health, finding ingest, inventory push, and clears stale errors on successful data flow', async () => {
   const { repository, stored } = repo()
 
-  await recordCtCveConnectionHealth('org_1', {
+  await recordCtCveConnectionHealth('instance_1', {
     repository,
     now: new Date('2026-04-30T11:00:00.000Z'),
   })
-  await recordCtCveConnectionError('org_1', 'inventory_push_failed', {
+  await recordCtCveConnectionError('instance_1', 'inventory_push_failed', {
     repository,
     now: new Date('2026-04-30T11:01:00.000Z'),
   })
-  await recordCtCveFindingIngest('org_1', {
+  await recordCtCveFindingIngest('instance_1', {
     repository,
     now: new Date('2026-04-30T11:02:00.000Z'),
   })
-  await recordCtCveInventoryPush('org_1', {
+  await recordCtCveInventoryPush('instance_1', {
     repository,
     now: new Date('2026-04-30T11:03:00.000Z'),
   })
 
   assert.deepEqual(stored(), {
     contractVersion: '2026-04-30',
-    instanceId: 'org_1',
+    instanceId: 'instance_1',
     configured: true,
     enabled: true,
     lastInventoryPushAt: '2026-04-30T11:03:00.000Z',

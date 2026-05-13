@@ -13,12 +13,12 @@ export const metadata: Metadata = {
 
 export default async function SmtpRelaySettingsPage() {
   const session = await getRequiredSession()
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
-  const org = await getCurrentInstanceSettingsRecord()
+  const instance = await getCurrentInstanceSettingsRecord()
 
-  if (!org) {
+  if (!instance) {
     return (
       <div className="space-y-6">
         <AdminTabs
@@ -40,7 +40,7 @@ export default async function SmtpRelaySettingsPage() {
         tabs={integrationSettingsTabs}
       />
       <SettingsClient
-        org={org}
+        instance={instance}
         isAdmin={isAdmin}
         sections={['smtp']}
         title="SMTP Relay"

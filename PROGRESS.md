@@ -9,7 +9,7 @@
 **Phase 5 — Tooling + release hardening (in progress)**
 
 ## Current Status
-🟢 Phase 5 progressing — tooling has expanded beyond Directory User Lookup and SSL Certificate Checker into Jenkins/GitLab air-gap bundle generation, recursive plugin dependency resolution, offline install bundles, host-mediated bundle transfer, and better transfer/download status. Since the last update the platform has also had a substantial release-hardening pass: local auth email verification, login lockout, self-service password reset for local accounts, shared database-backed auth and abuse throttles across replicas, trusted-origin mutation checks, org-authenticated server actions, enrolment-token limits, certificate-checker SSRF and parsing hardening, signed-update enforcement, terminal SSH credential enforcement, heartbeat/JWT tightening, agent script limits, ingest gRPC caps, config-file permission validation, digest-pinned customer bundles, installer checksum verification, Password Manager release descriptor pinning, and broader E2E/process coverage.
+🟢 Phase 5 progressing — tooling has expanded beyond Directory User Lookup and SSL Certificate Checker into Jenkins/GitLab air-gap bundle generation, recursive plugin dependency resolution, offline install bundles, host-mediated bundle transfer, and better transfer/download status. Since the last update the platform has also had a substantial release-hardening pass: local auth email verification, login lockout, self-service password reset for local accounts, shared database-backed auth and abuse throttles across replicas, trusted-origin mutation checks, instance-authenticated server actions, enrolment-token limits, certificate-checker SSRF and parsing hardening, signed-update enforcement, terminal SSH credential enforcement, heartbeat/JWT tightening, agent script limits, ingest gRPC caps, config-file permission validation, digest-pinned customer bundles, installer checksum verification, Password Manager release descriptor pinning, and broader E2E/process coverage.
 
 ---
 
@@ -71,12 +71,12 @@
 - `pnpm --dir apps/web exec playwright test --list tests/e2e/tooling/password-manager.spec.ts`
 - `pnpm --dir apps/web exec node tests/e2e/runner.mjs tests/e2e/tooling/password-manager.spec.ts --grep "read-only vault roles"` (blocked locally: `testcontainers` could not find a working container runtime)
 
-### Session 130 — Password Manager tenant audit view
+### Session 130 — Password Manager instance audit view
 
 **Standards-oriented audit visibility** (`apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/client.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
 - Added Password Manager client support for the standalone API's redacted
-  tenant audit event listing and audit integrity status routes.
-- Added an unlocked workspace Audit tab with tenant-wide filters for vault,
+  instance audit event listing and audit integrity status routes.
+- Added an unlocked workspace Audit tab with instance-wide filters for vault,
   actor, event type, object type, outcome, and time range.
 - Rendered public-safe audit evidence only: timestamp, actor, action, target,
   outcome, summary, and integrity status, with E2E assertions that forensic or
@@ -167,9 +167,9 @@
 
 **Persistence, security, and audit**
 - Added `calendar_events`, `calendar_event_hosts`, and
-  `calendar_event_participants` with org-scoped RLS, indexes, idempotent create
+  `calendar_event_participants` with instance-scoped RLS, indexes, idempotent create
   support via `client_request_id`, and occurrence-exception uniqueness.
-- Calendar mutations validate input on the server, enforce org ownership for
+- Calendar mutations validate input on the server, enforce instance ownership for
   linked hosts/users, rate-limit writes, and emit audit events.
 - Added sidebar/command-palette entries, docs, E2E fixture cleanup, and route
   warmup coverage.
@@ -370,7 +370,7 @@
 
 **Vault member selector and public-key lookup** (`apps/web/app/(dashboard)/password-manager/page.tsx`, `apps/web/app/(dashboard)/password-manager/password-manager-client.tsx`, `apps/web/lib/password-manager/client.ts`, `apps/web/tests/e2e/fixtures/password-manager.ts`, `apps/web/tests/e2e/tooling/password-manager.spec.ts`)
 - Replaced the manual CT-Ops user ID and pasted public-key JSON add-member
-  controls with a searchable organisation-user selector that disables existing
+  controls with a searchable instance-user selector that disables existing
   members and users who have not completed Password Manager setup.
 - Added a Password Manager client call for the new vault-scoped
   `/member-recipients` lookup, caching returned public-key envelopes in browser
@@ -464,12 +464,12 @@
 - Added a Password Manager Playwright mock fixture that intercepts the hosted
   `/password-manager-api/` traffic, simulates session launch/setup/unlock,
   vault and entry CRUD, member sharing and revocation, key rotation, audit
-  hooks, session expiry, and organisation switches, and records outbound
+  hooks, session expiry, and instance switches, and records outbound
   request bodies plus headers for leak checks.
 - Added a targeted hosted Password Manager E2E spec that covers launch,
   browser-only setup, relaunch + unlock, vault create/delete, entry
   create/reveal/copy/export/edit/delete, member add/remove, rotation prompts,
-  session refresh expiry handling, and organisation switching from the CT-Ops
+  session refresh expiry handling, and instance switching from the CT-Ops
   hosted route shell.
 - Added network and browser-surface assertions proving the hosted flow does not
   send unlock passwords, plaintext entry values, or plaintext-shaped key fields
@@ -559,15 +559,15 @@
 
 **CT-Ops Password Manager launch route** (`apps/web/app/api/password-manager/launch-assertion/route.ts`, `apps/web/lib/password-manager/launch-assertion.ts`, `apps/web/lib/password-manager/launch-assertion.test.mjs`)
 - Added `POST /api/password-manager/launch-assertion`, gated by trusted
-  mutation origins, an active organisation session, Tooling access, and a
+  mutation origins, an active instance session, Tooling access, and a
   per-user launch rate limit.
 - Added a shared Password Manager launch-assertion helper that reads the CT-Ops
   launch config from runtime env, parses the configured Ed25519 PKCS#8 private
   key, and signs short-lived `EdDSA` JWTs carrying the required Password
   Manager claims including issuer, audience, product, CT-Ops instance,
-  organisation, user identity, `iat`, `exp`, and `jti`.
-- Included optional organisation display names in the assertion when CT-Ops can
-  resolve them from the organisations table, while keeping failure responses
+  instance, user identity, `iat`, `exp`, and `jti`.
+- Included optional instance display names in the assertion when CT-Ops can
+  resolve them from the instances table, while keeping failure responses
   generic and never proxying Password Manager API traffic or session cookies.
 
 **Validation**
@@ -729,7 +729,7 @@
 ### Session 97 — Durable licence verifier key rotation
 
 **Licence verifier continuity** (`apps/web/lib/licence.ts`, `apps/web/lib/actions/settings.ts`, `apps/web/lib/actions/licence-guard.ts`, `apps/web/lib/seat-admission.ts`)
-- Added persisted licence verifier public key storage on the organisation row so each saved licence continues to validate against the public key that originally verified it.
+- Added persisted licence verifier public key storage on the instance row so each saved licence continues to validate against the public key that originally verified it.
 - Added `LICENCE_PUBLIC_KEY_PATH` support and mounted `./licence-keys/current.pem` into the customer bundle for newly activated licences, with the baked production key retained as a fallback.
 - Added a migration for `licence_verifier_public_key` and `licence_verifier_public_key_fingerprint`.
 
@@ -804,7 +804,7 @@
 
 **CT-CVE connector setup/status surface** (`apps/web/app/(dashboard)/settings/integrations/ct-cve/page.tsx`, `apps/web/lib/integrations/ct-cve/setup-status.ts`)
 - Added an admin-only Settings -> Integrations -> CT-CVE page showing connector configured state, inbound signed-token scopes/counts, outbound inventory targets, recent health/finding/inventory timestamps, and connector errors without exposing token ids or secrets.
-- Added a sanitised setup overview helper that summarises `CT_CVE_SERVICE_TOKENS`, `CT_CVE_INVENTORY_PUSH_TARGETS`, and durable connection status for the active organisation.
+- Added a sanitised setup overview helper that summarises `CT_CVE_SERVICE_TOKENS`, `CT_CVE_INVENTORY_PUSH_TARGETS`, and durable connection status for the active instance.
 - Added the CT-CVE tab alongside LDAP and SMTP integration settings.
 
 **Validation**
@@ -833,7 +833,7 @@
 ### Session 88 — CT-CVE durable connection status
 
 **CT-CVE connector status persistence** (`apps/web/lib/integrations/ct-cve/connection-status.ts`, `apps/web/app/api/integrations/ct-cve/v1/connection-health/route.ts`)
-- Added durable, org-scoped CT-CVE connector status persisted through `system_config`, including last inventory push, finding ingest, health check, and connector error timestamps.
+- Added durable, instance-scoped CT-CVE connector status persisted through `system_config`, including last inventory push, finding ingest, health check, and connector error timestamps.
 - Updated signed connection health to return and refresh the stored status instead of returning process-local placeholder timestamps.
 - Updated CT-CVE finding ingestion and inventory snapshot pushes to maintain the durable status and clear stale connector errors after successful data flow.
 
@@ -843,7 +843,7 @@
 ### Session 87 — CT-CVE inventory export connector
 
 **CT-CVE outbound inventory snapshots** (`apps/web/lib/integrations/ct-cve/inventory-export.ts`)
-- Added CT Ops inventory snapshot construction for CT-CVE, scoped by organisation and limited to active hosts plus current software package rows.
+- Added CT Ops inventory snapshot construction for CT-CVE, scoped by instance and limited to active hosts plus current software package rows.
 - Included contract metadata, stable package fingerprints, Linux distro/package manager metadata, bounded host/package page sizes, and opaque cursors for follow-up inventory pages.
 - Added a signed outbound push helper for `POST /api/v1/ct-ops/inventory-snapshots` using the CT-CVE `inventory:write` service-token contract.
 - Corrected CT Ops connection health to require `connection:read` rather than `findings:write`.
@@ -854,12 +854,12 @@
 ### Session 86 — CT-CVE inbound connector boundary
 
 **CT-CVE connector foundation** (`apps/web/lib/integrations/ct-cve/service-token.ts`, `apps/web/app/api/integrations/ct-cve/v1/connection-health/route.ts`)
-- Added signed CT-CVE service-token verification for inbound CT Ops connector requests, including `Authorization: CT-ServiceToken`, body SHA-256 checks, HMAC signatures, timestamp skew enforcement, nonce replay protection, token revocation, org binding, and scope checks.
-- Added the first signed CT Ops connector endpoint, `GET /api/integrations/ct-cve/v1/connection-health?orgId=...`, with per-token rate limiting and contract-shaped status output.
+- Added signed CT-CVE service-token verification for inbound CT Ops connector requests, including `Authorization: CT-ServiceToken`, body SHA-256 checks, HMAC signatures, timestamp skew enforcement, nonce replay protection, token revocation, instance binding, and scope checks.
+- Added the first signed CT Ops connector endpoint, `GET /api/integrations/ct-cve/v1/connection-health?instanceId=...`, with per-token rate limiting and contract-shaped status output.
 - Documented the `CT_CVE_SERVICE_TOKENS` configuration shape for early connector deployments.
 
 **Validation**
-- Added focused unit coverage for valid signatures, stale timestamps, content hash mismatches, invalid signatures, replayed nonces, scope checks, and org binding.
+- Added focused unit coverage for valid signatures, stale timestamps, content hash mismatches, invalid signatures, replayed nonces, scope checks, and instance binding.
 - Validation run: `node --experimental-strip-types --test lib/integrations/ct-cve/service-token.test.mjs`, targeted ESLint for the new connector files, `pnpm --dir apps/web type-check`, `pnpm --dir apps/web db:validate`, and `pnpm --dir apps/web test:unit`.
 
 ### Session 85 — Licensing UI and docs
@@ -938,7 +938,7 @@
 **Additive role model** (`apps/web/lib/auth/`, `apps/web/lib/actions/`, `apps/web/lib/db/schema/`, `apps/web/lib/db/migrations/0053_bright_black_cat.sql`)
 - Added persisted `roles` arrays to users and invitations while keeping the legacy single `role` column as a derived compatibility value so existing role-gated flows keep working during the transition.
 - Normalised session/auth loading and guard checks to treat permissions as the union of assigned roles, with explicit precedence preserved for the legacy `role` field and `pending` users continuing to carry no assigned roles.
-- Updated organisation creation, invitation acceptance, invitation restore, and role-update flows to write the new additive role shape and to keep last-super-admin protections working when `super_admin` membership is removed, deactivated, or deleted.
+- Updated instance creation, invitation acceptance, invitation restore, and role-update flows to write the new additive role shape and to keep last-super-admin protections working when `super_admin` membership is removed, deactivated, or deleted.
 
 **Team management UI** (`apps/web/app/(dashboard)/team/`, `apps/web/tests/e2e/team/`)
 - Reworked the People page to display all assigned roles as badges, support multi-role assignment from the member role menu, and support multi-role invitations from the invite dialog.
@@ -952,7 +952,7 @@
 **Confirmed finding model and reports** (`apps/web/lib/db/schema/vulnerabilities.ts`, `apps/web/lib/actions/vulnerabilities.ts`, `apps/web/app/(dashboard)/reports/vulnerabilities/`)
 - Added explicit vulnerability finding confidence and match-reason persistence so confirmed Linux package matches are distinguishable from probable/future best-effort matches.
 - Defaulted host and global vulnerability reports to confirmed findings while adding a report confidence filter for operators who want to inspect probable matches.
-- Added a migration for `host_vulnerability_findings.confidence`, `match_reason`, and supporting org/status/confidence lookup.
+- Added a migration for `host_vulnerability_findings.confidence`, `match_reason`, and supporting instance/status/confidence lookup.
 - Added a host Overview vulnerability assessment card showing affected/clear/stale/not-assessed status, confirmed finding counts, critical/high split, last inventory scan time, last vulnerability feed sync time, and a direct link to host findings.
 
 **Red Hat and matcher accuracy** (`apps/ingest/internal/vuln/`)
@@ -1011,7 +1011,7 @@
 **Vulnerability operations UI** (`apps/web/app/(dashboard)/settings/vulnerabilities/`, `apps/web/lib/actions/vulnerabilities.ts`)
 - Added an admin-only **Administration → Vulnerabilities** page that shows vulnerability feed/API connection status, upstream API URLs, last attempt/success times, pulled record counts, and recent connection errors without exposing secrets.
 - Added a live CVE catalog view backed by `vulnerability_cves`, including pulled CVE counts, severity/KEV summaries, affected-package rule counts, source filtering, and CVE/title search so users can confirm API data is present independently of host findings.
-- Added a bounded, rate-limited server action for the management snapshot, with organisation admin authorization and org-scoped open finding counts.
+- Added a bounded, rate-limited server action for the management snapshot, with instance admin authorization and instance-scoped open finding counts.
 - Added sync policy visibility plus expected feed rows for NVD, CISA KEV, Debian, Ubuntu OSV, Alpine SecDB, and Red Hat, so the page shows the APIs CT-Ops is supposed to contact even before the first sync attempt. Ingest now stores the attempted upstream URL in source metadata for accurate display after environment overrides.
 - Added an admin NVD API key control to **Administration → Vulnerabilities**. The key is stored encrypted in `system_config` as `vulnerability_nvd_api_key`; ingest uses it when `NVD_API_KEY` is not set, while keeping the environment variable as the deployment-level override.
 
@@ -1028,7 +1028,7 @@
 - Added distro-aware version comparison plus asynchronous host matching after feed syncs and software inventory ingestion; unsupported package sources are left unassessed rather than treated as safe.
 
 **Persistence and reporting** (`apps/web/lib/db/schema/`, `apps/web/lib/actions/vulnerabilities.ts`, `apps/web/app/(dashboard)/reports/vulnerabilities/`)
-- Added normalized CVE catalog, vulnerability source state, affected package ranges, and per-host finding tables, scoped by organisation for host findings.
+- Added normalized CVE catalog, vulnerability source state, affected package ranges, and per-host finding tables, scoped by instance for host findings.
 - Added the Pro-gated **Reports → Vulnerabilities** page with filters for CVE, package, severity, KEV, fix availability, host group, distro, and package source.
 - Added an **Inventory → Vulnerabilities** host detail tab showing CVE findings for a selected host.
 
@@ -1039,8 +1039,8 @@
 ### Session 73 — Build document builder
 
 **Build Docs product area** (`apps/web/app/(dashboard)/build-docs/`, `apps/web/lib/actions/build-docs.ts`, `apps/web/lib/db/schema/build-docs.ts`)
-- Added a new Build Docs workspace for organisation-level build document templates, reusable snippets, structured reorderable sections, screenshot/image assets, browser preview, and PDF/DOCX exports.
-- Added immutable template versions, snippet provenance on inserted sections, document/section revision snapshots, Postgres full-text search vectors, and org-scoped RLS-backed database tables.
+- Added a new Build Docs workspace for instance-level build document templates, reusable snippets, structured reorderable sections, screenshot/image assets, browser preview, and PDF/DOCX exports.
+- Added immutable template versions, snippet provenance on inserted sections, document/section revision snapshots, Postgres full-text search vectors, and instance-scoped RLS-backed database tables.
 - Added filesystem-backed image storage by default plus S3-compatible storage settings and storage adapter support for object storage deployments.
 - Replaced the placeholder Runbooks route with a redirect to Build Docs and added Build Docs to navigation and the command palette.
 
@@ -1094,9 +1094,9 @@
 ### Session 68 — Centralised authz guards
 
 **Shared authz guard layer** (`apps/web/lib/auth/guards.ts`, `apps/web/lib/actions/`, `apps/web/lib/eslint/`, `SECURITY.md`)
-- Added shared web authz helpers for active-user, same-org, admin-role, and writable-role checks so role and organisation enforcement lives in one place instead of being reimplemented ad hoc across server actions.
-- Migrated the remaining raw `session.user` authorisation checks in org settings, networks, notes, certificates, terminal, task schedules, software inventory, notifications, users, and security actions onto the shared helpers or the existing `requireOrgAccess` / `requireOrgAdminAccess` wrappers.
-- Added a local ESLint rule that rejects direct `session.user.organisationId` / `session.user.role` comparisons and role-list `includes()` checks in web auth/action code, and marked security finding `I-10` complete.
+- Added shared web authz helpers for active-user, same-instance, admin-role, and writable-role checks so role and instance enforcement lives in one place instead of being reimplemented ad hoc across server actions.
+- Migrated the remaining raw `session.user` authorisation checks in instance settings, networks, notes, certificates, terminal, task schedules, software inventory, notifications, users, and security actions onto the shared helpers or the existing `requireInstanceAccess` / `requireInstanceAdminAccess` wrappers.
+- Added a local ESLint rule that rejects direct `session.user.instanceId` / `session.user.role` comparisons and role-list `includes()` checks in web auth/action code, and marked security finding `I-10` complete.
 
 **Validation**
 - Added focused unit coverage for the new guards and the new ESLint rule.
@@ -1105,8 +1105,8 @@
 ### Session 67 — Administration information architecture
 
 **Administration layout** (`apps/web/components/shared/sidebar.tsx`, `apps/web/app/(dashboard)/settings/`)
-- Replaced the old Administration sidebar grouping of Team plus nested Settings with high-level areas: People, Organisation, Agents, Monitoring, Integrations, Security, and System.
-- Split the settings UI into focused pages with tabs: Organisation profile/licence, Agents enrolment/defaults/tag rules/software inventory, Monitoring alert defaults/notification policy/metric retention, Integrations LDAP/SMTP, and Security mTLS/terminal access.
+- Replaced the old Administration sidebar grouping of Team plus nested Settings with high-level areas: People, Instance, Agents, Monitoring, Integrations, Security, and System.
+- Split the settings UI into focused pages with tabs: Instance profile/licence, Agents enrolment/defaults/tag rules/software inventory, Monitoring alert defaults/notification policy/metric retention, Integrations LDAP/SMTP, and Security mTLS/terminal access.
 - Kept compatibility redirects for the old Alert Defaults, LDAP, and Tag Rules settings URLs, and updated in-app links plus onboarding/agent docs to point at the new locations.
 
 **Validation**
@@ -1159,7 +1159,7 @@
 ### Session 62 — Central SMTP relay settings
 
 **Notification email delivery** (`apps/web/lib/actions/notification-settings.ts`, `apps/web/app/(dashboard)/settings/settings-client.tsx`, `apps/web/lib/notifications/`)
-- Moved SMTP relay configuration out of per-alert channels and into organisation Settings as a central SMTP relay.
+- Moved SMTP relay configuration out of per-alert channels and into instance Settings as a central SMTP relay.
 - Added admin-only save/test actions for the relay; SMTP passwords are encrypted before storage and redacted from client responses.
 - Backend validation now restricts SMTP ports and rejects private/reserved relay hosts when the relay is enabled.
 - Alert email channels now store only channel name and recipient addresses; relay host, credentials, encryption, and sender identity come from central settings.
@@ -1176,7 +1176,7 @@
 
 **Agent operating rules** (`AGENTS.md`)
 - Added an E2E Database Harness section that points agents to `apps/docs/docs/development/testing.md` as the source of truth for the web E2E harness, avoiding duplicated setup details that can drift
-- Added rules requiring the database-backed harness when tests depend on real SQL, migrations, constraints, auth/session rows, organisation scoping, cascades, or persisted state
+- Added rules requiring the database-backed harness when tests depend on real SQL, migrations, constraints, auth/session rows, instance scoping, cascades, or persisted state
 - Added rules requiring explicit, relevant seed data for tests instead of relying on leaked state
 - Added Progress Tracking guidance: when new feature work satisfies all or part of a requirement, update `PROGRESS.md` and state what is complete versus outstanding
 - Added Completion Cleanup guidance: remove temporary worktrees only after commit, push, release, and any relevant image/artifact publication, and never delete worktrees with uncommitted user work
@@ -1184,7 +1184,7 @@
 
 **E2E harness docs** (`apps/docs/docs/development/testing.md`)
 - Expanded the Playwright/Testcontainers documentation with agent-ready detail on how the tmpfs TimescaleDB/Postgres database is created, how `DATABASE_URL` is injected before Next.js starts, and how migrations run
-- Documented `getTestDb()` for direct SQL seeding, when to seed through SQL versus UI/API paths, and how the baseline `seedOrgAndUser()` fixture works
+- Documented `getTestDb()` for direct SQL seeding, when to seed through SQL versus UI/API paths, and how the baseline `seedInstanceAndUser()` fixture works
 - Added guidance for feature-specific seed helpers, isolation maintenance, updating `APP_TABLES` for new app tables, single-spec runs, and common troubleshooting
 
 **Build state**
@@ -1205,16 +1205,16 @@
 
 ---
 
-### Session 59 — Security, auth, and tenant-bound action hardening
+### Session 59 — Security, auth, and instance-bound action hardening
 
 **Authentication and account controls** (`apps/web/lib/auth/`, `apps/web/app/(auth)/`)
 - Local email/password sign-ups require email verification before dashboard access by default.
 - Per-account login lockout added for repeated failed password attempts.
 - Production auth config is now validated via `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and trusted origins instead of silently accepting unsafe defaults.
-- LDAP login links are scoped to organisation context; team-management mutations derive the actor from the session.
+- LDAP login links are scoped to instance context; team-management mutations derive the actor from the session.
 
 **Mutation and tenancy boundaries** (`apps/web/lib/actions/`, `apps/web/lib/security/trusted-origins.ts`)
-- Server actions now require an authenticated organisation context across agents, alerts, certificates, checks, host groups/settings, LDAP, networks, notes, notifications, service accounts, settings, software inventory, tag rules, tasks, terminal, and users.
+- Server actions now require an authenticated instance context across agents, alerts, certificates, checks, host groups/settings, LDAP, networks, notes, notifications, service accounts, settings, software inventory, tag rules, tasks, terminal, and users.
 - Trusted-origin validation added for mutation routes such as agent bundles, host queries, bundle transfer, and certificate checker calls.
 - Notification test targets block private/internal addresses.
 
@@ -1344,7 +1344,7 @@
 ### Session 51 — Host registration deduplication (hostname / IP overlap)
 
 **Ingest-side dedup** (`apps/ingest/internal/handlers/register.go`, `apps/ingest/internal/db/queries/hosts.sql.go`, `agent/internal/registration/registrar.go`)
-- Two live hosts in the same org cannot share a hostname or IP — guard now runs at `Register` and at `approveAgent`
+- Two live hosts in the same instance cannot share a hostname or IP — guard now runs at `Register` and at `approveAgent`
 - **Online or revoked match** → reject with `ALREADY_EXISTS` so the admin deletes the stale record first
 - **Offline / unknown match** → adopt the existing `agents`/`hosts` rows, rotate the new public key onto the existing agent, and preserve approval state — covers reinstall-with-wiped-data-dir cases that previously produced a duplicate "Offline" record
 - Agents now report non-loopback IPs in `PlatformInfo` at register time so the server can run the overlap check
@@ -1364,8 +1364,8 @@
 
 **New download route** (`apps/web/app/api/agent/bundle/route.ts`, `apps/web/lib/agent/bundle.ts`, `apps/web/lib/agent/binary.ts`)
 - **Settings → Agent Enrolment → Download Install Bundle** — produces a per-OS/arch zip containing the agent binary, install helper (`install.sh` on Linux/macOS, `install.ps1` on Windows), pre-populated `agent.toml`, `SHA256SUMS`, and a `README.md`
-- Three token options: generate a fresh single-use token (default 7-day expiry), embed an existing active token, or ship without a token (operator exports `CT_OPS_ORG_TOKEN` before install)
-- Gated to `super_admin` / `org_admin`; scoped by `organisationId`; single-use tokens persisted via `agent_enrolment_tokens` with `metadata.source = 'install-bundle'` and `metadata.os` / `metadata.arch` for audit
+- Three token options: generate a fresh single-use token (default 7-day expiry), embed an existing active token, or ship without a token (operator exports `CT_OPS_ENROLMENT_TOKEN` before install)
+- Gated to `super_admin` / `instance_admin`; scoped by `instanceId`; single-use tokens persisted via `agent_enrolment_tokens` with `metadata.source = 'install-bundle'` and `metadata.os` / `metadata.arch` for audit
 - Shared binary resolver extracted to `apps/web/lib/agent/binary.ts` so the new route reuses the download route's cache / GitHub-release / baked-binary fallback
 - Zip built with `jszip`
 - Closes carrtech-dev/ct-ops#244; PR #250
@@ -1406,7 +1406,7 @@
   - Groups: full `memberOf` list with CN + DN, copy button, and client-side filter visible whenever the user has any groups
   - All LDAP Attributes: searchable table of every returned attribute, with Windows file-time / LDAP generalized-time values rendered as human-readable dates and the raw value shown below; binary values as `[binary NB]`; password-hash attributes excluded for safety
 - Removed unused sync scaffolding from `ldap_configurations` (`lastSyncAt`, `syncIntervalMinutes`, etc.) and LDAP-sourced columns from `domain_accounts` (`ldapConfigurationId`, `distinguishedName`, `groups`) — the Service Accounts register is now manual-only; live queries go through this tool
-- Any authenticated org user can run a lookup; managing LDAP configs remains `org_admin` / `super_admin`
+- Any authenticated instance user can run a lookup; managing LDAP configs remains `instance_admin` / `super_admin`
 
 **Follow-up fixes during the same afternoon**
 - **Server-action error surfacing** — `searchLdapDirectory` / `lookupDirectoryUser` wrapped in try/catch/finally so a stale client bundle (e.g. after a deploy) no longer leaves the typeahead silently stuck on the spinner; users see a "please reload" message (PR #242)
@@ -1487,7 +1487,7 @@
 ### Session 44 — Networks (CIDR-based auto-assignment)
 
 **Schema & migrations** (`apps/web/lib/db/schema/networks.ts`, migration 0031)
-- New `networks` table — named IP subnets with CIDR range, multi-tenant
+- New `networks` table — named IP subnets with CIDR range, instance-scoped
 - New `host_network_memberships` join table with `is_auto_assigned` flag
 
 **Server actions & UI** (`apps/web/lib/actions/networks.ts`, `apps/web/app/(dashboard)/hosts/networks/`)
@@ -1496,7 +1496,7 @@
 - "Networks" nav item added to sidebar under Hosts
 
 **Ingest auto-assignment** (`apps/ingest/internal/`)
-- `SyncHostNetworks` matches heartbeat IPs against org network ranges and syncs auto-assignments; stale assignments removed when IPs change
+- `SyncHostNetworks` matches heartbeat IPs against instance network ranges and syncs auto-assignments; stale assignments removed when IPs change
 - Called from heartbeat handler on every tick
 
 **Docs**
@@ -1568,7 +1568,7 @@
 - PRs: carrtech-dev/ct-ops#196 (notifications), #198 (all FKs), #200 (software_scans)
 
 **JWT signing key persistence** (`apps/ingest/internal/`)
-- Ingest service now persists its JWT signing key in the database (org settings table) on first start
+- Ingest service now persists its JWT signing key in the database (instance settings table) on first start
 - Survives Docker volume resets — agents no longer get 401s after a volume wipe
 - PR: carrtech-dev/ct-ops#194
 
@@ -1598,7 +1598,7 @@
 **Monitoring reliability** (`agent/internal/heartbeat/heartbeat.go`, `apps/ingest/internal/db/queries/alerts.sql.go`, `apps/web/app/(dashboard)/hosts/[id]/alerts-tab.tsx`)
 - **CPU spike elimination**: `resultsReady` heartbeats now send a cached `hostMetricsSnapshot` collected on the regular 30s tick rather than re-sampling CPU — prevents near-zero delta windows inflating readings to 100%
 - **Alert double-evaluation fix**: `GetAlertRulesForHost` now filters `is_global_default = false` — global defaults (templates) were being evaluated alongside their host-specific clones
-- **Global defaults visible**: Alerts tab on host detail shows a read-only "Organisation-wide Default Rules" section linking to Settings → Alerts
+- **Global defaults visible**: Alerts tab on host detail shows a read-only "Instance-wide Default Rules" section linking to Settings → Alerts
 - PR: carrtech-dev/ct-ops#183
 
 **Build state**
@@ -1614,13 +1614,13 @@
   - Linux: dpkg → rpm → pacman → apk (ordered by availability)
   - macOS: `system_profiler SPApplicationsDataType` + Homebrew
   - Windows: registry walk (`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`)
-- Snap/Flatpak/Windows Store sources toggleable via org settings
+- Snap/Flatpak/Windows Store sources toggleable via instance settings
 - Streams packages in 500-package chunks via new `SubmitSoftwareInventory` gRPC endpoint
 - `task_id` injected into context from `runner.go` so handlers use it as `scan_id`
 
 **Ingest** (`apps/ingest/internal/handlers/`)
 - `inventory.go`: JWT-authenticated client-streaming RPC; bulk UNNEST upsert, marks removed rows on `is_last`, completes `task_run_hosts` row
-- `software_sweeper.go`: 60s ticker creates `software_inventory` tasks for hosts overdue per org `intervalHours` setting
+- `software_sweeper.go`: 60s ticker creates `software_inventory` tasks for hosts overdue per instance `intervalHours` setting
 - `software.sql.go`: bulk UNNEST upsert, removed-package marking, scan tracking queries
 
 **Database** (`apps/web/lib/db/schema/software.ts`, migrations `0028`, `0029`)
@@ -1707,10 +1707,10 @@
 **TypeScript actions** (`apps/web/lib/actions/notifications.ts`)
 - `deleteNotification` / `deleteNotifications` — converted from hard delete to soft delete (set `deleted_at`)
 - All inbox queries (`getNotifications`, `getUnreadCount`, `markAsRead`, `markAllAsRead`, `markBatchReadStatus`) now filter `WHERE deleted_at IS NULL`
-- `deleteNotifications(orgId, userId, ids[])` — new batch soft-delete action
-- `markBatchReadStatus(orgId, userId, ids[], read)` — new batch read/unread toggle
-- `getNotificationStats(orgId, userId, hostId?)` — counts per severity for pie chart; optional `hostId` scopes to a specific host
-- `getNotificationsOverTime(orgId, userId, range, hostId?)` — daily or hourly aggregation for line chart; intentionally omits `deleted_at` filter so deleting from the inbox never affects historical trend data; optional `hostId` scopes to a specific host; enforces 90-day maximum retention window
+- `deleteNotifications(instanceId, userId, ids[])` — new batch soft-delete action
+- `markBatchReadStatus(instanceId, userId, ids[], read)` — new batch read/unread toggle
+- `getNotificationStats(instanceId, userId, hostId?)` — counts per severity for pie chart; optional `hostId` scopes to a specific host
+- `getNotificationsOverTime(instanceId, userId, range, hostId?)` — daily or hourly aggregation for line chart; intentionally omits `deleted_at` filter so deleting from the inbox never affects historical trend data; optional `hostId` scopes to a specific host; enforces 90-day maximum retention window
 - `TrendRange` type exported: `'1h' | '6h' | '12h' | '24h' | '7d' | '30d' | '90d'`
 
 **UI — Notifications page** (`apps/web/app/(dashboard)/notifications/notifications-client.tsx`)
@@ -1736,23 +1736,23 @@
 
 ### Session 34 — Slack, Telegram, and in-app notification channels
 
-**Database** (`apps/web/lib/db/schema/alerts.ts`, `auth.ts`, `organisations.ts`, migration `0026_youthful_anthem`)
+**Database** (`apps/web/lib/db/schema/alerts.ts`, `auth.ts`, `instances.ts`, migration `0026_youthful_anthem`)
 - `notifications` table: per-user rows with subject, body, severity, resourceType, resourceId, read flag, alertInstanceId FK
 - `notificationsEnabled` column added to `user` table (default true)
-- `OrgNotificationSettings` added to `OrgMetadata` JSONB: `inAppEnabled`, `inAppRoles`, `allowUserOptOut`
+- `InstanceNotificationSettings` added to `InstanceMetadata` JSONB: `inAppEnabled`, `inAppRoles`, `allowUserOptOut`
 - `NotificationChannelType` expanded to `'webhook' | 'smtp' | 'slack' | 'telegram'`
 - `SlackChannelConfig { webhookUrl }` and `TelegramChannelConfig { botToken; chatId }` interfaces added
 
 **Go ingest service** (`apps/ingest/internal/`)
-- `alerts.sql.go`: `GetEnabledSlackChannels`, `GetEnabledTelegramChannels`, `GetOrgNotificationSettings`, `GetAlertTargetUsers` (role + opt-out filter), `InsertNotificationBatch` (pgx.Batch)
-- `notify.go`: `postSlack` (Block Kit JSON), `dispatchSlack`, `postTelegram` (Bot API HTML mode), `dispatchTelegram`, `dispatchInApp` (org settings → user targeting → batch insert)
+- `alerts.sql.go`: `GetEnabledSlackChannels`, `GetEnabledTelegramChannels`, `GetInstanceNotificationSettings`, `GetAlertTargetUsers` (role + opt-out filter), `InsertNotificationBatch` (pgx.Batch)
+- `notify.go`: `postSlack` (Block Kit JSON), `dispatchSlack`, `postTelegram` (Bot API HTML mode), `dispatchTelegram`, `dispatchInApp` (instance settings → user targeting → batch insert)
 - `alerts.go`: `notifChannels` struct expanded; all evaluators (`check_status`, `metric_threshold`, `cert_expiry`) call Slack + Telegram + in-app dispatch on fire and resolve
 
 **TypeScript actions** (`apps/web/lib/actions/`)
 - `alerts.ts`: Zod discriminated union extended for Slack/Telegram; `NotificationChannelSafe` union updated (Telegram masks botToken as `hasBotToken`); `updateNotificationChannel` and `sendTestNotification` handle all four types
 - `notifications.ts`: `getNotifications`, `getUnreadCount`, `markAsRead`, `markAllAsRead`, `deleteNotification`
-- `notification-settings.ts`: `getOrgNotificationSettings` (with defaults), `updateOrgNotificationSettings` (admin-only, Zod-validated)
-- `profile.ts`: `updateNotificationPreference` (respects org `allowUserOptOut`)
+- `notification-settings.ts`: `getInstanceNotificationSettings` (with defaults), `updateInstanceNotificationSettings` (admin-only, Zod-validated)
+- `profile.ts`: `updateNotificationPreference` (respects instance `allowUserOptOut`)
 
 **UI — Alerts page** (`apps/web/app/(dashboard)/alerts/alerts-client.tsx`)
 - `AddSlackDialog`, `EditSlackDialog`, `AddTelegramDialog`, `EditTelegramDialog` components following existing dialog pattern
@@ -1774,10 +1774,10 @@
 - Polls every 30 s
 
 **UI — Settings** (`apps/web/app/(dashboard)/settings/settings-client.tsx`)
-- "Notification Settings" card: Enable in-app toggle, role checkboxes (super_admin/org_admin/engineer/read_only), Allow user opt-out toggle; admin-only
+- "Notification Settings" card: Enable in-app toggle, role checkboxes (super_admin/instance_admin/engineer/read_only), Allow user opt-out toggle; admin-only
 
 **UI — Profile** (`apps/web/app/(dashboard)/profile/profile-client.tsx`)
-- "Notifications" card: toggle visible when org `inAppEnabled`; disabled with explanatory text when org disallows opt-out
+- "Notifications" card: toggle visible when instance `inAppEnabled`; disabled with explanatory text when instance disallows opt-out
 
 **Sidebar** (`apps/web/components/shared/sidebar.tsx`)
 - "Notifications" entry added to Monitoring group (BellPlus icon, `/notifications`)
@@ -1847,7 +1847,7 @@
 **Per-user authentication** (`apps/web/lib/db/schema/terminal-sessions.ts`, `agent/internal/terminal/session.go`)
 - New `username` column on `terminal_sessions` table — migration `0025_luxuriant_smasher.sql`
 - Agent launches PTY via `su -l <username>` with dropped privileges (not `login`, which varies across distros)
-- Organisation-level "Direct Access" toggle (`terminalDirectAccess` in org metadata) allows bypassing username requirement
+- Instance-level "Direct Access" toggle (`terminalDirectAccess` in instance metadata) allows bypassing username requirement
 - UI shows username input on terminal tab; direct access mode skips it
 
 **Shell environment hardening** (`agent/internal/terminal/session.go`)
@@ -1872,7 +1872,7 @@
 - New `TerminalStream` RPC on ingest service for bidirectional terminal I/O
 
 **Database schema** (`apps/web/lib/db/schema/terminal-sessions.ts`, migration `0024_flat_blade.sql`)
-- `terminal_sessions` table: session ID, host ID, user ID, org ID, status (pending/connected/disconnected/failed), timestamps
+- `terminal_sessions` table: session ID, host ID, user ID, instance ID, status (pending/connected/disconnected/failed), timestamps
 
 **Ingest: session routing** (`apps/ingest/`)
 - Pending terminal sessions included in every heartbeat response so agent picks them up
@@ -1888,8 +1888,8 @@
 - WebSocket connection from browser → Next.js API route → ingest gRPC stream
 - Container shown during "connecting" state to avoid 0x0 dimension bug with xterm
 
-**Organisation settings** (`apps/web/app/(dashboard)/settings/settings-client.tsx`)
-- Terminal enable/disable toggle and port configuration in org settings
+**Instance settings** (`apps/web/app/(dashboard)/settings/settings-client.tsx`)
+- Terminal enable/disable toggle and port configuration in instance settings
 
 **Build state**
 - `pnpm run build` — zero TypeScript errors ✅
@@ -1956,7 +1956,7 @@
 ### Session 26 — General agent task framework with Linux host patching
 
 **Database schema** (`apps/web/lib/db/schema/tasks.ts`, migrations `0021`–`0022`)
-- `task_runs` table: type, status, config jsonb, `max_parallel`, org/created-by FKs, started/completed timestamps
+- `task_runs` table: type, status, config jsonb, `max_parallel`, instance/created-by FKs, started/completed timestamps
 - `task_run_hosts` table: per-host execution state (pending → running → completed/failed/cancelled/skipped), `raw_output` text accumulator, exit_code, reboot_required, packages_updated jsonb
 - `max_parallel` enforced at query level — SQL counts active rows before dispatching so concurrent ingest instances cannot over-dispatch
 
@@ -1995,22 +1995,22 @@
 ### Session 25 — Host groups with collapsible sidebar navigation
 
 **Database schema** (`apps/web/lib/db/schema/host-groups.ts`, migration `0021_chilly_tomas.sql`)
-- `host_groups` table: name, description, org FK, standard timestamps
-- `host_group_members` table: group FK, host FK, agent FK, org FK — join table with audit timestamps
+- `host_groups` table: name, description, instance FK, standard timestamps
+- `host_group_members` table: group FK, host FK, agent FK, instance FK — join table with audit timestamps
 
 **Server actions** (`apps/web/lib/actions/host-groups.ts`)
-- `createHostGroup`, `updateHostGroup`, `deleteHostGroup` — full CRUD, Zod-validated, org-scoped
-- `getHostGroups(orgId)` — returns groups with member count
-- `getHostGroup(orgId, groupId)` — returns group + full member list
+- `createHostGroup`, `updateHostGroup`, `deleteHostGroup` — full CRUD, Zod-validated, instance-scoped
+- `getHostGroups(instanceId)` — returns groups with member count
+- `getHostGroup(instanceId, groupId)` — returns group + full member list
 - `addHostToGroup`, `removeHostFromGroup` — membership management
 
 **Groups UI** (`apps/web/app/(dashboard)/hosts/groups/`)
 - `/hosts/groups` list page: create dialog, edit inline, delete with confirmation, member count badge
-- `/hosts/groups/[id]` detail page: group metadata header, member list table with remove button, "Add Host" dialog with search/filter over org hosts not already in the group
+- `/hosts/groups/[id]` detail page: group metadata header, member list table with remove button, "Add Host" dialog with search/filter over instance hosts not already in the group
 - Host detail page "Groups" tab: shows current group memberships with inline add and remove
 
 **Sidebar restructure** (`apps/web/components/shared/sidebar.tsx`)
-- Collapsible parent/child navigation: Hosts → All Hosts + Groups; Settings → Organisation + Agent Enrolment + Alert Defaults + LDAP + System Health
+- Collapsible parent/child navigation: Hosts → All Hosts + Groups; Settings → Instance + Agent Enrolment + Alert Defaults + LDAP + System Health
 - `CollapsibleSidebarItem` component with chevron indicator; auto-expands when a child route is active
 - Added shadcn `textarea` and `form` UI components
 
@@ -2083,9 +2083,9 @@
 ### Session 21 — Phase 4: LDAP directory integration and service account restructure
 
 **Service account / directory account split** (`apps/web/app/(dashboard)/service-accounts/`, `apps/web/app/(dashboard)/hosts/[id]/`)
-- Local OS users moved from top-level service accounts page to per-host "Users" and "Settings" tabs; these are host-scoped, not org-level inventory
+- Local OS users moved from top-level service accounts page to per-host "Users" and "Settings" tabs; these are host-scoped, not instance-level inventory
 - New "Service Accounts" top-level page targets network/domain accounts sourced from LDAP/AD
-- Per-host "Settings" tab: collection toggles (CPU, Memory, Disk on by default; Local Users opt-in); org-level defaults applied to newly enrolled hosts
+- Per-host "Settings" tab: collection toggles (CPU, Memory, Disk on by default; Local Users opt-in); instance-level defaults applied to newly enrolled hosts
 
 **LDAP / Active Directory integration** (`apps/web/lib/ldap/client.ts`, `apps/web/app/api/auth/ldap/route.ts`, `apps/web/app/(dashboard)/settings/ldap/`)
 - `ldap_configurations` table: host, port, bind DN/password (AES-256-GCM encrypted at rest using `LDAP_ENCRYPTION_KEY`), base DN, user/group filters, TLS mode — migration `0016`
@@ -2116,8 +2116,8 @@
 - **Overview** now shows the operational state of infrastructure: Agents (online/offline), Certificates (valid/expiring/expired), Active Alerts (firing/acknowledged), and a Summary panel. All cards link through to their respective detail pages.
 
 **New `/api/overview` endpoint** (`apps/web/app/api/overview/route.ts`)
-- Returns `agents`, `certificates`, and `alerts` counts scoped to the user's organisation.
-- `/api/system/health` stripped of certificate and alert queries — now only queries agents and org config.
+- Returns `agents`, `certificates`, and `alerts` counts scoped to the user's instance.
+- `/api/system/health` stripped of certificate and alert queries — now only queries agents and instance config.
 
 **New `DashboardClient` component** (`apps/web/app/(dashboard)/dashboard/dashboard-client.tsx`)
 - Polls `/api/overview` every 30 seconds (matching System Health behaviour).
@@ -2156,7 +2156,7 @@
 ### Session 16 — Phase 3 Certificate Management
 
 **Database schema** (`apps/web/lib/db/schema/certificates.ts`, migration `0013_certificates.sql`)
-- New `certificates` table with composite unique index on `(org_id, host, port, server_name, fingerprint_sha256)`, expiry and status indexes, soft delete, `source` column (`discovered|imported|issued`) for future CA work, `discoveredByHostId` field (semantically scoped to discovery, not deployment)
+- New `certificates` table with composite unique index on `(instance_id, host, port, server_name, fingerprint_sha256)`, expiry and status indexes, soft delete, `source` column (`discovered|imported|issued`) for future CA work, `discoveredByHostId` field (semantically scoped to discovery, not deployment)
 - New `certificate_events` table for append-only event spine: discovered, renewed, expiring_soon, expired, restored, removed
 - `CertificateStatus`, `CertificateSource`, `CertificateEventType` TypeScript types
 
@@ -2165,10 +2165,10 @@
 - Zod schema in `createCheck` / `updateCheck` accepts the new type
 
 **Web: server actions** (`apps/web/lib/actions/certificates.ts`, `apps/web/lib/certificates/expiry.ts`)
-- `getCertificates(orgId, filters)` — paginated, filterable by status/host, sortable
-- `getCertificate(orgId, certId)` — returns cert + events
-- `getCertificateCounts(orgId)` — valid/expiring_soon/expired/invalid tallies
-- `deleteCertificate(orgId, certId)` — soft delete
+- `getCertificates(instanceId, filters)` — paginated, filterable by status/host, sortable
+- `getCertificate(instanceId, certId)` — returns cert + events
+- `getCertificateCounts(instanceId)` — valid/expiring_soon/expired/invalid tallies
+- `deleteCertificate(instanceId, certId)` — soft delete
 - `computeExpiryStatus(notAfter, warnDays)` and `formatDaysUntil(date)` helpers
 
 **Web: UI** (`apps/web/app/(dashboard)/certificates/`, `apps/web/components/certificates/`)
@@ -2192,13 +2192,13 @@
 - Wired into heartbeat handler via per-heartbeat `GetChecksForHost` type map
 
 **Ingest: cert expiry alert evaluator + sweeper** (`apps/ingest/internal/handlers/alerts.go`, `apps/ingest/cmd/ingest/main.go`)
-- `evaluateCertExpiryForCert` — called immediately after persist; loads org's cert_expiry rules, evaluates each
+- `evaluateCertExpiryForCert` — called immediately after persist; loads instance's cert_expiry rules, evaluates each
 - `evaluateCertExpiryRule` — fires/resolves `alert_instances` row keyed by `ruleID + metadata.certificateId`; uses cert's `discovered_by_host_id` as FK-safe `host_id`; dispatches via existing webhook + SMTP pipeline
-- `RunCertExpirySweeper` goroutine — ticks every 15 min, sweeps all orgs with cert_expiry rules
+- `RunCertExpirySweeper` goroutine — ticks every 15 min, sweeps all instances with cert_expiry rules
 - Sweeper started from `main.go`
 
 **Go queries** (`apps/ingest/internal/db/queries/certificates.sql.go`)
-- `UpsertCertificate`, `FindCertsForEndpoint`, `InsertCertificateEvent`, `GetActiveCertAlertInstance`, `InsertCertAlertInstance`, `GetCertExpiryRulesForOrg`, `GetAllOrgsWithCertExpiryRules`, `ListCertificatesExpiringWithin`, `GetCertificateByID`
+- `UpsertCertificate`, `FindCertsForEndpoint`, `InsertCertificateEvent`, `GetActiveCertAlertInstance`, `InsertCertAlertInstance`, `GetCertExpiryRulesForInstance`, `GetAllInstancesWithCertExpiryRules`, `ListCertificatesExpiringWithin`, `GetCertificateByID`
 
 **Build state**
 - `pnpm run build` (apps/web) — zero TypeScript errors ✅
@@ -2228,9 +2228,9 @@
 - `host_metrics_daily` — 1-day bucket CAGG, refresh policy: every day, covering last 3 days
 - `getHostMetrics` (in `apps/web/lib/actions/agents.ts`) now queries from `host_metrics_hourly` for 24h range and `host_metrics_daily` for 7d range using raw SQL via `db.execute(sql\`...\`)`; falls back to the raw `host_metrics` table if the view doesn't exist (graceful degradation for plain PostgreSQL)
 
-**Metric retention setting** (`apps/web/lib/db/schema/organisations.ts`, `apps/web/lib/actions/settings.ts`, `apps/web/app/(dashboard)/settings/settings-client.tsx`)
-- New `metricRetentionDays` integer column (default 30) on `organisations` table — migration `0011_overrated_mongu.sql`
-- `updateMetricRetention(orgId, days)` server action validates 1–3650 days; admin-only
+**Metric retention setting** (`apps/web/lib/db/schema/instances.ts`, `apps/web/lib/actions/settings.ts`, `apps/web/app/(dashboard)/settings/settings-client.tsx`)
+- New `metricRetentionDays` integer column (default 30) on `instances` table — migration `0011_overrated_mongu.sql`
+- `updateMetricRetention(instanceId, days)` server action validates 1–3650 days; admin-only
 - New "Metric Retention" card in Settings UI with a Select (7 / 14 / 30 / 60 / 90 / 180 days / 1 year); Save button disabled when value matches current DB value
 
 **Build state**
@@ -2269,7 +2269,7 @@
 ### Session 13 — Alert silencing + migration runner root-cause fix
 
 **Alert silencing feature** (`apps/web/lib/db/schema/alerts.ts`, `apps/web/lib/actions/alerts.ts`, `apps/web/app/(dashboard)/alerts/alerts-client.tsx`, `apps/web/app/(dashboard)/hosts/[id]/alerts-tab.tsx`, `apps/ingest/internal/db/queries/alerts.sql.go`, `apps/ingest/internal/handlers/alerts.go`)
-- New `alert_silences` table — host-scoped or org-wide time windows that suppress alert evaluation; migration `0010_eager_chameleon.sql` generated via `db:generate`
+- New `alert_silences` table — host-scoped or instance-wide time windows that suppress alert evaluation; migration `0010_eager_chameleon.sql` generated via `db:generate`
 - Server actions: `getSilences`, `getActiveSilencesForHost`, `createSilence`, `deleteSilence`
 - Go ingest: `IsHostSilenced` query short-circuits `evaluateAlerts` so silenced hosts skip rule evaluation entirely
 - UI: dedicated Silences card on `/alerts` page with Active/Upcoming/Expired badges + add dialog; per-host "Silence Host" button and amber active-silence banner with one-click remove on the host detail Alerts tab
@@ -2347,11 +2347,11 @@
 
 **Global alert defaults** (`apps/web/lib/db/schema/alerts.ts`, migration `0009_global_alert_defaults.sql`, `apps/web/lib/actions/alerts.ts`, `apps/web/lib/actions/agents.ts`)
 - New `isGlobalDefault` boolean column on `alertRules` (default false); migration `0009` adds it
-- `getGlobalAlertDefaults(orgId)` — fetches all global-default rules for the org
-- `createGlobalAlertDefault(orgId, input)` — creates a rule with `isGlobalDefault = true`; only `metric_threshold` type allowed for defaults
-- `deleteGlobalAlertDefault(orgId, ruleId)` — soft-deletes a global default rule
-- `applyGlobalDefaultsToHost(orgId, hostId)` — clones each active global-default rule as a host-scoped rule; called from `approveAgent` immediately after manual approval
-- `getAlertRules` now excludes global defaults from regular host/org rule listings (prevents duplicates in the Alerts tab)
+- `getGlobalAlertDefaults(instanceId)` — fetches all global-default rules for the instance
+- `createGlobalAlertDefault(instanceId, input)` — creates a rule with `isGlobalDefault = true`; only `metric_threshold` type allowed for defaults
+- `deleteGlobalAlertDefault(instanceId, ruleId)` — soft-deletes a global default rule
+- `applyGlobalDefaultsToHost(instanceId, hostId)` — clones each active global-default rule as a host-scoped rule; called from `approveAgent` immediately after manual approval
+- `getAlertRules` now excludes global defaults from regular host/instance rule listings (prevents duplicates in the Alerts tab)
 
 **Global Alert Defaults settings page** (`apps/web/app/(dashboard)/settings/alerts/`)
 - New `page.tsx` — admin-only server component; fetches initial defaults, passes to client
@@ -2366,9 +2366,9 @@
 ### Session 9 — Alert rule builder + alert state machine
 
 **Schema** (`apps/web/lib/db/schema/alerts.ts`, migration `0008_alert_rules.sql`)
-- `alertRules` table: org-scoped, hostId nullable (null = org-wide), conditionType, config JSONB, severity, enabled
-- `alertInstances` table: ruleId, hostId, orgId, status (firing/resolved/acknowledged), message, triggeredAt, resolvedAt, acknowledgedAt/By
-- `notificationChannels` table: orgId, name, type='webhook', config JSONB (url + optional secret), enabled
+- `alertRules` table: instance-scoped, hostId nullable (null = instance-wide), conditionType, config JSONB, severity, enabled
+- `alertInstances` table: ruleId, hostId, instanceId, status (firing/resolved/acknowledged), message, triggeredAt, resolvedAt, acknowledgedAt/By
+- `notificationChannels` table: instanceId, name, type='webhook', config JSONB (url + optional secret), enabled
 
 **Ingest alert evaluation** (`apps/ingest/internal/db/queries/alerts.sql.go`, `apps/ingest/internal/handlers/alerts.go`, `apps/ingest/internal/handlers/notify.go`)
 - `GetAlertRulesForHost`, `GetActiveAlertInstance`, `InsertAlertInstance`, `ResolveAlertInstance`, `GetRecentCheckResults`, `GetEnabledWebhookChannels` — Go query functions
@@ -2379,9 +2379,9 @@
 - `processHeartbeat` signature extended with `hostname string` param; both call sites updated
 
 **Server actions** (`apps/web/lib/actions/alerts.ts`)
-- `getAlertRules(orgId, hostId?)` — uses `or(eq, isNull)` for org-wide rule inclusion
+- `getAlertRules(instanceId, hostId?)` — uses `or(eq, isNull)` for instance-wide rule inclusion
 - `createAlertRule`, `updateAlertRule`, `deleteAlertRule` (soft delete), `getAlertInstances`, `acknowledgeAlert`
-- `getActiveAlertCountsForHosts(orgId, hostIds[])` — GROUP BY for inventory badge
+- `getActiveAlertCountsForHosts(instanceId, hostIds[])` — GROUP BY for inventory badge
 - `getNotificationChannels` (redacts secret → `hasSecret: boolean`), `createNotificationChannel`, `deleteNotificationChannel`
 
 **Alerts page** (`apps/web/app/(dashboard)/alerts/page.tsx`, `alerts-client.tsx`)
@@ -2393,7 +2393,7 @@
 
 **Host detail Alerts tab** (`apps/web/app/(dashboard)/hosts/[id]/alerts-tab.tsx`)
 - Host-specific rules section with Add Rule dialog (conditionType selector, check picker / metric config, severity)
-- Enable/disable `<Switch>` and delete per rule; org-wide rules shown read-only in separate card
+- Enable/disable `<Switch>` and delete per rule; instance-wide rules shown read-only in separate card
 - Active alert count badge pulled via TanStack Query; shown in red if > 0
 - Host detail `page.tsx` now passes `currentUserId` to `HostDetailClient`
 - `host-detail-client.tsx`: new `'alerts'` tab with red count badge; `getAlertInstances` query for badge count
@@ -2443,10 +2443,10 @@
 ### Session 7 — Ad-hoc agent queries (port and service discovery)
 
 **`agent_queries` schema** (`apps/web/lib/db/schema/agent-queries.ts`)
-- `agent_queries` table: org_id, host_id, query_type (`list_ports` | `list_services`), status (`pending` | `complete` | `error`), result jsonb, error_message, expires_at (2-minute TTL), requested/completed timestamps
+- `agent_queries` table: instance_id, host_id, query_type (`list_ports` | `list_services`), status (`pending` | `complete` | `error`), result jsonb, error_message, expires_at (2-minute TTL), requested/completed timestamps
 
 **API routes** (`apps/web/app/api/hosts/[id]/queries/`)
-- `POST /api/hosts/[id]/queries` — creates a pending query, returns query ID; auth-guarded with org membership check
+- `POST /api/hosts/[id]/queries` — creates a pending query, returns query ID; auth-guarded with instance membership check
 - `GET /api/hosts/[id]/queries/[queryId]` — polls query status and returns result when complete; 1-second client poll interval
 
 **Ingest: push pending queries to open streams** (`apps/ingest/internal/handlers/heartbeat.go`)
@@ -2494,9 +2494,9 @@ _(Built between Sessions 3 and 4; not previously documented)_
 
 **Bootstrap install script** (`apps/web/app/api/agent/install/route.ts`, `agent/cmd/agent/main.go`)
 - `curl -fsSL "https://server/api/agent/install" | sh` downloads the installer without placing enrolment tokens into URLs
-- Shell script detects OS/arch, downloads the versioned binary, and installs when `CT_OPS_ORG_TOKEN` is present in the runtime environment
-- Agent `--install` accepts either `--token` or `CT_OPS_ORG_TOKEN`, then copies the binary to the system path, writes TOML config, installs the service unit, and starts the service
-- Also supports `-address` CLI flag and `CT_OPS_ORG_TOKEN` / `CT_OPS_INGEST_ADDRESS` env vars for config-less operation
+- Shell script detects OS/arch, downloads the versioned binary, and installs when `CT_OPS_ENROLMENT_TOKEN` is present in the runtime environment
+- Agent `--install` accepts either `--token` or `CT_OPS_ENROLMENT_TOKEN`, then copies the binary to the system path, writes TOML config, installs the service unit, and starts the service
+- Also supports `-address` CLI flag and `CT_OPS_ENROLMENT_TOKEN` / `CT_OPS_INGEST_ADDRESS` env vars for config-less operation
 - Enrolment token dialog now keeps the token separate from the installer command so the secret is not reflected into copied URLs
 
 **Multi-platform service install** (`agent/internal/install/install.go`, `agent/cmd/agent/service_windows.go`)
@@ -2528,8 +2528,8 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `HeartbeatRequest` gains `check_results` field; `HeartbeatResponse` gains `checks` field
 
 **`checks` + `check_results` schema** (`apps/web/lib/db/schema/checks.ts`)
-- `checks` table: org/host scoped, check_type, config jsonb, enabled, interval_seconds, soft delete, metadata
-- `check_results` hypertable: check_id, host_id, org_id, ran_at (partition key), status, output, duration_ms
+- `checks` table: instance/host scoped, check_type, config jsonb, enabled, interval_seconds, soft delete, metadata
+- `check_results` hypertable: check_id, host_id, instance_id, ran_at (partition key), status, output, duration_ms
 - Migration `0006_icy_trish_tilby.sql` — includes TimescaleDB hypertable + 30-day retention, graceful degradation wrapped in `DO $$` block
 
 **Ingest handler updates** (`apps/ingest/internal/handlers/heartbeat.go`)
@@ -2545,7 +2545,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `heartbeat.go` updated to drain check results into each request and update definitions from each response
 
 **Web server actions** (`apps/web/lib/actions/checks.ts`)
-- `getChecks`, `createCheck`, `updateCheck`, `deleteCheck`, `getCheckResults` — all Zod-validated, org-scoped
+- `getChecks`, `createCheck`, `updateCheck`, `deleteCheck`, `getCheckResults` — all Zod-validated, instance-scoped
 
 **Checks tab** (`apps/web/app/(dashboard)/hosts/[id]/checks-tab.tsx`)
 - Expandable check rows: name, type badge, status badge, last run time
@@ -2563,7 +2563,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 ### Session 5 — Metric history, TimescaleDB hypertable, metric graphs
 
 **`host_metrics` TimescaleDB hypertable** (`apps/web/lib/db/schema/metrics.ts`)
-- New table: `id, organisation_id, host_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds, created_at`
+- New table: `id, instance_id, host_id, recorded_at, cpu_percent, memory_percent, disk_percent, uptime_seconds, created_at`
 - Migration `0005_wet_photon.sql` creates the table, converts it to a TimescaleDB hypertable on `recorded_at`, and adds a 30-day retention policy. Wrapped in `DO $$` block for graceful degradation if TimescaleDB is not available.
 
 **Ingest: persist metric rows** (`apps/ingest/internal/db/queries/metrics.sql.go`)
@@ -2574,7 +2574,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - Replaced `math/rand` with `crypto/rand` — IDs are now cryptographically random
 
 **`getHostMetrics` server action** (`apps/web/lib/actions/agents.ts`)
-- `getHostMetrics(orgId, hostId, range: '1h'|'24h'|'7d')` — queries `host_metrics` with a computed cutoff timestamp, returns rows ordered by `recorded_at` asc
+- `getHostMetrics(instanceId, hostId, range: '1h'|'24h'|'7d')` — queries `host_metrics` with a computed cutoff timestamp, returns rows ordered by `recorded_at` asc
 
 **Metrics tab on host detail page** (`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`)
 - Fourth tab: Metrics
@@ -2584,7 +2584,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - Refetches every 60 s; only fetches when the Metrics tab is active
 
 **Offline period visualisation** (`apps/web/app/(dashboard)/hosts/[id]/host-detail-client.tsx`)
-- `getAgentOfflinePeriods(orgId, agentId, range)` server action — walks `agent_status_history` to build `{start, end}` offline windows within the visible time range; looks back one extra hour to capture periods that started before the window
+- `getAgentOfflinePeriods(instanceId, agentId, range)` server action — walks `agent_status_history` to build `{start, end}` offline windows within the visible time range; looks back one extra hour to capture periods that started before the window
 - Chart X-axis domain always extends to `Date.now()` via a sentinel null point so time advances even when no new rows are arriving
 - `ReferenceArea` rendered for each offline window — light gray tint (`fillOpacity: 0.15`), dark readable "Offline" label
 - Zero-value boundary points injected at each offline start/end so lines visually drop to 0% during the outage and rise again on reconnect
@@ -2614,14 +2614,14 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - Allows `offline` agents to reconnect and transition back to `active`
 
 **Host detail page** (`apps/web/app/(dashboard)/hosts/[id]/`)
-- `page.tsx` — server component, fetches host via `getHost(orgId, hostId)`, 404 if not found
+- `page.tsx` — server component, fetches host via `getHost(instanceId, hostId)`, 404 if not found
 - `host-detail-client.tsx` — tabbed UI:
   - **Overview tab**: CPU / memory / disk gauges (green ≤ 70 %, amber ≤ 90 %, red > 90 %); system info panel (hostname, OS, version, arch, uptime, IPs); agent info panel (status badge, version, agent ID, last heartbeat, registration date)
   - **Storage tab**: per-disk table (mount point, device, filesystem, total/used/free, usage %) from `host.metadata.disks`
   - **Network tab**: interface table (name, MAC, IPs extracted from CIDR, Up/Down badge) from `host.metadata.network_interfaces`
 
 **SSE streaming** (`apps/web/app/api/hosts/[id]/stream/route.ts`)
-- GET `/api/hosts/{id}/stream` — requires valid session and org membership
+- GET `/api/hosts/{id}/stream` — requires valid session and instance membership
 - Sends initial snapshot immediately on connection
 - Polls DB every 5 s and pushes `update` events as SSE JSON
 - Sends `error` event if host not found; closes cleanly on client disconnect (abort signal)
@@ -2629,11 +2629,11 @@ _(Built between Sessions 3 and 4; not previously documented)_
 **useHostStream hook** (`apps/web/hooks/use-host-stream.ts`)
 - `'use client'` hook consumed by `HostDetailClient`
 - Opens `EventSource` to `/api/hosts/{hostId}/stream`
-- Writes each `update` event directly into React Query cache key `['host', orgId, hostId]`
+- Writes each `update` event directly into React Query cache key `['host', instanceId, hostId]`
 - Closes on unmount; auto-reconnects on remount
 
 **Server action added**
-- `getHost(orgId, hostId)` in `lib/actions/agents.ts` — single-host fetch with agent LEFT JOIN
+- `getHost(instanceId, hostId)` in `lib/actions/agents.ts` — single-host fetch with agent LEFT JOIN
 
 **Agent example config** (`agent/examples/agent.toml`)
 - Reference config file for operators
@@ -2697,13 +2697,13 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `lib/db/schema/index.ts` — updated with three new exports
 
 **Server actions** (`lib/actions/agents.ts`)
-- `listPendingAgents(orgId)` — pending agents for admin approval
-- `approveAgent(orgId, agentId, actorId)` — sets status active + appends history
-- `rejectAgent(orgId, agentId, actorId)` — sets status revoked + appends history
-- `listHosts(orgId)` — left join with agents, returns `HostWithAgent[]`
-- `createEnrolmentToken(orgId, userId, input)` — creates token with label/auto-approve/maxUses/expiry
-- `listEnrolmentTokens(orgId)` — active tokens for org
-- `revokeEnrolmentToken(orgId, tokenId)` — soft delete
+- `listPendingAgents(instanceId)` — pending agents for admin approval
+- `approveAgent(instanceId, agentId, actorId)` — sets status active + appends history
+- `rejectAgent(instanceId, agentId, actorId)` — sets status revoked + appends history
+- `listHosts(instanceId)` — left join with agents, returns `HostWithAgent[]`
+- `createEnrolmentToken(instanceId, userId, input)` — creates token with label/auto-approve/maxUses/expiry
+- `listEnrolmentTokens(instanceId)` — active tokens for instance
+- `revokeEnrolmentToken(instanceId, tokenId)` — soft delete
 
 **Web UI**
 - `app/(dashboard)/hosts/page.tsx` — server component (replaced placeholder, fetches initial data)
@@ -2735,7 +2735,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 ### Session 2 — User management, roles, feature flags, licence scaffold
 
 **Auth middleware / proxy**
-- `proxy.ts` — Next.js 16 renamed `middleware.ts` to `proxy.ts`; already implemented. Checks `better-auth.session_token` cookie; unauthenticated requests to protected routes redirect to `/login`. Full session verification (including org check) done in server components.
+- `proxy.ts` — Next.js 16 renamed `middleware.ts` to `proxy.ts`; already implemented. Checks `better-auth.session_token` cookie; unauthenticated requests to protected routes redirect to `/login`. Full session verification (including instance check) done in server components.
 
 **Auth session helper**
 - `lib/auth/session.ts` — `getRequiredSession()` fetches Better Auth session + full DB user row, redirects to `/login` if unauthenticated
@@ -2745,21 +2745,21 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `components/shared/feature-gate.tsx` — client component that gates UI behind licence tier; renders fallback/upgrade message if not entitled
 
 **Licence validation**
-- `lib/licence.ts` — offline RS256 JWT validation with bundled dev public key; validates tier, org, expiry, and signature
+- `lib/licence.ts` — offline RS256 JWT validation with bundled dev public key; validates tier, instance, expiry, and signature
 
 **Server actions**
-- `lib/actions/users.ts` — `getOrgUsers`, `inviteUser` (7-day token), `updateUserRole`, `deactivateUser`, `cancelInvite`
-- `lib/actions/settings.ts` — `updateOrgName`, `saveLicenceKey` (validates via licence.ts, persists tier)
+- `lib/actions/users.ts` — `getInstanceUsers`, `inviteUser` (7-day token), `updateUserRole`, `deactivateUser`, `cancelInvite`
+- `lib/actions/settings.ts` — `updateInstanceName`, `saveLicenceKey` (validates via licence.ts, persists tier)
 
 **Pages (real UI, not placeholders)**
 - `app/(dashboard)/team/page.tsx` + `TeamClient` — member table, role management, invite dialog, pending invites, deactivation
-- `app/(dashboard)/settings/page.tsx` + `SettingsClient` — org name editor, licence key entry with tier badge and error feedback
+- `app/(dashboard)/settings/page.tsx` + `SettingsClient` — instance name editor, licence key entry with tier badge and error feedback
 - `app/(dashboard)/profile/page.tsx` + `ProfileClient` — name editor, password change
 
 **Database schema additions**
-- `lib/db/schema/invitations.ts` — email, role, token, org/user refs, 7-day expiry, soft delete
-- `organisations` table extended — `licenceTier`, `licenceKey`, `slug`, `logo`
-- `users` table extended — `organisationId`, `role`, `isActive`, `twoFactorEnabled`
+- `lib/db/schema/invitations.ts` — email, role, token, instance/user refs, 7-day expiry, soft delete
+- `instances` table extended — `licenceTier`, `licenceKey`, `slug`, `logo`
+- `users` table extended — `instanceId`, `role`, `isActive`, `twoFactorEnabled`
 
 ---
 
@@ -2778,7 +2778,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 
 **Database**
 - Drizzle ORM with `postgres` driver
-- Schema: `organisations`, `users`, `sessions`, `accounts`, `verifications`, `totp_credential`
+- Schema: `instances`, `users`, `sessions`, `accounts`, `verifications`, `totp_credential`
 - `drizzle.config.ts` pointing at `lib/db/schema/index.ts`
 - All tables follow CLAUDE.md conventions (id/createdAt/updatedAt/deletedAt/metadata, soft deletes)
 - Migration scripts: `db:generate`, `db:migrate`, `db:push`, `db:studio`
@@ -2793,7 +2793,7 @@ _(Built between Sessions 3 and 4; not previously documented)_
 - `/` → redirects to `/login`
 - `(auth)/login` — login form with Zod validation, React Hook Form
 - `(auth)/register` — register form, posts to Better Auth
-- `(setup)/onboarding` — org creation wizard, creates organisation and links user as `super_admin`
+- `(setup)/onboarding` — instance creation wizard, creates instance and links user as `super_admin`
 - `(dashboard)/dashboard` — overview placeholder
 
 **Components**
@@ -2867,7 +2867,7 @@ Notification data hygiene is complete. Suggested next steps:
 - [x] Docker Compose single-node
 - [x] CI pipeline (GitHub Actions) — pr-checks.yml: lint, type-check, build, go test
 - [x] Better Auth — email/password + TOTP
-- [x] Organisation + user schema
+- [x] Instance + user schema
 - [x] Basic RBAC (roles + permissions)
 - [x] User management UI
 - [x] Feature flag system
@@ -2897,13 +2897,13 @@ Notification data hygiene is complete. Suggested next steps:
 - [x] Check types — port, process, http (shell/file deferred)
 - [x] Ad-hoc agent queries (list_ports, list_services — used in check creation UI)
 - [x] TimescaleDB continuous aggregates (host_metrics_hourly + host_metrics_daily)
-- [x] Metric retention policies (configurable per-org in settings, default 30 days)
+- [x] Metric retention policies (configurable per-instance in settings, default 30 days)
 - [x] Metric graphs (Recharts)
-- [x] Alert rule builder (check_status + metric_threshold, per-host + org-wide)
+- [x] Alert rule builder (check_status + metric_threshold, per-host + instance-wide)
 - [x] Alert state machine (fire/resolve in ingest; acknowledge in web)
 - [x] Notification channels (webhook HMAC-SHA256, SMTP, Slack, Telegram, in-app)
 - [x] In-app notification bell, dropdown, and /notifications page
-- [x] Org notification settings (roles, opt-out) + per-user opt-out
+- [x] Instance notification settings (roles, opt-out) + per-user opt-out
 - [x] Notification bulk actions (select-all, bulk mark read/unread, bulk delete)
 - [x] Notification severity pie chart + trend line chart on /notifications page
 - [x] Notification charts on host detail Metrics tab (host-scoped)
@@ -2951,7 +2951,7 @@ Notification data hygiene is complete. Suggested next steps:
 - [ ] White labelling
 
 ### Phase 7 — Cloud SaaS
-- [ ] Multi-tenant hardening
+- [ ] Instance-scoped hardening
 - [ ] Usage metering
 - [ ] Billing (Stripe)
 - [ ] Customer portal

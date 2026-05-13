@@ -41,9 +41,9 @@ export const serviceAccounts = pgTable('service_accounts', {
   metadata: jsonb('metadata'),
 }, (t) => [
   uniqueIndex('service_accounts_identity_idx').on(t.instanceId, t.hostId, t.username),
-  index('service_accounts_org_type_idx').on(t.instanceId, t.accountType),
-  index('service_accounts_org_status_idx').on(t.instanceId, t.status),
-  index('service_accounts_org_host_idx').on(t.instanceId, t.hostId),
+  index('service_accounts_instance_type_idx').on(t.instanceId, t.accountType),
+  index('service_accounts_instance_status_idx').on(t.instanceId, t.status),
+  index('service_accounts_instance_host_idx').on(t.instanceId, t.hostId),
 ])
 
 export const sshKeys = pgTable('ssh_keys', {
@@ -68,10 +68,10 @@ export const sshKeys = pgTable('ssh_keys', {
   metadata: jsonb('metadata'),
 }, (t) => [
   uniqueIndex('ssh_keys_identity_idx').on(t.instanceId, t.hostId, t.fingerprintSha256, t.filePath),
-  index('ssh_keys_org_fingerprint_idx').on(t.instanceId, t.fingerprintSha256),
-  index('ssh_keys_org_type_idx').on(t.instanceId, t.keyType),
-  index('ssh_keys_org_status_idx').on(t.instanceId, t.status),
-  index('ssh_keys_org_host_idx').on(t.instanceId, t.hostId),
+  index('ssh_keys_instance_fingerprint_idx').on(t.instanceId, t.fingerprintSha256),
+  index('ssh_keys_instance_type_idx').on(t.instanceId, t.keyType),
+  index('ssh_keys_instance_status_idx').on(t.instanceId, t.status),
+  index('ssh_keys_instance_host_idx').on(t.instanceId, t.hostId),
   index('ssh_keys_account_idx').on(t.serviceAccountId),
 ])
 
@@ -86,7 +86,7 @@ export const identityEvents = pgTable('identity_events', {
   occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
   metadata: jsonb('metadata'),
 }, (t) => [
-  index('identity_events_org_time_idx').on(t.instanceId, t.occurredAt),
+  index('identity_events_instance_time_idx').on(t.instanceId, t.occurredAt),
   index('identity_events_account_time_idx').on(t.serviceAccountId, t.occurredAt),
   index('identity_events_key_time_idx').on(t.sshKeyId, t.occurredAt),
   index('identity_events_host_time_idx').on(t.hostId, t.occurredAt),

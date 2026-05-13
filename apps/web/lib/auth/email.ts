@@ -37,7 +37,7 @@ export function getAuthEmailConfigFromEnv(
   }
 }
 
-export function getAuthEmailConfigFromOrgSettings(
+export function getAuthEmailConfigFromInstanceSettings(
   notificationSettings: InstanceNotificationSettings | undefined,
 ): SmtpSendConfig | null {
   const relay = notificationSettings?.smtpRelay

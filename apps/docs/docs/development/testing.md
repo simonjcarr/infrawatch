@@ -75,7 +75,7 @@ Use `getTestDb()` from `tests/e2e/fixtures/db.ts` when a test needs to create or
 ```ts
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
 test('shows seeded hosts', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
@@ -84,7 +84,7 @@ test('shows seeded hosts', async ({ authenticatedPage: page }) => {
     INSERT INTO hosts (id, instance_id, hostname, status)
     VALUES (
       'test-host-1',
-      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug}),
       'web-01',
       'online'
     )
@@ -97,7 +97,7 @@ test('shows seeded hosts', async ({ authenticatedPage: page }) => {
 
 Use direct SQL seeding when the setup is only test data and does not need to verify a UI or HTTP workflow. Use the product UI or an API request when the creation path itself is part of the behavior under test, or when production code must perform side effects such as password hashing, session creation, token generation, or validation.
 
-The baseline seed is `seedOrgAndUser()` in `tests/e2e/fixtures/seed.ts`. It is intentionally idempotent: it signs up `e2e@example.com` through Better Auth so the password and account rows are correct, creates the baseline `instance_settings` row if needed, promotes the user to admin, and deletes the sign-up session so login tests start cleanly.
+The baseline seed is `seedInstanceAndUser()` in `tests/e2e/fixtures/seed.ts`. It is intentionally idempotent: it signs up `e2e@example.com` through Better Auth so the password and account rows are correct, creates the baseline `instance_settings` row if needed, promotes the user to admin, and deletes the sign-up session so login tests start cleanly.
 
 When adding feature-specific seed helpers:
 
@@ -128,7 +128,7 @@ For authenticated, database-backed tests, use this shape:
 ```ts
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
 test('feature behavior', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
@@ -137,7 +137,7 @@ test('feature behavior', async ({ authenticatedPage: page }) => {
     INSERT INTO example_table (id, instance_id, name)
     VALUES (
       'example-1',
-      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug}),
       'Example'
     )
   `

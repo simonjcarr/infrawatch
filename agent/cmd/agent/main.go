@@ -82,10 +82,7 @@ func mergeTags(layers ...[]string) []*agentv1.Tag {
 }
 
 func enrolmentTokenFromEnv() string {
-	if token := strings.TrimSpace(os.Getenv("CT_OPS_ENROLMENT_TOKEN")); token != "" {
-		return token
-	}
-	return strings.TrimSpace(os.Getenv("CT_OPS_ORG_TOKEN"))
+	return strings.TrimSpace(os.Getenv("CT_OPS_ENROLMENT_TOKEN"))
 }
 
 func main() {

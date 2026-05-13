@@ -73,7 +73,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 	}
 
 	// ── Validate scan_id belongs to this agent ────────────────────────────────
-	hostOrg, err := queries.GetHostOrgForTaskRunHost(ctx, h.pool, scanID, agentID)
+	hostInstance, err := queries.GetHostInstanceForTaskRunHost(ctx, h.pool, scanID, agentID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return status.Errorf(codes.NotFound, "scan_id %s not found for agent %s", scanID, agentID)
@@ -82,11 +82,11 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 		return status.Error(codes.Internal, "internal error")
 	}
 
-	slog.Info("inventory: scan started", "scan_id", scanID, "agent_id", agentID, "host_id", hostOrg.HostID, "source", source)
+	slog.Info("inventory: scan started", "scan_id", scanID, "agent_id", agentID, "host_id", hostInstance.HostID, "source", source)
 
 	// ── Create software_scans row ─────────────────────────────────────────────
 	startedAt := time.Now()
-	softwareScanID, err := queries.InsertSoftwareScan(ctx, h.pool, hostOrg.InstanceID, hostOrg.HostID, scanID, source, startedAt)
+	softwareScanID, err := queries.InsertSoftwareScan(ctx, h.pool, hostInstance.InstanceID, hostInstance.HostID, scanID, source, startedAt)
 	if err != nil {
 		slog.Error("inventory: creating software scan", "err", err)
 		return status.Error(codes.Internal, "could not create scan record")
@@ -143,7 +143,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 
 		added, err := queries.UpsertSoftwarePackagesBatch(
 			ctx, h.pool,
-			hostOrg.InstanceID, hostOrg.HostID, source,
+			hostInstance.InstanceID, hostInstance.HostID, source,
 			names, versions, archs, publishers,
 			distroIDs, distroVersionIDs, distroCodenames, distroIDLikes,
 			sourceNames, sourceVersions, packageEpochs, packageReleases,
@@ -167,7 +167,7 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 	}
 
 	if first.IsLast {
-		return h.finalise(ctx, softwareScanID, scanID, hostOrg.HostID, source, startedAt, totalReceived, totalAdded, stream)
+		return h.finalise(ctx, softwareScanID, scanID, hostInstance.HostID, source, startedAt, totalReceived, totalAdded, stream)
 	}
 
 	// ── Receive remaining chunks ──────────────────────────────────────────────
@@ -194,11 +194,11 @@ func (h *InventoryHandler) SubmitSoftwareInventory(stream agentv1.IngestService_
 		}
 
 		if chunk.IsLast {
-			return h.finalise(ctx, softwareScanID, scanID, hostOrg.HostID, source, startedAt, totalReceived, totalAdded, stream)
+			return h.finalise(ctx, softwareScanID, scanID, hostInstance.HostID, source, startedAt, totalReceived, totalAdded, stream)
 		}
 	}
 
-	return h.finalise(ctx, softwareScanID, scanID, hostOrg.HostID, source, startedAt, totalReceived, totalAdded, stream)
+	return h.finalise(ctx, softwareScanID, scanID, hostInstance.HostID, source, startedAt, totalReceived, totalAdded, stream)
 }
 
 // finalise marks removed packages, completes the scan row, and sends the ack.

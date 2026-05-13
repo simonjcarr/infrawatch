@@ -66,7 +66,7 @@ export function BuildDocsClient({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const canWrite = userRole !== 'read_only'
-  const canAdmin = ['org_admin', 'super_admin'].includes(userRole)
+  const canAdmin = ['instance_admin', 'super_admin'].includes(userRole)
   const defaultTemplate = useMemo(
     () => templates.find((template) => template.isDefault && template.latestVersion) ?? templates.find((template) => template.latestVersion),
     [templates],

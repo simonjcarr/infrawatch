@@ -50,6 +50,13 @@
       "when": 1778659600000,
       "tag": "0006_docker_container_lifecycle_events",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778663200000,
+      "tag": "0007_instance_role_residue",
+      "breakpoints": true
     }
   ]
 }

@@ -1,21 +1,21 @@
 import { createId } from '@paralleldrive/cuid2'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 import { createStorageStateForUser } from '../fixtures/auth'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
 }
 
-async function createOrgUser(
+async function createInstanceUser(
   sql: ReturnType<typeof getTestDb>,
   instanceId: string,
   input: { email: string; isActive?: boolean; deleted?: boolean },
@@ -66,8 +66,8 @@ test('deactivating a user revokes existing sessions and blocks stale dashboard/a
   baseURL,
 }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
-  const userId = await createOrgUser(sql, instanceId, {
+  const instanceId = await getInstanceId(sql)
+  const userId = await createInstanceUser(sql, instanceId, {
     email: 'stale-deactivated@example.com',
   })
 
@@ -103,8 +103,8 @@ test('removing a user clears any leftover sessions', async ({
   baseURL,
 }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
-  const userId = await createOrgUser(sql, instanceId, {
+  const instanceId = await getInstanceId(sql)
+  const userId = await createInstanceUser(sql, instanceId, {
     email: 'stale-removed@example.com',
     isActive: false,
   })

@@ -33,7 +33,7 @@ function dedupeByKey(pairs: TagPair[]): TagPair[] {
 }
 
 // Merges layers of {key,value} pairs with last-wins on conflicting keys. The
-// caller passes layers from weakest to strongest (e.g. org defaults, token
+// caller passes layers from weakest to strongest (e.g. instance defaults, token
 // tags, CLI tags) so the final set reflects the operator's most-specific
 // intent.
 export async function mergeTagLayers(...layers: TagPair[][]): Promise<TagPair[]> {
@@ -285,17 +285,17 @@ export async function listResourceTags(
   return rows
 }
 
-export async function getOrgDefaultTags(instanceId: string): Promise<TagPair[]> {
+export async function getInstanceDefaultTags(instanceId: string): Promise<TagPair[]> {
   await requireInstanceAccess(instanceId)
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseInstanceMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(instance?.metadata)
   return meta?.defaultTags ?? []
 }
 
-export async function updateOrgDefaultTags(
+export async function updateInstanceDefaultTags(
   instanceId: string,
   pairs: TagPair[],
 ): Promise<{ success: true } | { error: string }> {
@@ -305,13 +305,13 @@ export async function updateOrgDefaultTags(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid tags' }
     const deduped = dedupeByKey(parsed.data)
 
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { id: true, metadata: true },
     })
-    if (!org) return { error: 'Instance not found' }
+    if (!instance) return { error: 'Instance not found' }
 
-    const currentMetadata = parseInstanceMetadata(org.metadata)
+    const currentMetadata = parseInstanceMetadata(instance.metadata)
     const updatedMetadata: InstanceMetadata = {
       ...currentMetadata,
       defaultTags: deduped,
@@ -323,7 +323,7 @@ export async function updateOrgDefaultTags(
 
     return { success: true }
   } catch (err) {
-    logError('Failed to update org default tags:', err)
+    logError('Failed to update instance default tags:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

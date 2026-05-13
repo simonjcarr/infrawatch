@@ -15,13 +15,13 @@ export default async function SettingsPage() {
   const session = await getRequiredSession()
   const instanceId = session.user.instanceId
 
-  const org = instanceId
+  const instance = instanceId
     ? await db.query.instanceSettings.findFirst({
         where: eq(instanceSettings.id, instanceId),
       })
     : null
 
-  if (!org) {
+  if (!instance) {
     return (
       <div className="space-y-6">
         <AdminTabs
@@ -40,7 +40,7 @@ export default async function SettingsPage() {
     )
   }
 
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
 
   return (
     <div className="space-y-6">
@@ -51,7 +51,7 @@ export default async function SettingsPage() {
         ]}
       />
       <SettingsClient
-        org={org}
+        instance={instance}
         isAdmin={isAdmin}
         sections={['instance']}
         title="Instance"

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 import { waitForPasswordResetUrl } from '../fixtures/email'
 import { TEST_USER } from '../fixtures/seed'
 import { generateTotpCode } from '../../../lib/auth/ldap-two-factor'
@@ -131,9 +131,9 @@ test('password reset ignores unsafe callback urls and returns to the login notic
 
   await sql`
     UPDATE "user"
-    SET instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
+    SET instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug}),
         email_verified = true,
-        role = 'org_admin',
+        role = 'instance_admin',
         is_active = true
     WHERE email = ${email}
   `

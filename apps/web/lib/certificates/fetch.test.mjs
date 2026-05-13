@@ -21,7 +21,7 @@ prompt = no
 
 [req_dn]
 CN = example.com
-O = Example Org
+O = Example Instance
 OU = Platform
 C = GB
 ST = London
@@ -67,7 +67,7 @@ test('parseCertificateBuffer uses the X509 path and preserves key certificate me
   const parsed = parseCertificateBuffer(pem)
 
   assert.equal(parsed.commonName, 'example.com')
-  assert.equal(parsed.organization, 'Example Org')
+  assert.equal(parsed.organization, 'Example Instance')
   assert.equal(parsed.organizationalUnit, 'Platform')
   assert.equal(parsed.country, 'GB')
   assert.equal(parsed.state, 'London')

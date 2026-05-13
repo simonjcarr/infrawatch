@@ -232,8 +232,8 @@ func InsertCertAlertInstance(
 	return returnedID, err
 }
 
-// GetCertExpiryRulesForOrg returns all enabled cert_expiry alert rules for an org.
-func GetCertExpiryRulesForOrg(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]AlertRuleRow, error) {
+// GetCertExpiryRulesForInstance returns all enabled cert_expiry alert rules for an instance.
+func GetCertExpiryRulesForInstance(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]AlertRuleRow, error) {
 	const q = `
 		SELECT id, host_id, instance_id, name, condition_type, config::text, severity
 		FROM alert_rules
@@ -259,9 +259,9 @@ func GetCertExpiryRulesForOrg(ctx context.Context, pool *pgxpool.Pool, instanceI
 	return result, rows.Err()
 }
 
-// GetAllOrgsWithCertExpiryRules returns distinct org IDs that have at least one
+// GetAllInstancesWithCertExpiryRules returns distinct instance IDs that have at least one
 // enabled cert_expiry rule — used by the sweeper.
-func GetAllOrgsWithCertExpiryRules(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
+func GetAllInstancesWithCertExpiryRules(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
 	const q = `
 		SELECT DISTINCT instance_id
 		FROM alert_rules
@@ -490,7 +490,7 @@ func ListCertificatesExpiringWithin(
 	return result, rows.Err()
 }
 
-// GetCertificateByID returns a single certificate row by ID (org-scoped).
+// GetCertificateByID returns a single certificate row by ID (instance-scoped).
 func GetCertificateByID(
 	ctx context.Context,
 	pool *pgxpool.Pool,

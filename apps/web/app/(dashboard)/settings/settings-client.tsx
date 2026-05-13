@@ -17,21 +17,21 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { updateOrgName, saveLicenceKey, updateMetricRetention, updateDockerMetricRetention, generateActivationToken, updateFreeSeatUsers } from '@/lib/actions/settings'
-import { getOrgDefaultCollectionSettings, updateOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
-import { getOrgTerminalSettings, updateOrgTerminalSettings } from '@/lib/actions/terminal'
+import { updateInstanceName, saveLicenceKey, updateMetricRetention, updateDockerMetricRetention, generateActivationToken, updateFreeSeatUsers } from '@/lib/actions/settings'
+import { getInstanceDefaultCollectionSettings, updateInstanceDefaultCollectionSettings } from '@/lib/actions/host-settings'
+import { getInstanceTerminalSettings, updateInstanceTerminalSettings } from '@/lib/actions/terminal'
 import {
   getInstanceNotificationSettings,
-  getOrgSmtpRelaySettings,
+  getInstanceSmtpRelaySettings,
   sendTestSmtpRelaySettings,
   updateInstanceNotificationSettings,
-  updateOrgSmtpRelaySettings,
+  updateInstanceSmtpRelaySettings,
 } from '@/lib/actions/notification-settings'
 import { getSoftwareInventorySettings, updateSoftwareInventorySettings } from '@/lib/actions/software-inventory'
-import { getOrgDefaultTags, updateOrgDefaultTags } from '@/lib/actions/tags'
+import { getInstanceDefaultTags, updateInstanceDefaultTags } from '@/lib/actions/tags'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import type { TagPair } from '@/lib/db/schema'
-import type { OrgTerminalSettings } from '@/lib/actions/terminal-core'
+import type { InstanceTerminalSettings } from '@/lib/actions/terminal-core'
 import type { InstanceNotificationSettingsFull, InstanceSmtpRelaySettingsInput, SmtpRelayTestLogEntry } from '@/lib/actions/notification-settings'
 import type { Instance, HostCollectionSettings, SoftwareInventorySettings } from '@/lib/db/schema'
 import { DEFAULT_COLLECTION_SETTINGS } from '@/lib/db/schema'
@@ -40,15 +40,15 @@ import { FREE_INCLUDED_USER_SEATS } from '@/lib/licence-seats'
 
 const ALL_ROLES = [
   { value: 'super_admin', label: 'Super Admin' },
-  { value: 'org_admin', label: 'Org Admin' },
+  { value: 'instance_admin', label: 'Instance Admin' },
   { value: 'engineer', label: 'Engineer' },
   { value: 'read_only', label: 'Read Only' },
 ]
 
-const orgNameSchema = z.object({
+const instanceNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
 })
-type OrgNameValues = z.infer<typeof orgNameSchema>
+type InstanceNameValues = z.infer<typeof instanceNameSchema>
 
 const licenceSchema = z.object({
   key: z.string().min(1, 'Licence key is required'),
@@ -67,7 +67,7 @@ export type SettingsSection =
   | 'software'
 
 interface SettingsClientProps {
-  org: Instance
+  instance: Instance
   isAdmin: boolean
   sections?: SettingsSection[]
   title?: string
@@ -175,7 +175,7 @@ const EMPTY_SMTP_RELAY_SETTINGS: InstanceSmtpRelaySettingsInput = {
 }
 
 export function SettingsClient({
-  org,
+  instance,
   isAdmin,
   sections,
   title = 'Settings',
@@ -186,7 +186,7 @@ export function SettingsClient({
 }: SettingsClientProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const tier = effectiveLicence?.tier ?? (org.licenceTier as LicenceTier)
+  const tier = effectiveLicence?.tier ?? (instance.licenceTier as LicenceTier)
   const visibleSections = new Set<SettingsSection>(
     sections ?? [
       'instance',
@@ -200,7 +200,7 @@ export function SettingsClient({
       'licence',
     ],
   )
-  const [orgSaveSuccess, setOrgSaveSuccess] = useState(false)
+  const [instanceSaveSuccess, setInstanceSaveSuccess] = useState(false)
   const [licenceResult, setLicenceResult] = useState<{
     success?: boolean
     tier?: string
@@ -209,10 +209,10 @@ export function SettingsClient({
     previousMaxUsers?: number
     error?: string
   } | null>(null)
-  const [retentionDays, setRetentionDays] = useState(String(org.metricRetentionDays ?? 30))
+  const [retentionDays, setRetentionDays] = useState(String(instance.metricRetentionDays ?? 30))
   const [retentionSaveSuccess, setRetentionSaveSuccess] = useState(false)
   const [retentionError, setRetentionError] = useState<string | null>(null)
-  const [dockerRetentionDays, setDockerRetentionDays] = useState(String(org.dockerMetricRetentionDays ?? 30))
+  const [dockerRetentionDays, setDockerRetentionDays] = useState(String(instance.dockerMetricRetentionDays ?? 30))
   const [dockerRetentionSaveSuccess, setDockerRetentionSaveSuccess] = useState(false)
   const [dockerRetentionError, setDockerRetentionError] = useState<string | null>(null)
   const [selectedFreeSeatUserIds, setSelectedFreeSeatUserIds] = useState(
@@ -220,9 +220,9 @@ export function SettingsClient({
   )
   const [freeSeatResult, setFreeSeatResult] = useState<{ success?: boolean; error?: string } | null>(null)
 
-  const orgForm = useForm<OrgNameValues>({
-    resolver: zodResolver(orgNameSchema),
-    defaultValues: { name: org.name },
+  const instanceForm = useForm<InstanceNameValues>({
+    resolver: zodResolver(instanceNameSchema),
+    defaultValues: { name: instance.name },
   })
 
   const licenceForm = useForm<LicenceValues>({
@@ -230,20 +230,20 @@ export function SettingsClient({
     defaultValues: { key: '' },
   })
 
-  const orgMutation = useMutation({
-    mutationFn: (values: OrgNameValues) => updateOrgName(org.id, values.name),
+  const instanceMutation = useMutation({
+    mutationFn: (values: InstanceNameValues) => updateInstanceName(instance.id, values.name),
     onSuccess: (result) => {
       if ('error' in result) {
-        orgForm.setError('name', { message: result.error })
+        instanceForm.setError('name', { message: result.error })
         return
       }
-      setOrgSaveSuccess(true)
-      setTimeout(() => setOrgSaveSuccess(false), 3000)
+      setInstanceSaveSuccess(true)
+      setTimeout(() => setInstanceSaveSuccess(false), 3000)
     },
   })
 
   const licenceMutation = useMutation({
-    mutationFn: (values: LicenceValues) => saveLicenceKey(org.id, values.key),
+    mutationFn: (values: LicenceValues) => saveLicenceKey(instance.id, values.key),
     onSuccess: (result) => {
       if ('error' in result) {
         setLicenceResult({ error: result.error })
@@ -262,7 +262,7 @@ export function SettingsClient({
   })
 
   const freeSeatMutation = useMutation({
-    mutationFn: (userIds: string[]) => updateFreeSeatUsers(org.id, userIds),
+    mutationFn: (userIds: string[]) => updateFreeSeatUsers(instance.id, userIds),
     onSuccess: (result) => {
       if ('error' in result) {
         setFreeSeatResult({ error: result.error })
@@ -280,7 +280,7 @@ export function SettingsClient({
   const [activationCopied, setActivationCopied] = useState(false)
 
   const activationMutation = useMutation({
-    mutationFn: () => generateActivationToken(org.id),
+    mutationFn: () => generateActivationToken(instance.id),
     onSuccess: (result) => {
       if ('error' in result) {
         setActivationError(result.error)
@@ -315,7 +315,7 @@ export function SettingsClient({
   }
 
   const retentionMutation = useMutation({
-    mutationFn: (days: number) => updateMetricRetention(org.id, days),
+    mutationFn: (days: number) => updateMetricRetention(instance.id, days),
     onSuccess: (result) => {
       if ('error' in result) {
         setRetentionError(result.error)
@@ -328,7 +328,7 @@ export function SettingsClient({
   })
 
   const dockerRetentionMutation = useMutation({
-    mutationFn: (days: number) => updateDockerMetricRetention(org.id, days),
+    mutationFn: (days: number) => updateDockerMetricRetention(instance.id, days),
     onSuccess: (result) => {
       if ('error' in result) {
         setDockerRetentionError(result.error)
@@ -343,20 +343,20 @@ export function SettingsClient({
   // Default collection settings
   const [collectionSaveSuccess, setCollectionSaveSuccess] = useState(false)
   const { data: collectionDefaults } = useQuery({
-    queryKey: ['org-collection-defaults', org.id],
-    queryFn: () => getOrgDefaultCollectionSettings(org.id),
+    queryKey: ['instance-collection-defaults', instance.id],
+    queryFn: () => getInstanceDefaultCollectionSettings(instance.id),
   })
   const [localCollectionSettings, setLocalCollectionSettings] = useState<HostCollectionSettings | null>(null)
   const currentCollectionSettings = localCollectionSettings ?? collectionDefaults ?? { ...DEFAULT_COLLECTION_SETTINGS }
   const collectionDirty = localCollectionSettings !== null
 
   const collectionMutation = useMutation({
-    mutationFn: (settings: HostCollectionSettings) => updateOrgDefaultCollectionSettings(org.id, settings),
+    mutationFn: (settings: HostCollectionSettings) => updateInstanceDefaultCollectionSettings(instance.id, settings),
     onSuccess: (result) => {
       if ('error' in result) return
       setLocalCollectionSettings(null)
       setCollectionSaveSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['org-collection-defaults', org.id] })
+      queryClient.invalidateQueries({ queryKey: ['instance-collection-defaults', instance.id] })
       setTimeout(() => setCollectionSaveSuccess(false), 3000)
     },
   })
@@ -364,8 +364,8 @@ export function SettingsClient({
   // Default tags
   const [tagsSaveSuccess, setTagsSaveSuccess] = useState(false)
   const { data: defaultTags } = useQuery({
-    queryKey: ['org-default-tags', org.id],
-    queryFn: () => getOrgDefaultTags(org.id),
+    queryKey: ['instance-default-tags', instance.id],
+    queryFn: () => getInstanceDefaultTags(instance.id),
   })
   const [localDefaultTags, setLocalDefaultTags] = useState<EditorTag[] | null>(null)
   const currentDefaultTags: EditorTag[] =
@@ -373,12 +373,12 @@ export function SettingsClient({
   const tagsDirty = localDefaultTags !== null
 
   const tagsMutation = useMutation({
-    mutationFn: (pairs: TagPair[]) => updateOrgDefaultTags(org.id, pairs),
+    mutationFn: (pairs: TagPair[]) => updateInstanceDefaultTags(instance.id, pairs),
     onSuccess: (result) => {
       if ('error' in result) return
       setLocalDefaultTags(null)
       setTagsSaveSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['org-default-tags', org.id] })
+      queryClient.invalidateQueries({ queryKey: ['instance-default-tags', instance.id] })
       setTimeout(() => setTagsSaveSuccess(false), 3000)
     },
   })
@@ -386,20 +386,20 @@ export function SettingsClient({
   // Terminal settings
   const [terminalSaveSuccess, setTerminalSaveSuccess] = useState(false)
   const { data: terminalDefaults } = useQuery({
-    queryKey: ['org-terminal-settings', org.id],
-    queryFn: () => getOrgTerminalSettings(org.id),
+    queryKey: ['instance-terminal-settings', instance.id],
+    queryFn: () => getInstanceTerminalSettings(instance.id),
   })
-  const [localTerminalSettings, setLocalTerminalSettings] = useState<OrgTerminalSettings | null>(null)
+  const [localTerminalSettings, setLocalTerminalSettings] = useState<InstanceTerminalSettings | null>(null)
   const currentTerminalSettings = localTerminalSettings ?? terminalDefaults ?? { terminalEnabled: true, terminalLoggingEnabled: false, terminalDirectAccess: false }
   const terminalDirty = localTerminalSettings !== null
 
   const terminalMutation = useMutation({
-    mutationFn: (settings: OrgTerminalSettings) => updateOrgTerminalSettings(org.id, settings),
+    mutationFn: (settings: InstanceTerminalSettings) => updateInstanceTerminalSettings(instance.id, settings),
     onSuccess: (result) => {
       if ('error' in result) return
       setLocalTerminalSettings(null)
       setTerminalSaveSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['org-terminal-settings', org.id] })
+      queryClient.invalidateQueries({ queryKey: ['instance-terminal-settings', instance.id] })
       setTimeout(() => setTerminalSaveSuccess(false), 3000)
     },
   })
@@ -407,24 +407,24 @@ export function SettingsClient({
   // Notification settings
   const [notificationSaveSuccess, setNotificationSaveSuccess] = useState(false)
   const { data: notificationDefaults } = useQuery({
-    queryKey: ['org-notification-settings', org.id],
-    queryFn: () => getInstanceNotificationSettings(org.id),
+    queryKey: ['instance-notification-settings', instance.id],
+    queryFn: () => getInstanceNotificationSettings(instance.id),
   })
   const [localNotificationSettings, setLocalNotificationSettings] = useState<InstanceNotificationSettingsFull | null>(null)
   const currentNotificationSettings = localNotificationSettings ?? notificationDefaults ?? {
     inAppEnabled: true,
-    inAppRoles: ['super_admin', 'org_admin', 'engineer'],
+    inAppRoles: ['super_admin', 'instance_admin', 'engineer'],
     allowUserOptOut: true,
   }
   const notificationDirty = localNotificationSettings !== null
 
   const notificationMutation = useMutation({
-    mutationFn: (settings: InstanceNotificationSettingsFull) => updateInstanceNotificationSettings(org.id, settings),
+    mutationFn: (settings: InstanceNotificationSettingsFull) => updateInstanceNotificationSettings(instance.id, settings),
     onSuccess: (result) => {
       if ('error' in result) return
       setLocalNotificationSettings(null)
       setNotificationSaveSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['org-notification-settings', org.id] })
+      queryClient.invalidateQueries({ queryKey: ['instance-notification-settings', instance.id] })
       setTimeout(() => setNotificationSaveSuccess(false), 3000)
     },
   })
@@ -440,8 +440,8 @@ export function SettingsClient({
     log?: SmtpRelayTestLogEntry[]
   } | null>(null)
   const { data: smtpRelayDefaults } = useQuery({
-    queryKey: ['org-smtp-relay-settings', org.id],
-    queryFn: () => getOrgSmtpRelaySettings(org.id),
+    queryKey: ['instance-smtp-relay-settings', instance.id],
+    queryFn: () => getInstanceSmtpRelaySettings(instance.id),
   })
   const [localSmtpRelaySettings, setLocalSmtpRelaySettings] = useState<InstanceSmtpRelaySettingsInput | null>(null)
   const currentSmtpRelaySettings = localSmtpRelaySettings ?? {
@@ -452,7 +452,7 @@ export function SettingsClient({
   const smtpDirty = localSmtpRelaySettings !== null
 
   const smtpMutation = useMutation({
-    mutationFn: (settings: InstanceSmtpRelaySettingsInput) => updateOrgSmtpRelaySettings(org.id, settings),
+    mutationFn: (settings: InstanceSmtpRelaySettingsInput) => updateInstanceSmtpRelaySettings(instance.id, settings),
     onSuccess: (result) => {
       if ('error' in result) {
         setSmtpError(result.error)
@@ -462,13 +462,13 @@ export function SettingsClient({
       setLocalSmtpRelaySettings(null)
       setSmtpError(null)
       setSmtpSaveSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['org-smtp-relay-settings', org.id] })
+      queryClient.invalidateQueries({ queryKey: ['instance-smtp-relay-settings', instance.id] })
       setTimeout(() => setSmtpSaveSuccess(false), 3000)
     },
   })
 
   const smtpTestMutation = useMutation({
-    mutationFn: (recipient: string) => sendTestSmtpRelaySettings(org.id, recipient),
+    mutationFn: (recipient: string) => sendTestSmtpRelaySettings(instance.id, recipient),
     onSuccess: (result, recipient) => {
       if ('error' in result) {
         setSmtpTestResult({ error: result.error, log: result.log })
@@ -493,20 +493,20 @@ export function SettingsClient({
   // Software inventory settings
   const [swInvSaveSuccess, setSwInvSaveSuccess] = useState(false)
   const { data: swInvDefaults } = useQuery({
-    queryKey: ['org-software-inventory-settings', org.id],
-    queryFn: () => getSoftwareInventorySettings(org.id),
+    queryKey: ['instance-software-inventory-settings', instance.id],
+    queryFn: () => getSoftwareInventorySettings(instance.id),
   })
   const [localSwInvSettings, setLocalSwInvSettings] = useState<SoftwareInventorySettings | null>(null)
   const currentSwInvSettings = localSwInvSettings ?? swInvDefaults ?? { enabled: false, intervalHours: 24 }
   const swInvDirty = localSwInvSettings !== null
 
   const swInvMutation = useMutation({
-    mutationFn: (settings: SoftwareInventorySettings) => updateSoftwareInventorySettings(org.id, settings),
+    mutationFn: (settings: SoftwareInventorySettings) => updateSoftwareInventorySettings(instance.id, settings),
     onSuccess: (result) => {
       if ('error' in result) return
       setLocalSwInvSettings(null)
       setSwInvSaveSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['org-software-inventory-settings', org.id] })
+      queryClient.invalidateQueries({ queryKey: ['instance-software-inventory-settings', instance.id] })
       setTimeout(() => setSwInvSaveSuccess(false), 3000)
     },
   })
@@ -544,19 +544,19 @@ export function SettingsClient({
         <CardContent>
           {isAdmin ? (
             <form
-              onSubmit={orgForm.handleSubmit((v) => orgMutation.mutate(v))}
+              onSubmit={instanceForm.handleSubmit((v) => instanceMutation.mutate(v))}
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <Label htmlFor="org-name">Instance name</Label>
+                <Label htmlFor="instance-name">Instance name</Label>
                 <Input
-                  id="org-name"
-                  data-testid="settings-org-name-input"
-                  {...orgForm.register('name')}
+                  id="instance-name"
+                  data-testid="settings-instance-name-input"
+                  {...instanceForm.register('name')}
                 />
-                {orgForm.formState.errors.name && (
+                {instanceForm.formState.errors.name && (
                   <p className="text-xs text-destructive">
-                    {orgForm.formState.errors.name.message}
+                    {instanceForm.formState.errors.name.message}
                   </p>
                 )}
               </div>
@@ -564,15 +564,15 @@ export function SettingsClient({
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={orgMutation.isPending}
-                  data-testid="settings-org-name-save"
+                  disabled={instanceMutation.isPending}
+                  data-testid="settings-instance-name-save"
                 >
-                  {orgMutation.isPending ? 'Saving…' : 'Save'}
+                  {instanceMutation.isPending ? 'Saving…' : 'Save'}
                 </Button>
-                {orgSaveSuccess && (
+                {instanceSaveSuccess && (
                   <span
                     className="flex items-center gap-1 text-sm text-green-700"
-                    data-testid="settings-org-name-success"
+                    data-testid="settings-instance-name-success"
                   >
                     <CheckCircle2 className="size-4" />
                     Saved
@@ -581,7 +581,7 @@ export function SettingsClient({
               </div>
             </form>
           ) : (
-            <p className="text-sm text-foreground">{org.name}</p>
+            <p className="text-sm text-foreground">{instance.name}</p>
           )}
         </CardContent>
       </Card>
@@ -627,7 +627,7 @@ export function SettingsClient({
               <div className="flex items-center gap-3">
                 <Button
                   size="sm"
-                  disabled={retentionMutation.isPending || retentionDays === String(org.metricRetentionDays ?? 30)}
+                  disabled={retentionMutation.isPending || retentionDays === String(instance.metricRetentionDays ?? 30)}
                   onClick={() => retentionMutation.mutate(Number(retentionDays))}
                   data-testid="settings-retention-save"
                 >
@@ -668,7 +668,7 @@ export function SettingsClient({
                     size="sm"
                     disabled={
                       dockerRetentionMutation.isPending ||
-                      dockerRetentionDays === String(org.dockerMetricRetentionDays ?? 30)
+                      dockerRetentionDays === String(instance.dockerMetricRetentionDays ?? 30)
                     }
                     onClick={() => dockerRetentionMutation.mutate(Number(dockerRetentionDays))}
                     data-testid="settings-docker-retention-save"
@@ -688,11 +688,11 @@ export function SettingsClient({
             <div className="space-y-2 text-sm text-foreground">
               <p>
                 Host metrics:{' '}
-                {RETENTION_OPTIONS.find((o) => o.value === String(org.metricRetentionDays ?? 30))?.label ?? `${org.metricRetentionDays ?? 30} days`}
+                {RETENTION_OPTIONS.find((o) => o.value === String(instance.metricRetentionDays ?? 30))?.label ?? `${instance.metricRetentionDays ?? 30} days`}
               </p>
               <p>
                 Docker metrics:{' '}
-                {RETENTION_OPTIONS.find((o) => o.value === String(org.dockerMetricRetentionDays ?? 30))?.label ?? `${org.dockerMetricRetentionDays ?? 30} days`}
+                {RETENTION_OPTIONS.find((o) => o.value === String(instance.dockerMetricRetentionDays ?? 30))?.label ?? `${instance.dockerMetricRetentionDays ?? 30} days`}
               </p>
             </div>
           )}
@@ -1605,13 +1605,13 @@ export function SettingsClient({
                 <div>
                   <p className="text-muted-foreground">Instance name</p>
                   <p className="mt-1 break-words font-medium text-foreground" data-testid="licence-instance-name">
-                    {org.name}
+                    {instance.name}
                   </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Instance ID</p>
                   <p className="mt-1 break-all font-mono text-foreground" data-testid="licence-instance-id">
-                    {org.id}
+                    {instance.id}
                   </p>
                 </div>
               </div>

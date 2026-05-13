@@ -10,11 +10,11 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const securitySource = readFileSync(path.join(here, 'security.ts'), 'utf8')
 
 const baseUser = {
-  role: 'org_admin',
-  roles: ['org_admin'],
+  role: 'instance_admin',
+  roles: ['instance_admin'],
 }
 
-test('Agent CA management rejects org admins', () => {
+test('Agent CA management rejects instance admins', () => {
   assert.throws(
     () => assertAgentCAManagementAccess(baseUser),
     /forbidden: super_admin role required/,

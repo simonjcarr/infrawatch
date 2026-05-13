@@ -14,7 +14,7 @@ export const auditEvents = pgTable('audit_events', {
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index('audit_events_org_time_idx').on(t.instanceId, t.createdAt),
+  index('audit_events_instance_time_idx').on(t.instanceId, t.createdAt),
   index('audit_events_actor_time_idx').on(t.actorUserId, t.createdAt),
   index('audit_events_target_time_idx').on(t.targetType, t.targetId, t.createdAt),
 ])

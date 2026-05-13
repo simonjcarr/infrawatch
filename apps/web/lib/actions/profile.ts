@@ -108,12 +108,12 @@ export async function updateNotificationPreference(enabled: boolean): Promise<{ 
     return { error: 'Instance context is required' }
   }
 
-  // Check whether the org allows users to opt out
-  const org = await db.query.instanceSettings.findFirst({
+  // Check whether the instance allows users to opt out.
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseInstanceMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(instance?.metadata)
   const allowOptOut = meta.notificationSettings?.allowUserOptOut !== false
 
   if (!allowOptOut && !enabled) {

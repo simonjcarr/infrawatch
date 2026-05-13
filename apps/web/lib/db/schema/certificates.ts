@@ -62,9 +62,9 @@ export const certificates = pgTable('certificates', {
   uniqueIndex('certificates_identity_idx').on(
     t.instanceId, t.host, t.port, t.serverName, t.fingerprintSha256,
   ),
-  index('certificates_org_expiry_idx').on(t.instanceId, t.notAfter),
-  index('certificates_org_status_idx').on(t.instanceId, t.status),
-  index('certificates_org_host_idx').on(t.instanceId, t.discoveredByHostId),
+  index('certificates_instance_expiry_idx').on(t.instanceId, t.notAfter),
+  index('certificates_instance_status_idx').on(t.instanceId, t.status),
+  index('certificates_instance_host_idx').on(t.instanceId, t.discoveredByHostId),
   index('certificates_refresh_due_idx').on(t.trackedUrl, t.lastRefreshedAt),
 ])
 
@@ -80,7 +80,7 @@ export const certificateEvents = pgTable('certificate_events', {
   metadata: jsonb('metadata'),
 }, (t) => [
   index('cert_events_cert_time_idx').on(t.certificateId, t.occurredAt),
-  index('cert_events_org_time_idx').on(t.instanceId, t.occurredAt),
+  index('cert_events_instance_time_idx').on(t.instanceId, t.occurredAt),
 ])
 
 export type Certificate = typeof certificates.$inferSelect

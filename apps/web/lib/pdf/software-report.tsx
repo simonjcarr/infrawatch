@@ -160,7 +160,7 @@ interface VersionFilter {
 }
 
 interface Props {
-  orgName: string
+  instanceName: string
   packageName: string
   versionFilter?: VersionFilter
   osFamily?: string
@@ -186,7 +186,7 @@ function fmtDate(d: Date): string {
 }
 
 export function SoftwareReportPDF({
-  orgName,
+  instanceName,
   packageName,
   versionFilter,
   osFamily,
@@ -202,7 +202,7 @@ export function SoftwareReportPDF({
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Installed Software Report</Text>
-          <Text style={styles.subtitle}>{orgName}</Text>
+          <Text style={styles.subtitle}>{instanceName}</Text>
           <View style={styles.metaRow}>
             <Text style={styles.metaItem}>
               Generated: <Text style={styles.metaValue}>{generatedAt.toLocaleString()}</Text>
@@ -259,7 +259,7 @@ export function SoftwareReportPDF({
         {/* Footer */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
-            {orgName} — Installed Software Report — {generatedAt.toLocaleDateString()}
+            {instanceName} — Installed Software Report — {generatedAt.toLocaleDateString()}
           </Text>
           <Text style={styles.footerText} render={({ pageNumber, totalPages }) =>
             `Page ${pageNumber} of ${totalPages}`

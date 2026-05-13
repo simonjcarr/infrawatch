@@ -85,11 +85,11 @@ func TestExistingAgentBelongsToTokenInstanceRejectsInstanceMismatch(t *testing.T
 
 	existing := &queries.AgentRow{
 		ID:         "agent_existing",
-		InstanceID: "org_original",
+		InstanceID: "instance_original",
 		Status:     "active",
 	}
 
-	if existingAgentBelongsToTokenInstance(existing, "org_attacker") {
+	if existingAgentBelongsToTokenInstance(existing, "instance_attacker") {
 		t.Fatal("existing agent matched a different enrolment token instance")
 	}
 }

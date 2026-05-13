@@ -1,12 +1,12 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
@@ -61,7 +61,7 @@ async function seedDockerStatus(sql: ReturnType<typeof getTestDb>, instanceId: s
 
 test('host Containers tab lists containers and filters by name and state', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-containers-host')
   await seedDockerStatus(sql, instanceId, 'docker-containers-host', 'installed')
 
@@ -152,7 +152,7 @@ test('host Containers tab lists containers and filters by name and state', async
 
 test('host Containers tab shows per-container metric charts with max spike values', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-container-metrics-host')
   await seedDockerStatus(sql, instanceId, 'docker-container-metrics-host', 'installed')
 
@@ -313,7 +313,7 @@ test('host Containers tab shows per-container metric charts with max spike value
 
 test('host Containers tab shows lifecycle in a sub tab scoped to the selected container', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-lifecycle-host')
   await seedDockerStatus(sql, instanceId, 'docker-lifecycle-host', 'installed')
 
@@ -377,7 +377,7 @@ test('host Containers tab shows lifecycle in a sub tab scoped to the selected co
 
 test('host Containers tab ranks top containers by selected metric and statistic', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-top-containers-host')
   await seedDockerStatus(sql, instanceId, 'docker-top-containers-host', 'installed')
 
@@ -450,7 +450,7 @@ test('host Containers tab ranks top containers by selected metric and statistic'
 
 test('host Containers tab explains Docker unavailable states', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-containers-denied')
   await seedDockerStatus(sql, instanceId, 'docker-containers-denied', 'permission_denied')
 

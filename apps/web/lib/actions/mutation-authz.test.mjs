@@ -58,14 +58,14 @@ const adminGuardedActions = [
   ['automation.ts', 'updateAnsibleAutomationSettings'],
   ['automation.ts', 'createAnsibleCredentialProfile'],
   ['automation.ts', 'deleteAnsibleCredentialProfile'],
-  ['host-settings.ts', 'updateOrgDefaultCollectionSettings'],
+  ['host-settings.ts', 'updateInstanceDefaultCollectionSettings'],
   ['tag-rules.ts', 'createTagRule'],
   ['tag-rules.ts', 'updateTagRule'],
   ['tag-rules.ts', 'deleteTagRule'],
-  ['tags-core.ts', 'updateOrgDefaultTags'],
+  ['tags-core.ts', 'updateInstanceDefaultTags'],
 ]
 
-test('instance state mutations require write-capable org access', () => {
+test('instance state mutations require write-capable instance access', () => {
   for (const [fileName, action] of writeGuardedActions) {
     const segment = getActionSegment(fileName, action)
 
@@ -77,14 +77,14 @@ test('instance state mutations require write-capable org access', () => {
   }
 })
 
-test('instance-wide defaults and rules require org admin access', () => {
+test('instance-wide defaults and rules require instance admin access', () => {
   for (const [fileName, action] of adminGuardedActions) {
     const segment = getActionSegment(fileName, action)
 
     assert.match(
       segment,
       /(?:const session = )?await requireInstanceAdminAccess\((?:instanceId|currentScope)\)/,
-      `${fileName} ${action} must require org admin access before mutating instance-wide settings`,
+      `${fileName} ${action} must require instance admin access before mutating instance-wide settings`,
     )
   }
 })

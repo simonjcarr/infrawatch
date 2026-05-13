@@ -97,7 +97,7 @@ export const buildDocTemplates = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
-    index('build_doc_templates_org_active_idx').on(t.instanceId, t.deletedAt, t.isActive),
+    index('build_doc_templates_instance_active_idx').on(t.instanceId, t.deletedAt, t.isActive),
     uniqueIndex('build_doc_templates_default_uidx')
       .on(t.instanceId, t.isDefault)
       .where(sql`${t.isDefault} = TRUE AND ${t.deletedAt} IS NULL`),
@@ -145,7 +145,7 @@ export const buildDocSnippets = pgTable(
     metadata: jsonb('metadata').$type<BuildDocSnippetMetadata>(),
   },
   (t) => [
-    index('build_doc_snippets_org_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
+    index('build_doc_snippets_instance_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
     index('build_doc_snippets_search_vector_idx').using('gin', t.searchVector),
   ],
 )
@@ -174,7 +174,7 @@ export const buildDocs = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
-    index('build_docs_org_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
+    index('build_docs_instance_updated_idx').on(t.instanceId, t.deletedAt, t.updatedAt),
     index('build_docs_template_idx').on(t.templateVersionId),
     index('build_docs_status_idx').on(t.instanceId, t.status),
     index('build_docs_search_vector_idx').using('gin', t.searchVector),
@@ -255,7 +255,7 @@ export const buildDocAssetStorageSettings = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('build_doc_asset_storage_settings_org_uidx').on(t.instanceId)],
+  (t) => [uniqueIndex('build_doc_asset_storage_settings_instance_uidx').on(t.instanceId)],
 )
 
 export type BuildDocTemplate = typeof buildDocTemplates.$inferSelect

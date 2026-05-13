@@ -18,7 +18,7 @@ export type PackageSource =
   | 'other'
 
 /**
- * One row per (org, host, name, version, architecture) combination.
+ * One row per (instance, host, name, version, architecture) combination.
  * Packages are upserted on each scan; rows not seen in the latest scan get
  * `removed_at` stamped instead of being deleted, so `first_seen_at` is stable
  * for "new in last N days" queries.
@@ -58,7 +58,7 @@ export const softwarePackages = pgTable(
   },
   (t) => [
     uniqueIndex('sw_pkg_uniq').on(t.instanceId, t.hostId, t.name, t.version, t.architecture),
-    index('sw_pkg_org_name_idx').on(t.instanceId, t.name),
+    index('sw_pkg_instance_name_idx').on(t.instanceId, t.name),
     index('sw_pkg_source_name_idx').on(t.source, t.distroId, t.distroCodename, t.sourceName),
     index('sw_pkg_host_idx').on(t.hostId),
     index('sw_pkg_first_seen_idx').on(t.instanceId, t.firstSeenAt),

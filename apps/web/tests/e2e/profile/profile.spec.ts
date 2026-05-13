@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test'
 import { request as playwrightRequest } from '@playwright/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+import { TEST_INSTANCE, TEST_USER } from '../fixtures/seed'
 import { generateTotpCode } from '../../../lib/auth/ldap-two-factor'
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
@@ -22,12 +22,12 @@ function decodeBase32Secret(encoded: string): string {
   return new TextDecoder().decode(new Uint8Array(bytes))
 }
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
     SELECT instanceSettings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
     JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+    WHERE instanceSettings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
@@ -226,7 +226,7 @@ test('authenticated user can switch profile theme preferences and persist the se
 
 test('authenticated user can opt out of in-app notifications when the instance allows it', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     UPDATE instance_settings
@@ -275,7 +275,7 @@ test('authenticated user can opt out of in-app notifications when the instance a
 
 test('authenticated user cannot opt out of in-app notifications when the instance requires them', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     UPDATE instance_settings

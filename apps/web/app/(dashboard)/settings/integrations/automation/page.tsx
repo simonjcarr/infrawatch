@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default async function AutomationIntegrationSettingsPage() {
   const session = await getRequiredSession()
 
-  if (!hasRole(session.user, ['org_admin', 'super_admin'])) {
+  if (!hasRole(session.user, ['instance_admin', 'super_admin'])) {
     redirect('/settings')
   }
 

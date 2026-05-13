@@ -264,7 +264,7 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
       const payload = decodeJwtPayload(assertion)
       state.launchAssertions.push(assertion)
       state.currentUserId = payload.ct_ops_user_id || state.currentUserId
-      state.currentInstanceId = payload.ct_ops_organization_id || state.currentInstanceId
+      state.currentInstanceId = payload.ct_ops_instance_settings_id || state.currentInstanceId
       state.sessionToken = randomUUID()
 
       await fulfillEmpty(route, 204, {
@@ -673,10 +673,10 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
     },
     async switchAuthenticatedInstance() {
       const sql = getTestDb()
-      const instanceId = `org-switched-${Date.now()}`
+      const instanceId = `instance-switched-${Date.now()}`
       await sql`
         INSERT INTO instance_settings (id, name, slug)
-        VALUES (${instanceId}, ${'Switched Org'}, ${`switched-org-${Date.now()}`})
+        VALUES (${instanceId}, ${'Switched Instance'}, ${`switched-instance-${Date.now()}`})
       `
       await sql`
         UPDATE "user"

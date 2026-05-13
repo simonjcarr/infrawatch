@@ -14,7 +14,7 @@ export default async function SoftwareReportPage() {
 
   return (
     <NuqsAdapter>
-      <SoftwareReportClient orgName="CT-Ops" hostGroups={groups} />
+      <SoftwareReportClient instanceName="CT-Ops" hostGroups={groups} />
     </NuqsAdapter>
   )
 }

@@ -1,6 +1,6 @@
 import { test as setup, type APIRequestContext, type Page } from '@playwright/test'
 import { getStorageStatePath } from './fixtures/auth'
-import { seedOrgAndUser } from './fixtures/seed'
+import { seedInstanceAndUser } from './fixtures/seed'
 
 const publicRoutes = [
   '/login',
@@ -132,7 +132,7 @@ async function warmupRequest(request: APIRequestContext, route: string): Promise
 setup('seed test instance and warm Next routes', async ({ browser, baseURL }) => {
   if (!baseURL) throw new Error('baseURL must be configured')
 
-  await seedOrgAndUser()
+  await seedInstanceAndUser()
 
   const publicContext = await browser.newContext()
   const publicPage = await publicContext.newPage()

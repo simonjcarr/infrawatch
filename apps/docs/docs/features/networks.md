@@ -80,6 +80,6 @@ The context menu uses React Flow's `onNodeContextMenu` so the browser's native r
 
 | Action | Required Role |
 |---|---|
-| Create / edit / delete a network | `org_admin`, `super_admin` |
-| Add / remove a host from a network | `engineer`, `org_admin`, `super_admin` |
+| Create / edit / delete a network | `instance_admin`, `super_admin` |
+| Add / remove a host from a network | `engineer`, `instance_admin`, `super_admin` |
 | View networks | All authenticated users |

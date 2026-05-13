@@ -55,8 +55,8 @@ test('signPasswordManagerLaunchAssertion emits the required claims', async () =>
 
   const assertion = await signPasswordManagerLaunchAssertion(
     {
-      instanceId: 'org-123',
-      instanceName: 'Example Org',
+      instanceId: 'instance-123',
+      instanceName: 'Example Instance',
       userId: 'user-456',
       email: 'ops@example.com',
       name: 'Example Operator',
@@ -75,8 +75,8 @@ test('signPasswordManagerLaunchAssertion emits the required claims', async () =>
   assert.equal(protectedHeader.alg, 'EdDSA')
   assert.equal(payload.product, 'ct-password-manager')
   assert.equal(payload.ct_ops_instance_id, 'ct-ops-prod-1')
-  assert.equal(payload.ct_ops_organization_id, 'org-123')
-  assert.equal(payload.ct_ops_organization_name, 'Example Org')
+  assert.equal(payload.ct_ops_instance_settings_id, 'instance-123')
+  assert.equal(payload.ct_ops_instance_name, 'Example Instance')
   assert.equal(payload.ct_ops_user_id, 'user-456')
   assert.equal(payload.email, 'ops@example.com')
   assert.equal(payload.name, 'Example Operator')
@@ -95,7 +95,7 @@ test('signPasswordManagerLaunchAssertion omits the optional instance name when a
 
   const assertion = await signPasswordManagerLaunchAssertion(
     {
-      instanceId: 'org-123',
+      instanceId: 'instance-123',
       userId: 'user-456',
       email: 'ops@example.com',
       name: 'Example Operator',
@@ -111,5 +111,5 @@ test('signPasswordManagerLaunchAssertion omits the optional instance name when a
     currentDate: new Date('2026-05-05T17:45:30.000Z'),
   })
 
-  assert.equal('ct_ops_organization_name' in payload, false)
+  assert.equal('ct_ops_instance_name' in payload, false)
 })

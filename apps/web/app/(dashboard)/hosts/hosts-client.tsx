@@ -203,7 +203,7 @@ export function HostsClient({
   initialPendingAgents,
 }: HostsClientProps) {
   const queryClient = useQueryClient()
-  const isAdmin = currentUserRole === 'super_admin' || currentUserRole === 'org_admin'
+  const isAdmin = currentUserRole === 'super_admin' || currentUserRole === 'instance_admin'
 
   // ─── Filter / sort / page state ────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState('')

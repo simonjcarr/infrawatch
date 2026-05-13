@@ -50,7 +50,7 @@ async function claimDirectSignupUsers(instanceId: string): Promise<void> {
   `)
 }
 
-export async function getOrgUsers(): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
+export async function getInstanceUsers(): Promise<{ members: User[]; pendingInvites: Invitation[] }> {
   const session = await getRequiredSession()
   const currentScope = resolveOptionalActionScope(session)
   if (!currentScope) return { members: [session.user], pendingInvites: [] }
@@ -234,11 +234,11 @@ export async function updateUserRole(
     }
 
     if (hasSuperAdminRole(targetUser.role, targetUser.roles) && !nextRoles.includes('super_admin')) {
-      const orgUsers = await db.query.users.findMany({
+      const instanceUsers = await db.query.users.findMany({
         where: and(eq(users.instanceId, instanceId), isNull(users.deletedAt)),
         columns: { id: true, role: true, roles: true },
       })
-      const superAdmins = orgUsers.filter((user) => hasSuperAdminRole(user.role, user.roles))
+      const superAdmins = instanceUsers.filter((user) => hasSuperAdminRole(user.role, user.roles))
       if (superAdmins.length === 1 && superAdmins[0]?.id === targetUserId) {
         return { error: 'Cannot demote the last super admin' }
       }

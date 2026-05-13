@@ -20,7 +20,7 @@ CT-Ops is an open-source monitoring and operations platform designed to run **en
 - **Host groups & tagging** — flexible `key:value` tags on any resource, group-based access control for teams.
 - **Terminal workspace** — split-pane browser terminal for ad-hoc investigation without leaving the dashboard.
 - **Air-gap agent bundles** — download a self-contained zip (binary + config + install script) for hosts that can't reach the internet.
-- **Instance-scoped RBAC** — `super_admin` → `org_admin` → `engineer` → `read_only` → `agent` role hierarchy.
+- **Instance-scoped RBAC** — `super_admin` → `instance_admin` → `engineer` → `read_only` → `agent` role hierarchy.
 - **Three deployment profiles** — `single` (one host), `standard` (Redpanda), `ha` (clustered) — same codebase, different `docker-compose` files.
 
 ---

@@ -14,7 +14,7 @@ function getActionSegment(action) {
   return source.slice(start, next === -1 ? undefined : next)
 }
 
-test('calendar mutations require write access but list requires org access', () => {
+test('calendar mutations require write access but list requires instance access', () => {
   assert.match(getActionSegment('listCalendarEvents'), /await requireInstanceAccess\(instanceId\)/)
 
   for (const action of [

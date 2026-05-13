@@ -42,7 +42,7 @@ export interface InstanceNotificationSettingsFull {
   allowUserOptOut: boolean
 }
 
-const updateOrgSmtpRelaySettingsSchema = z.object({
+const updateInstanceSmtpRelaySettingsSchema = z.object({
   enabled: z.boolean(),
   host: z.string().min(1, 'Host is required'),
   port: z
@@ -58,7 +58,7 @@ const updateOrgSmtpRelaySettingsSchema = z.object({
   fromName: z.string().optional(),
 })
 
-export type InstanceSmtpRelaySettingsInput = z.infer<typeof updateOrgSmtpRelaySettingsSchema>
+export type InstanceSmtpRelaySettingsInput = z.infer<typeof updateInstanceSmtpRelaySettingsSchema>
 
 export interface SmtpRelayTestLogEntry {
   level: 'info' | 'success' | 'error'
@@ -69,11 +69,11 @@ export async function getInstanceNotificationSettings(
   instanceId: string,
 ): Promise<InstanceNotificationSettingsFull> {
   await requireInstanceAccess(instanceId)
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseInstanceMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(instance?.metadata)
   const ns = meta.notificationSettings ?? {}
   return {
     inAppEnabled: ns.inAppEnabled !== false,
@@ -99,13 +99,13 @@ export async function updateInstanceNotificationSettings(
 
   const { inAppEnabled, inAppRoles, allowUserOptOut } = parsed.data
 
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  if (!org) return { error: 'Instance not found' }
+  if (!instance) return { error: 'Instance not found' }
 
-  const currentMetadata = parseInstanceMetadata(org.metadata)
+  const currentMetadata = parseInstanceMetadata(instance.metadata)
   const updatedMetadata = {
     ...currentMetadata,
     notificationSettings: {
@@ -126,15 +126,15 @@ export async function updateInstanceNotificationSettings(
   }
 }
 
-export async function getOrgSmtpRelaySettings(
+export async function getInstanceSmtpRelaySettings(
   instanceId: string,
 ): Promise<SmtpRelaySettingsSafe | null> {
   await requireInstanceAccess(instanceId)
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseInstanceMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(instance?.metadata)
   return sanitiseSmtpRelayForClient(meta.notificationSettings?.smtpRelay)
 }
 
@@ -148,23 +148,23 @@ async function getAdminInstanceMetadata(instanceId: string): Promise<
     return { error: 'You do not have permission to update SMTP settings' }
   }
 
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  if (!org) return { error: 'Instance not found' }
+  if (!instance) return { error: 'Instance not found' }
 
-  return { metadata: parseInstanceMetadata(org.metadata) }
+  return { metadata: parseInstanceMetadata(instance.metadata) }
 }
 
-export async function updateOrgSmtpRelaySettings(
+export async function updateInstanceSmtpRelaySettings(
   instanceId: string,
   input: unknown,
 ): Promise<{ success: true } | { error: string }> {
   const access = await getAdminInstanceMetadata(instanceId)
   if ('error' in access) return { error: access.error ?? 'Unable to load SMTP settings' }
 
-  const parsed = updateOrgSmtpRelaySettingsSchema.safeParse(input)
+  const parsed = updateInstanceSmtpRelaySettingsSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
   }

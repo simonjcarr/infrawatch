@@ -12,12 +12,12 @@ export const metadata: Metadata = {
 
 export default async function SoftwareInventorySettingsPage() {
   const session = await getRequiredSession()
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
-  const org = await getCurrentInstanceSettingsRecord()
+  const instance = await getCurrentInstanceSettingsRecord()
 
-  if (!org) return null
+  if (!instance) return null
 
   return (
     <div className="space-y-6">
@@ -30,7 +30,7 @@ export default async function SoftwareInventorySettingsPage() {
         ]}
       />
       <SettingsClient
-        org={org}
+        instance={instance}
         isAdmin={isAdmin}
         sections={['software']}
         title="Software Inventory"

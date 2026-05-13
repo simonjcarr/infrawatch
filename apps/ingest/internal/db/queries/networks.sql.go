@@ -21,8 +21,8 @@ type HostNetworkMembershipRow struct {
 	AutoAssigned bool
 }
 
-// GetNetworksForOrg returns all active (non-deleted) networks for an instance.
-func GetNetworksForOrg(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]NetworkRow, error) {
+// GetNetworksForInstance returns all active (non-deleted) networks for an instance.
+func GetNetworksForInstance(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]NetworkRow, error) {
 	const q = `
 		SELECT id, cidr
 		FROM networks
@@ -125,8 +125,8 @@ func SyncHostNetworks(ctx context.Context, pool *pgxpool.Pool, instanceID, hostI
 		}
 	}
 
-	// Fetch all active networks for the org.
-	networks, err := GetNetworksForOrg(ctx, pool, instanceID)
+	// Fetch all active networks for the instance.
+	networks, err := GetNetworksForInstance(ctx, pool, instanceID)
 	if err != nil {
 		return err
 	}

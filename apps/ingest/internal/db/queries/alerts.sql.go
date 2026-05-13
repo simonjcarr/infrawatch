@@ -12,7 +12,7 @@ import (
 // AlertRuleRow is a row from the alert_rules table.
 type AlertRuleRow struct {
 	ID            string
-	HostID        *string // nil for org-wide rules
+	HostID        *string // nil for instance-wide rules
 	InstanceID    string
 	Name          string
 	ConditionType string // "check_status" | "metric_threshold"
@@ -42,7 +42,7 @@ type WebhookChannelRow struct {
 }
 
 // GetAlertRulesForHost returns all enabled, non-deleted alert rules scoped to the
-// given host OR org-wide (host_id IS NULL, isGlobalDefault = false).
+// given host OR instance-wide (host_id IS NULL, isGlobalDefault = false).
 // Global defaults (is_global_default = true) are excluded — they are cloned as
 // host-specific rules at approval time and must not be double-evaluated.
 func GetAlertRulesForHost(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string) ([]AlertRuleRow, error) {
@@ -154,7 +154,7 @@ func GetRecentCheckResults(ctx context.Context, pool *pgxpool.Pool, checkID stri
 type SmtpChannelRow struct {
 	ID              string
 	ConfigJSON      string // raw notification_channels.config JSONB as text
-	RelayConfigJSON string // raw instances.metadata.notificationSettings.smtpRelay JSONB as text; may be empty
+	RelayConfigJSON string // raw instance_settings.metadata.notificationSettings.smtpRelay JSONB as text; may be empty
 }
 
 // GetEnabledSmtpChannels returns all enabled, non-deleted SMTP notification
@@ -165,7 +165,7 @@ func GetEnabledSmtpChannels(ctx context.Context, pool *pgxpool.Pool, instanceID 
 		       c.config::text,
 		       COALESCE(o.metadata->'notificationSettings'->'smtpRelay', '{}'::jsonb)::text
 		FROM notification_channels c
-		JOIN instances o ON o.id = c.instance_id
+		JOIN instance_settings o ON o.id = c.instance_id
 		WHERE c.instance_id = $1
 		  AND c.type = 'smtp'
 		  AND c.enabled = true
@@ -301,41 +301,41 @@ func GetEnabledTelegramChannels(ctx context.Context, pool *pgxpool.Pool, instanc
 	return result, rows.Err()
 }
 
-// OrgNotificationSettingsRow holds the notification settings from org metadata.
-type OrgNotificationSettingsRow struct {
+// InstanceNotificationSettingsRow holds the notification settings from instance metadata.
+type InstanceNotificationSettingsRow struct {
 	InAppEnabled    bool
 	InAppRoles      []string
 	AllowUserOptOut bool
 }
 
-// GetOrgNotificationSettings fetches the in-app notification settings for an org.
+// GetInstanceNotificationSettings fetches the in-app notification settings for an instance.
 // Returns sensible defaults if metadata is not set.
-func GetOrgNotificationSettings(ctx context.Context, pool *pgxpool.Pool, instanceID string) (OrgNotificationSettingsRow, error) {
+func GetInstanceNotificationSettings(ctx context.Context, pool *pgxpool.Pool, instanceID string) (InstanceNotificationSettingsRow, error) {
 	const q = `
 		SELECT
 			COALESCE((metadata->'notificationSettings'->>'inAppEnabled')::boolean, true),
 			COALESCE(
 				ARRAY(SELECT jsonb_array_elements_text(metadata->'notificationSettings'->'inAppRoles')),
-				ARRAY['super_admin','org_admin','engineer']
+				ARRAY['super_admin','instance_admin','engineer']
 			),
 			COALESCE((metadata->'notificationSettings'->>'allowUserOptOut')::boolean, true)
-		FROM instances
+		FROM instance_settings
 		WHERE id = $1
 	`
-	var row OrgNotificationSettingsRow
+	var row InstanceNotificationSettingsRow
 	err := pool.QueryRow(ctx, q, instanceID).Scan(&row.InAppEnabled, &row.InAppRoles, &row.AllowUserOptOut)
 	if err != nil {
 		// Return defaults on error
-		return OrgNotificationSettingsRow{
+		return InstanceNotificationSettingsRow{
 			InAppEnabled:    true,
-			InAppRoles:      []string{"super_admin", "org_admin", "engineer"},
+			InAppRoles:      []string{"super_admin", "instance_admin", "engineer"},
 			AllowUserOptOut: true,
 		}, err
 	}
 	// ARRAY(SELECT ...) returns '{}' (not NULL) when the JSON key is absent, so
 	// COALESCE in SQL never fires. Apply the default here instead.
 	if len(row.InAppRoles) == 0 {
-		row.InAppRoles = []string{"super_admin", "org_admin", "engineer"}
+		row.InAppRoles = []string{"super_admin", "instance_admin", "engineer"}
 	}
 	return row, nil
 }

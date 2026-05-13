@@ -16,7 +16,7 @@ import { getTrustedEffectiveLicence } from '@/lib/actions/licence-guard'
 import { getRequiredSession } from '@/lib/auth/session'
 import { resolveOptionalActionScope } from './action-scope'
 
-const updateOrgNameSchema = z.object({
+const updateInstanceNameSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
 })
 
@@ -29,7 +29,7 @@ export async function getCurrentInstanceSettingsRecord() {
   })
 }
 
-export async function updateOrgName(
+export async function updateInstanceName(
   instanceId: string,
   name: string,
 ): Promise<{ success: true } | { error: string }> {
@@ -39,7 +39,7 @@ export async function updateOrgName(
     return { error: 'You do not have permission to perform this action' }
   }
 
-  const parsed = updateOrgNameSchema.safeParse({ name })
+  const parsed = updateInstanceNameSchema.safeParse({ name })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid name' }
   }
@@ -52,7 +52,7 @@ export async function updateOrgName(
 
     return { success: true }
   } catch (err) {
-    logError('Failed to update org name:', err)
+    logError('Failed to update instance name:', err)
     return { error: 'An unexpected error occurred' }
   }
 }
@@ -220,17 +220,17 @@ export async function generateActivationToken(
   }
 
   try {
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { id: true, name: true },
     })
-    if (!org) {
+    if (!instance) {
       return { error: 'Instance not found' }
     }
 
     const token = encodeActivationToken({
-      installOrgId: org.id,
-      installOrgName: org.name,
+      installInstanceId: instance.id,
+      installInstanceName: instance.name,
       nonce: createId(),
     })
     return { success: true, token }
@@ -266,7 +266,7 @@ export async function updateFreeSeatUsers(
   }
 
   try {
-    const [org, activeUsers] = await Promise.all([
+    const [instance, activeUsers] = await Promise.all([
       db.query.instanceSettings.findFirst({
         where: eq(instanceSettings.id, instanceId),
         columns: { metadata: true },
@@ -284,7 +284,7 @@ export async function updateFreeSeatUsers(
           }),
     ])
 
-    if (!org) {
+    if (!instance) {
       return { error: 'Instance not found' }
     }
 
@@ -295,7 +295,7 @@ export async function updateFreeSeatUsers(
     }
 
     const metadata = {
-      ...parseInstanceMetadata(org.metadata),
+      ...parseInstanceMetadata(instance.metadata),
       freeSeatUserIds: uniqueUserIds,
     }
 

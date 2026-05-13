@@ -629,7 +629,7 @@ type certExpiryConfig struct {
 }
 
 // evaluateCertExpiryForCert is called immediately after a cert is upserted.
-// It loads all cert_expiry rules for the org and evaluates them against the
+// It loads all cert_expiry rules for the instance and evaluates them against the
 // freshly-observed cert.
 func evaluateCertExpiryForCert(
 	ctx context.Context,
@@ -637,7 +637,7 @@ func evaluateCertExpiryForCert(
 	instanceID, certID, commonName, issuer, host string, port int,
 	notAfter time.Time, status string,
 ) {
-	rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, instanceID)
+	rules, err := queries.GetCertExpiryRulesForInstance(ctx, pool, instanceID)
 	if err != nil {
 		slog.Warn("evaluateCertExpiry: fetching rules", "instance_id", instanceID, "err", err)
 		return
@@ -763,7 +763,7 @@ func evaluateCertExpiryRule(
 	}
 }
 
-// RunCertExpirySweeper periodically evaluates all cert_expiry rules for all orgs.
+// RunCertExpirySweeper periodically evaluates all cert_expiry rules for all instances.
 // This catches certs that drift into the warning window without a new scan.
 func RunCertExpirySweeper(ctx context.Context, pool *pgxpool.Pool, interval time.Duration) {
 	if interval <= 0 {
@@ -785,14 +785,14 @@ func RunCertExpirySweeper(ctx context.Context, pool *pgxpool.Pool, interval time
 }
 
 func runCertExpirySweep(ctx context.Context, pool *pgxpool.Pool) {
-	instanceIDs, err := queries.GetAllOrgsWithCertExpiryRules(ctx, pool)
+	instanceIDs, err := queries.GetAllInstancesWithCertExpiryRules(ctx, pool)
 	if err != nil {
-		slog.Warn("cert sweeper: fetching orgs", "err", err)
+		slog.Warn("cert sweeper: fetching instances", "err", err)
 		return
 	}
 
 	for _, instanceID := range instanceIDs {
-		rules, err := queries.GetCertExpiryRulesForOrg(ctx, pool, instanceID)
+		rules, err := queries.GetCertExpiryRulesForInstance(ctx, pool, instanceID)
 		if err != nil {
 			slog.Warn("cert sweeper: fetching rules", "instance_id", instanceID, "err", err)
 			continue

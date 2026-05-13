@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
 test('admin can update metric retention from monitoring settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
@@ -18,7 +18,7 @@ test('admin can update metric retention from monitoring settings', async ({ auth
       const rows = await sql<Array<{ metric_retention_days: number }>>`
         SELECT metric_retention_days
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -43,7 +43,7 @@ test('admin can update Docker metric retention from monitoring settings', async 
       const rows = await sql<Array<{ docker_metric_retention_days: number }>>`
         SELECT docker_metric_retention_days
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -77,7 +77,7 @@ test('admin can update default host collection settings from agent defaults', as
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -118,7 +118,7 @@ test('admin can update software inventory defaults from agent settings', async (
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 

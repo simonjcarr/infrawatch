@@ -89,3 +89,47 @@ func TestValidateDockerTelemetryBatchAllowsEmptyAgentID(t *testing.T) {
 		t.Fatalf("validateDockerTelemetryBatch() error = %v, want nil", err)
 	}
 }
+
+func TestNormaliseDockerContainerAlertConfigDefaultsAndBounds(t *testing.T) {
+	t.Parallel()
+
+	cfg := dockerContainerAlertConfig{
+		Rule:              "sustained_cpu",
+		DockerContainerID: " container-1 ",
+		WindowMinutes:     0,
+		Threshold:         200,
+		SampleThreshold:   0,
+	}
+
+	normaliseDockerContainerAlertConfig(&cfg)
+
+	if cfg.DockerContainerID != "container-1" {
+		t.Fatalf("DockerContainerID = %q, want trimmed", cfg.DockerContainerID)
+	}
+	if cfg.WindowMinutes != 10 {
+		t.Fatalf("WindowMinutes = %d, want default 10", cfg.WindowMinutes)
+	}
+	if cfg.Threshold != 90 {
+		t.Fatalf("Threshold = %v, want default 90", cfg.Threshold)
+	}
+	if cfg.SampleThreshold != 3 {
+		t.Fatalf("SampleThreshold = %d, want default 3", cfg.SampleThreshold)
+	}
+}
+
+func TestNormaliseDockerContainerAlertConfigNetworkDefault(t *testing.T) {
+	t.Parallel()
+
+	cfg := dockerContainerAlertConfig{Rule: "high_network_io", Threshold: 0, WindowMinutes: 2000, SampleThreshold: 2000}
+	normaliseDockerContainerAlertConfig(&cfg)
+
+	if cfg.Threshold != 1024*1024 {
+		t.Fatalf("Threshold = %v, want default bytes/sec", cfg.Threshold)
+	}
+	if cfg.WindowMinutes != 1440 {
+		t.Fatalf("WindowMinutes = %d, want capped 1440", cfg.WindowMinutes)
+	}
+	if cfg.SampleThreshold != 1000 {
+		t.Fatalf("SampleThreshold = %d, want capped 1000", cfg.SampleThreshold)
+	}
+}

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.145.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.144.0...web/v0.145.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add top container rankings ([04a75c5](https://github.com/carrtech-dev/ct-ops/commit/04a75c5374294fd077c162e14a3d2f885b97d6e3))
+
 ## [0.144.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.143.0...web/v0.144.0) (2026-05-13)
 
 

@@ -96,6 +96,9 @@ func (h *InventoryHandler) SubmitDockerTelemetry(stream agentv1.IngestService_Su
 			slog.Error("docker telemetry: inserting container metrics", "host_id", hostID, "err", err)
 			return status.Error(codes.Internal, "failed to persist Docker metrics")
 		}
+		if len(reports) > 0 || len(metricReports) > 0 {
+			evaluateDockerContainerAlerts(ctx, h.pool, agent.InstanceID, hostID, agent.Hostname, now)
+		}
 
 		totalInventory += len(reports)
 		totalSamples += len(metricReports)

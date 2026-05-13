@@ -25,8 +25,21 @@ export interface CertExpiryConfig {
   daysBeforeExpiry: number
 }
 
-export type AlertConditionType = 'check_status' | 'metric_threshold' | 'cert_expiry'
-export type AlertRuleConfig = CheckStatusConfig | MetricThresholdConfig | CertExpiryConfig
+export interface DockerContainerAlertConfig {
+  rule:
+    | 'restart_loop'
+    | 'memory_near_limit'
+    | 'sustained_cpu'
+    | 'container_missing'
+    | 'high_network_io'
+  dockerContainerId?: string
+  windowMinutes: number
+  threshold: number
+  sampleThreshold?: number
+}
+
+export type AlertConditionType = 'check_status' | 'metric_threshold' | 'cert_expiry' | 'docker_container'
+export type AlertRuleConfig = CheckStatusConfig | MetricThresholdConfig | CertExpiryConfig | DockerContainerAlertConfig
 export type AlertSeverity = 'info' | 'warning' | 'critical'
 export type AlertInstanceStatus = 'firing' | 'resolved' | 'acknowledged'
 

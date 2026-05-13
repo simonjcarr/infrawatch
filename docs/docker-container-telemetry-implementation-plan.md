@@ -199,7 +199,7 @@ Purpose: make the feature operationally useful beyond basic charts.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Add top containers views | Codex | done | web actions/components | Phase 3 metrics | Users can rank containers by CPU, memory, network, and block I/O over a selected time range. | [#1379](https://github.com/carrtech-dev/ct-ops/pull/1379) | Merged in #1379. Uses max and p95 ranking options across CPU, memory, network I/O, and block I/O. E2E spec added; local E2E run blocked by unavailable container runtime. |
 | Add container lifecycle timeline | Codex | done | agent/inventory ingest/UI | Phase 2 inventory | Users can see starts, stops, restarts, and disappeared containers over time. | [#1382](https://github.com/carrtech-dev/ct-ops/pull/1382) | Merged in #1382 and released in #1383 as ingest v0.14.0, web v0.146.0, and bundle v0.13.0. |
-| Add alert rules for containers | unclaimed | pending | alert schema/evaluator/UI | Phase 3 metrics | Alerts cover restart loop, memory near limit, sustained CPU, container missing, and high network I/O. | TBD | Avoid alerting on short one-sample noise by default. |
+| Add alert rules for containers | Codex | review | alert schema/evaluator/UI | Phase 3 metrics | Alerts cover restart loop, memory near limit, sustained CPU, container missing, and high network I/O. | [#1385](https://github.com/carrtech-dev/ct-ops/pull/1385) | PR opened in #1385. Avoids one-sample noise with sample/window thresholds for metric-derived rules. |
 | Add fleet/container search | unclaimed | pending | web routes/actions/components | Phase 2 inventory | Users can search across hosts by container name, image, label, and state. | TBD | Useful for finding where a workload is running. |
 
 ## Testing Requirements

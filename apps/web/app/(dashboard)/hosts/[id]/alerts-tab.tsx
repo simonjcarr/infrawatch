@@ -48,12 +48,13 @@ import {
 } from '@/lib/actions/alerts'
 import { getChecksWithHistory } from '@/lib/actions/checks'
 import { getCertificates } from '@/lib/actions/certificates'
+import { getHostDockerContainers } from '@/lib/actions/docker-containers'
 import type { AlertRule, AlertSeverity, AlertSilence } from '@/lib/db/schema'
 
 // ─── Form schema (flat — validation applied per conditionType in onSubmit) ─────
 
 const ruleFormSchema = z.object({
-  conditionType: z.enum(['check_status', 'metric_threshold', 'cert_expiry']),
+  conditionType: z.enum(['check_status', 'metric_threshold', 'cert_expiry', 'docker_container']),
   name: z.string().min(1, 'Name is required').max(100),
   severity: z.enum(['info', 'warning', 'critical']),
   // check_status fields
@@ -67,6 +68,18 @@ const ruleFormSchema = z.object({
   certScope: z.enum(['all', 'specific']).optional(),
   certificateId: z.string().optional(),
   daysBeforeExpiry: z.number().int().min(1).max(365).optional(),
+  // docker_container fields
+  dockerRule: z.enum([
+    'restart_loop',
+    'memory_near_limit',
+    'sustained_cpu',
+    'container_missing',
+    'high_network_io',
+  ]).optional(),
+  dockerContainerId: z.string().optional(),
+  dockerWindowMinutes: z.number().int().min(1).max(1440).optional(),
+  dockerThreshold: z.number().min(0).optional(),
+  dockerSampleThreshold: z.number().int().min(1).max(1000).optional(),
 })
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>
@@ -97,7 +110,37 @@ function ruleConditionSummary(rule: AlertRule): string {
     const scope = cfg['scope'] === 'specific' ? 'specific cert' : 'any cert'
     return `${scope} expires within ${cfg['daysBeforeExpiry'] ?? 30} days`
   }
+  if (rule.conditionType === 'docker_container') {
+    const window = cfg['windowMinutes'] ?? 10
+    switch (cfg['rule']) {
+      case 'restart_loop':
+        return `container restarts >= ${cfg['threshold'] ?? 3} in ${window}m`
+      case 'memory_near_limit':
+        return `container memory >= ${cfg['threshold'] ?? 90}% in ${window}m`
+      case 'sustained_cpu':
+        return `container CPU >= ${cfg['threshold'] ?? 90}% for ${window}m`
+      case 'container_missing':
+        return `container missing for ${cfg['threshold'] ?? 5}m`
+      case 'high_network_io':
+        return `container network I/O >= ${cfg['threshold'] ?? 1048576} B/s in ${window}m`
+    }
+  }
   return '—'
+}
+
+function defaultDockerThreshold(rule: RuleFormValues['dockerRule']): number {
+  switch (rule) {
+    case 'memory_near_limit':
+    case 'sustained_cpu':
+      return 90
+    case 'container_missing':
+      return 5
+    case 'high_network_io':
+      return 1048576
+    case 'restart_loop':
+    default:
+      return 3
+  }
 }
 
 // ─── Silence Dialog (host-scoped) ─────────────────────────────────────────────
@@ -214,8 +257,9 @@ function AddRuleDialog({
   onOpenChange: (v: boolean) => void
   onSuccess: () => void
 }) {
-  const [conditionType, setConditionType] = useState<'check_status' | 'metric_threshold' | 'cert_expiry'>('check_status')
+  const [conditionType, setConditionType] = useState<'check_status' | 'metric_threshold' | 'cert_expiry' | 'docker_container'>('check_status')
   const [certScope, setCertScope] = useState<'all' | 'specific'>('all')
+  const [dockerRule, setDockerRule] = useState<RuleFormValues['dockerRule']>('restart_loop')
 
   const { data: checks = [] } = useQuery({
     queryKey: ['checks-history', scopeId, hostId],
@@ -228,10 +272,18 @@ function AddRuleDialog({
     enabled: conditionType === 'cert_expiry' && certScope === 'specific',
   })
 
+  const { data: dockerContainersResult } = useQuery({
+    queryKey: ['docker-containers-alert-options', scopeId, hostId],
+    queryFn: () => getHostDockerContainers(scopeId, hostId),
+    enabled: conditionType === 'docker_container',
+  })
+  const dockerContainers = dockerContainersResult?.containers ?? []
+
   const {
     register,
     handleSubmit,
     control,
+    setValue,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<RuleFormValues>({
@@ -242,6 +294,10 @@ function AddRuleDialog({
       checkId: '',
       failureThreshold: 3,
       severity: 'warning',
+      dockerRule: 'restart_loop',
+      dockerWindowMinutes: 10,
+      dockerThreshold: 3,
+      dockerSampleThreshold: 3,
     },
   })
 
@@ -267,6 +323,22 @@ function AddRuleDialog({
           scope,
           ...(scope === 'specific' && values.certificateId ? { certificateId: values.certificateId } : {}),
           daysBeforeExpiry: values.daysBeforeExpiry ?? 30,
+        },
+        severity: values.severity,
+      }
+    } else if (values.conditionType === 'docker_container') {
+      const selectedRule = values.dockerRule ?? 'restart_loop'
+      if (selectedRule === 'container_missing' && !values.dockerContainerId) return
+      input = {
+        hostId,
+        name: values.name,
+        conditionType: 'docker_container',
+        config: {
+          rule: selectedRule,
+          ...(values.dockerContainerId ? { dockerContainerId: values.dockerContainerId } : {}),
+          windowMinutes: values.dockerWindowMinutes ?? 10,
+          threshold: values.dockerThreshold ?? defaultDockerThreshold(selectedRule),
+          sampleThreshold: values.dockerSampleThreshold ?? 3,
         },
         severity: values.severity,
       }
@@ -306,7 +378,7 @@ function AddRuleDialog({
                   value={field.value}
                   onValueChange={(v) => {
                     field.onChange(v)
-                    setConditionType(v as 'check_status' | 'metric_threshold' | 'cert_expiry')
+                    setConditionType(v as 'check_status' | 'metric_threshold' | 'cert_expiry' | 'docker_container')
                   }}
                 >
                   <SelectTrigger>
@@ -316,6 +388,7 @@ function AddRuleDialog({
                     <SelectItem value="check_status">Check failure</SelectItem>
                     <SelectItem value="metric_threshold">Metric threshold</SelectItem>
                     <SelectItem value="cert_expiry">Certificate expiry</SelectItem>
+                    <SelectItem value="docker_container">Docker container</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -486,6 +559,116 @@ function AddRuleDialog({
                   placeholder="e.g. 30"
                   {...register('daysBeforeExpiry', { valueAsNumber: true })}
                 />
+              </div>
+            </>
+          )}
+
+          {/* docker_container fields */}
+          {conditionType === 'docker_container' && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Docker condition</Label>
+                <Controller
+                  name="dockerRule"
+                  control={control}
+                  defaultValue="restart_loop"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? 'restart_loop'}
+                      onValueChange={(v) => {
+                        const nextRule = v as RuleFormValues['dockerRule']
+                        field.onChange(nextRule)
+                        setDockerRule(nextRule)
+                        setValue('dockerThreshold', defaultDockerThreshold(nextRule))
+                        if (nextRule === 'container_missing') {
+                          setValue('dockerSampleThreshold', 1)
+                          setValue('dockerContainerId', '')
+                        } else {
+                          setValue('dockerSampleThreshold', 3)
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="restart_loop">Restart loop</SelectItem>
+                        <SelectItem value="memory_near_limit">Memory near limit</SelectItem>
+                        <SelectItem value="sustained_cpu">Sustained CPU</SelectItem>
+                        <SelectItem value="container_missing">Container missing</SelectItem>
+                        <SelectItem value="high_network_io">High network I/O</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Container</Label>
+                <Controller
+                  name="dockerContainerId"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ? field.value : dockerRule === 'container_missing' ? undefined : 'all'}
+                      onValueChange={(v) => field.onChange(v === 'all' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={dockerRule === 'container_missing' ? 'Select a container…' : 'All containers'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dockerRule !== 'container_missing' && <SelectItem value="all">All containers</SelectItem>}
+                        {dockerContainers.map((c) => (
+                          <SelectItem key={c.dockerContainerId} value={c.dockerContainerId}>
+                            {c.primaryName ?? c.dockerContainerId.slice(0, 12)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="docker-window">Window (minutes)</Label>
+                  <Input
+                    id="docker-window"
+                    type="number"
+                    min={1}
+                    max={1440}
+                    {...register('dockerWindowMinutes', { valueAsNumber: true })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="docker-threshold">
+                    {dockerRule === 'high_network_io'
+                      ? 'Bytes/sec'
+                      : dockerRule === 'container_missing'
+                        ? 'Missing minutes'
+                        : dockerRule === 'restart_loop'
+                          ? 'Restarts'
+                          : 'Threshold (%)'}
+                  </Label>
+                  <Input
+                    id="docker-threshold"
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 90"
+                    {...register('dockerThreshold', { valueAsNumber: true })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="docker-samples">Samples</Label>
+                  <Input
+                    id="docker-samples"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    disabled={dockerRule === 'container_missing'}
+                    {...register('dockerSampleThreshold', { valueAsNumber: true })}
+                  />
+                </div>
               </div>
             </>
           )}

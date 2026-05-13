@@ -75,11 +75,40 @@ const certExpiryConfigSchema = z.object({
   daysBeforeExpiry: z.number().int().min(1).max(365),
 })
 
+const dockerContainerAlertConfigSchema = z.object({
+  rule: z.enum([
+    'restart_loop',
+    'memory_near_limit',
+    'sustained_cpu',
+    'container_missing',
+    'high_network_io',
+  ]),
+  dockerContainerId: z.string().min(1).max(128).optional(),
+  windowMinutes: z.number().int().min(1).max(1440),
+  threshold: z.number().min(0).max(1_000_000_000_000),
+  sampleThreshold: z.number().int().min(1).max(1000).optional(),
+}).superRefine((value, ctx) => {
+  if (value.rule === 'container_missing' && !value.dockerContainerId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dockerContainerId'],
+      message: 'Select a container for missing-container alerts',
+    })
+  }
+  if ((value.rule === 'memory_near_limit' || value.rule === 'sustained_cpu') && value.threshold > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['threshold'],
+      message: 'Percentage thresholds cannot exceed 100',
+    })
+  }
+})
+
 const createAlertRuleSchema = z.object({
   hostId: z.string().min(1).nullable().optional(),
   name: z.string().min(1).max(100),
-  conditionType: z.enum(['check_status', 'metric_threshold', 'cert_expiry']),
-  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema]),
+  conditionType: z.enum(['check_status', 'metric_threshold', 'cert_expiry', 'docker_container']),
+  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema, dockerContainerAlertConfigSchema]),
   severity: z.enum(['info', 'warning', 'critical']).default('warning'),
 })
 
@@ -87,7 +116,7 @@ const updateAlertRuleSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
   severity: z.enum(['info', 'warning', 'critical']).optional(),
-  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema]).optional(),
+  config: z.union([checkStatusConfigSchema, metricThresholdConfigSchema, certExpiryConfigSchema, dockerContainerAlertConfigSchema]).optional(),
 })
 
 const httpsUrl = z

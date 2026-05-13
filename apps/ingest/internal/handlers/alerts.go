@@ -3,10 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/carrtech-dev/ct-ops/ingest/internal/db/queries"
@@ -30,6 +33,15 @@ type metricThresholdConfig struct {
 	Metric    string  `json:"metric"`    // "cpu" | "memory" | "disk"
 	Operator  string  `json:"operator"`  // "gt" | "lt"
 	Threshold float64 `json:"threshold"` // 0–100
+}
+
+// dockerContainerAlertConfig is the JSONB config for docker_container alert rules.
+type dockerContainerAlertConfig struct {
+	Rule              string  `json:"rule"`
+	DockerContainerID string  `json:"dockerContainerId,omitempty"`
+	WindowMinutes     int     `json:"windowMinutes"`
+	Threshold         float64 `json:"threshold"`
+	SampleThreshold   int     `json:"sampleThreshold,omitempty"`
 }
 
 // webhookChannelConfig matches the JSONB stored in notification_channels.config for webhook channels.
@@ -111,6 +123,324 @@ func evaluateAlerts(
 			evaluateMetricThresholdRule(ctx, pool, rule, hostID, hostname, metrics, channels)
 		}
 	}
+}
+
+func evaluateDockerContainerAlerts(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	instanceID, hostID, hostname string,
+	now time.Time,
+) {
+	silenced, err := queries.IsHostSilenced(ctx, pool, instanceID, hostID)
+	if err != nil {
+		slog.Warn("evaluateDockerContainerAlerts: checking silence", "host_id", hostID, "err", err)
+	} else if silenced {
+		return
+	}
+
+	rules, err := queries.GetAlertRulesForHost(ctx, pool, instanceID, hostID)
+	if err != nil {
+		slog.Warn("evaluateDockerContainerAlerts: fetching rules", "host_id", hostID, "err", err)
+		return
+	}
+
+	webhooks, _ := queries.GetEnabledWebhookChannels(ctx, pool, instanceID)
+	smtpChs, _ := queries.GetEnabledSmtpChannels(ctx, pool, instanceID)
+	slackChs, _ := queries.GetEnabledSlackChannels(ctx, pool, instanceID)
+	telegramChs, _ := queries.GetEnabledTelegramChannels(ctx, pool, instanceID)
+	channels := notifChannels{webhooks: webhooks, smtp: smtpChs, slack: slackChs, telegram: telegramChs}
+
+	for _, rule := range rules {
+		if rule.ConditionType != "docker_container" {
+			continue
+		}
+		evaluateDockerContainerAlertRule(ctx, pool, rule, hostID, hostname, now, channels)
+	}
+}
+
+func evaluateDockerContainerAlertRule(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	rule queries.AlertRuleRow,
+	hostID, hostname string,
+	now time.Time,
+	channels notifChannels,
+) {
+	var cfg dockerContainerAlertConfig
+	if err := json.Unmarshal([]byte(rule.ConfigJSON), &cfg); err != nil {
+		slog.Warn("evaluateDockerContainerAlerts: unmarshal config", "rule_id", rule.ID, "err", err)
+		return
+	}
+	normaliseDockerContainerAlertConfig(&cfg)
+
+	conditionMet, detail, err := dockerContainerAlertCondition(ctx, pool, rule.InstanceID, hostID, cfg, now)
+	if err != nil {
+		slog.Warn("evaluateDockerContainerAlerts: evaluating rule", "rule_id", rule.ID, "err", err)
+		return
+	}
+
+	existing, err := queries.GetActiveAlertInstance(ctx, pool, rule.ID, hostID)
+	if err != nil {
+		slog.Warn("evaluateDockerContainerAlerts: checking active instance", "rule_id", rule.ID, "err", err)
+		return
+	}
+
+	if conditionMet && existing == nil {
+		message := fmt.Sprintf("%s on host %s", detail, hostname)
+		id, err := queries.InsertAlertInstance(ctx, pool, rule.ID, hostID, rule.InstanceID, rule.Severity, message, now)
+		if err != nil {
+			slog.Warn("evaluateDockerContainerAlerts: inserting alert instance", "rule_id", rule.ID, "err", err)
+			return
+		}
+		ev := AlertEvent{
+			Event:     "alert.fired",
+			Severity:  rule.Severity,
+			Host:      hostname,
+			Rule:      rule.Name,
+			Message:   message,
+			Timestamp: now.UTC().Format(time.RFC3339),
+		}
+		dispatchWebhooks(ctx, channels.webhooks, ev)
+		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, rule.InstanceID, id, "host", hostID, ev)
+		return
+	}
+
+	if !conditionMet && existing != nil {
+		if err := queries.ResolveAlertInstance(ctx, pool, existing.ID, now); err != nil {
+			slog.Warn("evaluateDockerContainerAlerts: resolving alert instance", "instance_id", existing.ID, "err", err)
+			return
+		}
+		ev := AlertEvent{
+			Event:     "alert.resolved",
+			Severity:  rule.Severity,
+			Host:      hostname,
+			Rule:      rule.Name,
+			Message:   fmt.Sprintf("Docker container condition recovered on host %s", hostname),
+			Timestamp: now.UTC().Format(time.RFC3339),
+		}
+		dispatchWebhooks(ctx, channels.webhooks, ev)
+		dispatchSmtp(channels.smtp, ev)
+		dispatchSlack(ctx, channels.slack, ev)
+		dispatchTelegram(ctx, channels.telegram, ev)
+		dispatchInApp(ctx, pool, rule.InstanceID, existing.ID, "host", hostID, ev)
+	}
+}
+
+func normaliseDockerContainerAlertConfig(cfg *dockerContainerAlertConfig) {
+	if cfg.WindowMinutes < 1 {
+		cfg.WindowMinutes = 10
+	}
+	if cfg.WindowMinutes > 1440 {
+		cfg.WindowMinutes = 1440
+	}
+	if cfg.SampleThreshold < 1 {
+		cfg.SampleThreshold = 3
+	}
+	if cfg.SampleThreshold > 1000 {
+		cfg.SampleThreshold = 1000
+	}
+	cfg.DockerContainerID = strings.TrimSpace(cfg.DockerContainerID)
+	switch cfg.Rule {
+	case "memory_near_limit", "sustained_cpu":
+		if cfg.Threshold <= 0 || cfg.Threshold > 100 {
+			cfg.Threshold = 90
+		}
+	case "high_network_io":
+		if cfg.Threshold <= 0 {
+			cfg.Threshold = 1024 * 1024
+		}
+		if cfg.Threshold > 1_000_000_000_000 {
+			cfg.Threshold = 1_000_000_000_000
+		}
+	case "container_missing":
+		if cfg.Threshold <= 0 {
+			cfg.Threshold = 5
+		}
+		if cfg.Threshold > 1440 {
+			cfg.Threshold = 1440
+		}
+	default:
+		cfg.Rule = "restart_loop"
+		if cfg.Threshold <= 0 {
+			cfg.Threshold = 3
+		}
+		if cfg.Threshold > 1000 {
+			cfg.Threshold = 1000
+		}
+	}
+}
+
+func dockerContainerAlertCondition(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	instanceID, hostID string,
+	cfg dockerContainerAlertConfig,
+	now time.Time,
+) (bool, string, error) {
+	windowStart := now.Add(-time.Duration(cfg.WindowMinutes) * time.Minute)
+	switch cfg.Rule {
+	case "restart_loop":
+		return dockerRestartLoopAlertCondition(ctx, pool, instanceID, hostID, cfg, windowStart)
+	case "memory_near_limit":
+		return dockerMetricSampleAlertCondition(ctx, pool, instanceID, hostID, cfg, windowStart, "memory_percent", "memory")
+	case "sustained_cpu":
+		return dockerSustainedCPUAlertCondition(ctx, pool, instanceID, hostID, cfg, windowStart)
+	case "container_missing":
+		return dockerContainerMissingAlertCondition(ctx, pool, instanceID, hostID, cfg, now)
+	case "high_network_io":
+		return dockerNetworkIOAlertCondition(ctx, pool, instanceID, hostID, cfg, windowStart)
+	default:
+		return false, "", nil
+	}
+}
+
+func dockerRestartLoopAlertCondition(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string, cfg dockerContainerAlertConfig, windowStart time.Time) (bool, string, error) {
+	const q = `
+		SELECT COALESCE(e.primary_name, e.docker_container_id), COUNT(*)::int
+		FROM docker_container_lifecycle_events e
+		WHERE e.instance_id = $1
+		  AND e.host_id = $2
+		  AND e.event_type = 'restarted'
+		  AND e.occurred_at >= $3
+		  AND ($4 = '' OR e.docker_container_id = $4)
+		GROUP BY e.docker_container_id, e.primary_name
+		HAVING COUNT(*) >= $5
+		ORDER BY COUNT(*) DESC, COALESCE(e.primary_name, e.docker_container_id) ASC
+		LIMIT 1
+	`
+	var name string
+	var restarts int
+	err := pool.QueryRow(ctx, q, instanceID, hostID, windowStart, cfg.DockerContainerID, int(cfg.Threshold)).Scan(&name, &restarts)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+	return true, fmt.Sprintf("Container %s restarted %d times in %d minutes", name, restarts, cfg.WindowMinutes), nil
+}
+
+func dockerMetricSampleAlertCondition(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string, cfg dockerContainerAlertConfig, windowStart time.Time, column string, label string) (bool, string, error) {
+	q := fmt.Sprintf(`
+		SELECT COALESCE(dc.primary_name, dc.docker_container_id), COUNT(*) FILTER (WHERE m.%[1]s >= $5)::int, MAX(m.%[1]s)::double precision
+		FROM docker_container_metrics m
+		INNER JOIN docker_containers dc ON dc.id = m.docker_container_row_id
+		WHERE m.instance_id = $1
+		  AND m.host_id = $2
+		  AND m.recorded_at >= $3
+		  AND ($4 = '' OR m.docker_container_id = $4)
+		GROUP BY dc.docker_container_id, dc.primary_name
+		HAVING COUNT(*) FILTER (WHERE m.%[1]s >= $5) >= $6
+		ORDER BY MAX(m.%[1]s) DESC NULLS LAST
+		LIMIT 1
+	`, column)
+	var name string
+	var samples int
+	var maxValue float64
+	err := pool.QueryRow(ctx, q, instanceID, hostID, windowStart, cfg.DockerContainerID, cfg.Threshold, cfg.SampleThreshold).Scan(&name, &samples, &maxValue)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+	return true, fmt.Sprintf("Container %s %s reached %.1f%% across %d samples", name, label, maxValue, samples), nil
+}
+
+func dockerSustainedCPUAlertCondition(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string, cfg dockerContainerAlertConfig, windowStart time.Time) (bool, string, error) {
+	const q = `
+		SELECT COALESCE(dc.primary_name, dc.docker_container_id), COUNT(*)::int, AVG(m.cpu_percent)::double precision
+		FROM docker_container_metrics m
+		INNER JOIN docker_containers dc ON dc.id = m.docker_container_row_id
+		WHERE m.instance_id = $1
+		  AND m.host_id = $2
+		  AND m.recorded_at >= $3
+		  AND ($4 = '' OR m.docker_container_id = $4)
+		GROUP BY dc.docker_container_id, dc.primary_name
+		HAVING COUNT(*) >= $6 AND AVG(m.cpu_percent) >= $5
+		ORDER BY AVG(m.cpu_percent) DESC NULLS LAST
+		LIMIT 1
+	`
+	var name string
+	var samples int
+	var avgCPU float64
+	err := pool.QueryRow(ctx, q, instanceID, hostID, windowStart, cfg.DockerContainerID, cfg.Threshold, cfg.SampleThreshold).Scan(&name, &samples, &avgCPU)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+	return true, fmt.Sprintf("Container %s averaged %.1f%% CPU across %d samples", name, avgCPU, samples), nil
+}
+
+func dockerContainerMissingAlertCondition(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string, cfg dockerContainerAlertConfig, now time.Time) (bool, string, error) {
+	if cfg.DockerContainerID == "" {
+		return false, "", nil
+	}
+	const q = `
+		SELECT COALESCE(primary_name, docker_container_id), last_seen_at
+		FROM docker_containers
+		WHERE instance_id = $1
+		  AND host_id = $2
+		  AND docker_container_id = $3
+		  AND is_present = false
+		  AND last_seen_at <= $4
+		LIMIT 1
+	`
+	missingSince := now.Add(-time.Duration(cfg.Threshold) * time.Minute)
+	var name string
+	var lastSeen time.Time
+	err := pool.QueryRow(ctx, q, instanceID, hostID, cfg.DockerContainerID, missingSince).Scan(&name, &lastSeen)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+	return true, fmt.Sprintf("Container %s has been missing since %s", name, lastSeen.UTC().Format(time.RFC3339)), nil
+}
+
+func dockerNetworkIOAlertCondition(ctx context.Context, pool *pgxpool.Pool, instanceID, hostID string, cfg dockerContainerAlertConfig, windowStart time.Time) (bool, string, error) {
+	const q = `
+		WITH per_container AS (
+			SELECT
+				dc.docker_container_id,
+				COALESCE(dc.primary_name, dc.docker_container_id) AS name,
+				COUNT(*)::int AS samples,
+				EXTRACT(EPOCH FROM MAX(m.recorded_at) - MIN(m.recorded_at))::double precision AS seconds,
+				(MAX(COALESCE(m.network_rx_bytes, 0) + COALESCE(m.network_tx_bytes, 0)) -
+				 MIN(COALESCE(m.network_rx_bytes, 0) + COALESCE(m.network_tx_bytes, 0)))::double precision AS bytes_delta
+			FROM docker_container_metrics m
+			INNER JOIN docker_containers dc ON dc.id = m.docker_container_row_id
+			WHERE m.instance_id = $1
+			  AND m.host_id = $2
+			  AND m.recorded_at >= $3
+			  AND ($4 = '' OR m.docker_container_id = $4)
+			GROUP BY dc.docker_container_id, dc.primary_name
+		)
+		SELECT name, samples, bytes_delta / NULLIF(seconds, 0) AS bytes_per_second
+		FROM per_container
+		WHERE samples >= $6
+		  AND seconds > 0
+		  AND bytes_delta / NULLIF(seconds, 0) >= $5
+		ORDER BY bytes_per_second DESC NULLS LAST
+		LIMIT 1
+	`
+	var name string
+	var samples int
+	var bytesPerSecond float64
+	err := pool.QueryRow(ctx, q, instanceID, hostID, windowStart, cfg.DockerContainerID, cfg.Threshold, max(2, cfg.SampleThreshold)).Scan(&name, &samples, &bytesPerSecond)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+	return true, fmt.Sprintf("Container %s averaged %.0f B/s network I/O across %d samples", name, bytesPerSecond, samples), nil
 }
 
 func evaluateCheckStatusRule(

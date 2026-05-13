@@ -34,6 +34,10 @@ test('parseHostMetadata strips unknown fields and falls back on malformed values
         extra: true,
       },
     },
+    dockerSettings: {
+      retentionDaysOverride: 45,
+      extra: true,
+    },
     injected: { admin: true },
   })
 
@@ -58,7 +62,22 @@ test('parseHostMetadata strips unknown fields and falls back on malformed values
       selectedUsernames: ['alice'],
     },
   })
+  assert.deepEqual(parsed.dockerSettings, {
+    retentionDaysOverride: 45,
+  })
   assert.equal('injected' in parsed, false)
+})
+
+test('parseHostMetadata preserves a cleared Docker retention override', () => {
+  const parsed = parseHostMetadata({
+    dockerSettings: {
+      retentionDaysOverride: null,
+    },
+  })
+
+  assert.deepEqual(parsed.dockerSettings, {
+    retentionDaysOverride: null,
+  })
 })
 
 test('parseInstanceMetadata preserves valid settings and drops malformed nested metadata', () => {

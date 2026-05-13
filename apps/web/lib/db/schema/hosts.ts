@@ -37,6 +37,10 @@ export interface SshHostKeyMetadata {
   fingerprintSha256: string
 }
 
+export interface HostDockerSettings {
+  retentionDaysOverride?: number | null
+}
+
 export const DEFAULT_COLLECTION_SETTINGS: HostCollectionSettings = {
   cpu: true,
   memory: true,
@@ -64,6 +68,10 @@ const networkInterfaceSchema = z.object({
 const tagPairSchema = z.object({
   key: z.string(),
   value: z.string(),
+}).strip()
+
+const hostDockerSettingsSchema = z.object({
+  retentionDaysOverride: z.number().int().min(1).max(365).nullable().optional().catch(undefined),
 }).strip()
 
 export const hostCollectionSettingsSchema = z.object({
@@ -96,6 +104,7 @@ export const hostMetadataSchema = z.object({
   sshHostKeyChangedAt: z.string().optional().catch(undefined),
   lastSoftwareScanAt: z.string().optional().catch(undefined),
   pendingTags: z.array(tagPairSchema).catch([]).optional(),
+  dockerSettings: hostDockerSettingsSchema.optional().catch(undefined),
 }).strip()
 
 const defaultHostMetadata: HostMetadata = {
@@ -129,6 +138,7 @@ export interface HostMetadata {
   sshHostKeyStatus?: 'changed'
   sshHostKeyChangedAt?: string
   lastSoftwareScanAt?: string    // ISO timestamp; avoid Date in JSONB (use .toISOString())
+  dockerSettings?: HostDockerSettings
   // Tags supplied via the agent CLI --tag flag / token metadata at register
   // time. Stashed here until approveAgent merges them with org defaults and
   // writes canonical rows into resource_tags.

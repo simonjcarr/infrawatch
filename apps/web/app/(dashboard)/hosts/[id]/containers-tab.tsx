@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ import {
 } from '@/components/ui/table'
 import {
   getHostDockerContainerMetrics,
+  getHostDockerContainerMetricSparklines,
   getHostDockerContainerLifecycleEvents,
   getHostDockerContainers,
   getHostDockerTopContainers,
@@ -302,11 +304,52 @@ function ContainerMetricChart({
   )
 }
 
+function ContainerSparkline({ points, containerId }: { points: Array<{ recordedAt: Date; cpuMax: number | null }> | undefined; containerId: string }) {
+  const values = points?.map((point) => point.cpuMax).filter((value): value is number => typeof value === 'number') ?? []
+  const width = 96
+  const height = 28
+
+  if (values.length === 0) {
+    return (
+      <svg
+        role="img"
+        aria-label="No CPU trend data"
+        data-testid={`host-docker-container-sparkline-${containerId}`}
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-7 w-24 text-muted-foreground"
+      >
+        <line x1="2" y1={height / 2} x2={width - 2} y2={height / 2} stroke="currentColor" strokeDasharray="3 3" strokeWidth="1.5" />
+      </svg>
+    )
+  }
+
+  const max = Math.max(...values, 1)
+  const path = values.map((value, index) => {
+    const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * (width - 4) + 2
+    const y = height - 3 - (value / max) * (height - 6)
+    return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
+  }).join(' ')
+
+  return (
+    <svg
+      role="img"
+      aria-label="CPU trend"
+      data-testid={`host-docker-container-sparkline-${containerId}`}
+      viewBox={`0 0 ${width} ${height}`}
+      className="h-7 w-24 text-blue-600"
+    >
+      <path d={path} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    </svg>
+  )
+}
+
 export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
+  const [activeSubTab, setActiveSubTab] = useState('overview')
   const [search, setSearch] = useState('')
   const [state, setState] = useState('all')
   const [image, setImage] = useState('all')
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
+  const [selectedLifecycleContainerId, setSelectedLifecycleContainerId] = useState('none')
   const [metricsRange, setMetricsRange] = useState<DockerContainerMetricsPreset>('1h')
   const [topRange, setTopRange] = useState<DockerContainerMetricsPreset>('1h')
   const [topMetric, setTopMetric] = useState<DockerTopContainerMetric>('cpu')
@@ -321,6 +364,7 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
   })
 
   const containers = useMemo(() => data?.containers ?? [], [data?.containers])
+  const containerIds = useMemo(() => containers.map((container) => container.dockerContainerId), [containers])
   const imageOptions = data?.imageOptions ?? []
   const defaultMetricsContainer = containers.find((container) => container.isPresent && container.state === 'running')
     ?? containers.find((container) => container.isPresent)
@@ -328,6 +372,9 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
     ?? null
   const selectedContainer = containers.find((container) => container.dockerContainerId === selectedContainerId) ?? defaultMetricsContainer
   const effectiveSelectedContainerId = selectedContainer?.dockerContainerId ?? null
+  const selectedLifecycleContainer = selectedLifecycleContainerId === 'none'
+    ? null
+    : containers.find((container) => container.dockerContainerId === selectedLifecycleContainerId) ?? null
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['host-docker-container-metrics', scopeId, hostId, effectiveSelectedContainerId, metricsRange],
     queryFn: () => getHostDockerContainerMetrics(scopeId, hostId, effectiveSelectedContainerId!, { range: metricsRange }),
@@ -343,12 +390,18 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
     enabled: !dockerUnavailable,
   })
   const { data: lifecycleData, isLoading: lifecycleLoading } = useQuery({
-    queryKey: ['host-docker-container-lifecycle-events', scopeId, hostId],
-    queryFn: () => getHostDockerContainerLifecycleEvents(scopeId, hostId),
-    enabled: !dockerUnavailable,
+    queryKey: ['host-docker-container-lifecycle-events', scopeId, hostId, selectedLifecycleContainerId],
+    queryFn: () => getHostDockerContainerLifecycleEvents(scopeId, hostId, selectedLifecycleContainerId),
+    enabled: !dockerUnavailable && selectedLifecycleContainerId !== 'none',
+  })
+  const { data: sparklineData } = useQuery({
+    queryKey: ['host-docker-container-metric-sparklines', scopeId, hostId, containerIds],
+    queryFn: () => getHostDockerContainerMetricSparklines(scopeId, hostId, containerIds),
+    enabled: !dockerUnavailable && containerIds.length > 0,
   })
   const topContainers = topContainersData?.containers ?? []
   const lifecycleEvents = lifecycleData?.events ?? []
+  const sparklines = sparklineData?.sparklines ?? {}
   const metricPoints = useMemo(() => metricsData?.points ?? [], [metricsData?.points])
   const chartData = useMemo(() => metricPoints.map((point) => ({
     time: new Date(point.recordedAt).getTime(),
@@ -434,14 +487,26 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
         </div>
       </div>
 
-      <Card data-testid="host-docker-top-containers">
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="size-4 text-muted-foreground" />
-              Top containers
-            </CardTitle>
-            <div className="flex flex-wrap items-center gap-2">
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="gap-4">
+        <TabsList data-testid="host-docker-containers-subtabs">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <Card data-testid="host-docker-top-containers">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="size-4 text-muted-foreground" />
+                    Top containers
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Ranks containers by their highest or P95 resource use over the selected range.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
               <Select value={topMetric} onValueChange={(value) => setTopMetric(value as DockerTopContainerMetric)}>
                 <SelectTrigger className="w-36" data-testid="host-docker-top-metric-select">
                   <SelectValue />
@@ -478,10 +543,10 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
           {topContainersLoading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
@@ -535,26 +600,235 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      <Card data-testid="host-docker-container-lifecycle">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <History className="size-4 text-muted-foreground" />
-            Lifecycle timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {lifecycleLoading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
-              Loading lifecycle events...
-            </div>
-          ) : lifecycleEvents.length === 0 ? (
-            <EmptyState title="No lifecycle events" body="Starts, stops, restarts and disappeared containers will appear after new inventory changes are reported." icon={History} />
-          ) : (
-            <Table>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Box className="size-4 text-muted-foreground" />
+                Container Inventory
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
+                  Loading containers...
+                </div>
+              ) : containers.length === 0 ? (
+                hasActiveFilters ? (
+                  <EmptyState title="No containers match your filters" body="Clear the current filters to see all known Docker containers for this host." />
+                ) : (
+                  <EmptyState title="No containers reported" body="Docker is installed, but no current or recently seen containers have been reported yet." />
+                )
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Image</TableHead>
+                      <TableHead>State</TableHead>
+                      <TableHead>CPU trend</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last seen</TableHead>
+                      <TableHead>Started</TableHead>
+                      <TableHead className="text-right">Restarts</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {containers.map((container) => (
+                      <TableRow
+                        key={container.id}
+                        data-testid={`host-docker-container-row-${container.dockerContainerId}`}
+                        className={container.dockerContainerId === effectiveSelectedContainerId ? 'bg-muted/50' : 'cursor-pointer'}
+                        onClick={() => setSelectedContainerId(container.dockerContainerId)}
+                      >
+                        <TableCell>
+                          <div className="font-medium text-foreground">
+                            {container.primaryName || container.namesJson[0] || container.dockerContainerId.slice(0, 12)}
+                          </div>
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {container.dockerContainerId.slice(0, 12)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[260px] truncate text-sm">
+                          {container.image || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <ContainerStateBadge state={container.state} present={container.isPresent} />
+                        </TableCell>
+                        <TableCell>
+                          <ContainerSparkline points={sparklines[container.dockerContainerId]} containerId={container.dockerContainerId} />
+                        </TableCell>
+                        <TableCell className="max-w-[280px] truncate text-sm text-muted-foreground">
+                          {container.status || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">{formatRelative(container.lastSeenAt)}</TableCell>
+                        <TableCell className="text-sm">{formatAbsolute(container.startedAtSource)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {container.restartCount ?? '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {selectedContainer && (
+            <Card data-testid="host-docker-container-metrics">
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="size-4 text-muted-foreground" />
+                    Container Metrics
+                  </CardTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select value={effectiveSelectedContainerId ?? undefined} onValueChange={setSelectedContainerId}>
+                      <SelectTrigger className="w-56" data-testid="host-docker-metrics-container-select">
+                        <SelectValue placeholder="Select container" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {containers.map((container) => (
+                          <SelectItem key={container.dockerContainerId} value={container.dockerContainerId}>
+                            {container.primaryName || container.dockerContainerId.slice(0, 12)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {metricRangeOptions.map((option) => (
+                        <Button
+                          key={option.value}
+                          type="button"
+                          variant={metricsRange === option.value ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setMetricsRange(option.value)}
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {metricsLoading ? (
+                  <div className="py-12 text-center text-sm text-muted-foreground">
+                    <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
+                    Loading container metrics...
+                  </div>
+                ) : metricPoints.length === 0 ? (
+                  <EmptyState title="No metrics reported" body="Metric charts will appear after the agent uploads container samples for this container." icon={Activity} />
+                ) : (
+                  <div className="space-y-5">
+                    <div className="text-sm font-medium text-foreground">
+                      {selectedContainer.primaryName || selectedContainer.dockerContainerId.slice(0, 12)}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                      <MetricSummary label="CPU max" value={formatPercent(latestMax(metricPoints, 'cpuMax'))} />
+                      <MetricSummary label="Memory max" value={formatPercent(latestMax(metricPoints, 'memoryMax'))} />
+                      <MetricSummary label="Network RX max" value={formatBytes(latestMax(metricPoints, 'networkRxMax'))} />
+                      <MetricSummary label="Block read max" value={formatBytes(latestMax(metricPoints, 'blockReadMax'))} />
+                      <MetricSummary label="PIDs max" value={formatNumber(latestMax(metricPoints, 'pidsMax'))} />
+                    </div>
+                    <div className="grid gap-6 xl:grid-cols-2">
+                      <ContainerMetricChart
+                        title="CPU avg/max"
+                        data={chartData}
+                        yFormatter={(value) => `${value.toFixed(0)}%`}
+                        lines={[
+                          { key: 'cpuAvg', name: 'CPU avg', color: 'hsl(221, 83%, 53%)' },
+                          { key: 'cpuMax', name: 'CPU max', color: 'hsl(0, 84%, 60%)' },
+                        ]}
+                      />
+                      <ContainerMetricChart
+                        title="Memory avg/max"
+                        data={chartData}
+                        yFormatter={(value) => `${value.toFixed(0)}%`}
+                        lines={[
+                          { key: 'memoryAvg', name: 'Memory avg', color: 'hsl(142, 71%, 45%)' },
+                          { key: 'memoryMax', name: 'Memory max', color: 'hsl(38, 92%, 50%)' },
+                        ]}
+                      />
+                      <ContainerMetricChart
+                        title="Network I/O"
+                        data={chartData}
+                        yFormatter={formatBytes}
+                        lines={[
+                          { key: 'networkRxAvg', name: 'RX avg', color: 'hsl(221, 83%, 53%)' },
+                          { key: 'networkRxMax', name: 'RX max', color: 'hsl(0, 84%, 60%)' },
+                          { key: 'networkTxAvg', name: 'TX avg', color: 'hsl(142, 71%, 45%)' },
+                          { key: 'networkTxMax', name: 'TX max', color: 'hsl(38, 92%, 50%)' },
+                        ]}
+                      />
+                      <ContainerMetricChart
+                        title="Block I/O"
+                        data={chartData}
+                        yFormatter={formatBytes}
+                        lines={[
+                          { key: 'blockReadAvg', name: 'Read avg', color: 'hsl(221, 83%, 53%)' },
+                          { key: 'blockReadMax', name: 'Read max', color: 'hsl(0, 84%, 60%)' },
+                          { key: 'blockWriteAvg', name: 'Write avg', color: 'hsl(142, 71%, 45%)' },
+                          { key: 'blockWriteMax', name: 'Write max', color: 'hsl(38, 92%, 50%)' },
+                        ]}
+                      />
+                      <ContainerMetricChart
+                        title="PIDs"
+                        data={chartData}
+                        yFormatter={(value) => Math.round(value).toLocaleString()}
+                        lines={[
+                          { key: 'pidsAvg', name: 'PIDs avg', color: 'hsl(221, 83%, 53%)' },
+                          { key: 'pidsMax', name: 'PIDs max', color: 'hsl(0, 84%, 60%)' },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lifecycle">
+          <Card data-testid="host-docker-container-lifecycle">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="size-4 text-muted-foreground" />
+                  Lifecycle timeline
+                </CardTitle>
+                <Select value={selectedLifecycleContainerId} onValueChange={setSelectedLifecycleContainerId}>
+                  <SelectTrigger className="w-56" data-testid="host-docker-lifecycle-container-select">
+                    <SelectValue placeholder="Select container" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" disabled>
+                      Select container
+                    </SelectItem>
+                    {containers.map((container) => (
+                      <SelectItem key={container.dockerContainerId} value={container.dockerContainerId}>
+                        {container.primaryName || container.dockerContainerId.slice(0, 12)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!selectedLifecycleContainer ? (
+                <EmptyState title="Select a container" body="Choose one container to view its start, stop, restart and disappearance events." icon={History} />
+              ) : lifecycleLoading ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
+                  Loading lifecycle events...
+                </div>
+              ) : lifecycleEvents.length === 0 ? (
+                <EmptyState title="No lifecycle events" body="Starts, stops, restarts and disappeared containers will appear after new inventory changes are reported for this container." icon={History} />
+              ) : (
+                <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Event</TableHead>
@@ -600,179 +874,11 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Box className="size-4 text-muted-foreground" />
-            Container Inventory
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
-              Loading containers...
-            </div>
-          ) : containers.length === 0 ? (
-            hasActiveFilters ? (
-              <EmptyState title="No containers match your filters" body="Clear the current filters to see all known Docker containers for this host." />
-            ) : (
-              <EmptyState title="No containers reported" body="Docker is installed, but no current or recently seen containers have been reported yet." />
-            )
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Image</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last seen</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead className="text-right">Restarts</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {containers.map((container) => (
-                  <TableRow
-                    key={container.id}
-                    data-testid={`host-docker-container-row-${container.dockerContainerId}`}
-                    className={container.dockerContainerId === effectiveSelectedContainerId ? 'bg-muted/50' : 'cursor-pointer'}
-                    onClick={() => setSelectedContainerId(container.dockerContainerId)}
-                  >
-                    <TableCell>
-                      <div className="font-medium text-foreground">
-                        {container.primaryName || container.namesJson[0] || container.dockerContainerId.slice(0, 12)}
-                      </div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {container.dockerContainerId.slice(0, 12)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[260px] truncate text-sm">
-                      {container.image || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <ContainerStateBadge state={container.state} present={container.isPresent} />
-                    </TableCell>
-                    <TableCell className="max-w-[280px] truncate text-sm text-muted-foreground">
-                      {container.status || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">{formatRelative(container.lastSeenAt)}</TableCell>
-                    <TableCell className="text-sm">{formatAbsolute(container.startedAtSource)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {container.restartCount ?? '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {selectedContainer && (
-        <Card data-testid="host-docker-container-metrics">
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Activity className="size-4 text-muted-foreground" />
-                Container Metrics
-                <span className="font-mono text-xs font-normal text-muted-foreground">
-                  {selectedContainer.primaryName || selectedContainer.dockerContainerId.slice(0, 12)}
-                </span>
-              </CardTitle>
-              <div className="flex flex-wrap items-center gap-1">
-                {metricRangeOptions.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={metricsRange === option.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setMetricsRange(option.value)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {metricsLoading ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">
-                <Loader2 className="size-5 mx-auto mb-2 animate-spin" />
-                Loading container metrics...
-              </div>
-            ) : metricPoints.length === 0 ? (
-              <EmptyState title="No metrics reported" body="Metric charts will appear after the agent uploads container samples for this container." icon={Activity} />
-            ) : (
-              <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                  <MetricSummary label="CPU max" value={formatPercent(latestMax(metricPoints, 'cpuMax'))} />
-                  <MetricSummary label="Memory max" value={formatPercent(latestMax(metricPoints, 'memoryMax'))} />
-                  <MetricSummary label="Network RX max" value={formatBytes(latestMax(metricPoints, 'networkRxMax'))} />
-                  <MetricSummary label="Block read max" value={formatBytes(latestMax(metricPoints, 'blockReadMax'))} />
-                  <MetricSummary label="PIDs max" value={formatNumber(latestMax(metricPoints, 'pidsMax'))} />
-                </div>
-                <div className="grid gap-6 xl:grid-cols-2">
-                  <ContainerMetricChart
-                    title="CPU avg/max"
-                    data={chartData}
-                    yFormatter={(value) => `${value.toFixed(0)}%`}
-                    lines={[
-                      { key: 'cpuAvg', name: 'CPU avg', color: 'hsl(221, 83%, 53%)' },
-                      { key: 'cpuMax', name: 'CPU max', color: 'hsl(0, 84%, 60%)' },
-                    ]}
-                  />
-                  <ContainerMetricChart
-                    title="Memory avg/max"
-                    data={chartData}
-                    yFormatter={(value) => `${value.toFixed(0)}%`}
-                    lines={[
-                      { key: 'memoryAvg', name: 'Memory avg', color: 'hsl(142, 71%, 45%)' },
-                      { key: 'memoryMax', name: 'Memory max', color: 'hsl(38, 92%, 50%)' },
-                    ]}
-                  />
-                  <ContainerMetricChart
-                    title="Network I/O"
-                    data={chartData}
-                    yFormatter={formatBytes}
-                    lines={[
-                      { key: 'networkRxAvg', name: 'RX avg', color: 'hsl(221, 83%, 53%)' },
-                      { key: 'networkRxMax', name: 'RX max', color: 'hsl(0, 84%, 60%)' },
-                      { key: 'networkTxAvg', name: 'TX avg', color: 'hsl(142, 71%, 45%)' },
-                      { key: 'networkTxMax', name: 'TX max', color: 'hsl(38, 92%, 50%)' },
-                    ]}
-                  />
-                  <ContainerMetricChart
-                    title="Block I/O"
-                    data={chartData}
-                    yFormatter={formatBytes}
-                    lines={[
-                      { key: 'blockReadAvg', name: 'Read avg', color: 'hsl(221, 83%, 53%)' },
-                      { key: 'blockReadMax', name: 'Read max', color: 'hsl(0, 84%, 60%)' },
-                      { key: 'blockWriteAvg', name: 'Write avg', color: 'hsl(142, 71%, 45%)' },
-                      { key: 'blockWriteMax', name: 'Write max', color: 'hsl(38, 92%, 50%)' },
-                    ]}
-                  />
-                  <ContainerMetricChart
-                    title="PIDs"
-                    data={chartData}
-                    yFormatter={(value) => Math.round(value).toLocaleString()}
-                    lines={[
-                      { key: 'pidsAvg', name: 'PIDs avg', color: 'hsl(221, 83%, 53%)' },
-                      { key: 'pidsMax', name: 'PIDs max', color: 'hsl(0, 84%, 60%)' },
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

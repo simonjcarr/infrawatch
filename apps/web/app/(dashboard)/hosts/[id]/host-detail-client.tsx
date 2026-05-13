@@ -67,6 +67,7 @@ import { LocalUsersTab } from './local-users-tab'
 import { TasksTab } from './tasks-tab'
 import { LogsTab } from './logs-tab'
 import { InventoryTab } from './inventory-tab'
+import { ContainersTab } from './containers-tab'
 import { PatchStatusTab } from './patch-status-tab'
 import { VulnerabilitiesTab } from './vulnerabilities-tab'
 import { HostTerminalLauncher } from './host-terminal-launcher'
@@ -1401,6 +1402,11 @@ export function HostDetailClient({
       {/* Inventory Tab */}
       {activeTab === 'packages' && (
         <InventoryTab scopeId={scopeId} hostId={initialHost.id} />
+      )}
+
+      {/* Containers Tab */}
+      {activeTab === 'containers' && (
+        <ContainersTab scopeId={scopeId} hostId={initialHost.id} dockerStatus={host.dockerStatus} />
       )}
 
       {/* Vulnerabilities Tab */}

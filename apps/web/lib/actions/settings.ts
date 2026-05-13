@@ -61,6 +61,10 @@ const metricRetentionSchema = z.object({
   days: z.number().int().min(1).max(3650),
 })
 
+const dockerMetricRetentionSchema = z.object({
+  days: z.number().int().min(1).max(365),
+})
+
 export async function updateMetricRetention(
   instanceId: string,
   days: number,
@@ -105,6 +109,34 @@ export async function updateMetricRetention(
     return { success: true }
   } catch (err) {
     logError('Failed to update metric retention:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
+
+export async function updateDockerMetricRetention(
+  instanceId: string,
+  days: number,
+): Promise<{ success: true } | { error: string }> {
+  try {
+    await requireInstanceAdminAccess(instanceId)
+  } catch {
+    return { error: 'You do not have permission to perform this action' }
+  }
+
+  const parsed = dockerMetricRetentionSchema.safeParse({ days })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid value' }
+  }
+
+  try {
+    await db
+      .update(instanceSettings)
+      .set({ dockerMetricRetentionDays: parsed.data.days, updatedAt: new Date() })
+      .where(eq(instanceSettings.id, instanceId))
+
+    return { success: true }
+  } catch (err) {
+    logError('Failed to update Docker metric retention:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

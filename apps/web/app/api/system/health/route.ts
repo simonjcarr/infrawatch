@@ -42,6 +42,7 @@ export async function GET() {
       version: pkg.version,
       licenceTier: 'community',
       metricRetentionDays: 30,
+      dockerMetricRetentionDays: 30,
       database: { connected: true },
       agents: {
         online: 0,
@@ -236,6 +237,7 @@ export async function GET() {
     version: pkg.version,
     licenceTier: org?.licenceTier ?? 'community',
     metricRetentionDays: org?.metricRetentionDays ?? 30,
+    dockerMetricRetentionDays: org?.dockerMetricRetentionDays ?? 30,
     database: { connected: true },
     agents: {
       online: agentOnline,

@@ -2,7 +2,7 @@ import { test as base, expect, type Page } from '@playwright/test'
 import { truncateAppTables } from './db'
 import { getStorageStatePath } from './auth'
 import { createPasswordManagerMock, type PasswordManagerMockController } from './password-manager'
-import { seedOrgAndUser } from './seed'
+import { seedInstanceAndUser } from './seed'
 
 type Fixtures = {
   autoTruncate: void
@@ -14,7 +14,7 @@ export const test = base.extend<Fixtures>({
   autoTruncate: [
     async ({}, use) => {
       await truncateAppTables()
-      await seedOrgAndUser()
+      await seedInstanceAndUser()
       await use()
     },
     { auto: true },

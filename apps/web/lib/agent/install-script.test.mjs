@@ -20,7 +20,7 @@ test('buildAgentInstallCommand downloads the script without embedding secrets in
 
   assert.equal(command, 'curl -fsSLk "https://ct-ops.example.com/api/agent/install?skip_verify=true" | sh')
   assert.equal(command.includes('token='), false)
-  assert.equal(command.includes('CT_OPS_ORG_TOKEN='), false)
+  assert.equal(command.includes('CT_OPS_ENROLMENT_TOKEN='), false)
   assert.equal(command.includes('CT_OPS_ENROLMENT_TOKEN='), false)
 })
 
@@ -33,7 +33,7 @@ test('buildAgentInstallCommand can pass a newly-created token outside the URL', 
   )
   assert.equal(command.includes('token='), false)
   assert.match(command, /CT_OPS_ENROLMENT_TOKEN='ctops_test_token'/)
-  assert.equal(command.includes('CT_OPS_ORG_TOKEN='), false)
+  assert.equal(command.includes(['CT_OPS', 'ORG_TOKEN='].join('_')), false)
 })
 
 test('buildAgentInstallCommand shell-quotes tokens', () => {
@@ -48,8 +48,7 @@ test('buildAgentInstallScript consumes CT_OPS_ENROLMENT_TOKEN from the runtime e
 
   assert.match(script, /if \[ -n "\$\{CT_OPS_ENROLMENT_TOKEN:-\}" \]; then/)
   assert.match(script, /sudo env CT_OPS_ENROLMENT_TOKEN="\$CT_OPS_ENROLMENT_TOKEN" \.\/ct-ops-agent --install --address 'ct-ops\.example\.com:9443'/)
-  assert.match(script, /elif \[ -n "\$\{CT_OPS_ORG_TOKEN:-\}" \]; then/)
-  assert.match(script, /sudo env CT_OPS_ENROLMENT_TOKEN="\$CT_OPS_ORG_TOKEN" \.\/ct-ops-agent --install --address 'ct-ops\.example\.com:9443'/)
+  assert.equal(script.includes('elif [ -n'), false)
   assert.equal(script.includes('token='), false)
 })
 

@@ -55,7 +55,7 @@ export const hostVulnerabilityFindings = pgTable('host_vulnerability_findings', 
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('host_vuln_findings_uniq').on(t.instanceId, t.hostId, t.softwarePackageId, t.cveId),
-  index('host_vuln_findings_org_status_idx').on(t.instanceId, t.status, t.severity),
+  index('host_vuln_findings_instance_status_idx').on(t.instanceId, t.status, t.severity),
   index('host_vuln_findings_host_status_idx').on(t.hostId, t.status),
   index('host_vuln_findings_cve_idx').on(t.cveId),
   index('host_vuln_findings_confidence_idx').on(t.instanceId, t.status, t.confidence),

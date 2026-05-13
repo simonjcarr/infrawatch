@@ -40,8 +40,8 @@ function finding(overrides = {}) {
 function batch(findings = [finding()], overrides = {}) {
   return {
     contractVersion: '2026-04-30',
-    instanceId: 'org_1',
-    batchId: 'findings_20260430_092000_org_1',
+    instanceId: 'instance_1',
+    batchId: 'findings_20260430_092000_instance_1',
     generatedAt,
     findings,
     ...overrides,
@@ -50,8 +50,8 @@ function batch(findings = [finding()], overrides = {}) {
 
 function repo(overrides = {}) {
   const state = {
-    hosts: new Map([['host_1', { id: 'host_1', instanceId: 'org_1', deletedAt: null }]]),
-    packages: new Map([['pkg_1', { id: 'pkg_1', instanceId: 'org_1', hostId: 'host_1', removedAt: null, deletedAt: null }]]),
+    hosts: new Map([['host_1', { id: 'host_1', instanceId: 'instance_1', deletedAt: null }]]),
+    packages: new Map([['pkg_1', { id: 'pkg_1', instanceId: 'instance_1', hostId: 'host_1', removedAt: null, deletedAt: null }]]),
     existing: new Map(),
     cves: [],
     findings: [],
@@ -90,7 +90,7 @@ test('ingests a valid CT-CVE finding batch', async () => {
 
   assert.deepEqual(result, {
     accepted: true,
-    batchId: 'findings_20260430_092000_org_1',
+    batchId: 'findings_20260430_092000_instance_1',
     findingsAccepted: 1,
     findingsRejected: 0,
     findingsSkipped: 0,
@@ -98,7 +98,7 @@ test('ingests a valid CT-CVE finding batch', async () => {
   assert.equal(state.cves.length, 1)
   assert.equal(state.findings.length, 1)
   assert.equal(state.findings[0].metadata.ctCveFindingId, 'ctcve_find_1')
-  assert.equal(state.findings[0].metadata.ctCveBatchId, 'findings_20260430_092000_org_1')
+  assert.equal(state.findings[0].metadata.ctCveBatchId, 'findings_20260430_092000_instance_1')
 })
 
 test('rejects open findings for unknown or deleted hosts and inactive packages', async () => {

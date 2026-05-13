@@ -90,7 +90,7 @@ interface NormaliseForSaveOptions {
 }
 
 export function defaultCtCveConnectorTokenId(prefix: string, instanceId: string): string {
-  const suffix = instanceId.replace(/[^A-Za-z0-9._:-]/g, '_').replace(/^_+|_+$/g, '') || 'org'
+  const suffix = instanceId.replace(/[^A-Za-z0-9._:-]/g, '_').replace(/^_+|_+$/g, '') || 'instance'
   return `${prefix}_${suffix}`.slice(0, 128)
 }
 
@@ -234,7 +234,7 @@ function rowToFull(row: CtCveConnectorSettings): CtCveConnectorSettingsFull {
   }
 }
 
-async function getConnectorRowForOrg(instanceId: string): Promise<CtCveConnectorSettings | null> {
+async function getConnectorRowForInstance(instanceId: string): Promise<CtCveConnectorSettings | null> {
   const { db } = await import('../../db/index.ts')
   const row = await db.query.ctCveConnectorSettings.findFirst({
     where: eq(ctCveConnectorSettings.instanceId, instanceId),
@@ -244,15 +244,15 @@ async function getConnectorRowForOrg(instanceId: string): Promise<CtCveConnector
 
 async function listConnectorRowsAcrossInstances(): Promise<CtCveConnectorSettings[]> {
   const { db } = await import('../../db/index.ts')
-  const orgs = await db.query.instanceSettings.findMany({
+  const instances = await db.query.instanceSettings.findMany({
     where: isNull(instanceSettings.deletedAt),
     columns: { id: true },
     orderBy: [asc(instanceSettings.id)],
   })
 
   const rows: CtCveConnectorSettings[] = []
-  for (const org of orgs) {
-    const row = await getConnectorRowForOrg(org.id)
+  for (const instance of instances) {
+    const row = await getConnectorRowForInstance(instance.id)
     if (row) rows.push(row)
   }
   return rows
@@ -261,14 +261,14 @@ async function listConnectorRowsAcrossInstances(): Promise<CtCveConnectorSetting
 export async function getCtCveConnectorSettingsSummary(
   instanceId: string,
 ): Promise<CtCveConnectorSettingsSummary | null> {
-  const row = await getConnectorRowForOrg(instanceId)
+  const row = await getConnectorRowForInstance(instanceId)
   return row ? rowToSummary(row) : null
 }
 
 export async function getCtCveConnectorSettingsForAdmin(
   instanceId: string,
 ): Promise<CtCveConnectorSettingsFull | null> {
-  const row = await getConnectorRowForOrg(instanceId)
+  const row = await getConnectorRowForInstance(instanceId)
   return row ? rowToFull(row) : null
 }
 
@@ -276,7 +276,7 @@ export async function saveCtCveConnectorSettings(
   instanceId: string,
   input: CtCveConnectorSettingsInput,
 ): Promise<CtCveConnectorSettingsFull> {
-  const existing = await getConnectorRowForOrg(instanceId)
+  const existing = await getConnectorRowForInstance(instanceId)
   const now = new Date()
   const values = normaliseCtCveConnectorSettingsForSave({
     instanceId,
@@ -306,7 +306,7 @@ export async function saveCtCveConnectorSettings(
       },
     })
 
-  const saved = await getConnectorRowForOrg(instanceId)
+  const saved = await getConnectorRowForInstance(instanceId)
   if (!saved) {
     throw new Error('Failed to save CT-CVE connector settings')
   }
@@ -346,11 +346,11 @@ export function toCtCveServiceToken(settings: CtCveConnectorSettingsFull): CtCve
   }
 }
 
-export async function getCtCveServiceTokensForOrg(
+export async function getCtCveServiceTokensForInstance(
   instanceId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<CtCveServiceToken[]> {
-  const row = await getConnectorRowForOrg(instanceId)
+  const row = await getConnectorRowForInstance(instanceId)
   if (row) {
     if (!row.enabled) return []
     try {

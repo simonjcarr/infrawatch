@@ -270,7 +270,7 @@ func (h *RegisterHandler) Register(ctx context.Context, req *agentv1.RegisterReq
 		// must be written here. Saved tag_rules are evaluated later in TS by
 		// a cron/backfill job since they may depend on non-registration state.
 		if hostID != "" {
-			defaults, err := queries.GetOrgDefaultTags(ctx, h.pool, instanceID)
+			defaults, err := queries.GetInstanceDefaultTags(ctx, h.pool, instanceID)
 			if err != nil {
 				slog.Warn("loading instance default tags", "err", err)
 			}

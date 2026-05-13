@@ -387,7 +387,7 @@ export function HostDetailClient({
   ansibleAutomationEnabled,
 }: Props) {
   const canManageHost = canAccessTooling({ role: userRole })
-  const canRunHostTasks = userRole === 'org_admin' || userRole === 'super_admin'
+  const canRunHostTasks = userRole === 'instance_admin' || userRole === 'super_admin'
   const [activeParentTab, setActiveParentTab] = useState<ParentTabId>('overview')
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState<MetricsPreset>('24h')
@@ -1087,7 +1087,7 @@ export function HostDetailClient({
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <SettingsTab hostId={initialHost.id} isAdmin={userRole === 'org_admin' || userRole === 'super_admin'} />
+        <SettingsTab hostId={initialHost.id} isAdmin={userRole === 'instance_admin' || userRole === 'super_admin'} />
       )}
 
       {/* Groups Tab */}

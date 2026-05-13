@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { encrypt } from '../crypto/encrypt.ts'
 import {
   getAuthEmailConfigFromEnv,
-  getAuthEmailConfigFromOrgSettings,
+  getAuthEmailConfigFromInstanceSettings,
 } from './email.ts'
 
 test('getAuthEmailConfigFromEnv returns null without required SMTP env vars', () => {
@@ -34,12 +34,12 @@ test('getAuthEmailConfigFromEnv maps AUTH_EMAIL_* vars into SMTP config', () => 
   )
 })
 
-test('getAuthEmailConfigFromOrgSettings uses the enabled central relay and decrypts its password', () => {
+test('getAuthEmailConfigFromInstanceSettings uses the enabled central relay and decrypts its password', () => {
   process.env.BETTER_AUTH_SECRET = '01234567890123456789012345678901'
   const encryptedPassword = encrypt('relay-secret')
 
   assert.deepEqual(
-    getAuthEmailConfigFromOrgSettings({
+    getAuthEmailConfigFromInstanceSettings({
       smtpRelay: {
         enabled: true,
         host: 'relay.example.com',
@@ -63,10 +63,10 @@ test('getAuthEmailConfigFromOrgSettings uses the enabled central relay and decry
   )
 })
 
-test('getAuthEmailConfigFromOrgSettings ignores disabled or missing relays', () => {
-  assert.equal(getAuthEmailConfigFromOrgSettings(undefined), null)
+test('getAuthEmailConfigFromInstanceSettings ignores disabled or missing relays', () => {
+  assert.equal(getAuthEmailConfigFromInstanceSettings(undefined), null)
   assert.equal(
-    getAuthEmailConfigFromOrgSettings({
+    getAuthEmailConfigFromInstanceSettings({
       smtpRelay: {
         enabled: false,
         host: 'relay.example.com',

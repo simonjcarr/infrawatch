@@ -43,9 +43,9 @@ import type { Agent, AgentEnrolmentToken, Host, HostDockerStatus, HostMetric } f
 import { HOST_HIGH_USAGE_THRESHOLD, HOST_STALE_MINUTES } from '@/lib/db/schema/hosts'
 import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { escapeLikePattern } from '@/lib/utils'
-import { getOrgDefaultCollectionSettings } from '@/lib/actions/host-settings'
+import { getInstanceDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs-core'
-import { assignTagsToResource, getOrgDefaultTags, mergeTagLayers } from '@/lib/actions/tags'
+import { assignTagsToResource, getInstanceDefaultTags, mergeTagLayers } from '@/lib/actions/tags'
 import { runMatchingTagRules } from '@/lib/actions/tag-rules'
 import type { HostMetadata, TagPair } from '@/lib/db/schema'
 import { parseHostMetadata } from '@/lib/db/schema/hosts'
@@ -129,7 +129,7 @@ export async function approveAgent(
     if (agent.status !== 'pending') return { error: 'Agent is not in pending state' }
 
     // Guard against duplicate hosts: a pending agent that shares a hostname or
-    // any IP with a currently-online host in the same org must not be approved,
+    // any IP with a currently-online host in the same instance must not be approved,
     // because activating it would leave two live rows for the same physical
     // machine. The ingest register handler enforces the same rule at first
     // contact, but a collision can emerge later (e.g. another host with the
@@ -192,15 +192,15 @@ export async function approveAgent(
     if (host) {
       await applyGlobalDefaultsToHost(instanceId, host.id)
 
-      // Apply org default collection settings + drain any pendingTags the
+      // Apply instance default collection settings + drain any pendingTags the
       // ingest handler stashed at register time. pendingTags already represent
-      // the (token → CLI) merge on the ingest side; here we layer org defaults
+      // the (token → CLI) merge on the ingest side; here we layer instance defaults
       // underneath (weakest), then run any saved tag_rules last.
-      const defaults = await getOrgDefaultCollectionSettings(instanceId)
+      const defaults = await getInstanceDefaultCollectionSettings(instanceId)
       const currentMetadata = parseHostMetadata(host.metadata)
       const pendingTags: TagPair[] = currentMetadata.pendingTags ?? []
-      const orgDefaultTags = await getOrgDefaultTags(instanceId)
-      const finalTags = await mergeTagLayers(orgDefaultTags, pendingTags)
+      const instanceDefaultTags = await getInstanceDefaultTags(instanceId)
+      const finalTags = await mergeTagLayers(instanceDefaultTags, pendingTags)
 
       const nextMetadata: HostMetadata = {
         ...currentMetadata,
@@ -234,7 +234,7 @@ export async function approveAgent(
   }
 }
 
-// findOnlineHostCollision returns the first online host in the org (excluding
+// findOnlineHostCollision returns the first online host in the instance (excluding
 // the one linked to excludeAgentId) whose hostname matches or whose
 // ip_addresses jsonb array overlaps any of the provided ips. Used by
 // approveAgent to block activation when doing so would produce a duplicate.
@@ -589,7 +589,7 @@ export async function createEnrolmentToken(
   }
 
   // autoApprove bypasses the registration approval queue — restrict to super_admin to limit
-  // blast radius if an org_admin account is compromised (M-29).
+  // blast radius if an instance_admin account is compromised (M-29).
   if (parsed.data.autoApprove) {
     if (!hasRole(session.user, 'super_admin')) {
       return { error: 'Only super_admin users may create auto-approve enrolment tokens.' }

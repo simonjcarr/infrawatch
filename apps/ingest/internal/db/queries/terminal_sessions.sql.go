@@ -41,7 +41,7 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 		SET status     = 'active',
 		    started_at = NOW(),
 		    updated_at = NOW()
-		FROM instances o, hosts h
+		FROM instance_settings o, hosts h
 		WHERE ts.session_id       = $1
 		  AND ts.websocket_token_hash = $2
 		  AND ts.status           = 'pending'

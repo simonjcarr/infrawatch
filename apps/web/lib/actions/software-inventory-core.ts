@@ -52,11 +52,11 @@ export async function getSoftwareInventorySettings(
   instanceId: string,
 ): Promise<SoftwareInventorySettings> {
   await requireInstanceAccess(instanceId)
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: and(eq(instanceSettings.id, instanceId), isNull(instanceSettings.deletedAt)),
     columns: { metadata: true },
   })
-  const metadata = parseInstanceMetadata(org?.metadata)
+  const metadata = parseInstanceMetadata(instance?.metadata)
   return metadata.softwareInventorySettings ?? {
     enabled: false,
     intervalHours: 24,
@@ -79,11 +79,11 @@ export async function updateSoftwareInventorySettings(
   }
 
   try {
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     })
-    const currentMetadata = parseInstanceMetadata(org?.metadata)
+    const currentMetadata = parseInstanceMetadata(instance?.metadata)
     await db
       .update(instanceSettings)
       .set({

@@ -9,14 +9,14 @@ import {
 } from './shell.ts'
 
 test('launch success enters the locked shell and records setup status', () => {
-  const initial = createInitialPasswordManagerShellState('org-alpha')
+  const initial = createInitialPasswordManagerShellState('instance-alpha')
   const next = reducePasswordManagerShellState(initial, {
     type: 'launch-succeeded',
     setupConfigured: false,
   })
 
   assert.deepEqual(next, {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: null,
     launchNonce: 0,
@@ -30,7 +30,7 @@ test('launch success enters the locked shell and records setup status', () => {
 })
 
 test('setup completion stores encrypted materials and unlocks without persisting plaintext', () => {
-  const initial = reducePasswordManagerShellState(createInitialPasswordManagerShellState('org-alpha'), {
+  const initial = reducePasswordManagerShellState(createInitialPasswordManagerShellState('instance-alpha'), {
     type: 'launch-succeeded',
     setupConfigured: false,
   })
@@ -43,7 +43,7 @@ test('setup completion stores encrypted materials and unlocks without persisting
   })
 
   assert.deepEqual(next, {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: keyPair,
     encryptedPrivateKeyEnvelope: { ciphertext_b64: 'ciphertext' },
     launchNonce: 0,
@@ -58,7 +58,7 @@ test('setup completion stores encrypted materials and unlocks without persisting
 
 test('manual lock clears decrypted key material without forcing setup again', () => {
   const unlocked = {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: { privateKey: { kind: 'private' }, publicKey: { kind: 'public' } },
     encryptedPrivateKeyEnvelope: { ciphertext_b64: 'ciphertext' },
     launchNonce: 0,
@@ -73,7 +73,7 @@ test('manual lock clears decrypted key material without forcing setup again', ()
   const next = reducePasswordManagerShellState(unlocked, { type: 'lock' })
 
   assert.deepEqual(next, {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: { ciphertext_b64: 'ciphertext' },
     launchNonce: 0,
@@ -88,7 +88,7 @@ test('manual lock clears decrypted key material without forcing setup again', ()
 
 test('generic unlock failures keep the shell locked and avoid revealing the root cause', () => {
   const locked = {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: { privateKey: { kind: 'private' }, publicKey: { kind: 'public' } },
     encryptedPrivateKeyEnvelope: null,
     launchNonce: 0,
@@ -107,7 +107,7 @@ test('generic unlock failures keep the shell locked and avoid revealing the root
   })
 
   assert.deepEqual(next, {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: null,
     launchNonce: 0,
@@ -122,7 +122,7 @@ test('generic unlock failures keep the shell locked and avoid revealing the root
 
 test('instance changes tear down local state and restart launch', () => {
   const locked = {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: { privateKey: { kind: 'private' }, publicKey: { kind: 'public' } },
     encryptedPrivateKeyEnvelope: { ciphertext_b64: 'ciphertext' },
     launchNonce: 0,
@@ -136,11 +136,11 @@ test('instance changes tear down local state and restart launch', () => {
 
   const next = reducePasswordManagerShellState(locked, {
     type: 'instance-changed',
-    instanceId: 'org-bravo',
+    instanceId: 'instance-bravo',
   })
 
   assert.deepEqual(next, {
-    instanceId: 'org-bravo',
+    instanceId: 'instance-bravo',
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: null,
     launchNonce: 1,
@@ -155,7 +155,7 @@ test('instance changes tear down local state and restart launch', () => {
 
 test('explicit relaunch clears local shell state and increments launch nonce', () => {
   const locked = {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: { ciphertext_b64: 'ciphertext' },
     launchNonce: 3,
@@ -170,7 +170,7 @@ test('explicit relaunch clears local shell state and increments launch nonce', (
   const next = reducePasswordManagerShellState(locked, { type: 'restart-launch' })
 
   assert.deepEqual(next, {
-    instanceId: 'org-alpha',
+    instanceId: 'instance-alpha',
     activeKeyPair: null,
     encryptedPrivateKeyEnvelope: null,
     launchNonce: 4,

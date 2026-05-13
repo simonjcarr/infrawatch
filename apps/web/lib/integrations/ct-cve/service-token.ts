@@ -26,7 +26,7 @@ export interface CtCveServiceAuthError {
     | 'content_hash_mismatch'
     | 'invalid_signature'
     | 'insufficient_scope'
-    | 'org_scope_mismatch'
+    | 'instance_scope_mismatch'
     | 'replayed_nonce'
   message: string
   retryable: boolean
@@ -159,7 +159,7 @@ export async function verifyCtCveServiceRequest(options: {
     return fail('insufficient_scope', 403, 'CT-CVE service token is not allowed to perform this action.')
   }
   if (token.instanceId !== options.instanceId) {
-    return fail('org_scope_mismatch', 403, 'CT-CVE service token is not scoped to the requested instance.')
+    return fail('instance_scope_mismatch', 403, 'CT-CVE service token is not scoped to the requested instance.')
   }
 
   const timestamp = getHeader(options.headers, 'x-ct-timestamp')

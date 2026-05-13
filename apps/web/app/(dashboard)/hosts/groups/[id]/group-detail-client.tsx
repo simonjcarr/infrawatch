@@ -180,7 +180,7 @@ export function GroupDetailClient({
 }: Props) {
   const queryClient = useQueryClient()
   const router = useRouter()
-  const canRunTasks = userRole === 'org_admin' || userRole === 'super_admin'
+  const canRunTasks = userRole === 'instance_admin' || userRole === 'super_admin'
   const canUseAnsible = canRunTasks && ansibleAutomationEnabled
   const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')

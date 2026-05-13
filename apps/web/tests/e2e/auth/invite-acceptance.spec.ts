@@ -46,7 +46,7 @@ test('invite acceptance rejects logged-in users whose email does not match the i
     VALUES (
       ${`invite-${suffix}`},
       ${invitedEmail},
-      'org_admin',
+      'instance_admin',
       ${inviteToken},
       ${instanceId},
       ${invitedById},
@@ -126,7 +126,7 @@ test('invite acceptance attaches the matching user to the instance', async ({ pa
     VALUES (
       ${`invite-success-${suffix}`},
       ${invitedEmail},
-      'org_admin',
+      'instance_admin',
       ${inviteToken},
       ${instanceId},
       ${invitedById},
@@ -155,7 +155,7 @@ test('invite acceptance attaches the matching user to the instance', async ({ pa
     LIMIT 1
   `
   expect(invitee?.instance_id).not.toBeNull()
-  expect(invitee?.role).toBe('org_admin')
+  expect(invitee?.role).toBe('instance_admin')
 
   const [invite] = await sql<Array<{ accepted_at: Date | null }>>`
     SELECT accepted_at
@@ -193,7 +193,7 @@ test('invite signup without required email verification joins the inviting insta
     VALUES (
       ${`invite-signup-${suffix}`},
       ${invitedEmail},
-      'org_admin',
+      'instance_admin',
       ${inviteToken},
       ${instanceId},
       ${invitedById},
@@ -226,8 +226,8 @@ test('invite signup without required email verification joins the inviting insta
     LIMIT 1
   `
   expect(invitee?.instance_id).not.toBeNull()
-  expect(invitee?.role).toBe('org_admin')
-  expect(invitee?.roles).toEqual(['org_admin'])
+  expect(invitee?.role).toBe('instance_admin')
+  expect(invitee?.roles).toEqual(['instance_admin'])
   expect(invitee?.email_verified).toBe(false)
 
   const [invite] = await sql<Array<{ accepted_at: Date | null; email: string; token: string }>>`

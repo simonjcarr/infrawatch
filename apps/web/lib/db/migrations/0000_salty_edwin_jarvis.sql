@@ -1188,53 +1188,53 @@ ALTER TABLE "calendar_event_participants" ADD CONSTRAINT "calendar_event_partici
 ALTER TABLE "calendar_event_participants" ADD CONSTRAINT "calendar_event_participants_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calendar_events" ADD CONSTRAINT "calendar_events_instance_id_instance_settings_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."instance_settings"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calendar_events" ADD CONSTRAINT "calendar_events_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "users_org_active_deleted_name_email_idx" ON "user" USING btree ("instance_id","is_active","deleted_at","name","email");--> statement-breakpoint
-CREATE UNIQUE INDEX "tags_org_key_value_ci_uidx" ON "tags" USING btree ("instance_id",lower("key"),lower("value"));--> statement-breakpoint
-CREATE INDEX "tags_org_key_idx" ON "tags" USING btree ("instance_id","key");--> statement-breakpoint
+CREATE INDEX "users_instance_active_deleted_name_email_idx" ON "user" USING btree ("instance_id","is_active","deleted_at","name","email");--> statement-breakpoint
+CREATE UNIQUE INDEX "tags_instance_key_value_ci_uidx" ON "tags" USING btree ("instance_id",lower("key"),lower("value"));--> statement-breakpoint
+CREATE INDEX "tags_instance_key_idx" ON "tags" USING btree ("instance_id","key");--> statement-breakpoint
 CREATE INDEX "resource_tags_resource_idx" ON "resource_tags" USING btree ("resource_id","resource_type");--> statement-breakpoint
 CREATE INDEX "resource_tags_tag_idx" ON "resource_tags" USING btree ("tag_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "resource_tags_unique_uidx" ON "resource_tags" USING btree ("resource_id","resource_type","tag_id");--> statement-breakpoint
-CREATE INDEX "host_metrics_org_host_time_idx" ON "host_metrics" USING btree ("instance_id","host_id","recorded_at");--> statement-breakpoint
+CREATE INDEX "host_metrics_instance_host_time_idx" ON "host_metrics" USING btree ("instance_id","host_id","recorded_at");--> statement-breakpoint
 CREATE INDEX "check_results_check_idx" ON "check_results" USING btree ("check_id","ran_at");--> statement-breakpoint
 CREATE INDEX "check_results_instance_idx" ON "check_results" USING btree ("instance_id","ran_at");--> statement-breakpoint
-CREATE INDEX "checks_org_host_idx" ON "checks" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "checks_instance_host_idx" ON "checks" USING btree ("instance_id","host_id");--> statement-breakpoint
 CREATE INDEX "agent_queries_host_status_idx" ON "agent_queries" USING btree ("host_id","status");--> statement-breakpoint
 CREATE INDEX "agent_queries_instance_idx" ON "agent_queries" USING btree ("instance_id","requested_at");--> statement-breakpoint
-CREATE INDEX "alert_instances_org_status_idx" ON "alert_instances" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE INDEX "alert_instances_instance_status_idx" ON "alert_instances" USING btree ("instance_id","status");--> statement-breakpoint
 CREATE INDEX "alert_instances_rule_host_status_idx" ON "alert_instances" USING btree ("rule_id","host_id","status");--> statement-breakpoint
-CREATE INDEX "alert_rules_org_host_idx" ON "alert_rules" USING btree ("instance_id","host_id");--> statement-breakpoint
-CREATE INDEX "alert_rules_org_enabled_idx" ON "alert_rules" USING btree ("instance_id","enabled");--> statement-breakpoint
-CREATE INDEX "alert_rules_org_global_idx" ON "alert_rules" USING btree ("instance_id","is_global_default");--> statement-breakpoint
-CREATE INDEX "alert_silences_org_host_idx" ON "alert_silences" USING btree ("instance_id","host_id");--> statement-breakpoint
-CREATE INDEX "alert_silences_org_active_idx" ON "alert_silences" USING btree ("instance_id","starts_at","ends_at");--> statement-breakpoint
-CREATE INDEX "notification_channels_org_enabled_idx" ON "notification_channels" USING btree ("instance_id","enabled");--> statement-breakpoint
+CREATE INDEX "alert_rules_instance_host_idx" ON "alert_rules" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "alert_rules_instance_enabled_idx" ON "alert_rules" USING btree ("instance_id","enabled");--> statement-breakpoint
+CREATE INDEX "alert_rules_instance_global_idx" ON "alert_rules" USING btree ("instance_id","is_global_default");--> statement-breakpoint
+CREATE INDEX "alert_silences_instance_host_idx" ON "alert_silences" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "alert_silences_instance_active_idx" ON "alert_silences" USING btree ("instance_id","starts_at","ends_at");--> statement-breakpoint
+CREATE INDEX "notification_channels_instance_enabled_idx" ON "notification_channels" USING btree ("instance_id","enabled");--> statement-breakpoint
 CREATE INDEX "notifications_user_read_idx" ON "notifications" USING btree ("user_id","read");--> statement-breakpoint
-CREATE INDEX "notifications_org_user_idx" ON "notifications" USING btree ("instance_id","user_id");--> statement-breakpoint
+CREATE INDEX "notifications_instance_user_idx" ON "notifications" USING btree ("instance_id","user_id");--> statement-breakpoint
 CREATE INDEX "notifications_user_created_idx" ON "notifications" USING btree ("user_id","created_at");--> statement-breakpoint
 CREATE INDEX "notifications_deleted_at_idx" ON "notifications" USING btree ("deleted_at") WHERE "notifications"."deleted_at" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "cert_events_cert_time_idx" ON "certificate_events" USING btree ("certificate_id","occurred_at");--> statement-breakpoint
-CREATE INDEX "cert_events_org_time_idx" ON "certificate_events" USING btree ("instance_id","occurred_at");--> statement-breakpoint
+CREATE INDEX "cert_events_instance_time_idx" ON "certificate_events" USING btree ("instance_id","occurred_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "certificates_identity_idx" ON "certificates" USING btree ("instance_id","host","port","server_name","fingerprint_sha256");--> statement-breakpoint
-CREATE INDEX "certificates_org_expiry_idx" ON "certificates" USING btree ("instance_id","not_after");--> statement-breakpoint
-CREATE INDEX "certificates_org_status_idx" ON "certificates" USING btree ("instance_id","status");--> statement-breakpoint
-CREATE INDEX "certificates_org_host_idx" ON "certificates" USING btree ("instance_id","discovered_by_host_id");--> statement-breakpoint
+CREATE INDEX "certificates_instance_expiry_idx" ON "certificates" USING btree ("instance_id","not_after");--> statement-breakpoint
+CREATE INDEX "certificates_instance_status_idx" ON "certificates" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE INDEX "certificates_instance_host_idx" ON "certificates" USING btree ("instance_id","discovered_by_host_id");--> statement-breakpoint
 CREATE INDEX "certificates_refresh_due_idx" ON "certificates" USING btree ("tracked_url","last_refreshed_at");--> statement-breakpoint
-CREATE INDEX "identity_events_org_time_idx" ON "identity_events" USING btree ("instance_id","occurred_at");--> statement-breakpoint
+CREATE INDEX "identity_events_instance_time_idx" ON "identity_events" USING btree ("instance_id","occurred_at");--> statement-breakpoint
 CREATE INDEX "identity_events_account_time_idx" ON "identity_events" USING btree ("service_account_id","occurred_at");--> statement-breakpoint
 CREATE INDEX "identity_events_key_time_idx" ON "identity_events" USING btree ("ssh_key_id","occurred_at");--> statement-breakpoint
 CREATE INDEX "identity_events_host_time_idx" ON "identity_events" USING btree ("host_id","occurred_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "service_accounts_identity_idx" ON "service_accounts" USING btree ("instance_id","host_id","username");--> statement-breakpoint
-CREATE INDEX "service_accounts_org_type_idx" ON "service_accounts" USING btree ("instance_id","account_type");--> statement-breakpoint
-CREATE INDEX "service_accounts_org_status_idx" ON "service_accounts" USING btree ("instance_id","status");--> statement-breakpoint
-CREATE INDEX "service_accounts_org_host_idx" ON "service_accounts" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "service_accounts_instance_type_idx" ON "service_accounts" USING btree ("instance_id","account_type");--> statement-breakpoint
+CREATE INDEX "service_accounts_instance_status_idx" ON "service_accounts" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE INDEX "service_accounts_instance_host_idx" ON "service_accounts" USING btree ("instance_id","host_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "ssh_keys_identity_idx" ON "ssh_keys" USING btree ("instance_id","host_id","fingerprint_sha256","file_path");--> statement-breakpoint
-CREATE INDEX "ssh_keys_org_fingerprint_idx" ON "ssh_keys" USING btree ("instance_id","fingerprint_sha256");--> statement-breakpoint
-CREATE INDEX "ssh_keys_org_type_idx" ON "ssh_keys" USING btree ("instance_id","key_type");--> statement-breakpoint
-CREATE INDEX "ssh_keys_org_status_idx" ON "ssh_keys" USING btree ("instance_id","status");--> statement-breakpoint
-CREATE INDEX "ssh_keys_org_host_idx" ON "ssh_keys" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "ssh_keys_instance_fingerprint_idx" ON "ssh_keys" USING btree ("instance_id","fingerprint_sha256");--> statement-breakpoint
+CREATE INDEX "ssh_keys_instance_type_idx" ON "ssh_keys" USING btree ("instance_id","key_type");--> statement-breakpoint
+CREATE INDEX "ssh_keys_instance_status_idx" ON "ssh_keys" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE INDEX "ssh_keys_instance_host_idx" ON "ssh_keys" USING btree ("instance_id","host_id");--> statement-breakpoint
 CREATE INDEX "ssh_keys_account_idx" ON "ssh_keys" USING btree ("service_account_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "domain_accounts_org_username_idx" ON "domain_accounts" USING btree ("instance_id","username");--> statement-breakpoint
-CREATE INDEX "domain_accounts_org_status_idx" ON "domain_accounts" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "domain_accounts_instance_username_idx" ON "domain_accounts" USING btree ("instance_id","username");--> statement-breakpoint
+CREATE INDEX "domain_accounts_instance_status_idx" ON "domain_accounts" USING btree ("instance_id","status");--> statement-breakpoint
 CREATE INDEX "task_run_hosts_run_idx" ON "task_run_hosts" USING btree ("task_run_id");--> statement-breakpoint
 CREATE INDEX "task_run_hosts_host_status_idx" ON "task_run_hosts" USING btree ("host_id","status");--> statement-breakpoint
 CREATE INDEX "task_runs_instance_idx" ON "task_runs" USING btree ("instance_id","created_at");--> statement-breakpoint
@@ -1242,24 +1242,24 @@ CREATE INDEX "task_runs_target_idx" ON "task_runs" USING btree ("target_type","t
 CREATE INDEX "task_runs_scheduled_from_idx" ON "task_runs" USING btree ("scheduled_from_id");--> statement-breakpoint
 CREATE INDEX "task_schedules_instance_idx" ON "task_schedules" USING btree ("instance_id","created_at");--> statement-breakpoint
 CREATE INDEX "task_schedules_due_idx" ON "task_schedules" USING btree ("enabled","next_run_at");--> statement-breakpoint
-CREATE INDEX "terminal_sessions_org_host_idx" ON "terminal_sessions" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "terminal_sessions_instance_host_idx" ON "terminal_sessions" USING btree ("instance_id","host_id");--> statement-breakpoint
 CREATE INDEX "terminal_sessions_session_id_idx" ON "terminal_sessions" USING btree ("session_id");--> statement-breakpoint
 CREATE INDEX "saved_sw_reports_user_idx" ON "saved_software_reports" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "sw_pkg_uniq" ON "software_packages" USING btree ("instance_id","host_id","name","version","architecture");--> statement-breakpoint
-CREATE INDEX "sw_pkg_org_name_idx" ON "software_packages" USING btree ("instance_id","name");--> statement-breakpoint
+CREATE INDEX "sw_pkg_instance_name_idx" ON "software_packages" USING btree ("instance_id","name");--> statement-breakpoint
 CREATE INDEX "sw_pkg_source_name_idx" ON "software_packages" USING btree ("source","distro_id","distro_codename","source_name");--> statement-breakpoint
 CREATE INDEX "sw_pkg_host_idx" ON "software_packages" USING btree ("host_id");--> statement-breakpoint
 CREATE INDEX "sw_pkg_first_seen_idx" ON "software_packages" USING btree ("instance_id","first_seen_at");--> statement-breakpoint
 CREATE INDEX "sw_scan_host_idx" ON "software_scans" USING btree ("host_id","created_at");--> statement-breakpoint
 CREATE INDEX "sw_scan_instance_idx" ON "software_scans" USING btree ("instance_id","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "host_package_updates_current_uniq" ON "host_package_updates" USING btree ("instance_id","host_id","name","current_version","available_version","architecture","package_manager");--> statement-breakpoint
-CREATE INDEX "host_package_updates_org_status_idx" ON "host_package_updates" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE INDEX "host_package_updates_instance_status_idx" ON "host_package_updates" USING btree ("instance_id","status");--> statement-breakpoint
 CREATE INDEX "host_package_updates_host_status_idx" ON "host_package_updates" USING btree ("host_id","status");--> statement-breakpoint
 CREATE UNIQUE INDEX "host_patch_statuses_check_uniq" ON "host_patch_statuses" USING btree ("check_id");--> statement-breakpoint
-CREATE INDEX "host_patch_statuses_org_status_idx" ON "host_patch_statuses" USING btree ("instance_id","status");--> statement-breakpoint
+CREATE INDEX "host_patch_statuses_instance_status_idx" ON "host_patch_statuses" USING btree ("instance_id","status");--> statement-breakpoint
 CREATE INDEX "host_patch_statuses_host_checked_idx" ON "host_patch_statuses" USING btree ("host_id","checked_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "host_vuln_findings_uniq" ON "host_vulnerability_findings" USING btree ("instance_id","host_id","software_package_id","cve_id");--> statement-breakpoint
-CREATE INDEX "host_vuln_findings_org_status_idx" ON "host_vulnerability_findings" USING btree ("instance_id","status","severity");--> statement-breakpoint
+CREATE INDEX "host_vuln_findings_instance_status_idx" ON "host_vulnerability_findings" USING btree ("instance_id","status","severity");--> statement-breakpoint
 CREATE INDEX "host_vuln_findings_host_status_idx" ON "host_vulnerability_findings" USING btree ("host_id","status");--> statement-breakpoint
 CREATE INDEX "host_vuln_findings_cve_idx" ON "host_vulnerability_findings" USING btree ("cve_id");--> statement-breakpoint
 CREATE INDEX "host_vuln_findings_confidence_idx" ON "host_vulnerability_findings" USING btree ("instance_id","status","confidence");--> statement-breakpoint
@@ -1272,16 +1272,16 @@ CREATE INDEX "note_revisions_note_created_idx" ON "note_revisions" USING btree (
 CREATE INDEX "note_targets_type_id_idx" ON "note_targets" USING btree ("target_type","target_id");--> statement-breakpoint
 CREATE INDEX "note_targets_note_idx" ON "note_targets" USING btree ("note_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "note_targets_direct_unique_uidx" ON "note_targets" USING btree ("note_id","target_type","target_id") WHERE "note_targets"."target_id" IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "notes_org_active_updated_idx" ON "notes" USING btree ("instance_id","deleted_at","updated_at");--> statement-breakpoint
+CREATE INDEX "notes_instance_active_updated_idx" ON "notes" USING btree ("instance_id","deleted_at","updated_at");--> statement-breakpoint
 CREATE INDEX "notes_author_idx" ON "notes" USING btree ("author_id");--> statement-breakpoint
 CREATE INDEX "notes_search_vector_idx" ON "notes" USING gin ("search_vector");--> statement-breakpoint
 CREATE INDEX "cert_authorities_purpose_idx" ON "certificate_authorities" USING btree ("purpose","deleted_at");--> statement-breakpoint
 CREATE INDEX "revoked_certs_instance_idx" ON "revoked_certificates" USING btree ("instance_id");--> statement-breakpoint
 CREATE INDEX "pending_cert_signings_requested_at_idx" ON "pending_cert_signings" USING btree ("requested_at");--> statement-breakpoint
-CREATE INDEX "audit_events_org_time_idx" ON "audit_events" USING btree ("instance_id","created_at");--> statement-breakpoint
+CREATE INDEX "audit_events_instance_time_idx" ON "audit_events" USING btree ("instance_id","created_at");--> statement-breakpoint
 CREATE INDEX "audit_events_actor_time_idx" ON "audit_events" USING btree ("actor_user_id","created_at");--> statement-breakpoint
 CREATE INDEX "audit_events_target_time_idx" ON "audit_events" USING btree ("target_type","target_id","created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "build_doc_asset_storage_settings_org_uidx" ON "build_doc_asset_storage_settings" USING btree ("instance_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "build_doc_asset_storage_settings_instance_uidx" ON "build_doc_asset_storage_settings" USING btree ("instance_id");--> statement-breakpoint
 CREATE INDEX "build_doc_assets_doc_idx" ON "build_doc_assets" USING btree ("build_doc_id","deleted_at");--> statement-breakpoint
 CREATE INDEX "build_doc_assets_section_idx" ON "build_doc_assets" USING btree ("section_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "build_doc_assets_storage_key_uidx" ON "build_doc_assets" USING btree ("provider","storage_key");--> statement-breakpoint
@@ -1289,13 +1289,13 @@ CREATE INDEX "build_doc_revisions_doc_created_idx" ON "build_doc_revisions" USIN
 CREATE INDEX "build_doc_sections_doc_position_idx" ON "build_doc_sections" USING btree ("build_doc_id","position");--> statement-breakpoint
 CREATE INDEX "build_doc_sections_instance_idx" ON "build_doc_sections" USING btree ("instance_id","deleted_at");--> statement-breakpoint
 CREATE INDEX "build_doc_sections_search_vector_idx" ON "build_doc_sections" USING gin ("search_vector");--> statement-breakpoint
-CREATE INDEX "build_doc_snippets_org_updated_idx" ON "build_doc_snippets" USING btree ("instance_id","deleted_at","updated_at");--> statement-breakpoint
+CREATE INDEX "build_doc_snippets_instance_updated_idx" ON "build_doc_snippets" USING btree ("instance_id","deleted_at","updated_at");--> statement-breakpoint
 CREATE INDEX "build_doc_snippets_search_vector_idx" ON "build_doc_snippets" USING gin ("search_vector");--> statement-breakpoint
 CREATE UNIQUE INDEX "build_doc_template_versions_template_version_uidx" ON "build_doc_template_versions" USING btree ("template_id","version");--> statement-breakpoint
 CREATE INDEX "build_doc_template_versions_instance_idx" ON "build_doc_template_versions" USING btree ("instance_id","template_id");--> statement-breakpoint
-CREATE INDEX "build_doc_templates_org_active_idx" ON "build_doc_templates" USING btree ("instance_id","deleted_at","is_active");--> statement-breakpoint
+CREATE INDEX "build_doc_templates_instance_active_idx" ON "build_doc_templates" USING btree ("instance_id","deleted_at","is_active");--> statement-breakpoint
 CREATE UNIQUE INDEX "build_doc_templates_default_uidx" ON "build_doc_templates" USING btree ("instance_id","is_default") WHERE "build_doc_templates"."is_default" = TRUE AND "build_doc_templates"."deleted_at" IS NULL;--> statement-breakpoint
-CREATE INDEX "build_docs_org_updated_idx" ON "build_docs" USING btree ("instance_id","deleted_at","updated_at");--> statement-breakpoint
+CREATE INDEX "build_docs_instance_updated_idx" ON "build_docs" USING btree ("instance_id","deleted_at","updated_at");--> statement-breakpoint
 CREATE INDEX "build_docs_template_idx" ON "build_docs" USING btree ("template_version_id");--> statement-breakpoint
 CREATE INDEX "build_docs_status_idx" ON "build_docs" USING btree ("instance_id","status");--> statement-breakpoint
 CREATE INDEX "build_docs_search_vector_idx" ON "build_docs" USING gin ("search_vector");--> statement-breakpoint
@@ -1303,9 +1303,9 @@ CREATE INDEX "ingest_server_snapshots_server_time_idx" ON "ingest_server_snapsho
 CREATE INDEX "ingest_server_snapshots_observed_idx" ON "ingest_server_snapshots" USING btree ("observed_at");--> statement-breakpoint
 CREATE INDEX "ct_cve_service_nonces_expires_at_idx" ON "ct_cve_service_nonces" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "ct_cve_connector_settings_enabled_idx" ON "ct_cve_connector_settings" USING btree ("enabled");--> statement-breakpoint
-CREATE INDEX "calendar_event_hosts_org_host_idx" ON "calendar_event_hosts" USING btree ("instance_id","host_id");--> statement-breakpoint
-CREATE INDEX "calendar_event_participants_org_user_idx" ON "calendar_event_participants" USING btree ("instance_id","user_id");--> statement-breakpoint
-CREATE INDEX "calendar_events_org_range_idx" ON "calendar_events" USING btree ("instance_id","starts_at","ends_at");--> statement-breakpoint
-CREATE INDEX "calendar_events_org_series_idx" ON "calendar_events" USING btree ("instance_id","series_id","recurrence_instance_start_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "calendar_events_org_client_request_idx" ON "calendar_events" USING btree ("instance_id","client_request_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "calendar_events_org_series_occurrence_idx" ON "calendar_events" USING btree ("instance_id","series_id","recurrence_instance_start_at") WHERE "calendar_events"."series_id" IS NOT NULL AND "calendar_events"."recurrence_instance_start_at" IS NOT NULL;
+CREATE INDEX "calendar_event_hosts_instance_host_idx" ON "calendar_event_hosts" USING btree ("instance_id","host_id");--> statement-breakpoint
+CREATE INDEX "calendar_event_participants_instance_user_idx" ON "calendar_event_participants" USING btree ("instance_id","user_id");--> statement-breakpoint
+CREATE INDEX "calendar_events_instance_range_idx" ON "calendar_events" USING btree ("instance_id","starts_at","ends_at");--> statement-breakpoint
+CREATE INDEX "calendar_events_instance_series_idx" ON "calendar_events" USING btree ("instance_id","series_id","recurrence_instance_start_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "calendar_events_instance_client_request_idx" ON "calendar_events" USING btree ("instance_id","client_request_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "calendar_events_instance_series_occurrence_idx" ON "calendar_events" USING btree ("instance_id","series_id","recurrence_instance_start_at") WHERE "calendar_events"."series_id" IS NOT NULL AND "calendar_events"."recurrence_instance_start_at" IS NOT NULL;

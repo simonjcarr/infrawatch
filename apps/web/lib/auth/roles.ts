@@ -1,14 +1,14 @@
-export const ASSIGNED_ROLES = ['super_admin', 'org_admin', 'engineer', 'read_only'] as const
-export const INVITABLE_ROLES = ['org_admin', 'engineer', 'read_only'] as const
+export const ASSIGNED_ROLES = ['super_admin', 'instance_admin', 'engineer', 'read_only'] as const
+export const INVITABLE_ROLES = ['instance_admin', 'engineer', 'read_only'] as const
 
 export type AssignedRole = (typeof ASSIGNED_ROLES)[number]
 export type LegacyRole = AssignedRole | 'pending'
-export type AdminRole = 'org_admin' | 'super_admin'
-export type MembershipRole = 'org_admin' | 'super_admin' | 'engineer'
+export type AdminRole = 'instance_admin' | 'super_admin'
+export type MembershipRole = 'instance_admin' | 'super_admin' | 'engineer'
 
-export const ADMIN_ROLES: readonly string[] = ['org_admin', 'super_admin']
-export const MEMBERSHIP_ROLES: readonly string[] = ['org_admin', 'super_admin', 'engineer']
-export const DEFAULT_NOTIFICATION_ROLES: readonly string[] = ['super_admin', 'org_admin', 'engineer']
+export const ADMIN_ROLES: readonly string[] = ['instance_admin', 'super_admin']
+export const MEMBERSHIP_ROLES: readonly string[] = ['instance_admin', 'super_admin', 'engineer']
+export const DEFAULT_NOTIFICATION_ROLES: readonly string[] = ['super_admin', 'instance_admin', 'engineer']
 
 export function isAssignedRole(value: string): value is AssignedRole {
   return ASSIGNED_ROLES.includes(value as AssignedRole)

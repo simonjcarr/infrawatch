@@ -13,9 +13,9 @@ export const TEST_PASSWORD_MANAGER_MEMBER = {
   name: 'Password Manager Member',
 } as const
 
-export const TEST_ORG = {
-  name: 'E2E Test Org',
-  slug: 'e2e-test-org',
+export const TEST_INSTANCE = {
+  name: 'E2E Test Instance',
+  slug: 'e2e-test-instance',
 } as const
 
 export async function getSeededTestUserContext(): Promise<{
@@ -49,7 +49,7 @@ async function getTestUserPasswordHash(): Promise<string> {
 // Idempotent deterministic baseline for E2E tests. It writes Better Auth's
 // required user/account rows directly so per-test isolation does not have to
 // round-trip through the app server before each spec.
-export async function seedOrgAndUser(): Promise<void> {
+export async function seedInstanceAndUser(): Promise<void> {
   const sql = getTestDb()
   const instanceId = createId()
   const userId = createId()
@@ -57,7 +57,7 @@ export async function seedOrgAndUser(): Promise<void> {
 
   await sql`
     INSERT INTO instance_settings (id, name, slug)
-    VALUES (${instanceId}, ${TEST_ORG.name}, ${TEST_ORG.slug})
+    VALUES (${instanceId}, ${TEST_INSTANCE.name}, ${TEST_INSTANCE.slug})
     ON CONFLICT (slug) DO UPDATE
     SET name = EXCLUDED.name
   `
@@ -82,8 +82,8 @@ export async function seedOrgAndUser(): Promise<void> {
       true,
       NOW(),
       NOW(),
-      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
-      'org_admin',
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug}),
+      'instance_admin',
       '[]'::jsonb,
       true
     )
@@ -117,7 +117,7 @@ export async function seedOrgAndUser(): Promise<void> {
       true,
       NOW(),
       NOW(),
-      (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug}),
+      (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug}),
       'member',
       '[]'::jsonb,
       true

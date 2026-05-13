@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
           userId = createId()
           const email = ldapUser.email || `${ldapUser.username}@ldap.local`
 
-          // Find the org from the LDAP config
+          // Find the instance from the LDAP config.
           await db.insert(users).values({
             id: userId,
             name: ldapUser.displayName ?? ldapUser.username,

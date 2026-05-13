@@ -1,10 +1,10 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
-    SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug} LIMIT 1
+    SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug} LIMIT 1
   `
   expect(rows).toHaveLength(1)
   return rows[0]!.id
@@ -12,7 +12,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('patch status report shows instance compliance by network and host', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await sql`
     INSERT INTO hosts (
       id,

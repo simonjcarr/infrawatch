@@ -21,7 +21,7 @@ export default async function BuildDocsPage() {
     listBuildDocs(),
     listBuildDocTemplates(),
     listBuildDocSnippets(),
-    ['org_admin', 'super_admin'].includes(session.user.role) ? getBuildDocAssetStorageSettings() : Promise.resolve(null),
+    ['instance_admin', 'super_admin'].includes(session.user.role) ? getBuildDocAssetStorageSettings() : Promise.resolve(null),
   ])
 
   return (

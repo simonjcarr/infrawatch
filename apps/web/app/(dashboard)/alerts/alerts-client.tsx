@@ -939,13 +939,13 @@ function AddSilenceDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="silence-host">Host <span className="text-muted-foreground font-normal">(leave blank for org-wide)</span></Label>
+            <Label htmlFor="silence-host">Host <span className="text-muted-foreground font-normal">(leave blank for instance-wide)</span></Label>
             <select
               id="silence-host"
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               {...register('hostId')}
             >
-              <option value="">All hosts (org-wide)</option>
+              <option value="">All hosts (instance-wide)</option>
               {hosts.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.hostname}

@@ -18,7 +18,7 @@ export class SeatLimitError extends Error {
   }
 }
 
-export async function getOrgSeatUsage(instanceId: string, options: SeatUsageOptions = {}): Promise<SeatUsage> {
+export async function getInstanceSeatUsage(instanceId: string, options: SeatUsageOptions = {}): Promise<SeatUsage> {
   const licence = await getTrustedEffectiveLicence(instanceId)
   const now = new Date()
 
@@ -56,7 +56,7 @@ export async function assertCanReserveUserSeat(
   instanceId: string,
   options: SeatUsageOptions = {},
 ): Promise<SeatUsage> {
-  const usage = await getOrgSeatUsage(instanceId, options)
+  const usage = await getInstanceSeatUsage(instanceId, options)
   if (!canReserveSeats(usage, 1)) {
     throw new SeatLimitError(usage)
   }

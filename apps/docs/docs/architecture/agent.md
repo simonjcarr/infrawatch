@@ -16,7 +16,7 @@ The CT-Ops agent is a statically compiled Go binary. It has no runtime dependenc
 ### First run (no `agent_state.json`)
 
 1. Agent generates an Ed25519 keypair on the host and persists it to `data_dir`
-2. Sends a `Register` RPC with the org enrolment token and public key
+2. Sends a `Register` RPC with the instance enrolment token and public key
 3. Ingest validates the token, inserts a host record, and returns `agent_id` + status
 4. If **auto-approve** is enabled on the token: status is `active` immediately
 5. If not: status is `pending` — the agent polls every 30 seconds until an admin approves it in the UI
@@ -187,11 +187,11 @@ The agent collects the full list of installed software packages and streams them
 | **macOS** | `system_profiler SPApplicationsDataType` + Homebrew (`brew list`) |
 | **Windows** | Registry walk under `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` |
 
-Optional sources (Snap, Flatpak, Windows Store) can be enabled per-org in **Settings → Software Inventory**.
+Optional sources (Snap, Flatpak, Windows Store) can be enabled per-instance in **Settings → Software Inventory**.
 
 ### Scheduling
 
-The ingest service's `SoftwareSweeper` runs every 60 seconds and dispatches a `software_inventory` task to any host whose last scan is older than the org-level `intervalHours` setting. Admins can also trigger an immediate rescan from the host detail Inventory tab.
+The ingest service's `SoftwareSweeper` runs every 60 seconds and dispatches a `software_inventory` task to any host whose last scan is older than the instance-level `intervalHours` setting. Admins can also trigger an immediate rescan from the host detail Inventory tab.
 
 ### Package tracking
 

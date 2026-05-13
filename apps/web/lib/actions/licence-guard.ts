@@ -32,7 +32,7 @@ export type EffectiveLicence = {
 // Cached per-request so multiple requireFeature() calls in one server action
 // don't re-validate the JWT repeatedly.
 const loadEffectiveLicence = cache(async (instanceId: string): Promise<EffectiveLicence> => {
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     columns: {
       licenceTier: true,
       licenceKey: true,
@@ -41,16 +41,16 @@ const loadEffectiveLicence = cache(async (instanceId: string): Promise<Effective
     where: eq(instanceSettings.id, instanceId),
   })
 
-  if (!org) {
+  if (!instance) {
     return getCommunityLicence()
   }
 
-  if (!org.licenceKey) {
+  if (!instance.licenceKey) {
     return getCommunityLicence()
   }
 
-  const result = await validateLicenceKey(org.licenceKey, {
-    publicKeyPem: org.licenceVerifierPublicKey ?? undefined,
+  const result = await validateLicenceKey(instance.licenceKey, {
+    publicKeyPem: instance.licenceVerifierPublicKey ?? undefined,
   })
   if (!result.valid) {
     // Invalid or expired keys silently degrade to community. The licenceTier

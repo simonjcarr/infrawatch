@@ -11,7 +11,7 @@ import {
 const TOKEN = {
   id: 'ctcve_test_token',
   secret: Buffer.from('ct-cve unit test signing key only').toString('base64url'),
-  instanceId: 'org_123',
+  instanceId: 'instance_123',
   scopes: ['findings:write', 'connection:read'],
 }
 
@@ -187,7 +187,7 @@ test('rejects tokens without the required scope or instance binding', async () =
   assert.equal(wrongScope.ok, false)
   assert.equal(!wrongScope.ok && wrongScope.error.code, 'insufficient_scope')
 
-  const wrongOrg = await verifyCtCveServiceRequest({
+  const wrongInstance = await verifyCtCveServiceRequest({
     method: 'POST',
     path: '/api/integrations/ct-cve/v1/finding-batches',
     body,
@@ -198,8 +198,8 @@ test('rejects tokens without the required scope or instance binding', async () =
     tokens: [TOKEN],
     nonceStore: createInMemoryCtCveNonceStore(),
   })
-  assert.equal(wrongOrg.ok, false)
-  assert.equal(!wrongOrg.ok && wrongOrg.error.code, 'org_scope_mismatch')
+  assert.equal(wrongInstance.ok, false)
+  assert.equal(!wrongInstance.ok && wrongInstance.error.code, 'instance_scope_mismatch')
 })
 
 test('parses configured CT-CVE service tokens and rejects weak secrets', () => {

@@ -3992,7 +3992,7 @@ function PasswordManagerWorkspace({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <CardTitle>Audit</CardTitle>
-                  <CardDescription>Tenant-wide Password Manager activity with public-safe details only.</CardDescription>
+                  <CardDescription>Instance-wide Password Manager activity with public-safe details only.</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={auditIntegrity?.verified === false ? 'destructive' : 'secondary'}>

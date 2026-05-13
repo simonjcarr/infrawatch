@@ -500,7 +500,7 @@ func dispatchTelegram(ctx context.Context, channels []queries.TelegramChannelRow
 // dispatchInApp creates an in-app notification row for each eligible user in the org.
 // alertInstanceID may be empty (cert alerts use a different instance query).
 func dispatchInApp(ctx context.Context, pool *pgxpool.Pool, instanceID, alertInstanceID, resourceType, resourceID string, event AlertEvent) {
-	settings, err := queries.GetOrgNotificationSettings(ctx, pool, instanceID)
+	settings, err := queries.GetInstanceNotificationSettings(ctx, pool, instanceID)
 	if err != nil {
 		slog.Warn("dispatchInApp: fetching org notification settings", "instance_id", instanceID, "err", err)
 		// Proceed with defaults (already set by the query function on error)

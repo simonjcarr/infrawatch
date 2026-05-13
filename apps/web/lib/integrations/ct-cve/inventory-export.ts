@@ -53,7 +53,7 @@ export interface CtCveInventoryRepository {
 export interface CtCveInventorySnapshot {
   contractVersion: '2026-04-30'
   instanceId: string
-  orgSlug: string
+  instanceSlug: string
   snapshotId: string
   snapshotType: 'full' | 'incremental'
   generatedAt: string
@@ -193,7 +193,7 @@ export async function buildCtCveInventorySnapshot(options: {
   return {
     contractVersion: CONTRACT_VERSION,
     instanceId,
-    orgSlug: instance.slug,
+    instanceSlug: instance.slug,
     snapshotId: snapshotIdFor(instanceId, generatedAt, options.cursor),
     snapshotType: options.snapshotType ?? 'full',
     generatedAt: generatedAt.toISOString(),

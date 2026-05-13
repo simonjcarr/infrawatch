@@ -30,7 +30,7 @@ export const hostDockerStatus = pgTable(
   },
   (t) => [
     uniqueIndex('host_docker_status_host_uidx').on(t.hostId),
-    index('host_docker_status_org_status_checked_idx').on(t.instanceId, t.status, t.checkedAt),
+    index('host_docker_status_instance_status_checked_idx').on(t.instanceId, t.status, t.checkedAt),
   ],
 )
 
@@ -68,8 +68,8 @@ export const dockerContainers = pgTable(
   },
   (t) => [
     uniqueIndex('docker_containers_host_container_uidx').on(t.hostId, t.dockerContainerId),
-    index('docker_containers_org_host_present_seen_idx').on(t.instanceId, t.hostId, t.isPresent, t.lastSeenAt),
-    index('docker_containers_org_image_idx').on(t.instanceId, t.image),
+    index('docker_containers_instance_host_present_seen_idx').on(t.instanceId, t.hostId, t.isPresent, t.lastSeenAt),
+    index('docker_containers_instance_image_idx').on(t.instanceId, t.image),
   ],
 )
 
@@ -107,8 +107,8 @@ export const dockerContainerLifecycleEvents = pgTable(
   },
   (t) => [
     uniqueIndex('docker_container_lifecycle_events_host_event_uidx').on(t.hostId, t.dockerContainerId, t.eventType, t.occurredAt),
-    index('docker_container_lifecycle_events_org_host_time_idx').on(t.instanceId, t.hostId, t.occurredAt),
-    index('docker_container_lifecycle_events_org_container_time_idx').on(t.instanceId, t.dockerContainerRowId, t.occurredAt),
+    index('docker_container_lifecycle_events_instance_host_time_idx').on(t.instanceId, t.hostId, t.occurredAt),
+    index('docker_container_lifecycle_events_instance_container_time_idx').on(t.instanceId, t.dockerContainerRowId, t.occurredAt),
   ],
 )
 
@@ -144,8 +144,8 @@ export const dockerContainerMetrics = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.id, t.recordedAt] }),
-    index('docker_container_metrics_org_host_time_idx').on(t.instanceId, t.hostId, t.recordedAt),
-    index('docker_container_metrics_org_container_time_idx').on(t.instanceId, t.dockerContainerRowId, t.recordedAt),
+    index('docker_container_metrics_instance_host_time_idx').on(t.instanceId, t.hostId, t.recordedAt),
+    index('docker_container_metrics_instance_container_time_idx').on(t.instanceId, t.dockerContainerRowId, t.recordedAt),
   ],
 )
 

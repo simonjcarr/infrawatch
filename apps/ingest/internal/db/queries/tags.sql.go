@@ -42,10 +42,10 @@ func lower(s string) string {
 	return string(b)
 }
 
-// GetOrgDefaultTags reads instances.metadata.defaultTags. Returns nil when
+// GetInstanceDefaultTags reads instance_settings.metadata.defaultTags. Returns nil when
 // no defaults are set.
-func GetOrgDefaultTags(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]TagPair, error) {
-	const q = `SELECT COALESCE(metadata, '{}'::jsonb) FROM instances WHERE id = $1`
+func GetInstanceDefaultTags(ctx context.Context, pool *pgxpool.Pool, instanceID string) ([]TagPair, error) {
+	const q = `SELECT COALESCE(metadata, '{}'::jsonb) FROM instance_settings WHERE id = $1`
 	var raw []byte
 	if err := pool.QueryRow(ctx, q, instanceID).Scan(&raw); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default async function BulkTagPage() {
   const session = await getRequiredSession()
   const isAdmin =
-    session.user.role === 'super_admin' || session.user.role === 'org_admin' || session.user.role === 'engineer'
+    session.user.role === 'super_admin' || session.user.role === 'instance_admin' || session.user.role === 'engineer'
   if (!isAdmin) redirect('/dashboard')
 
   return <BulkTagClient instanceId={session.user.instanceId!} />

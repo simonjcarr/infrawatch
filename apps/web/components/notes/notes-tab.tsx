@@ -198,7 +198,7 @@ export function NotesTab({ hostId, currentUserId, userRole }: Props) {
             <TableBody>
               {visibleNotes.map((note) => {
                 const isAuthor = note.authorId === currentUserId
-                const isAdmin = userRole === 'super_admin' || userRole === 'org_admin'
+                const isAdmin = userRole === 'super_admin' || userRole === 'instance_admin'
                 const canManage =
                   !note.deletedAt && userRole !== 'read_only' && (isAuthor || isAdmin)
 

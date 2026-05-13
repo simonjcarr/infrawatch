@@ -476,8 +476,8 @@
         }
       },
       "indexes": {
-        "users_org_active_deleted_name_email_idx": {
-          "name": "users_org_active_deleted_name_email_idx",
+        "users_instance_active_deleted_name_email_idx": {
+          "name": "users_instance_active_deleted_name_email_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -1357,8 +1357,8 @@
         }
       },
       "indexes": {
-        "tags_org_key_value_ci_uidx": {
-          "name": "tags_org_key_value_ci_uidx",
+        "tags_instance_key_value_ci_uidx": {
+          "name": "tags_instance_key_value_ci_uidx",
           "columns": [
             {
               "expression": "instance_id",
@@ -1384,8 +1384,8 @@
           "method": "btree",
           "with": {}
         },
-        "tags_org_key_idx": {
-          "name": "tags_org_key_idx",
+        "tags_instance_key_idx": {
+          "name": "tags_instance_key_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -1713,8 +1713,8 @@
         }
       },
       "indexes": {
-        "host_metrics_org_host_time_idx": {
-          "name": "host_metrics_org_host_time_idx",
+        "host_metrics_instance_host_time_idx": {
+          "name": "host_metrics_instance_host_time_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2016,8 +2016,8 @@
         }
       },
       "indexes": {
-        "checks_org_host_idx": {
-          "name": "checks_org_host_idx",
+        "checks_instance_host_idx": {
+          "name": "checks_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2316,8 +2316,8 @@
         }
       },
       "indexes": {
-        "alert_instances_org_status_idx": {
-          "name": "alert_instances_org_status_idx",
+        "alert_instances_instance_status_idx": {
+          "name": "alert_instances_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2501,8 +2501,8 @@
         }
       },
       "indexes": {
-        "alert_rules_org_host_idx": {
-          "name": "alert_rules_org_host_idx",
+        "alert_rules_instance_host_idx": {
+          "name": "alert_rules_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2522,8 +2522,8 @@
           "method": "btree",
           "with": {}
         },
-        "alert_rules_org_enabled_idx": {
-          "name": "alert_rules_org_enabled_idx",
+        "alert_rules_instance_enabled_idx": {
+          "name": "alert_rules_instance_enabled_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2543,8 +2543,8 @@
           "method": "btree",
           "with": {}
         },
-        "alert_rules_org_global_idx": {
-          "name": "alert_rules_org_global_idx",
+        "alert_rules_instance_global_idx": {
+          "name": "alert_rules_instance_global_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2679,8 +2679,8 @@
         }
       },
       "indexes": {
-        "alert_silences_org_host_idx": {
-          "name": "alert_silences_org_host_idx",
+        "alert_silences_instance_host_idx": {
+          "name": "alert_silences_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2700,8 +2700,8 @@
           "method": "btree",
           "with": {}
         },
-        "alert_silences_org_active_idx": {
-          "name": "alert_silences_org_active_idx",
+        "alert_silences_instance_active_idx": {
+          "name": "alert_silences_instance_active_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -2857,8 +2857,8 @@
         }
       },
       "indexes": {
-        "notification_channels_org_enabled_idx": {
-          "name": "notification_channels_org_enabled_idx",
+        "notification_channels_instance_enabled_idx": {
+          "name": "notification_channels_instance_enabled_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3001,8 +3001,8 @@
           "method": "btree",
           "with": {}
         },
-        "notifications_org_user_idx": {
-          "name": "notifications_org_user_idx",
+        "notifications_instance_user_idx": {
+          "name": "notifications_instance_user_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3189,8 +3189,8 @@
           "method": "btree",
           "with": {}
         },
-        "cert_events_org_time_idx": {
-          "name": "cert_events_org_time_idx",
+        "cert_events_instance_time_idx": {
+          "name": "cert_events_instance_time_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3446,8 +3446,8 @@
           "method": "btree",
           "with": {}
         },
-        "certificates_org_expiry_idx": {
-          "name": "certificates_org_expiry_idx",
+        "certificates_instance_expiry_idx": {
+          "name": "certificates_instance_expiry_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3467,8 +3467,8 @@
           "method": "btree",
           "with": {}
         },
-        "certificates_org_status_idx": {
-          "name": "certificates_org_status_idx",
+        "certificates_instance_status_idx": {
+          "name": "certificates_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3488,8 +3488,8 @@
           "method": "btree",
           "with": {}
         },
-        "certificates_org_host_idx": {
-          "name": "certificates_org_host_idx",
+        "certificates_instance_host_idx": {
+          "name": "certificates_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3639,8 +3639,8 @@
         }
       },
       "indexes": {
-        "identity_events_org_time_idx": {
-          "name": "identity_events_org_time_idx",
+        "identity_events_instance_time_idx": {
+          "name": "identity_events_instance_time_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3952,8 +3952,8 @@
           "method": "btree",
           "with": {}
         },
-        "service_accounts_org_type_idx": {
-          "name": "service_accounts_org_type_idx",
+        "service_accounts_instance_type_idx": {
+          "name": "service_accounts_instance_type_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3973,8 +3973,8 @@
           "method": "btree",
           "with": {}
         },
-        "service_accounts_org_status_idx": {
-          "name": "service_accounts_org_status_idx",
+        "service_accounts_instance_status_idx": {
+          "name": "service_accounts_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -3994,8 +3994,8 @@
           "method": "btree",
           "with": {}
         },
-        "service_accounts_org_host_idx": {
-          "name": "service_accounts_org_host_idx",
+        "service_accounts_instance_host_idx": {
+          "name": "service_accounts_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -4210,8 +4210,8 @@
           "method": "btree",
           "with": {}
         },
-        "ssh_keys_org_fingerprint_idx": {
-          "name": "ssh_keys_org_fingerprint_idx",
+        "ssh_keys_instance_fingerprint_idx": {
+          "name": "ssh_keys_instance_fingerprint_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -4231,8 +4231,8 @@
           "method": "btree",
           "with": {}
         },
-        "ssh_keys_org_type_idx": {
-          "name": "ssh_keys_org_type_idx",
+        "ssh_keys_instance_type_idx": {
+          "name": "ssh_keys_instance_type_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -4252,8 +4252,8 @@
           "method": "btree",
           "with": {}
         },
-        "ssh_keys_org_status_idx": {
-          "name": "ssh_keys_org_status_idx",
+        "ssh_keys_instance_status_idx": {
+          "name": "ssh_keys_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -4273,8 +4273,8 @@
           "method": "btree",
           "with": {}
         },
-        "ssh_keys_org_host_idx": {
-          "name": "ssh_keys_org_host_idx",
+        "ssh_keys_instance_host_idx": {
+          "name": "ssh_keys_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -4432,8 +4432,8 @@
         }
       },
       "indexes": {
-        "domain_accounts_org_username_idx": {
-          "name": "domain_accounts_org_username_idx",
+        "domain_accounts_instance_username_idx": {
+          "name": "domain_accounts_instance_username_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -4453,8 +4453,8 @@
           "method": "btree",
           "with": {}
         },
-        "domain_accounts_org_status_idx": {
-          "name": "domain_accounts_org_status_idx",
+        "domain_accounts_instance_status_idx": {
+          "name": "domain_accounts_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -5671,8 +5671,8 @@
         }
       },
       "indexes": {
-        "terminal_sessions_org_host_idx": {
-          "name": "terminal_sessions_org_host_idx",
+        "terminal_sessions_instance_host_idx": {
+          "name": "terminal_sessions_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -6080,8 +6080,8 @@
           "method": "btree",
           "with": {}
         },
-        "sw_pkg_org_name_idx": {
-          "name": "sw_pkg_org_name_idx",
+        "sw_pkg_instance_name_idx": {
+          "name": "sw_pkg_instance_name_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -6542,8 +6542,8 @@
           "method": "btree",
           "with": {}
         },
-        "host_package_updates_org_status_idx": {
-          "name": "host_package_updates_org_status_idx",
+        "host_package_updates_instance_status_idx": {
+          "name": "host_package_updates_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -6748,8 +6748,8 @@
           "method": "btree",
           "with": {}
         },
-        "host_patch_statuses_org_status_idx": {
-          "name": "host_patch_statuses_org_status_idx",
+        "host_patch_statuses_instance_status_idx": {
+          "name": "host_patch_statuses_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -7011,8 +7011,8 @@
           "method": "btree",
           "with": {}
         },
-        "host_vuln_findings_org_status_idx": {
-          "name": "host_vuln_findings_org_status_idx",
+        "host_vuln_findings_instance_status_idx": {
+          "name": "host_vuln_findings_instance_status_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -8065,8 +8065,8 @@
         }
       },
       "indexes": {
-        "notes_org_active_updated_idx": {
-          "name": "notes_org_active_updated_idx",
+        "notes_instance_active_updated_idx": {
+          "name": "notes_instance_active_updated_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -8530,8 +8530,8 @@
         }
       },
       "indexes": {
-        "audit_events_org_time_idx": {
-          "name": "audit_events_org_time_idx",
+        "audit_events_instance_time_idx": {
+          "name": "audit_events_instance_time_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -8753,8 +8753,8 @@
         }
       },
       "indexes": {
-        "build_doc_asset_storage_settings_org_uidx": {
-          "name": "build_doc_asset_storage_settings_org_uidx",
+        "build_doc_asset_storage_settings_instance_uidx": {
+          "name": "build_doc_asset_storage_settings_instance_uidx",
           "columns": [
             {
               "expression": "instance_id",
@@ -9415,8 +9415,8 @@
         }
       },
       "indexes": {
-        "build_doc_snippets_org_updated_idx": {
-          "name": "build_doc_snippets_org_updated_idx",
+        "build_doc_snippets_instance_updated_idx": {
+          "name": "build_doc_snippets_instance_updated_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -9757,8 +9757,8 @@
         }
       },
       "indexes": {
-        "build_doc_templates_org_active_idx": {
-          "name": "build_doc_templates_org_active_idx",
+        "build_doc_templates_instance_active_idx": {
+          "name": "build_doc_templates_instance_active_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -9945,8 +9945,8 @@
         }
       },
       "indexes": {
-        "build_docs_org_updated_idx": {
-          "name": "build_docs_org_updated_idx",
+        "build_docs_instance_updated_idx": {
+          "name": "build_docs_instance_updated_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10453,8 +10453,8 @@
         }
       },
       "indexes": {
-        "calendar_event_hosts_org_host_idx": {
-          "name": "calendar_event_hosts_org_host_idx",
+        "calendar_event_hosts_instance_host_idx": {
+          "name": "calendar_event_hosts_instance_host_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10567,8 +10567,8 @@
         }
       },
       "indexes": {
-        "calendar_event_participants_org_user_idx": {
-          "name": "calendar_event_participants_org_user_idx",
+        "calendar_event_participants_instance_user_idx": {
+          "name": "calendar_event_participants_instance_user_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10770,8 +10770,8 @@
         }
       },
       "indexes": {
-        "calendar_events_org_range_idx": {
-          "name": "calendar_events_org_range_idx",
+        "calendar_events_instance_range_idx": {
+          "name": "calendar_events_instance_range_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10797,8 +10797,8 @@
           "method": "btree",
           "with": {}
         },
-        "calendar_events_org_series_idx": {
-          "name": "calendar_events_org_series_idx",
+        "calendar_events_instance_series_idx": {
+          "name": "calendar_events_instance_series_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10824,8 +10824,8 @@
           "method": "btree",
           "with": {}
         },
-        "calendar_events_org_client_request_idx": {
-          "name": "calendar_events_org_client_request_idx",
+        "calendar_events_instance_client_request_idx": {
+          "name": "calendar_events_instance_client_request_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10845,8 +10845,8 @@
           "method": "btree",
           "with": {}
         },
-        "calendar_events_org_series_occurrence_idx": {
-          "name": "calendar_events_org_series_occurrence_idx",
+        "calendar_events_instance_series_occurrence_idx": {
+          "name": "calendar_events_instance_series_occurrence_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -10991,8 +10991,8 @@
           "method": "btree",
           "with": {}
         },
-        "host_docker_status_org_status_checked_idx": {
-          "name": "host_docker_status_org_status_checked_idx",
+        "host_docker_status_instance_status_checked_idx": {
+          "name": "host_docker_status_instance_status_checked_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -11209,8 +11209,8 @@
           "method": "btree",
           "with": {}
         },
-        "docker_containers_org_host_present_seen_idx": {
-          "name": "docker_containers_org_host_present_seen_idx",
+        "docker_containers_instance_host_present_seen_idx": {
+          "name": "docker_containers_instance_host_present_seen_idx",
           "columns": [
             {
               "expression": "instance_id",
@@ -11242,8 +11242,8 @@
           "method": "btree",
           "with": {}
         },
-        "docker_containers_org_image_idx": {
-          "name": "docker_containers_org_image_idx",
+        "docker_containers_instance_image_idx": {
+          "name": "docker_containers_instance_image_idx",
           "columns": [
             {
               "expression": "instance_id",

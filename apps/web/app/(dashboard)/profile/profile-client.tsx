@@ -94,8 +94,8 @@ export function ProfileClient({ user, instanceId }: ProfileClientProps) {
   }, [twoFactorUri])
   const requireTwoFactorSetup = searchParams.get('setup') === 'two-factor' && !twoFactorEnabled
 
-  const { data: orgNotifSettings } = useQuery({
-    queryKey: ['org-notification-settings', instanceId],
+  const { data: instanceNotifSettings } = useQuery({
+    queryKey: ['instance-notification-settings', instanceId],
     queryFn: () => getInstanceNotificationSettings(instanceId),
     enabled: !!instanceId,
   })
@@ -568,7 +568,7 @@ export function ProfileClient({ user, instanceId }: ProfileClientProps) {
       </Card>
 
       {/* Notifications */}
-      {orgNotifSettings?.inAppEnabled && (
+      {instanceNotifSettings?.inAppEnabled && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -576,7 +576,7 @@ export function ProfileClient({ user, instanceId }: ProfileClientProps) {
               Notifications
             </CardTitle>
             <CardDescription>
-              {orgNotifSettings.allowUserOptOut
+              {instanceNotifSettings.allowUserOptOut
                 ? 'Control whether you receive in-app notifications for alert events'
                 : 'Your instance requires in-app notifications for your role'}
             </CardDescription>
@@ -591,7 +591,7 @@ export function ProfileClient({ user, instanceId }: ProfileClientProps) {
               </div>
               <Switch
                 checked={notificationsEnabled}
-                disabled={!orgNotifSettings.allowUserOptOut || notifMutation.isPending}
+                disabled={!instanceNotifSettings.allowUserOptOut || notifMutation.isPending}
                 data-testid="profile-notifications-toggle"
                 onCheckedChange={(checked) => {
                   setNotificationsEnabled(checked)

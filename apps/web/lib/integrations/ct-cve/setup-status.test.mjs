@@ -5,17 +5,17 @@ import { buildCtCveConnectorSetupOverview } from './setup-status.ts'
 
 test('summarises DB-backed CT-CVE connector settings without exposing token identifiers or secrets', async () => {
   const overview = await buildCtCveConnectorSetupOverview({
-    instanceId: 'org_1',
+    instanceId: 'instance_1',
     settingsRepository: {
       async getSummary(instanceId) {
-        assert.equal(instanceId, 'org_1')
+        assert.equal(instanceId, 'instance_1')
         return {
-          instanceId: 'org_1',
+          instanceId: 'instance_1',
           enabled: true,
           name: 'Primary CT-CVE',
           baseUrl: 'https://ct-cve.example.invalid',
-          inventoryTokenId: 'ctops_inventory_org_1',
-          ctCveTokenId: 'ctcve_findings_org_1',
+          inventoryTokenId: 'inventory-token-id',
+          ctCveTokenId: 'finding-token-id',
           hasInventoryTokenSecret: true,
           hasCtCveTokenSecret: true,
         }
@@ -23,10 +23,10 @@ test('summarises DB-backed CT-CVE connector settings without exposing token iden
     },
     statusRepository: {
       async get(instanceId) {
-        assert.equal(instanceId, 'org_1')
+        assert.equal(instanceId, 'instance_1')
         return {
           contractVersion: '2026-04-30',
-          instanceId: 'org_1',
+          instanceId: 'instance_1',
           configured: true,
           enabled: true,
           lastInventoryPushAt: '2026-05-01T09:00:00.000Z',
@@ -58,16 +58,16 @@ test('summarises DB-backed CT-CVE connector settings without exposing token iden
     targets: [{ name: 'Primary CT-CVE', baseUrl: 'https://ct-cve.example.invalid' }],
     error: null,
   })
-  assert.equal(JSON.stringify(overview).includes('ctcve_findings_org_1'), false)
-  assert.equal(JSON.stringify(overview).includes('ctops_inventory_org_1'), false)
+  assert.equal(JSON.stringify(overview).includes('finding-token-id'), false)
+  assert.equal(JSON.stringify(overview).includes('inventory-token-id'), false)
 })
 
 test('reports missing CT-CVE app settings as unconfigured', async () => {
   const overview = await buildCtCveConnectorSetupOverview({
-    instanceId: 'org_1',
+    instanceId: 'instance_1',
     settingsRepository: {
       async getSummary(instanceId) {
-        assert.equal(instanceId, 'org_1')
+        assert.equal(instanceId, 'instance_1')
         return null
       },
     },

@@ -1,15 +1,15 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+import { TEST_INSTANCE, TEST_USER } from '../fixtures/seed'
 
 const CALENDAR_TEST_NOW = new Date('2026-05-09T12:00:00Z')
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
     SELECT instanceSettings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
     JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+    WHERE instanceSettings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
@@ -22,7 +22,7 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ in
 
 test('engineer can create a host-linked calendar event with participant roles across calendar views', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getInstanceAndUserIds(sql)
 
   await sql`
     UPDATE "user"
@@ -37,7 +37,7 @@ test('engineer can create a host-linked calendar event with participant roles ac
 
   await sql`
     INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at, instance_id, role, roles, is_active)
-    VALUES ('calendar-approver-1', 'Calendar Approver', 'calendar-approver@example.com', true, NOW(), NOW(), ${instanceId}, 'org_admin', '["org_admin"]'::jsonb, true)
+    VALUES ('calendar-approver-1', 'Calendar Approver', 'calendar-approver@example.com', true, NOW(), NOW(), ${instanceId}, 'instance_admin', '["instance_admin"]'::jsonb, true)
   `
 
   await page.clock.setFixedTime(CALENDAR_TEST_NOW)
@@ -100,7 +100,7 @@ test('engineer can create a host-linked calendar event with participant roles ac
 
 test('dragging one recurring occurrence creates an exception without moving the series', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO calendar_events (
@@ -167,7 +167,7 @@ test('dragging one recurring occurrence creates an exception without moving the 
 
 test('overlapping timed calendar events render side by side', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO calendar_events (id, instance_id, created_by, title, starts_at, ends_at, all_day, timezone, status, category)
@@ -202,7 +202,7 @@ test('overlapping timed calendar events render side by side', async ({ authentic
 
 test('read-only users can view calendar events but cannot create them', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     UPDATE "user"

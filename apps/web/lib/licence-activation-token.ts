@@ -17,8 +17,8 @@ const MAX_TOKEN_AGE_DAYS = 30
 
 export type ActivationTokenPayload = {
   v: number
-  installOrgId: string
-  installOrgName: string
+  installInstanceId: string
+  installInstanceName: string
   generatedAt: string
   nonce: string
 }
@@ -46,8 +46,8 @@ export function encodeActivationToken(
 ): string {
   const payload: ActivationTokenPayload = {
     v: TOKEN_VERSION,
-    installOrgId: input.installOrgId,
-    installOrgName: input.installOrgName,
+    installInstanceId: input.installInstanceId,
+    installInstanceName: input.installInstanceName,
     generatedAt: (input.generatedAt ?? new Date()).toISOString(),
     nonce: input.nonce,
   }
@@ -79,11 +79,11 @@ export function decodeActivationToken(raw: string): ActivationTokenDecodeResult 
   if (p.v !== TOKEN_VERSION) {
     return { ok: false, error: `Unsupported activation token version: ${String(p.v)}` }
   }
-  if (typeof p.installOrgId !== 'string' || !p.installOrgId) {
-    return { ok: false, error: 'Activation token is missing installOrgId' }
+  if (typeof p.installInstanceId !== 'string' || !p.installInstanceId) {
+    return { ok: false, error: 'Activation token is missing installInstanceId' }
   }
-  if (typeof p.installOrgName !== 'string' || !p.installOrgName) {
-    return { ok: false, error: 'Activation token is missing installOrgName' }
+  if (typeof p.installInstanceName !== 'string' || !p.installInstanceName) {
+    return { ok: false, error: 'Activation token is missing installInstanceName' }
   }
   if (typeof p.generatedAt !== 'string' || !p.generatedAt) {
     return { ok: false, error: 'Activation token is missing generatedAt' }
@@ -108,8 +108,8 @@ export function decodeActivationToken(raw: string): ActivationTokenDecodeResult 
     ok: true,
     payload: {
       v: TOKEN_VERSION,
-      installOrgId: p.installOrgId,
-      installOrgName: p.installOrgName,
+      installInstanceId: p.installInstanceId,
+      installInstanceName: p.installInstanceName,
       generatedAt: p.generatedAt,
       nonce: p.nonce,
     },

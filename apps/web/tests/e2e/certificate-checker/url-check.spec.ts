@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
 const TRACKING_TEST_CERT_PEM = `-----BEGIN CERTIFICATE-----
 MIIDZTCCAk2gAwIBAgIUGqljnkaJw0tIYv9uPQ+dGmImmaMwDQYJKoZIhvcNAQEL
@@ -26,11 +26,11 @@ z9EhcxayTDhI7Oo2n2yorFz7WHBpytSIN1vQTrhRAUPbNXAcOaUie5TserTteazP
 sNone70z9cF/
 -----END CERTIFICATE-----`
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
@@ -247,7 +247,7 @@ test('authenticated user can analyse an uploaded certificate file with a matchin
 
 test('authenticated user can track an uploaded certificate after analysis', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await page.route('**/api/tools/certificate-checker', async (route) => {
     await route.fulfill({
       status: 200,

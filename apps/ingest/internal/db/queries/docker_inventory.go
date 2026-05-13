@@ -76,6 +76,11 @@ type dockerContainerLifecycleSnapshot struct {
 	IsPresent         bool
 }
 
+type dockerContainerLifecycleInsert struct {
+	RowID string
+	Event DockerContainerLifecycleEvent
+}
+
 func DockerContainerInventoryReportsFromProto(items []*agentv1.DockerContainerInventory, receivedAt time.Time) []DockerContainerInventoryReport {
 	reports := make([]DockerContainerInventoryReport, 0, len(items))
 	for _, item := range items {
@@ -229,7 +234,7 @@ func SyncDockerContainerInventory(ctx context.Context, pool *pgxpool.Pool, insta
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+		disappeared := make([]dockerContainerLifecycleInsert, 0)
 		for rows.Next() {
 			var rowID string
 			var containerID string
@@ -251,12 +256,16 @@ func SyncDockerContainerInventory(ctx context.Context, pool *pgxpool.Pool, insta
 				OccurredAt:        inventoryAt.UTC(),
 				RestartCount:      restartCount.Int32,
 			}
-			if err := insertDockerLifecycleEvent(ctx, tx, instanceID, hostID, rowID, event); err != nil {
-				return err
-			}
+			disappeared = append(disappeared, dockerContainerLifecycleInsert{RowID: rowID, Event: event})
 		}
+		rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
+		}
+		for _, item := range disappeared {
+			if err := insertDockerLifecycleEvent(ctx, tx, instanceID, hostID, item.RowID, item.Event); err != nil {
+				return err
+			}
 		}
 	}
 

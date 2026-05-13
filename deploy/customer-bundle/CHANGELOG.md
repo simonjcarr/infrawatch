@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.11.0...bundle/v0.12.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add top container rankings ([04a75c5](https://github.com/carrtech-dev/ct-ops/commit/04a75c5374294fd077c162e14a3d2f885b97d6e3))
+
 ## [0.11.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.10.0...bundle/v0.11.0) (2026-05-13)
 
 

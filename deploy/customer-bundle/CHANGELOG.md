@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.13.0...bundle/v0.14.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add container alert rules ([b76feb2](https://github.com/carrtech-dev/ct-ops/commit/b76feb26449cf8a88d4de72fb7b85b211f19895e))
+
 ## [0.13.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.12.0...bundle/v0.13.0) (2026-05-13)
 
 

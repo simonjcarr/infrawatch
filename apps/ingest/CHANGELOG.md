@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.14.0...ingest/v0.15.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add container alert rules ([b76feb2](https://github.com/carrtech-dev/ct-ops/commit/b76feb26449cf8a88d4de72fb7b85b211f19895e))
+
 ## [0.14.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.13.0...ingest/v0.14.0) (2026-05-13)
 
 

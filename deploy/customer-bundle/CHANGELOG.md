@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.7.0...bundle/v0.8.0) (2026-05-13)
+
+
+### Features
+
+* **web:** add docker container metric charts ([b7f06f3](https://github.com/carrtech-dev/ct-ops/commit/b7f06f397df8809fcf9b003efeb69b42745ffa1e))
+
 ## [0.7.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.6.0...bundle/v0.7.0) (2026-05-13)
 
 

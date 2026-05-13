@@ -22,3 +22,14 @@ test('container inventory is available as a top-level host tab', () => {
   assert.equal(containers.children, null)
   assert.equal(inventory?.children?.includes('containers'), false)
 })
+
+test('notes live under the top-level admin host tab', () => {
+  const admin = PARENT_TABS.find((tab) => tab.id === 'admin')
+  const notes = PARENT_TABS.find((tab) => tab.id === 'notes')
+
+  assert.ok(admin)
+  assert.equal(admin.label, 'Admin')
+  assert.equal(admin.defaultTab, 'notes')
+  assert.deepEqual(admin.children, ['notes'])
+  assert.equal(notes, undefined)
+})

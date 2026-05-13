@@ -417,14 +417,19 @@ export async function getHostDockerContainerLifecycleEvents(
     SELECT
       e.id,
       e.docker_container_id,
-      e.primary_name,
-      e.image,
-      e.state,
-      e.status,
+      COALESCE(dc.primary_name, e.primary_name) AS primary_name,
+      COALESCE(dc.image, e.image) AS image,
+      CASE WHEN dc.is_present = true THEN dc.state ELSE e.state END AS state,
+      CASE WHEN dc.is_present = true THEN dc.status ELSE e.status END AS status,
       e.event_type,
       e.occurred_at,
-      e.restart_count
+      CASE WHEN dc.is_present = true THEN dc.restart_count ELSE e.restart_count END AS restart_count
     FROM docker_container_lifecycle_events e
+    LEFT JOIN docker_containers dc
+      ON dc.id = e.docker_container_row_id
+     AND dc.instance_id = e.instance_id
+     AND dc.host_id = e.host_id
+     AND dc.docker_container_id = e.docker_container_id
     WHERE e.instance_id = ${instanceId}
       AND e.host_id = ${hostId}
     ORDER BY e.occurred_at DESC, e.created_at DESC

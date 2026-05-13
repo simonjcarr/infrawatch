@@ -58,5 +58,7 @@ test('getHostDockerContainerLifecycleEvents validates host scope before querying
   assert.match(segment, /eq\(hosts\.instanceId, instanceId\)/, 'host lookup must be scoped to the caller instance')
   assert.match(segment, /WHERE e\.instance_id = \$\{instanceId\}/, 'timeline query must be scoped to instance')
   assert.match(segment, /AND e\.host_id = \$\{hostId\}/, 'timeline query must be scoped to host')
+  assert.match(segment, /LEFT JOIN docker_containers dc/, 'timeline query should join current container inventory')
+  assert.match(segment, /CASE WHEN dc\.is_present = true THEN dc\.status ELSE e\.status END AS status/, 'present containers should show current Docker status text')
   assert.match(segment, /LIMIT \$\{MAX_LIFECYCLE_EVENTS\}/, 'timeline query must cap returned events')
 })

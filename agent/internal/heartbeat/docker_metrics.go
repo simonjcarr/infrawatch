@@ -18,6 +18,7 @@ const (
 	dockerMetricStatsTimeout          = 5 * time.Second
 	defaultDockerMetricSampleInterval = 2 * time.Second
 	defaultDockerMetricBufferSamples  = 10_000
+	maxDockerMetricConcurrentStats    = 8
 )
 
 type dockerMetricCollector func(context.Context) ([]*agentv1.DockerContainerMetricSample, error)
@@ -37,6 +38,11 @@ type dockerMetricBuffer struct {
 	max     int
 	samples []*agentv1.DockerContainerMetricSample
 	dropped uint32
+}
+
+type dockerMetricSampleResult struct {
+	index  int
+	sample *agentv1.DockerContainerMetricSample
 }
 
 type dockerContainerStats struct {
@@ -170,21 +176,62 @@ func collectDockerMetricSamplesWithClient(ctx context.Context, client *http.Clie
 	}
 
 	recordedAt := time.Now().Unix()
-	samples := make([]*agentv1.DockerContainerMetricSample, 0, len(containers))
+	running := make([]dockerContainerListItem, 0, len(containers))
 	for _, container := range containers {
+		state := strings.TrimSpace(container.State)
+		if state != "" && !strings.EqualFold(state, "running") {
+			continue
+		}
 		containerID := truncateUTF8(strings.TrimSpace(container.ID), maxDockerContainerIDBytes)
 		if containerID == "" {
 			continue
 		}
-		stats, err := fetchDockerContainerStats(ctx, client, baseURL, containerID)
-		if err != nil {
+		container.ID = containerID
+		running = append(running, container)
+	}
+
+	results := make(chan dockerMetricSampleResult, len(running))
+	sem := make(chan struct{}, maxDockerMetricConcurrentStats)
+	var wg sync.WaitGroup
+	for index, container := range running {
+		wg.Add(1)
+		go func(index int, containerID string) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+
+			stats, err := fetchDockerContainerStats(ctx, client, baseURL, containerID)
+			if err != nil {
+				return
+			}
+			sample := dockerMetricSampleFromStats(containerID, recordedAt, stats)
+			if inspect, err := inspectDockerContainer(ctx, client, baseURL, containerID); err == nil {
+				sample.RestartCount = inspect.RestartCount
+			}
+			results <- dockerMetricSampleResult{index: index, sample: sample}
+		}(index, container.ID)
+	}
+	wg.Wait()
+	close(results)
+
+	ordered := make([]*agentv1.DockerContainerMetricSample, len(running))
+	count := 0
+	for result := range results {
+		if result.sample == nil || result.index < 0 || result.index >= len(ordered) {
 			continue
 		}
-		sample := dockerMetricSampleFromStats(containerID, recordedAt, stats)
-		if inspect, err := inspectDockerContainer(ctx, client, baseURL, containerID); err == nil {
-			sample.RestartCount = inspect.RestartCount
+		ordered[result.index] = result.sample
+		count++
+	}
+	samples := make([]*agentv1.DockerContainerMetricSample, 0, count)
+	for _, sample := range ordered {
+		if sample != nil {
+			samples = append(samples, sample)
 		}
-		samples = append(samples, sample)
 	}
 	return samples, nil
 }
@@ -194,7 +241,7 @@ func listDockerContainersForMetrics(ctx context.Context, client *http.Client, ba
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL+"?all=1", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
 	if err != nil {
 		return nil, err
 	}

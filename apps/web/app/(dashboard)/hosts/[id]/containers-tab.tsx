@@ -322,7 +322,11 @@ export function ContainersTab({ scopeId, hostId, dockerStatus }: Props) {
 
   const containers = useMemo(() => data?.containers ?? [], [data?.containers])
   const imageOptions = data?.imageOptions ?? []
-  const selectedContainer = containers.find((container) => container.dockerContainerId === selectedContainerId) ?? containers[0] ?? null
+  const defaultMetricsContainer = containers.find((container) => container.isPresent && container.state === 'running')
+    ?? containers.find((container) => container.isPresent)
+    ?? containers[0]
+    ?? null
+  const selectedContainer = containers.find((container) => container.dockerContainerId === selectedContainerId) ?? defaultMetricsContainer
   const effectiveSelectedContainerId = selectedContainer?.dockerContainerId ?? null
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['host-docker-container-metrics', scopeId, hostId, effectiveSelectedContainerId, metricsRange],

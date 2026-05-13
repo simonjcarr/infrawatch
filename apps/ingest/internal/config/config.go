@@ -260,6 +260,13 @@ func applyEnv(cfg *Config) {
 			cfg.GRPCPort = port
 		}
 	}
+	if v := os.Getenv("INGEST_HTTP_PORT"); v != "" {
+		var port int
+		_, _ = fmt.Sscanf(v, "%d", &port)
+		if port > 0 {
+			cfg.HTTPPort = port
+		}
+	}
 	if v := os.Getenv("INGEST_TLS_CERT"); v != "" {
 		cfg.TLS.CertFile = v
 	}

@@ -1,0 +1,230 @@
+##
+# CT-Ops full local development stack.
+#
+# This compose file is intentionally source-tree only. It runs backing services
+# and a dev proxy while Next.js and ingest run from bind-mounted source for
+# fast local feedback.
+# Use ./dev-stack.sh rather than invoking this file directly.
+##
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  password-manager-db:
+    image: postgres:17-alpine@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: password_manager
+      POSTGRES_USER: password_manager
+      POSTGRES_PASSWORD: ${PASSWORD_MANAGER_DB_PASSWORD}
+    volumes:
+      - password_manager_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U password_manager -d password_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  password-manager-migrate:
+    image: ${PASSWORD_MANAGER_API_IMAGE:?PASSWORD_MANAGER_API_IMAGE must be set by dev-stack.sh}
+    restart: "no"
+    depends_on:
+      password-manager-db:
+        condition: service_healthy
+    environment:
+      PM_DATABASE_URL: postgres://password_manager:${PASSWORD_MANAGER_DB_PASSWORD}@password-manager-db:5432/password_manager?sslmode=disable
+      PM_CT_OPS_ISSUER: ${PASSWORD_MANAGER_CT_OPS_ISSUER}
+      PM_CT_OPS_AUDIENCE: ${PASSWORD_MANAGER_CT_OPS_AUDIENCE}
+      PM_CT_OPS_PRODUCT: ${PASSWORD_MANAGER_CT_OPS_PRODUCT}
+      PM_CT_OPS_INSTANCE_ID: ${CT_OPS_INSTANCE_ID}
+      PM_CT_OPS_ED25519_PUBLIC_KEY: ${PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY}
+      PM_TRUSTED_ORIGINS: ${PASSWORD_MANAGER_TRUSTED_ORIGINS}
+      PM_SESSION_COOKIE_SECURE: ${PASSWORD_MANAGER_SESSION_COOKIE_SECURE}
+    entrypoint: ["/app/password-manager-migrate"]
+    command: ["-action", "up"]
+
+  password-manager-api:
+    image: ${PASSWORD_MANAGER_API_IMAGE:?PASSWORD_MANAGER_API_IMAGE must be set by dev-stack.sh}
+    restart: unless-stopped
+    depends_on:
+      password-manager-db:
+        condition: service_healthy
+      password-manager-migrate:
+        condition: service_completed_successfully
+    environment:
+      PM_DATABASE_URL: postgres://password_manager:${PASSWORD_MANAGER_DB_PASSWORD}@password-manager-db:5432/password_manager?sslmode=disable
+      PM_CT_OPS_ISSUER: ${PASSWORD_MANAGER_CT_OPS_ISSUER}
+      PM_CT_OPS_AUDIENCE: ${PASSWORD_MANAGER_CT_OPS_AUDIENCE}
+      PM_CT_OPS_PRODUCT: ${PASSWORD_MANAGER_CT_OPS_PRODUCT}
+      PM_CT_OPS_INSTANCE_ID: ${CT_OPS_INSTANCE_ID}
+      PM_CT_OPS_ED25519_PUBLIC_KEY: ${PASSWORD_MANAGER_CT_OPS_ED25519_PUBLIC_KEY}
+      PM_TRUSTED_ORIGINS: ${PASSWORD_MANAGER_TRUSTED_ORIGINS}
+      PM_SESSION_COOKIE_SECURE: ${PASSWORD_MANAGER_SESSION_COOKIE_SECURE}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  web-migrate:
+    image: node:20-bookworm-slim
+    restart: "no"
+    working_dir: /workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS}
+    volumes:
+      - .:/workspace
+      - web_node_modules:/workspace/node_modules
+      - web_app_node_modules:/workspace/apps/web/node_modules
+      - pnpm_store:/pnpm/store
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        corepack enable
+        corepack prepare pnpm@10.6.5 --activate
+        pnpm config set store-dir /pnpm/store
+        pnpm install --frozen-lockfile
+        cd apps/web
+        pnpm run db:migrate
+
+  web-dev:
+    image: node:20-bookworm-slim
+    restart: unless-stopped
+    working_dir: /workspace
+    depends_on:
+      web-migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS}
+      CT_OPS_TRUST_PROXY_HEADERS: ${CT_OPS_TRUST_PROXY_HEADERS}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION}
+      AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL}
+      INGEST_WS_URL: ${INGEST_WS_URL}
+      AGENT_DIST_DIR: ./data/agent-dist
+      INGEST_TLS_CERT: /workspace/deploy/dev-tls/server.crt
+      PASSWORD_MANAGER_CT_OPS_ISSUER: ${PASSWORD_MANAGER_CT_OPS_ISSUER}
+      PASSWORD_MANAGER_CT_OPS_AUDIENCE: ${PASSWORD_MANAGER_CT_OPS_AUDIENCE}
+      PASSWORD_MANAGER_CT_OPS_PRODUCT: ${PASSWORD_MANAGER_CT_OPS_PRODUCT}
+      PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY: ${PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY}
+      CT_OPS_INSTANCE_ID: ${CT_OPS_INSTANCE_ID}
+      ANSIBLE_API_URL: http://ansible-api:8080
+      CT_OPS_DEV_NEXT_FLAGS: ${CT_OPS_DEV_NEXT_FLAGS}
+    expose:
+      - "3001"
+    ports:
+      - "127.0.0.1:${CT_OPS_DEV_NEXT_PORT}:3001"
+    volumes:
+      - .:/workspace
+      - web_node_modules:/workspace/node_modules
+      - web_app_node_modules:/workspace/apps/web/node_modules
+      - pnpm_store:/pnpm/store
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        corepack enable
+        corepack prepare pnpm@10.6.5 --activate
+        pnpm config set store-dir /pnpm/store
+        pnpm install --frozen-lockfile
+        cd apps/web
+        pnpm exec next dev ${CT_OPS_DEV_NEXT_FLAGS} -H 0.0.0.0 -p 3001
+
+  ingest-dev:
+    image: golang:1.25
+    restart: unless-stopped
+    working_dir: /workspace
+    depends_on:
+      db:
+        condition: service_healthy
+      web-migrate:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      LDAP_ENCRYPTION_KEY: ${BETTER_AUTH_SECRET}
+      INGEST_GRPC_PORT: "9443"
+      INGEST_HTTP_PORT: "8080"
+      INGEST_TLS_CERT: /workspace/deploy/dev-tls/server.crt
+      INGEST_TLS_KEY: /workspace/deploy/dev-tls/server.key
+      INGEST_JWT_KEY_FILE: /workspace/deploy/dev-ingest-data/jwt_key.pem
+      INGEST_AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL}
+      INGEST_RELEASE_MANIFEST_PATH: /workspace/.release-please-manifest.json
+    ports:
+      - "127.0.0.1:${CT_OPS_DEV_INGEST_HTTP_PORT}:8080"
+      - "127.0.0.1:${CT_OPS_DEV_INGEST_GRPC_PORT}:9443"
+    volumes:
+      - .:/workspace
+      - go_build_cache:/go-cache
+      - go_mod_cache:/go/pkg/mod
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        mkdir -p /workspace/deploy/dev-ingest-data
+        GOCACHE=/go-cache /usr/local/go/bin/go run ./apps/ingest/cmd/ingest
+
+  dev-proxy:
+    image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    restart: unless-stopped
+    depends_on:
+      web-dev:
+        condition: service_started
+      ingest-dev:
+        condition: service_started
+      password-manager-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${CT_OPS_DEV_PROXY_PORT}:80"
+    environment:
+      CT_OPS_DEV_NEXT_PORT: ${CT_OPS_DEV_NEXT_PORT}
+      CT_OPS_DEV_WEB_UPSTREAM: web-dev:3001
+      CT_OPS_DEV_INGEST_UPSTREAM: ingest-dev:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./deploy/nginx/dev-stack.conf.template:/etc/nginx/templates/default.conf.template:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+  password_manager_db_data:
+  web_node_modules:
+  web_app_node_modules:
+  pnpm_store:
+  go_build_cache:
+  go_mod_cache:

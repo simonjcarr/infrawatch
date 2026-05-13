@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.146.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.145.0...web/v0.146.0) (2026-05-13)
+
+
+### Features
+
+* **docker:** add container lifecycle timeline ([a527cb6](https://github.com/carrtech-dev/ct-ops/commit/a527cb6867d76517c015cb9907e4744701474b9d))
+
 ## [0.145.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.144.0...web/v0.145.0) (2026-05-13)
 
 

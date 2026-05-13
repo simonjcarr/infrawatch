@@ -181,8 +181,8 @@ services:
       INGEST_AGENT_DOWNLOAD_BASE_URL: ${AGENT_DOWNLOAD_BASE_URL}
       INGEST_RELEASE_MANIFEST_PATH: /workspace/.release-please-manifest.json
     ports:
-      - "127.0.0.1:${CT_OPS_DEV_INGEST_HTTP_PORT}:8080"
-      - "127.0.0.1:${CT_OPS_DEV_INGEST_GRPC_PORT}:9443"
+      - "${CT_OPS_DEV_BIND_ADDR}:${CT_OPS_DEV_INGEST_HTTP_PORT}:8080"
+      - "${CT_OPS_DEV_BIND_ADDR}:${CT_OPS_DEV_INGEST_GRPC_PORT}:9443"
     volumes:
       - .:/workspace
       - go_build_cache:/go-cache
@@ -205,7 +205,7 @@ services:
       password-manager-api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${CT_OPS_DEV_PROXY_PORT}:80"
+      - "${CT_OPS_DEV_BIND_ADDR}:${CT_OPS_DEV_PROXY_PORT}:80"
     environment:
       CT_OPS_DEV_NEXT_PORT: ${CT_OPS_DEV_NEXT_PORT}
       CT_OPS_DEV_WEB_UPSTREAM: web-dev:3001

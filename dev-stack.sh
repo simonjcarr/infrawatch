@@ -16,7 +16,11 @@ DOWN=false
 RESET=false
 STATUS=false
 CHECK=false
+CHECK_PUBLIC=false
 WRITE_CONFIG_ONLY=false
+PUBLIC=false
+LOCAL=false
+PUBLIC_HOST_OVERRIDE=""
 REBUILD_AGENTS=false
 SKIP_AGENTS=false
 
@@ -30,26 +34,47 @@ Usage:
   ./dev-stack.sh --reset          Stop and remove local dev volumes/config
   ./dev-stack.sh --status         Show local dev service status
   ./dev-stack.sh --check          Check local dev endpoints
+  ./dev-stack.sh --check-public   Check the public agent-connectable endpoints
+  ./dev-stack.sh --public         Expose web and ingest on this laptop's network IP
+  ./dev-stack.sh --public-host IP Expose web and ingest using a specific host/IP
+  ./dev-stack.sh --local          Switch generated config back to loopback-only
   ./dev-stack.sh --rebuild-agents Rebuild agent binaries before starting
   ./dev-stack.sh --skip-agents    Do not build missing agent binaries
 
 Open http://localhost:3000. The dev proxy listens on :3000 and forwards to
 Next.js, Password Manager, and ingest running in Docker.
+
+Agent-connectable mode keeps Postgres private but exposes the web proxy and
+ingest on the configured host interface. Prefer a Tailscale IP for --public-host.
 EOF
 }
 
-for arg in "$@"; do
+while [ "$#" -gt 0 ]; do
+  arg="$1"
   case "$arg" in
     --down) DOWN=true ;;
     --reset) RESET=true ;;
     --status) STATUS=true ;;
     --check) CHECK=true ;;
+    --check-public) CHECK_PUBLIC=true ;;
     --write-config-only) WRITE_CONFIG_ONLY=true ;;
+    --public) PUBLIC=true ;;
+    --local) LOCAL=true ;;
+    --public-host)
+      PUBLIC=true
+      shift
+      if [ "$#" -eq 0 ]; then
+        echo "ERROR: --public-host requires a host or IP value" >&2
+        exit 1
+      fi
+      PUBLIC_HOST_OVERRIDE="$1"
+      ;;
     --rebuild-agents) REBUILD_AGENTS=true ;;
     --skip-agents) SKIP_AGENTS=true ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown flag: $arg" >&2; usage >&2; exit 1 ;;
   esac
+  shift
 done
 
 compose() {
@@ -90,9 +115,11 @@ upsert_env_var() {
   local file="$1"
   local key="$2"
   local value="$3"
+  local tmp
 
   mkdir -p "$(dirname "$file")"
   touch "$file"
+  tmp="$(mktemp "${file}.XXXXXX")"
   awk -v key="$key" -v value="$value" '
     BEGIN { replaced = 0 }
     $0 ~ "^#?[[:space:]]*" key "=" {
@@ -106,7 +133,7 @@ upsert_env_var() {
         print key "=" value
       }
     }
-  ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+  ' "$file" > "$tmp" && mv "$tmp" "$file"
   chmod 600 "$file"
 }
 
@@ -125,6 +152,54 @@ generate_hex() {
 read_password_manager_digest_reference() {
   sed -n 's/.*"digest_reference"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
     deploy/password-manager-release.json | head -n1
+}
+
+detect_public_host() {
+  local host
+
+  if command -v tailscale >/dev/null 2>&1; then
+    host="$(tailscale ip -4 2>/dev/null | head -n1 || true)"
+    if [ -n "$host" ]; then
+      printf '%s\n' "$host"
+      return 0
+    fi
+  fi
+
+  if command -v ipconfig >/dev/null 2>&1; then
+    host="$(ipconfig getifaddr en0 2>/dev/null || true)"
+    if [ -n "$host" ]; then
+      printf '%s\n' "$host"
+      return 0
+    fi
+  fi
+
+  if command -v ip >/dev/null 2>&1; then
+    host="$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {split($2,a,"/"); print a[1]; exit}' || true)"
+    if [ -n "$host" ]; then
+      printf '%s\n' "$host"
+      return 0
+    fi
+  elif command -v ifconfig >/dev/null 2>&1; then
+    host="$(ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/ {print $2; exit}' || true)"
+    if [ -n "$host" ]; then
+      printf '%s\n' "$host"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+san_for_host() {
+  local host="$1"
+
+  if printf '%s' "$host" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+    printf 'IP:%s\n' "$host"
+  elif printf '%s' "$host" | grep -q ':'; then
+    printf 'IP:%s\n' "$host"
+  else
+    printf 'DNS:%s\n' "$host"
+  fi
 }
 
 find_optional_command() {
@@ -187,6 +262,7 @@ EOF
 
 ensure_dev_env() {
   local proxy_port next_port postgres_port ingest_http_port ingest_grpc_port app_url pm_image
+  local bind_addr public_host public_enabled trusted_origins
   local private_key public_key keypair_output repaired_public_key
 
   need openssl
@@ -201,20 +277,55 @@ ensure_dev_env() {
   postgres_port="$(read_env_var "$DEV_ENV" POSTGRES_PORT)"
   ingest_http_port="$(read_env_var "$DEV_ENV" CT_OPS_DEV_INGEST_HTTP_PORT)"
   ingest_grpc_port="$(read_env_var "$DEV_ENV" CT_OPS_DEV_INGEST_GRPC_PORT)"
+  bind_addr="$(read_env_var "$DEV_ENV" CT_OPS_DEV_BIND_ADDR)"
+  public_host="$(read_env_var "$DEV_ENV" CT_OPS_DEV_PUBLIC_HOST)"
 
   proxy_port="${proxy_port:-3000}"
   next_port="${next_port:-3001}"
   postgres_port="${postgres_port:-55432}"
   ingest_http_port="${ingest_http_port:-8080}"
   ingest_grpc_port="${ingest_grpc_port:-9443}"
-  app_url="http://localhost:${proxy_port}"
+  bind_addr="${bind_addr:-127.0.0.1}"
+
+  if [ -n "$PUBLIC_HOST_OVERRIDE" ]; then
+    public_host="$PUBLIC_HOST_OVERRIDE"
+  fi
+  if $LOCAL; then
+    public_host=""
+    bind_addr="127.0.0.1"
+  fi
+
+  public_enabled=false
+  if ! $LOCAL && { $PUBLIC || [ "$bind_addr" != "127.0.0.1" ] || [ -n "$public_host" ]; }; then
+    public_enabled=true
+  fi
+
+  if $public_enabled; then
+    bind_addr="0.0.0.0"
+    if [ -z "$public_host" ]; then
+      if ! public_host="$(detect_public_host)"; then
+        echo "ERROR: could not detect a public host. Re-run with --public-host <tailscale-or-lan-ip>." >&2
+        exit 1
+      fi
+    fi
+    app_url="http://${public_host}:${proxy_port}"
+    trusted_origins="http://localhost:${proxy_port},http://127.0.0.1:${proxy_port},${app_url}"
+  else
+    bind_addr="127.0.0.1"
+    public_host=""
+    app_url="http://localhost:${proxy_port}"
+    trusted_origins="$app_url"
+  fi
 
   upsert_env_var "$DEV_ENV" COMPOSE_PROJECT_NAME "$COMPOSE_PROJECT_NAME"
+  upsert_env_var "$DEV_ENV" CT_OPS_DEV_BIND_ADDR "$bind_addr"
+  upsert_env_var "$DEV_ENV" CT_OPS_DEV_PUBLIC_HOST "$public_host"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_PROXY_PORT "$proxy_port"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_NEXT_PORT "$next_port"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_INGEST_HTTP_PORT "$ingest_http_port"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_INGEST_GRPC_PORT "$ingest_grpc_port"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_APP_URL "$app_url"
+  upsert_env_var "$DEV_ENV" CT_OPS_DEV_AGENT_INGEST_ADDRESS "${public_host:-localhost}:${ingest_grpc_port}"
   if [ -z "$(read_env_var "$DEV_ENV" CT_OPS_DEV_NEXT_FLAGS)" ]; then
     upsert_env_var "$DEV_ENV" CT_OPS_DEV_NEXT_FLAGS "--turbopack"
   fi
@@ -234,7 +345,7 @@ ensure_dev_env() {
     upsert_env_var "$DEV_ENV" BETTER_AUTH_SECRET "$(generate_hex 32)"
   fi
   upsert_env_var "$DEV_ENV" BETTER_AUTH_URL "$app_url"
-  upsert_env_var "$DEV_ENV" BETTER_AUTH_TRUSTED_ORIGINS "$app_url"
+  upsert_env_var "$DEV_ENV" BETTER_AUTH_TRUSTED_ORIGINS "$trusted_origins"
   upsert_env_var "$DEV_ENV" REQUIRE_EMAIL_VERIFICATION "false"
   upsert_env_var "$DEV_ENV" CT_OPS_TRUST_PROXY_HEADERS "true"
   upsert_env_var "$DEV_ENV" AGENT_DOWNLOAD_BASE_URL "$app_url"
@@ -249,7 +360,7 @@ ensure_dev_env() {
   upsert_env_var "$DEV_ENV" PASSWORD_MANAGER_CT_OPS_ISSUER "$app_url"
   upsert_env_var "$DEV_ENV" PASSWORD_MANAGER_CT_OPS_AUDIENCE "ct-password-manager"
   upsert_env_var "$DEV_ENV" PASSWORD_MANAGER_CT_OPS_PRODUCT "ct-password-manager"
-  upsert_env_var "$DEV_ENV" PASSWORD_MANAGER_TRUSTED_ORIGINS "$app_url"
+  upsert_env_var "$DEV_ENV" PASSWORD_MANAGER_TRUSTED_ORIGINS "$trusted_origins"
   upsert_env_var "$DEV_ENV" PASSWORD_MANAGER_SESSION_COOKIE_SECURE "false"
 
   private_key="$(read_env_var "$DEV_ENV" PASSWORD_MANAGER_CT_OPS_ED25519_PRIVATE_KEY)"
@@ -313,9 +424,29 @@ check_port_available() {
   fi
 }
 
+cert_has_san() {
+  local cert="$1"
+  local san="$2"
+  local value
+
+  value="${san#*:}"
+  [ -f "$cert" ] || return 1
+  openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null | grep -Fq "$value"
+}
+
 generate_dev_tls() {
-  if [ ! -f deploy/dev-tls/server.crt ] || [ ! -f deploy/dev-tls/server.key ]; then
-    deploy/scripts/gen-dev-tls.sh
+  local extra_sans="" force=0 public_host
+
+  public_host="$(read_env_var "$DEV_ENV" CT_OPS_DEV_PUBLIC_HOST)"
+  if [ -n "$public_host" ]; then
+    extra_sans="$(san_for_host "$public_host")"
+    if ! cert_has_san "deploy/dev-tls/server.crt" "$extra_sans"; then
+      force=1
+    fi
+  fi
+
+  if [ "$force" = "1" ] || [ ! -f deploy/dev-tls/server.crt ] || [ ! -f deploy/dev-tls/server.key ]; then
+    FORCE="$force" EXTRA_SANS="$extra_sans" deploy/scripts/gen-dev-tls.sh
   fi
 }
 
@@ -364,6 +495,23 @@ check_endpoints() {
   echo "Dev stack endpoints are reachable."
 }
 
+check_public_endpoints() {
+  # shellcheck disable=SC1090
+  set -a; source "$DEV_ENV"; set +a
+
+  if [ -z "${CT_OPS_DEV_PUBLIC_HOST:-}" ] || [ "${CT_OPS_DEV_BIND_ADDR:-127.0.0.1}" = "127.0.0.1" ]; then
+    echo "ERROR: public dev mode is not enabled. Start with ./dev-stack.sh --public or --public-host <host>." >&2
+    exit 1
+  fi
+
+  curl -fsS "http://${CT_OPS_DEV_PUBLIC_HOST}:${CT_OPS_DEV_PROXY_PORT}/nginx-healthz" >/dev/null
+  curl -fsS "http://${CT_OPS_DEV_PUBLIC_HOST}:${CT_OPS_DEV_INGEST_HTTP_PORT}/healthz" >/dev/null
+  cert_has_san "deploy/dev-tls/server.crt" "$(san_for_host "$CT_OPS_DEV_PUBLIC_HOST")"
+  echo "Public dev stack endpoints are reachable."
+  echo "Agent ingest address: ${CT_OPS_DEV_AGENT_INGEST_ADDRESS}"
+  echo "Agent CA cert:        ${SCRIPT_DIR}/deploy/dev-tls/server.crt"
+}
+
 show_status() {
   if [ -f "$DEV_ENV" ]; then
     # shellcheck disable=SC1090
@@ -407,6 +555,11 @@ if $CHECK; then
   exit 0
 fi
 
+if $CHECK_PUBLIC; then
+  check_public_endpoints
+  exit 0
+fi
+
 check_start_dependencies
 
 # shellcheck disable=SC1090
@@ -423,8 +576,10 @@ fi
 if ! compose_service_running web-dev; then
   check_port_available "$CT_OPS_DEV_NEXT_PORT" "Next.js direct"
 fi
-check_port_available "$CT_OPS_DEV_INGEST_HTTP_PORT" "ingest HTTP"
-check_port_available "$CT_OPS_DEV_INGEST_GRPC_PORT" "ingest gRPC"
+if ! compose_service_running ingest-dev; then
+  check_port_available "$CT_OPS_DEV_INGEST_HTTP_PORT" "ingest HTTP"
+  check_port_available "$CT_OPS_DEV_INGEST_GRPC_PORT" "ingest gRPC"
+fi
 
 generate_dev_tls
 build_agent_binaries
@@ -437,8 +592,12 @@ echo ""
 echo "CT-Ops dev stack is starting."
 echo "  Web UI:          ${BETTER_AUTH_URL}"
 echo "  Next.js direct:  http://localhost:${CT_OPS_DEV_NEXT_PORT}"
-echo "  Ingest gRPC:     localhost:${CT_OPS_DEV_INGEST_GRPC_PORT}"
+echo "  Ingest gRPC:     ${CT_OPS_DEV_AGENT_INGEST_ADDRESS}"
 echo "  Postgres:        localhost:${POSTGRES_PORT}"
+if [ "${CT_OPS_DEV_BIND_ADDR:-127.0.0.1}" != "127.0.0.1" ]; then
+  echo "  Public check:    ./dev-stack.sh --check-public"
+  echo "  Agent CA cert:   ${SCRIPT_DIR}/deploy/dev-tls/server.crt"
+fi
 echo ""
 echo "Stop Docker services later with: ./dev-stack.sh --down"
 echo ""

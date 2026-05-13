@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.18.0...bundle/v0.18.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **auth:** prevent prehydration login form submits ([aaeb305](https://github.com/carrtech-dev/ct-ops/commit/aaeb3059bf750579c931b1997df50395773128ea))
+
 ## [0.18.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.17.0...bundle/v0.18.0) (2026-05-13)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.3](https://github.com/carrtech-dev/ct-ops/compare/web/v0.151.2...web/v0.151.3) (2026-05-14)
+
+
+### Bug Fixes
+
+* **web:** rename host admin tab to activity ([6a1c69c](https://github.com/carrtech-dev/ct-ops/commit/6a1c69c51ecafe6ab534b1c0b5d4bf76059aef92))
+
 ## [0.151.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.151.1...web/v0.151.2) (2026-05-14)
 
 

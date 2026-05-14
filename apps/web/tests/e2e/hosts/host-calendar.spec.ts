@@ -88,3 +88,57 @@ test('host admin calendar shows an empty state when no events are linked', async
 
   await expect(page.getByTestId('host-calendar-tab')).toContainText('No calendar events linked to this host')
 })
+
+test('host admin calendar picks up newly linked events without a browser refresh', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
+
+  await sql`
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
+    VALUES ('host-calendar-live', ${instanceId}, 'host-calendar-live', 'Host Calendar Live', 'Ubuntu 24.04', 'x86_64', '["10.70.0.13"]'::jsonb, 'online', NOW())
+  `
+
+  await page.goto('/hosts/host-calendar-live')
+  await expect(page.getByRole('heading', { name: 'Host Calendar Live' })).toBeVisible()
+
+  await page.getByTestId('host-parent-tab-admin').click()
+  await page.getByTestId('host-tab-calendar').click()
+
+  await expect(page.getByTestId('host-calendar-tab')).toContainText('No calendar events linked to this host')
+
+  await sql`
+    INSERT INTO calendar_events (
+      id,
+      instance_id,
+      created_by,
+      title,
+      description,
+      starts_at,
+      ends_at,
+      all_day,
+      timezone,
+      status,
+      category
+    )
+    VALUES (
+      'host-calendar-live-event',
+      ${instanceId},
+      ${userId},
+      'Live host patch',
+      'Created while the host calendar tab is open.',
+      '2026-05-24T09:00:00Z',
+      '2026-05-24T10:00:00Z',
+      false,
+      'UTC',
+      'planned',
+      'patching'
+    )
+  `
+
+  await sql`
+    INSERT INTO calendar_event_hosts (instance_id, event_id, host_id)
+    VALUES (${instanceId}, 'host-calendar-live-event', 'host-calendar-live')
+  `
+
+  await expect(page.getByTestId('host-calendar-event-host-calendar-live-event')).toContainText('Live host patch', { timeout: 15_000 })
+})

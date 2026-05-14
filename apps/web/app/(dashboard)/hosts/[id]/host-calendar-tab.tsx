@@ -40,6 +40,7 @@ const STATUS_BADGE_CLASS: Record<CalendarEventStatus, string> = {
   completed: 'bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-100',
   cancelled: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100',
 }
+const HOST_CALENDAR_REFETCH_INTERVAL_MS = 5_000
 
 function safeTestId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-')
@@ -85,6 +86,7 @@ export function HostCalendarTab({ scopeId, hostId }: { scopeId: string; hostId: 
   const { data, isLoading, error } = useQuery({
     queryKey: ['host-calendar-events', scopeId, hostId],
     queryFn: () => listCalendarEventsForHost(scopeId, hostId),
+    refetchInterval: HOST_CALENDAR_REFETCH_INTERVAL_MS,
   })
 
   const events = data && !('error' in data) ? data.events : []

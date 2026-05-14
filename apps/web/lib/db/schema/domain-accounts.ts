@@ -19,8 +19,8 @@ export const domainAccounts = pgTable('domain_accounts', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (t) => [
-  uniqueIndex('domain_accounts_org_username_idx').on(t.instanceId, t.username),
-  index('domain_accounts_org_status_idx').on(t.instanceId, t.status),
+  uniqueIndex('domain_accounts_instance_username_idx').on(t.instanceId, t.username),
+  index('domain_accounts_instance_status_idx').on(t.instanceId, t.status),
 ])
 
 export type DomainAccount = typeof domainAccounts.$inferSelect

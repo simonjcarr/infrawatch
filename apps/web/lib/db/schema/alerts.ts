@@ -88,9 +88,9 @@ export const alertRules = pgTable('alert_rules', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('alert_rules_org_host_idx').on(table.instanceId, table.hostId),
-  index('alert_rules_org_enabled_idx').on(table.instanceId, table.enabled),
-  index('alert_rules_org_global_idx').on(table.instanceId, table.isGlobalDefault),
+  index('alert_rules_instance_host_idx').on(table.instanceId, table.hostId),
+  index('alert_rules_instance_enabled_idx').on(table.instanceId, table.enabled),
+  index('alert_rules_instance_global_idx').on(table.instanceId, table.isGlobalDefault),
 ])
 
 export const alertInstances = pgTable('alert_instances', {
@@ -106,7 +106,7 @@ export const alertInstances = pgTable('alert_instances', {
   acknowledgedBy: text('acknowledged_by'),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('alert_instances_org_status_idx').on(table.instanceId, table.status),
+  index('alert_instances_instance_status_idx').on(table.instanceId, table.status),
   index('alert_instances_rule_host_status_idx').on(table.ruleId, table.hostId, table.status),
 ])
 
@@ -122,7 +122,7 @@ export const notificationChannels = pgTable('notification_channels', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('notification_channels_org_enabled_idx').on(table.instanceId, table.enabled),
+  index('notification_channels_instance_enabled_idx').on(table.instanceId, table.enabled),
 ])
 
 export const notifications = pgTable('notifications', {
@@ -140,7 +140,7 @@ export const notifications = pgTable('notifications', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => [
   index('notifications_user_read_idx').on(table.userId, table.read),
-  index('notifications_org_user_idx').on(table.instanceId, table.userId),
+  index('notifications_instance_user_idx').on(table.instanceId, table.userId),
   index('notifications_user_created_idx').on(table.userId, table.createdAt),
   index('notifications_deleted_at_idx').on(table.deletedAt).where(sql`${table.deletedAt} IS NOT NULL`),
 ])
@@ -148,7 +148,7 @@ export const notifications = pgTable('notifications', {
 export const alertSilences = pgTable('alert_silences', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   instanceId: text('instance_id').notNull().references(() => instanceSettings.id),
-  hostId: text('host_id').references(() => hosts.id),      // null = org-wide silence
+  hostId: text('host_id').references(() => hosts.id),      // null = instance-wide silence
   ruleId: text('rule_id').references(() => alertRules.id), // null = silence all rules
   reason: text('reason').notNull(),
   startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
@@ -159,8 +159,8 @@ export const alertSilences = pgTable('alert_silences', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   metadata: jsonb('metadata'),
 }, (table) => [
-  index('alert_silences_org_host_idx').on(table.instanceId, table.hostId),
-  index('alert_silences_org_active_idx').on(table.instanceId, table.startsAt, table.endsAt),
+  index('alert_silences_instance_host_idx').on(table.instanceId, table.hostId),
+  index('alert_silences_instance_active_idx').on(table.instanceId, table.startsAt, table.endsAt),
 ])
 
 export type AlertRule = typeof alertRules.$inferSelect

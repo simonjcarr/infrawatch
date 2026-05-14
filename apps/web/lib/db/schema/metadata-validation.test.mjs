@@ -110,7 +110,7 @@ test('parseInstanceMetadata preserves valid settings and drops malformed nested 
   assert.deepEqual(parsed.defaultTags, [])
   assert.deepEqual(parsed.notificationSettings, {
     inAppEnabled: true,
-    inAppRoles: ['super_admin', 'org_admin', 'engineer'],
+    inAppRoles: ['super_admin', 'instance_admin', 'engineer'],
     allowUserOptOut: false,
   })
   assert.deepEqual(parsed.softwareInventorySettings, {

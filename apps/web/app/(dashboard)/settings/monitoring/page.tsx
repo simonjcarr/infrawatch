@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default async function MonitoringSettingsPage() {
   const session = await getRequiredSession()
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const defaults = await getGlobalAlertDefaults()

@@ -1,12 +1,12 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
@@ -15,7 +15,7 @@ async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
 
 test('authenticated user sees the LDAP setup empty state when no directory is configured', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
 
   await sql`
     DELETE FROM ldap_configurations
@@ -41,7 +41,7 @@ test('authenticated user sees the LDAP setup empty state when no directory is co
 
 test('authenticated user can access the directory lookup UI when enabled LDAP configs exist', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
 
   await sql`
     INSERT INTO ldap_configurations (

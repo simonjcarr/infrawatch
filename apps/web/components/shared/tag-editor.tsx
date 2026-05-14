@@ -56,7 +56,7 @@ export function TagEditor({
   const debKey = useDebounced(keyInput)
   const debValue = useDebounced(valueInput)
 
-  // Key suggestions: prefix match on any key in this org's tag catalogue.
+  // Key suggestions: prefix match on any key in this instance's tag catalogue.
   // Distinct keys (via de-dupe on the client) so typing "env" doesn't fan out
   // into one entry per value.
   const keyQuery = useQuery({

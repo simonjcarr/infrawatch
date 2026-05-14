@@ -21,10 +21,10 @@ test('seat admission preserves a super admin before pinned free-seat users', () 
   )
 })
 
-test('seat admission falls back to an org admin when no super admin exists', () => {
+test('seat admission falls back to an instance admin when no super admin exists', () => {
   const activeUsers = [
     user('engineer_1', 'engineer', '2026-01-01T00:00:00Z'),
-    user('admin_1', 'org_admin', '2026-01-03T00:00:00Z'),
+    user('admin_1', 'instance_admin', '2026-01-03T00:00:00Z'),
     user('engineer_2', 'engineer', '2026-01-04T00:00:00Z'),
   ]
 

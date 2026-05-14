@@ -94,7 +94,7 @@ export type NewHost = typeof hosts.$inferInsert
 // Use `unknown` and narrow, or define proper types
 
 // Server Actions must be explicitly typed
-export async function getHosts(orgId: string): Promise<Host[]> {}
+export async function getHosts(instanceId: string): Promise<Host[]> {}
 
 // All server actions live in apps/web/lib/actions/
 // Named by domain: hosts.ts, certificates.ts, alerts.ts etc.
@@ -107,8 +107,8 @@ export async function getHosts(orgId: string): Promise<Host[]> {}
 ```typescript
 // Reading data — TanStack Query calling a Server Action
 const { data, isLoading } = useQuery({
-  queryKey: ['hosts', orgId],
-  queryFn: () => getHosts(orgId),
+  queryKey: ['hosts', instanceId],
+  queryFn: () => getHosts(instanceId),
 })
 
 // Writing data — TanStack Query mutation calling a Server Action
@@ -131,7 +131,7 @@ All exported from `apps/web/lib/db/schema/index.ts`
 Every table MUST have:
 ```typescript
 id: text('id').primaryKey().$defaultFn(() => createId()),  // cuid2
-organisationId: text('organisation_id').notNull().references(() => organisations.id),
+instanceId: text('instance_id').notNull().references(() => instances.id),
 createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 deletedAt: timestamp('deleted_at', { withTimezone: true }),  // soft delete
@@ -148,7 +148,7 @@ Resources with state use both a current status column AND a status history table
 Never overwrite status — append to history.
 
 ### Foundational patterns (always respect these)
-1. **Multi-tenancy** — every resource row has `organisation_id`
+1. **Instance scoping** — every resource row has `instance_id`
 2. **Soft deletes** — `deleted_at` on every table, never hard delete
 3. **Tags as first-class** — flexible `key:value` tagging on any resource
 4. **Event spine** — significant state changes append to the `events` table
@@ -179,7 +179,7 @@ Note: LDAP/AD is in the community tier — paywalling it would block corporate a
 **RBAC Roles:**
 ```
 super_admin   Full system access, billing, global config
-org_admin     User/team management, integrations, org config
+instance_admin     User/team management, integrations, instance config
 engineer      Read/write on assigned resource groups, alert management
 read_only     View dashboards, alerts, inventory (management, auditors)
 agent         Non-human, register host + submit metrics only
@@ -316,14 +316,14 @@ Include `contextHolder` in component JSX.
 ## Development Roadmap Phases
 
 ```
-Phase 0 — Foundation        Monorepo, Next.js, auth, orgs, Docker Compose
+Phase 0 — Foundation        Monorepo, Next.js, auth, instances, Docker Compose
 Phase 1 — Agent & Inventory Agents, hosts, basic metrics, gRPC, ingest
 Phase 2 — Monitoring        Checks, alerting, graphs, TimescaleDB
 Phase 3 — Certificates      Discovery, expiry alerts, CSR workflows
 Phase 4 — Service Accounts  Identity, SSH keys, LDAP sync
 Phase 5 — Tooling           Air-gap bundlers, runbooks, scheduled tasks
 Phase 6 — Enterprise        SSO, audit log, advanced RBAC, compliance packs
-Phase 7 — Cloud SaaS        Multi-tenant hardening, billing, hosted offering
+Phase 7 — Cloud SaaS        Instance-scoped hardening, billing, hosted offering
 ```
 
 Each phase must be **independently deployable and useful** before the next begins.
@@ -380,7 +380,7 @@ The docs site is built with **VuePress 2** (`@vuepress/theme-default`). The `app
 - No linting errors — fix before committing
 - Run `pnpm run build` after every significant change and fix all errors
 - Server Actions must validate input with Zod before touching the database
-- All database queries must be scoped by `organisationId`
+- All database queries must be scoped by `instanceId`
 - Never expose internal IDs in URLs without verifying the requesting user has access
 - All mutations must be wrapped in try/catch with meaningful error messages
 

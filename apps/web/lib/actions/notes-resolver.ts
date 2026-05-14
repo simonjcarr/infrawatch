@@ -31,7 +31,7 @@ export type ResolvedNote = Omit<Note, 'searchVector'> & {
 
 // Resolves every visible, non-deleted note that applies to a host via any of
 // the three targeting modes. Runs as a single CTE query so N-per-host stays
-// under a few ms even with tens of thousands of notes per org. Materialising
+// under a few ms even with tens of thousands of notes per instance. Materialising
 // the result into a cache table is deferred — the CTE is small enough at v1
 // scale and avoids a new invalidation surface.
 export async function resolveNotesForHost(

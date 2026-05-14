@@ -84,10 +84,10 @@ In `processHeartbeat()`, metrics are saved unconditionally:
 // Lines 205–231: no hostID check
 queries.UpdateAgentHeartbeat(...)    // uses agentID only
 queries.UpdateHostVitals(...)        // uses agentID only
-queries.InsertHostMetricByAgentID(...)  // uses orgID + agentID
+queries.InsertHostMetricByAgentID(...)  // uses instanceID + agentID
 ```
 
-All three metric operations use `agentID` or `orgID`, neither of which requires the hosts table lookup.
+All three metric operations use `agentID` or `instanceID`, neither of which requires the hosts table lookup.
 
 ---
 

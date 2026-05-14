@@ -9,7 +9,7 @@ GCP semantics).
 
 There are four places tags can originate, merged in weakest-to-strongest order:
 
-1. **Organisation defaults** — Administration → Agents → Host defaults → Default Tags. Applied
+1. **Instance defaults** — Administration → Agents → Host defaults → Default Tags. Applied
    to every newly approved host.
 2. **Enrolment token** — chosen when creating an install token. Baked into the
    install bundle so every machine installed with that bundle registers with
@@ -20,7 +20,7 @@ There are four places tags can originate, merged in weakest-to-strongest order:
    on demand. Run last and only fill in keys not already set, so they never
    override explicit operator intent on the same key.
 
-Merge order: `org defaults → token tags → CLI tags → rules` (last-wins).
+Merge order: `instance defaults → token tags → CLI tags → rules` (last-wins).
 
 ## Autocomplete and dedupe
 

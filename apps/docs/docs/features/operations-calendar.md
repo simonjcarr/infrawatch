@@ -41,7 +41,7 @@ Deleting or editing the whole series affects the parent recurring event.
 | Role | View | Create / Edit / Delete |
 |---|---:|---:|
 | `super_admin` | ✅ | ✅ |
-| `org_admin` | ✅ | ✅ |
+| `instance_admin` | ✅ | ✅ |
 | `engineer` | ✅ | ✅ |
 | `read_only` | ✅ | ❌ |
 

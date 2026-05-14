@@ -36,12 +36,12 @@ export async function getSecurityOverview(): Promise<SecurityOverview | { error:
 
     let accountAuth: SecurityOverview['accountAuth'] = { requireTwoFactor: false }
     if (instanceId) {
-      const org = await db.query.instanceSettings.findFirst({
+      const instance = await db.query.instanceSettings.findFirst({
         where: eq(instanceSettings.id, instanceId),
         columns: { metadata: true },
       })
       accountAuth = {
-        requireTwoFactor: isTwoFactorRequired(parseInstanceMetadata(org?.metadata)),
+        requireTwoFactor: isTwoFactorRequired(parseInstanceMetadata(instance?.metadata)),
       }
     }
 
@@ -104,13 +104,13 @@ export async function updateAccountAuthenticationSettings(
     if (!instanceId) return { error: 'Instance not found' }
 
     const parsed = updateAccountAuthSchema.parse(input)
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     })
-    if (!org) return { error: 'Instance not found' }
+    if (!instance) return { error: 'Instance not found' }
 
-    const metadata = parseInstanceMetadata(org.metadata)
+    const metadata = parseInstanceMetadata(instance.metadata)
     const securitySettings: InstanceSecuritySettings = {
       ...metadata.securitySettings,
       requireTwoFactor: parsed.requireTwoFactor,

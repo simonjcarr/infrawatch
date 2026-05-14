@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function AgentsSettingsPage() {
   const session = await getRequiredSession()
 
-  const isAdmin = hasRole(session.user, ['org_admin', 'super_admin'])
+  const isAdmin = hasRole(session.user, ['instance_admin', 'super_admin'])
   if (!isAdmin) redirect('/dashboard')
 
   const tokens = await listEnrolmentTokens()

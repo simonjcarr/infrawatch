@@ -4,13 +4,13 @@ import { getRequiredSession } from '@/lib/auth/session'
 import { resolveCurrentActionScope } from './action-scope'
 import {
   assignTagsToResource as assignTagsToResourceCore,
-  getOrgDefaultTags as getOrgDefaultTagsCore,
+  getInstanceDefaultTags as getInstanceDefaultTagsCore,
   listResourceTags as listResourceTagsCore,
   mergeTagLayers as mergeTagLayersCore,
   removeTagFromResource as removeTagFromResourceCore,
   replaceResourceTags as replaceResourceTagsCore,
   searchTags as searchTagsCore,
-  updateOrgDefaultTags as updateOrgDefaultTagsCore,
+  updateInstanceDefaultTags as updateInstanceDefaultTagsCore,
   type TagAssignment,
 } from './tags-core'
 
@@ -62,13 +62,13 @@ export async function listResourceTags(
   return listResourceTagsCore(currentScope, resourceType, resourceId)
 }
 
-export async function getOrgDefaultTags(scopeId: string): Promise<import('@/lib/db/schema').TagPair[]> {
-  return getOrgDefaultTagsCore(scopeId)
+export async function getInstanceDefaultTags(scopeId: string): Promise<import('@/lib/db/schema').TagPair[]> {
+  return getInstanceDefaultTagsCore(scopeId)
 }
 
-export async function updateOrgDefaultTags(
+export async function updateInstanceDefaultTags(
   scopeId: string,
   pairs: import('@/lib/db/schema').TagPair[],
 ): Promise<{ success: true } | { error: string }> {
-  return updateOrgDefaultTagsCore(scopeId, pairs)
+  return updateInstanceDefaultTagsCore(scopeId, pairs)
 }

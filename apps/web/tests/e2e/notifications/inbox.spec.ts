@@ -1,13 +1,13 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+import { TEST_INSTANCE, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
     SELECT instanceSettings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
     JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+    WHERE instanceSettings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
@@ -20,7 +20,7 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ in
 
 test('authenticated user can review, filter, and bulk delete notifications', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
@@ -134,7 +134,7 @@ test('authenticated user can review, filter, and bulk delete notifications', asy
 
 test('authenticated user can mark all unread notifications as read', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
@@ -222,7 +222,7 @@ test('authenticated user can mark all unread notifications as read', async ({ au
 
 test('authenticated user can mark selected read notifications as unread', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (
@@ -321,7 +321,7 @@ test('authenticated user can mark selected read notifications as unread', async 
 
 test('authenticated user can expand a notification, change its read state, and delete it', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await sql`
     INSERT INTO notifications (

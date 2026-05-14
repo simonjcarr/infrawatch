@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.151.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.150.1...web/v0.151.0) (2026-05-14)
+
+
+### Features
+
+* **web:** improve host container telemetry views ([#1409](https://github.com/carrtech-dev/ct-ops/issues/1409)) ([b143565](https://github.com/carrtech-dev/ct-ops/commit/b1435654ca1d3a9b2882aa31bbbb16c91ef996fa))
+
+
+### Bug Fixes
+
+* **agents:** show enrolment install URL when viewing tokens ([#1412](https://github.com/carrtech-dev/ct-ops/issues/1412)) ([eb90bd4](https://github.com/carrtech-dev/ct-ops/commit/eb90bd4cbfd759e4d879960992374bd20de4142d))
+* **calendar:** contain operations calendar scrolling ([#1406](https://github.com/carrtech-dev/ct-ops/issues/1406)) ([2235d87](https://github.com/carrtech-dev/ct-ops/commit/2235d8796db15a0ff339476a986ec016c9e4810d))
+
 ## [0.150.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.150.0...web/v0.150.1) (2026-05-13)
 
 
@@ -159,7 +172,7 @@
 
 ### Features
 
-* **password-manager:** add tenant audit view ([d990582](https://github.com/carrtech-dev/ct-ops/commit/d9905825c5c9ed959e917514460093c1eff6cb57))
+* **password-manager:** add instance audit view ([d990582](https://github.com/carrtech-dev/ct-ops/commit/d9905825c5c9ed959e917514460093c1eff6cb57))
 
 
 ### Bug Fixes
@@ -276,8 +289,8 @@
 
 ### Features
 
-* **web:** remove organisation scope from web baseline ([0b41340](https://github.com/carrtech-dev/ct-ops/commit/0b41340e8ee70b6b552a5b21a0f1f361975deda6))
-* **web:** remove organisation scope from web baseline ([c1a8e54](https://github.com/carrtech-dev/ct-ops/commit/c1a8e54f1634dc0310c2493ce0975c1a7cfe7931))
+* **web:** remove instance scope from web baseline ([0b41340](https://github.com/carrtech-dev/ct-ops/commit/0b41340e8ee70b6b552a5b21a0f1f361975deda6))
+* **web:** remove instance scope from web baseline ([c1a8e54](https://github.com/carrtech-dev/ct-ops/commit/c1a8e54f1634dc0310c2493ce0975c1a7cfe7931))
 
 ## [0.130.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.129.3...web/v0.130.0) (2026-05-10)
 
@@ -343,7 +356,7 @@
 
 ### Features
 
-* **web:** remove organisation onboarding from auth setup ([#1218](https://github.com/carrtech-dev/ct-ops/issues/1218)) ([863f40e](https://github.com/carrtech-dev/ct-ops/commit/863f40ec8bc3552b77a86cf2ba0e33b0ea5198d7))
+* **web:** remove instance onboarding from auth setup ([#1218](https://github.com/carrtech-dev/ct-ops/issues/1218)) ([863f40e](https://github.com/carrtech-dev/ct-ops/commit/863f40ec8bc3552b77a86cf2ba0e33b0ea5198d7))
 
 ## [0.124.5](https://github.com/carrtech-dev/ct-ops/compare/web/v0.124.4...web/v0.124.5) (2026-05-09)
 
@@ -682,7 +695,7 @@
 
 ### Bug Fixes
 
-* **authz:** require write access for tenant mutations ([1f2d660](https://github.com/carrtech-dev/ct-ops/commit/1f2d6606344d340a54ffd3ea98dbc8aa1d5cd1af))
+* **authz:** require write access for instance mutations ([1f2d660](https://github.com/carrtech-dev/ct-ops/commit/1f2d6606344d340a54ffd3ea98dbc8aa1d5cd1af))
 
 ## [0.106.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.105.1...web/v0.106.0) (2026-05-05)
 
@@ -696,7 +709,7 @@
 
 ### Bug Fixes
 
-* **security:** scope host checks to tenant ([#1059](https://github.com/carrtech-dev/ct-ops/issues/1059)) ([c137203](https://github.com/carrtech-dev/ct-ops/commit/c137203ebec8acfc36156f50cf3587896ac3b845))
+* **security:** scope host checks to instance ([#1059](https://github.com/carrtech-dev/ct-ops/issues/1059)) ([c137203](https://github.com/carrtech-dev/ct-ops/commit/c137203ebec8acfc36156f50cf3587896ac3b845))
 
 ## [0.105.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.104.0...web/v0.105.0) (2026-05-05)
 
@@ -745,7 +758,7 @@
 
 ### Bug Fixes
 
-* **db:** scope auth tables with tenant RLS ([#1027](https://github.com/carrtech-dev/ct-ops/issues/1027)) ([28bd8e9](https://github.com/carrtech-dev/ct-ops/commit/28bd8e937246c6822a619996c74e33cb5062a9f3))
+* **db:** scope auth tables with instance RLS ([#1027](https://github.com/carrtech-dev/ct-ops/issues/1027)) ([28bd8e9](https://github.com/carrtech-dev/ct-ops/commit/28bd8e937246c6822a619996c74e33cb5062a9f3))
 
 ## [0.103.15](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.14...web/v0.103.15) (2026-05-05)
 
@@ -759,7 +772,7 @@
 
 ### Bug Fixes
 
-* **db:** fail closed for tenant RLS scope ([0612b94](https://github.com/carrtech-dev/ct-ops/commit/0612b94489c4bf4517509faf6d76a18d11e13c19)), closes [#980](https://github.com/carrtech-dev/ct-ops/issues/980)
+* **db:** fail closed for instance RLS scope ([0612b94](https://github.com/carrtech-dev/ct-ops/commit/0612b94489c4bf4517509faf6d76a18d11e13c19)), closes [#980](https://github.com/carrtech-dev/ct-ops/issues/980)
 
 ## [0.103.13](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.12...web/v0.103.13) (2026-05-05)
 
@@ -787,7 +800,7 @@
 
 ### Bug Fixes
 
-* **auth:** scope LDAP login to organisation slug ([f5e331e](https://github.com/carrtech-dev/ct-ops/commit/f5e331ed73e272a38ee8fe4a4ee203b396d67e9e))
+* **auth:** scope LDAP login to instance slug ([f5e331e](https://github.com/carrtech-dev/ct-ops/commit/f5e331ed73e272a38ee8fe4a4ee203b396d67e9e))
 
 ## [0.103.9](https://github.com/carrtech-dev/ct-ops/compare/web/v0.103.8...web/v0.103.9) (2026-05-05)
 
@@ -1229,7 +1242,7 @@
 
 ### Bug Fixes
 
-* **web:** add org-scoped RLS helper ([#681](https://github.com/carrtech-dev/ct-ops/issues/681)) ([08e4b6e](https://github.com/carrtech-dev/ct-ops/commit/08e4b6edb59a2f4a45d3cd70f28b46f9ebaeb0d5))
+* **web:** add instance-scoped RLS helper ([#681](https://github.com/carrtech-dev/ct-ops/issues/681)) ([08e4b6e](https://github.com/carrtech-dev/ct-ops/commit/08e4b6edb59a2f4a45d3cd70f28b46f9ebaeb0d5))
 
 ## [0.74.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.74.1...web/v0.74.2) (2026-04-28)
 
@@ -1497,7 +1510,7 @@
 
 ### Bug Fixes
 
-* **auth:** scope LDAP login links to organisation ([96d28df](https://github.com/carrtech-dev/ct-ops/commit/96d28df206a7548ef5b1e07e6237585bf8f15cb8)), closes [#273](https://github.com/carrtech-dev/ct-ops/issues/273)
+* **auth:** scope LDAP login links to instance ([96d28df](https://github.com/carrtech-dev/ct-ops/commit/96d28df206a7548ef5b1e07e6237585bf8f15cb8)), closes [#273](https://github.com/carrtech-dev/ct-ops/issues/273)
 
 ## [0.68.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.67.2...web/v0.68.0) (2026-04-26)
 

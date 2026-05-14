@@ -863,11 +863,11 @@ export async function sendTestNotification(
     }
   } else if (existing.type === 'smtp') {
     const channelCfg = normaliseSmtpConfig(existing.config)
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     })
-    const relay = parseInstanceMetadata(org?.metadata).notificationSettings?.smtpRelay
+    const relay = parseInstanceMetadata(instance?.metadata).notificationSettings?.smtpRelay
     if (!relay?.enabled) return { error: 'Central SMTP relay is not enabled' }
     await assertPublicHost(relay.host)
     let password = ''
@@ -1011,7 +1011,7 @@ export async function getActiveSilencesForHost(
       isNull(alertSilences.deletedAt),
       lte(alertSilences.startsAt, now),
       gte(alertSilences.endsAt, now),
-      // match host-specific silences for this host, or org-wide silences (hostId IS NULL)
+      // match host-specific silences for this host, or instance-wide silences (hostId IS NULL)
       // We use a raw SQL OR here via the Drizzle `or` helper imported above
       sql`(${alertSilences.hostId} = ${hostId} OR ${alertSilences.hostId} IS NULL)`,
     ),

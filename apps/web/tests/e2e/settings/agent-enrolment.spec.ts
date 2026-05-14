@@ -1,13 +1,13 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG, TEST_USER } from '../fixtures/seed'
+import { TEST_INSTANCE, TEST_USER } from '../fixtures/seed'
 
-async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
+async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
-    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    SELECT instance_settings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
-    JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_ORG.slug}
+    JOIN "user" ON "user".instance_id = instance_settings.id
+    WHERE instance_settings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
@@ -20,7 +20,7 @@ async function getOrgAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ in
 
 test('admin can create and revoke an enrolment token from agent settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
 
   await page.goto('/settings/agents')
 
@@ -107,9 +107,53 @@ test('admin can create and revoke an enrolment token from agent settings', async
     .toBeTruthy()
 })
 
+test('admin can view the install URL for an existing enrolment token', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
+
+  await sql`
+    INSERT INTO agent_enrolment_tokens (
+      id,
+      instance_id,
+      label,
+      token,
+      created_by_id,
+      auto_approve,
+      skip_verify,
+      max_uses,
+      usage_count,
+      expires_at,
+      metadata
+    )
+    VALUES (
+      'view-existing-token-id',
+      ${instanceId},
+      'View Existing Token',
+      'view-existing-token-value',
+      ${userId},
+      false,
+      false,
+      5,
+      0,
+      NOW() + INTERVAL '14 days',
+      '{}'::jsonb
+    )
+  `
+
+  await page.goto('/settings/agents')
+
+  const tokenRow = page.getByTestId('agent-enrolment-row').filter({ hasText: 'View Existing Token' })
+  await tokenRow.getByTestId('agent-enrolment-view').click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('View Existing Token')
+  await expect(page.getByTestId('agent-enrolment-view-install-command')).toContainText('/api/agent/install')
+  await expect(page.getByTestId('agent-enrolment-view-install-command')).not.toContainText('token=')
+})
+
 test('admin cannot create an auto-approved token without super admin privileges', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId } = await getOrgAndUserIds(sql)
+  const { instanceId } = await getInstanceAndUserIds(sql)
 
   await page.goto('/settings/agents')
 
@@ -137,7 +181,7 @@ test('admin cannot create an auto-approved token without super admin privileges'
 
 test('admin can generate an install bundle with an existing token and bundle tags', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const { instanceId, userId } = await getOrgAndUserIds(sql)
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
   let capturedBody: Record<string, unknown> | null = null
 
   await sql`

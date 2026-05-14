@@ -26,7 +26,7 @@ test('getNotificationChannels redacts Slack webhook URLs from client payloads', 
   assert.doesNotMatch(slackBranch, /config:\s*\{\s*webhookUrl:\s*cfg\.webhookUrl\s*\}/)
 })
 
-test('notification channel management actions require org admin access', () => {
+test('notification channel management actions require instance admin access', () => {
   for (const action of [
     'createNotificationChannel',
     'deleteNotificationChannel',
@@ -38,7 +38,7 @@ test('notification channel management actions require org admin access', () => {
     assert.match(
       segment,
       /(?:const session = )?await requireInstanceAdminAccess\(instanceId\)/,
-      `${action} must require org admin access before managing notification channels`,
+      `${action} must require instance admin access before managing notification channels`,
     )
   }
 })

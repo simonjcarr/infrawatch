@@ -18,7 +18,7 @@ import {
 } from '@/lib/actions/host-settings'
 import { getHostTerminalSettings, trustPendingSshHostKeys, updateHostTerminalSettings } from '@/lib/actions/terminal'
 import type { HostTerminalSettings } from '@/lib/actions/terminal-core'
-import { getOrgUsers } from '@/lib/actions/users'
+import { getInstanceUsers } from '@/lib/actions/users'
 import { listResourceTags, replaceResourceTags } from '@/lib/actions/tags'
 import type { HostCollectionSettings } from '@/lib/db/schema'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
@@ -64,9 +64,9 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
     queryFn: () => getHostDockerRetentionSettings(hostId),
   })
 
-  const { data: orgUsers } = useQuery({
-    queryKey: ['org-users'],
-    queryFn: () => getOrgUsers(),
+  const { data: instanceUsers } = useQuery({
+    queryKey: ['instance-users'],
+    queryFn: () => getInstanceUsers(),
     enabled: isAdmin,
   })
 
@@ -588,7 +588,7 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
                 </div>
 
                 {/* User select */}
-                {orgUsers && (
+                {instanceUsers && (
                   <div className="flex gap-2">
                     <select
                       value={newAllowedUser}
@@ -596,7 +596,7 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
                       className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-w-xs"
                     >
                       <option value="">Select a user...</option>
-                      {orgUsers.members
+                      {instanceUsers.members
                         .filter((u) => !(currentTerminalSettings.terminalAllowedUsers ?? []).includes(u.id))
                         .filter((u) => u.role !== 'agent')
                         .map((u) => (
@@ -620,7 +620,7 @@ export function SettingsTab({ hostId, isAdmin }: SettingsTabProps) {
                 {/* Current allowlist */}
                 <div className="flex flex-wrap gap-2">
                   {(currentTerminalSettings.terminalAllowedUsers ?? []).map((userId) => {
-                    const user = orgUsers?.members.find((u) => u.id === userId)
+                    const user = instanceUsers?.members.find((u) => u.id === userId)
                     return (
                       <span
                         key={userId}

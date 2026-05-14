@@ -9,7 +9,7 @@ import {
 const token = {
   id: 'ctops_inventory_token',
   secret: Buffer.from('ct-ops outbound inventory signing key only').toString('base64url'),
-  instanceId: 'org_1',
+  instanceId: 'instance_1',
   scopes: ['inventory:write'],
 }
 
@@ -69,7 +69,7 @@ test('pushes every paged inventory snapshot for configured targets', async () =>
       return {
         contractVersion: '2026-04-30',
         instanceId,
-        orgSlug: 'acme',
+        instanceSlug: 'acme',
         snapshotId: cursor ? 'snapshot_page_2' : 'snapshot_page_1',
         snapshotType,
         generatedAt: '2026-04-30T10:00:00.000Z',
@@ -93,8 +93,8 @@ test('pushes every paged inventory snapshot for configured targets', async () =>
   })
 
   assert.deepEqual(snapshots, [
-    { instanceId: 'org_1', cursor: undefined, snapshotType: 'full' },
-    { instanceId: 'org_1', cursor: 'next-page', snapshotType: 'full' },
+    { instanceId: 'instance_1', cursor: undefined, snapshotType: 'full' },
+    { instanceId: 'instance_1', cursor: 'next-page', snapshotType: 'full' },
   ])
   assert.equal(pushes.length, 2)
   assert.equal(pushes[0].baseUrl, 'https://ct-cve.example.invalid')
@@ -126,7 +126,7 @@ test('loads CT-CVE inventory push targets from app settings when no explicit tar
     buildSnapshot: async ({ instanceId }) => ({
       contractVersion: '2026-04-30',
       instanceId,
-      orgSlug: 'acme',
+      instanceSlug: 'acme',
       snapshotId: 'snapshot',
       snapshotType: 'full',
       generatedAt: '2026-04-30T10:00:00.000Z',
@@ -178,7 +178,7 @@ test('reports target failures without stopping later targets', async () => {
     buildSnapshot: async ({ instanceId }) => ({
       contractVersion: '2026-04-30',
       instanceId,
-      orgSlug: 'acme',
+      instanceSlug: 'acme',
       snapshotId: 'snapshot',
       snapshotType: 'full',
       generatedAt: '2026-04-30T10:00:00.000Z',

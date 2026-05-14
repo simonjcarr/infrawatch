@@ -15,11 +15,11 @@ test('isTwoFactorRequired reads the instance security metadata flag', () => {
 })
 
 test('two-factor policy only redirects unprotected users away from non-setup paths', () => {
-  const requiringOrg = { securitySettings: { requireTwoFactor: true } }
+  const requiringInstance = { securitySettings: { requireTwoFactor: true } }
 
   assert.equal(
     getTwoFactorPolicyRedirect({
-      metadata: requiringOrg,
+      metadata: requiringInstance,
       userTwoFactorEnabled: false,
       pathname: '/hosts',
     }),
@@ -28,7 +28,7 @@ test('two-factor policy only redirects unprotected users away from non-setup pat
 
   assert.equal(
     getTwoFactorPolicyRedirect({
-      metadata: requiringOrg,
+      metadata: requiringInstance,
       userTwoFactorEnabled: false,
       pathname: '/profile',
     }),
@@ -37,7 +37,7 @@ test('two-factor policy only redirects unprotected users away from non-setup pat
 
   assert.equal(
     getTwoFactorPolicyRedirect({
-      metadata: requiringOrg,
+      metadata: requiringInstance,
       userTwoFactorEnabled: true,
       pathname: '/hosts',
     }),

@@ -1,12 +1,12 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
-async function getOrgId(sql: ReturnType<typeof getTestDb>): Promise<string> {
+async function getInstanceId(sql: ReturnType<typeof getTestDb>): Promise<string> {
   const rows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM instance_settings
-    WHERE slug = ${TEST_ORG.slug}
+    WHERE slug = ${TEST_INSTANCE.slug}
     LIMIT 1
   `
   expect(rows).toHaveLength(1)
@@ -43,12 +43,14 @@ async function seedHost(sql: ReturnType<typeof getTestDb>, instanceId: string, h
 async function seedDockerStatus(sql: ReturnType<typeof getTestDb>, instanceId: string, hostId: string, status: string) {
   await sql`
     INSERT INTO host_docker_status (
+      id,
       instance_id,
       host_id,
       status,
       checked_at
     )
     VALUES (
+      ${`${hostId}-docker-status`},
       ${instanceId},
       ${hostId},
       ${status},
@@ -59,12 +61,13 @@ async function seedDockerStatus(sql: ReturnType<typeof getTestDb>, instanceId: s
 
 test('host Containers tab lists containers and filters by name and state', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-containers-host')
   await seedDockerStatus(sql, instanceId, 'docker-containers-host', 'installed')
 
   await sql`
     INSERT INTO docker_containers (
+      id,
       instance_id,
       host_id,
       docker_container_id,
@@ -85,6 +88,7 @@ test('host Containers tab lists containers and filters by name and state', async
     )
     VALUES
       (
+        'docker-containers-web-row',
         ${instanceId},
         'docker-containers-host',
         'web-container-id',
@@ -104,6 +108,7 @@ test('host Containers tab lists containers and filters by name and state', async
         true
       ),
       (
+        'docker-containers-worker-row',
         ${instanceId},
         'docker-containers-host',
         'worker-container-id',
@@ -130,6 +135,7 @@ test('host Containers tab lists containers and filters by name and state', async
   await expect(page.getByTestId('host-containers-tab')).toContainText('2 containers')
   await expect(page.getByTestId('host-docker-container-row-web-container-id')).toContainText('web')
   await expect(page.getByTestId('host-docker-container-row-web-container-id')).toContainText('nginx:1.27')
+  await expect(page.getByTestId('host-docker-container-sparkline-web-container-id')).toBeVisible()
   await expect(page.getByTestId('host-docker-container-row-worker-container-id')).toContainText('worker')
   await expect(page.getByTestId('host-docker-container-row-worker-container-id')).toContainText('Not present')
 
@@ -146,7 +152,7 @@ test('host Containers tab lists containers and filters by name and state', async
 
 test('host Containers tab shows per-container metric charts with max spike values', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-container-metrics-host')
   await seedDockerStatus(sql, instanceId, 'docker-container-metrics-host', 'installed')
 
@@ -169,24 +175,43 @@ test('host Containers tab shows per-container metric charts with max spike value
       restart_count,
       is_present
     )
-    VALUES (
-      'docker-metrics-row',
-      ${instanceId},
-      'docker-container-metrics-host',
-      'metrics-container-id',
-      'metrics-web',
-      '["metrics-web"]'::jsonb,
-      'nginx:metrics',
-      'sha256:metrics',
-      '{}'::jsonb,
-      'running',
-      'Up 8 minutes',
-      NOW() - INTERVAL '10 minutes',
-      NOW() - INTERVAL '30 seconds',
-      NOW() - INTERVAL '30 seconds',
-      1,
-      true
-    )
+    VALUES
+      (
+        'docker-metrics-row',
+        ${instanceId},
+        'docker-container-metrics-host',
+        'metrics-container-id',
+        'metrics-web',
+        '["metrics-web"]'::jsonb,
+        'nginx:metrics',
+        'sha256:metrics',
+        '{}'::jsonb,
+        'running',
+        'Up 8 minutes',
+        NOW() - INTERVAL '10 minutes',
+        NOW() - INTERVAL '30 seconds',
+        NOW() - INTERVAL '30 seconds',
+        1,
+        true
+      ),
+      (
+        'docker-metrics-worker-row',
+        ${instanceId},
+        'docker-container-metrics-host',
+        'metrics-worker-container-id',
+        'metrics-worker',
+        '["metrics-worker"]'::jsonb,
+        'worker:metrics',
+        'sha256:metrics-worker',
+        '{}'::jsonb,
+        'running',
+        'Up 7 minutes',
+        NOW() - INTERVAL '10 minutes',
+        NOW() - INTERVAL '30 seconds',
+        NOW() - INTERVAL '30 seconds',
+        0,
+        true
+      )
   `
 
   await sql`
@@ -244,6 +269,24 @@ test('host Containers tab shows per-container metric charts with max spike value
         32768,
         18,
         1
+      ),
+      (
+        'docker-metrics-worker-sample-1',
+        ${instanceId},
+        'docker-container-metrics-host',
+        'docker-metrics-worker-row',
+        'metrics-worker-container-id',
+        NOW() - INTERVAL '10 minutes',
+        33.0,
+        134217728,
+        1073741824,
+        12.5,
+        100,
+        250,
+        2048,
+        4096,
+        2,
+        0
       )
   `
 
@@ -261,11 +304,80 @@ test('host Containers tab shows per-container metric charts with max spike value
   await expect(metrics.getByText('CPU avg/max')).toBeVisible()
   await expect(metrics.getByText('Network I/O')).toBeVisible()
   await expect(metrics.getByText('Block I/O')).toBeVisible()
+
+  await page.getByTestId('host-docker-metrics-container-select').click()
+  await page.getByRole('option', { name: 'metrics-worker' }).click()
+  await expect(metrics).toContainText('metrics-worker')
+  await expect(metrics).toContainText('33.0%')
+})
+
+test('host Containers tab shows lifecycle in a sub tab scoped to the selected container', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const instanceId = await getInstanceId(sql)
+  await seedHost(sql, instanceId, 'docker-lifecycle-host')
+  await seedDockerStatus(sql, instanceId, 'docker-lifecycle-host', 'installed')
+
+  await sql`
+    INSERT INTO docker_containers (
+      id,
+      instance_id,
+      host_id,
+      docker_container_id,
+      primary_name,
+      names_json,
+      image,
+      image_id,
+      labels_json,
+      state,
+      status,
+      first_seen_at,
+      last_seen_at,
+      last_inventory_at,
+      restart_count,
+      is_present
+    )
+    VALUES
+      ('docker-lifecycle-api-row', ${instanceId}, 'docker-lifecycle-host', 'lifecycle-api-container-id', 'lifecycle-api', '["lifecycle-api"]'::jsonb, 'api:latest', 'sha256:api', '{}'::jsonb, 'running', 'Up 9 minutes', NOW() - INTERVAL '20 minutes', NOW() - INTERVAL '30 seconds', NOW() - INTERVAL '30 seconds', 0, true),
+      ('docker-lifecycle-worker-row', ${instanceId}, 'docker-lifecycle-host', 'lifecycle-worker-container-id', 'lifecycle-worker', '["lifecycle-worker"]'::jsonb, 'worker:latest', 'sha256:worker', '{}'::jsonb, 'exited', 'Exited', NOW() - INTERVAL '20 minutes', NOW() - INTERVAL '30 seconds', NOW() - INTERVAL '30 seconds', 1, true)
+  `
+
+  await sql`
+    INSERT INTO docker_container_lifecycle_events (
+      id,
+      instance_id,
+      host_id,
+      docker_container_row_id,
+      docker_container_id,
+      primary_name,
+      image,
+      state,
+      status,
+      event_type,
+      occurred_at,
+      restart_count
+    )
+    VALUES
+      ('lifecycle-api-started', ${instanceId}, 'docker-lifecycle-host', 'docker-lifecycle-api-row', 'lifecycle-api-container-id', 'lifecycle-api', 'api:latest', 'running', 'Up', 'started', NOW() - INTERVAL '10 minutes', 0),
+      ('lifecycle-worker-stopped', ${instanceId}, 'docker-lifecycle-host', 'docker-lifecycle-worker-row', 'lifecycle-worker-container-id', 'lifecycle-worker', 'worker:latest', 'exited', 'Exited', 'stopped', NOW() - INTERVAL '5 minutes', 1)
+  `
+
+  await page.goto('/hosts/docker-lifecycle-host')
+  await page.getByTestId('host-parent-tab-containers').click()
+
+  await expect(page.getByTestId('host-docker-container-lifecycle')).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Lifecycle' }).click()
+
+  await page.getByTestId('host-docker-lifecycle-container-select').click()
+  await page.getByRole('option', { name: 'lifecycle-worker' }).click()
+  const lifecycle = page.getByTestId('host-docker-container-lifecycle')
+  await expect(lifecycle).toContainText('lifecycle-worker')
+  await expect(lifecycle).toContainText('Stopped')
+  await expect(lifecycle).not.toContainText('lifecycle-api')
 })
 
 test('host Containers tab ranks top containers by selected metric and statistic', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-top-containers-host')
   await seedDockerStatus(sql, instanceId, 'docker-top-containers-host', 'installed')
 
@@ -324,6 +436,7 @@ test('host Containers tab ranks top containers by selected metric and statistic'
 
   const topContainers = page.getByTestId('host-docker-top-containers')
   await expect(topContainers).toContainText('Top containers')
+  await expect(topContainers).toContainText('Ranks containers by their highest or P95 resource use over the selected range.')
   await expect(page.getByTestId('host-docker-top-container-row-top-api-container-id')).toContainText('82.4%')
 
   await page.getByTestId('host-docker-top-metric-select').click()
@@ -337,7 +450,7 @@ test('host Containers tab ranks top containers by selected metric and statistic'
 
 test('host Containers tab explains Docker unavailable states', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
-  const instanceId = await getOrgId(sql)
+  const instanceId = await getInstanceId(sql)
   await seedHost(sql, instanceId, 'docker-containers-denied')
   await seedDockerStatus(sql, instanceId, 'docker-containers-denied', 'permission_denied')
 

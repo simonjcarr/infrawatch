@@ -35,6 +35,6 @@ test('pending users are redirected to approval and can sign out', async ({ authe
     await page.waitForURL('**/login')
     await expect(page.getByTestId('login-submit')).toBeVisible()
   } finally {
-    await sql`UPDATE "user" SET role = 'org_admin', updated_at = NOW() WHERE id = ${userId}`
+    await sql`UPDATE "user" SET role = 'instance_admin', updated_at = NOW() WHERE id = ${userId}`
   }
 })

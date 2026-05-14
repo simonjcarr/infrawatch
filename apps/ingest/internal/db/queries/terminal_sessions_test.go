@@ -86,7 +86,7 @@ func TestVerifySSHHostKeyMetadataBlocksWhenPendingChangeExists(t *testing.T) {
 
 func TestTerminalAuthThrottleKeysIncludeUserHostUsernameAndSource(t *testing.T) {
 	info := TerminalSessionInfo{
-		InstanceID: "org-1",
+		InstanceID: "instance-1",
 		UserID:     "user-1",
 		HostID:     "host-1",
 		Username:   "Admin",
@@ -116,7 +116,7 @@ func TestTerminalAuthThrottleKeysIncludeUserHostUsernameAndSource(t *testing.T) 
 
 func TestTerminalAuthThrottleKeyNormalisesUsernameAndSource(t *testing.T) {
 	base := TerminalSessionInfo{
-		InstanceID: "org-1",
+		InstanceID: "instance-1",
 		UserID:     "user-1",
 		HostID:     "host-1",
 		Username:   "Admin",

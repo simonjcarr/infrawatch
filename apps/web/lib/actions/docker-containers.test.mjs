@@ -62,3 +62,25 @@ test('getHostDockerContainerLifecycleEvents validates host scope before querying
   assert.match(segment, /CASE WHEN dc\.is_present = true THEN dc\.status ELSE e\.status END AS status/, 'present containers should show current Docker status text')
   assert.match(segment, /LIMIT \$\{MAX_LIFECYCLE_EVENTS\}/, 'timeline query must cap returned events')
 })
+
+test('getHostDockerContainerLifecycleEvents can scope the timeline to one container', () => {
+  const segment = getActionSegment('getHostDockerContainerLifecycleEvents')
+
+  assert.match(segment, /dockerContainerId\?: string/, 'timeline action should accept an optional container id')
+  assert.match(segment, /cleanFilter\(dockerContainerId\)/, 'timeline container id should be normalized')
+  assert.match(segment, /AND e\.docker_container_id = \$\{containerId\}/, 'timeline query should filter selected container events')
+})
+
+test('getHostDockerContainerMetricSparklines validates host scope and caps selected containers', () => {
+  const segment = getActionSegment('getHostDockerContainerMetricSparklines')
+  const hostLookupIndex = segment.indexOf('db.query.hosts.findFirst')
+  const metricQueryIndex = segment.indexOf('FROM docker_container_metrics')
+
+  assert.notEqual(hostLookupIndex, -1, 'host ownership must be validated')
+  assert.notEqual(metricQueryIndex, -1, 'sparkline metric query must exist')
+  assert.ok(hostLookupIndex < metricQueryIndex, 'host validation must run before sparkline query')
+  assert.match(segment, /eq\(hosts\.instanceId, instanceId\)/, 'host lookup must be scoped to the caller instance')
+  assert.match(segment, /MAX_SPARKLINE_CONTAINERS/, 'sparkline action must cap selected containers')
+  assert.match(segment, /m\.docker_container_id IN \(\$\{sql\.join/, 'sparkline query must only return requested containers')
+  assert.match(segment, /MAX\(m\.cpu_percent\)::double precision AS cpu_max/, 'sparkline should expose CPU trend values')
+})

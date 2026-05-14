@@ -42,7 +42,7 @@ func TestGetChecksForHostScopesByHostAndInstance(t *testing.T) {
 	queryErr := errors.New("stop after query capture")
 	queryer := &fakeCheckQueryer{err: queryErr}
 
-	_, err := getChecksForHost(context.Background(), queryer, "host-victim", "org-victim")
+	_, err := getChecksForHost(context.Background(), queryer, "host-victim", "instance-victim")
 	if !errors.Is(err, queryErr) {
 		t.Fatalf("getChecksForHost error = %v, want sentinel query error", err)
 	}
@@ -52,7 +52,7 @@ func TestGetChecksForHostScopesByHostAndInstance(t *testing.T) {
 	if !strings.Contains(queryer.sql, "AND instance_id = $2") {
 		t.Fatalf("query does not filter by instance_id: %s", queryer.sql)
 	}
-	if len(queryer.args) != 2 || queryer.args[0] != "host-victim" || queryer.args[1] != "org-victim" {
+	if len(queryer.args) != 2 || queryer.args[0] != "host-victim" || queryer.args[1] != "instance-victim" {
 		t.Fatalf("args = %#v, want host and instance", queryer.args)
 	}
 }
@@ -67,7 +67,7 @@ func TestInsertCheckResultRejectsCrossInstanceCheckID(t *testing.T) {
 		execer,
 		"check-attacker",
 		"host-victim",
-		"org-victim",
+		"instance-victim",
 		"pass",
 		"ok",
 		123,

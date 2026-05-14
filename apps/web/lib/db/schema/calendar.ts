@@ -47,10 +47,10 @@ export const calendarEvents = pgTable('calendar_events', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (t) => [
-  index('calendar_events_org_range_idx').on(t.instanceId, t.startsAt, t.endsAt),
-  index('calendar_events_org_series_idx').on(t.instanceId, t.seriesId, t.recurrenceInstanceStartAt),
-  uniqueIndex('calendar_events_org_client_request_idx').on(t.instanceId, t.clientRequestId),
-  uniqueIndex('calendar_events_org_series_occurrence_idx')
+  index('calendar_events_instance_range_idx').on(t.instanceId, t.startsAt, t.endsAt),
+  index('calendar_events_instance_series_idx').on(t.instanceId, t.seriesId, t.recurrenceInstanceStartAt),
+  uniqueIndex('calendar_events_instance_client_request_idx').on(t.instanceId, t.clientRequestId),
+  uniqueIndex('calendar_events_instance_series_occurrence_idx')
     .on(t.instanceId, t.seriesId, t.recurrenceInstanceStartAt)
     .where(sql`${t.seriesId} IS NOT NULL AND ${t.recurrenceInstanceStartAt} IS NOT NULL`),
 ])
@@ -62,7 +62,7 @@ export const calendarEventHosts = pgTable('calendar_event_hosts', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.eventId, t.hostId], name: 'calendar_event_hosts_pk' }),
-  index('calendar_event_hosts_org_host_idx').on(t.instanceId, t.hostId),
+  index('calendar_event_hosts_instance_host_idx').on(t.instanceId, t.hostId),
 ])
 
 export const calendarEventParticipants = pgTable('calendar_event_participants', {
@@ -73,7 +73,7 @@ export const calendarEventParticipants = pgTable('calendar_event_participants', 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.eventId, t.userId], name: 'calendar_event_participants_pk' }),
-  index('calendar_event_participants_org_user_idx').on(t.instanceId, t.userId),
+  index('calendar_event_participants_instance_user_idx').on(t.instanceId, t.userId),
 ])
 
 export type CalendarEvent = typeof calendarEvents.$inferSelect

@@ -18,14 +18,14 @@ export class SeatAdmissionError extends Error {
 }
 
 async function getSeatLimit(instanceId: string): Promise<number> {
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { licenceKey: true, licenceVerifierPublicKey: true },
   })
-  if (!org?.licenceKey) return FREE_INCLUDED_USER_SEATS
+  if (!instance?.licenceKey) return FREE_INCLUDED_USER_SEATS
 
-  const result = await validateLicenceKey(org.licenceKey, {
-    publicKeyPem: org.licenceVerifierPublicKey ?? undefined,
+  const result = await validateLicenceKey(instance.licenceKey, {
+    publicKeyPem: instance.licenceVerifierPublicKey ?? undefined,
   })
   if (!result.valid || result.payload.sub !== instanceId) {
     return FREE_INCLUDED_USER_SEATS
@@ -35,14 +35,14 @@ async function getSeatLimit(instanceId: string): Promise<number> {
 }
 
 export async function canUserAccessSeat(instanceId: string, userId: string): Promise<boolean> {
-  const [org, maxUsers] = await Promise.all([
+  const [instance, maxUsers] = await Promise.all([
     db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { metadata: true },
     }),
     getSeatLimit(instanceId),
   ])
-  if (!org) return false
+  if (!instance) return false
 
   const activeUsers = await db.query.users.findMany({
     where: and(eq(users.instanceId, instanceId), eq(users.isActive, true), isNull(users.deletedAt)),
@@ -51,7 +51,7 @@ export async function canUserAccessSeat(instanceId: string, userId: string): Pro
   })
   if (activeUsers.length <= maxUsers) return true
 
-  const metadata = parseInstanceMetadata(org.metadata)
+  const metadata = parseInstanceMetadata(instance.metadata)
   const admitted = selectAdmittedSeatUserIds(
     activeUsers,
     metadata.freeSeatUserIds ?? [],

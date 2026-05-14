@@ -6,11 +6,11 @@ Complete Phase 0: auth middleware, user management UI, RBAC enforcement, feature
 ## Scope
 
 **In scope:**
-- `middleware.ts` — protect dashboard routes, redirect unauthenticated to `/login`, redirect users without org to `/onboarding`
-- User management UI — list users in org, invite by email, change role, deactivate
+- `middleware.ts` — protect dashboard routes, redirect unauthenticated to `/login`, redirect users without instance to `/onboarding`
+- User management UI — list users in instance, invite by email, change role, deactivate
 - Feature flag system — server-side `hasFeature(session, feature)` based on licence tier
 - Licence key validation scaffold — offline-capable signed JWT with bundled public key
-- System settings page — org name, licence key entry
+- System settings page — instance name, licence key entry
 - Profile page — change name, change password, setup/remove TOTP
 - Run Drizzle migrations (`drizzle-kit push` against a live DB or generate migration files)
 - `npm run build` must pass with zero errors and zero lint warnings
@@ -23,7 +23,7 @@ Complete Phase 0: auth middleware, user management UI, RBAC enforcement, feature
 
 ## Definition of Done
 - [ ] Unauthenticated users cannot access any `/dashboard/*` route
-- [ ] Users without an `organisation_id` are redirected to `/onboarding` after login
+- [ ] Users without an `instance_id` are redirected to `/onboarding` after login
 - [ ] Admin can view list of team members
 - [ ] Admin can invite a user by email (creates a pending invite record)
 - [ ] Admin can change a user's role
@@ -45,7 +45,7 @@ apps/web/
 │   ├── licence.ts                         # NEW — licence key validation
 │   └── actions/
 │       ├── users.ts                       # NEW — invite, update role, deactivate
-│       └── settings.ts                    # NEW — update org, save licence key
+│       └── settings.ts                    # NEW — update instance, save licence key
 ├── app/(dashboard)/
 │   ├── team/
 │   │   └── page.tsx                       # MODIFY — real team management UI

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
 test('admin can update instance terminal settings from settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
@@ -26,7 +26,7 @@ test('admin can update instance terminal settings from settings', async ({ authe
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -53,7 +53,7 @@ test('admin can update instance terminal settings from settings', async ({ authe
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -98,7 +98,7 @@ test('admin can update instance notification settings from settings', async ({ a
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -106,7 +106,7 @@ test('admin can update instance notification settings from settings', async ({ a
     })
     .toEqual({
       inAppEnabled: false,
-      inAppRoles: ['super_admin', 'org_admin', 'engineer'],
+      inAppRoles: ['super_admin', 'instance_admin', 'engineer'],
       allowUserOptOut: true,
     })
 
@@ -131,7 +131,7 @@ test('admin can update instance notification settings from settings', async ({ a
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = ${TEST_ORG.slug}
+        WHERE slug = ${TEST_INSTANCE.slug}
         LIMIT 1
       `
 
@@ -139,7 +139,7 @@ test('admin can update instance notification settings from settings', async ({ a
     })
     .toEqual({
       inAppEnabled: true,
-      inAppRoles: ['super_admin', 'org_admin', 'read_only'],
+      inAppRoles: ['super_admin', 'instance_admin', 'read_only'],
       allowUserOptOut: false,
     })
 })
@@ -175,7 +175,7 @@ test('admin can save SMTP relay settings and sees validation for an invalid test
       }>>`
         SELECT metadata
         FROM instance_settings
-        WHERE slug = 'e2e-test-org'
+        WHERE slug = 'e2e-test-instance'
         LIMIT 1
       `
 

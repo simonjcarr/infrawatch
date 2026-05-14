@@ -101,7 +101,7 @@ export function NoteCard({
   const [actionError, setActionError] = useState<string | null>(null)
 
   const isAuthor = note.authorId === currentUserId
-  const isAdmin = userRole === 'super_admin' || userRole === 'org_admin'
+  const isAdmin = userRole === 'super_admin' || userRole === 'instance_admin'
   const canEdit = !note.deletedAt && userRole !== 'read_only' && (isAuthor || isAdmin)
   const canDelete = canEdit
   const canPin = note.directTargetId != null && canEdit

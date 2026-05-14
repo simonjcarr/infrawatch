@@ -50,7 +50,7 @@ Readers can mark a note **helpful** or **outdated**. A user can only cast each r
 Three entry points:
 
 1. **Per-host Notes tab** — everything that resolves to this host. Supports category filters and a "New note" action that attaches the note to the current host. Category templates seed the body when you choose a category on a new note, so runbooks and contacts land with a consistent shape. Changes stream in via the host SSE channel (`notes` event on `/api/hosts/[id]/stream`) so another engineer's edit shows up without a refresh.
-2. **Global `/notes` page** — org-wide list with full-text search (`websearch_to_tsquery` over title + body, title weighted higher) and category / author / "mine only" filters
+2. **Global `/notes` page** — instance-wide list with full-text search (`websearch_to_tsquery` over title + body, title weighted higher) and category / author / "mine only" filters
 3. **Cmd+K palette** — type `/notes` or a note title to jump straight to it
 
 ## Overview card
@@ -61,11 +61,11 @@ Pinned notes surface as a "Pinned notes" card on the host's Overview tab — abo
 
 | Action | Who |
 |---|---|
-| Read shared note | Anyone in the org |
+| Read shared note | Anyone in the instance |
 | Read private note | Author + super admin |
 | Create note | Any role except `read_only` |
-| Edit note | Author + org admin + super admin |
-| Delete note (soft) | Author + org admin + super admin |
+| Edit note | Author + instance admin + super admin |
+| Delete note (soft) | Author + instance admin + super admin |
 | Toggle private | Author only |
 
 Deletion is soft — the note row is marked `deletedAt` and disappears from every list, but the revision history remains.

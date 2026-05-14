@@ -23,7 +23,7 @@ test('ldap placeholder users must set a real email before reaching the dashboard
     UPDATE "user"
     SET instance_id = ${instanceId},
         email_verified = true,
-        role = 'org_admin',
+        role = 'instance_admin',
         is_active = true
     WHERE email = ${placeholderEmail}
   `

@@ -27,7 +27,7 @@ const privilegedTaskRunActions = [
   'triggerGroupPatchRun',
 ]
 
-test('privileged host task actions require org admin access and derive actors from session', () => {
+test('privileged host task actions require instance admin access and derive actors from session', () => {
   for (const action of privilegedTaskRunActions) {
     const segment = getActionSegment(taskRunsSource, action)
 
@@ -39,7 +39,7 @@ test('privileged host task actions require org admin access and derive actors fr
     assert.match(
       segment,
       /const session = await requireInstanceAdminAccess\(currentScope\)/,
-      `${action} must capture an org-admin-authorized session`,
+      `${action} must capture an instance-admin-authorized session`,
     )
     assert.match(
       segment,
@@ -49,14 +49,14 @@ test('privileged host task actions require org admin access and derive actors fr
   }
 })
 
-test('privileged task schedule mutations require org admin access', () => {
+test('privileged task schedule mutations require instance admin access', () => {
   for (const action of ['createSchedule', 'updateSchedule', 'runScheduleNow']) {
     const segment = getActionSegment(taskSchedulesSource, action)
 
     assert.match(
       segment,
       /(?:const session = )?await requireInstanceAdminAccess\(currentScope\)/,
-      `${action} must require org admin access before mutating privileged schedules`,
+      `${action} must require instance admin access before mutating privileged schedules`,
     )
   }
 })

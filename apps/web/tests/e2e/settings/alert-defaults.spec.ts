@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { getTestDb } from '../fixtures/db'
-import { TEST_ORG } from '../fixtures/seed'
+import { TEST_INSTANCE } from '../fixtures/seed'
 
 test('admin can create and delete global alert defaults from monitoring settings', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
@@ -29,7 +29,7 @@ test('admin can create and delete global alert defaults from monitoring settings
       }>>`
         SELECT id, name, severity, condition_type, config
         FROM alert_rules
-        WHERE instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug})
+        WHERE instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug})
           AND host_id IS NULL
           AND is_global_default = true
           AND deleted_at IS NULL
@@ -54,7 +54,7 @@ test('admin can create and delete global alert defaults from monitoring settings
   const createdRows = await sql<Array<{ id: string }>>`
     SELECT id
     FROM alert_rules
-    WHERE instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_ORG.slug})
+    WHERE instance_id = (SELECT id FROM instance_settings WHERE slug = ${TEST_INSTANCE.slug})
       AND host_id IS NULL
       AND is_global_default = true
       AND deleted_at IS NULL

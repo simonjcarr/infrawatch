@@ -19,19 +19,19 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 ## CRITICAL
 
-- [ ] **[C-01] LDAP login can silently merge to an account in ANY organisation (cross-org takeover)**
+- [ ] **[C-01] LDAP login can silently merge to an account in ANY instance (cross-instance takeover)**
   - Location: `apps/web/app/api/auth/ldap/route.ts:~67-75`
-  - On LDAP bind success, the handler finds an existing user by email with no `organisationId` filter, then links the LDAP account to whatever user row it finds. An attacker operating in Org A with control of an LDAP entry using a victim's email can hijack the Org B account when the LDAP user next authenticates.
-  - Fix direction: scope `findFirst` for `users` by both `email` and the configured org id (`eq(users.organisationId, config.organisationId)`). Never link across organisations.
+  - On LDAP bind success, the handler finds an existing user by email with no `instanceId` filter, then links the LDAP account to whatever user row it finds. An attacker operating in Instance A with control of an LDAP entry using a victim's email can hijack the Instance B account when the LDAP user next authenticates.
+  - Fix direction: scope `findFirst` for `users` by both `email` and the configured instance id (`eq(users.instanceId, config.instanceId)`). Never link across instances.
 
 - [ ] **[C-02] User management server actions trust a client-supplied `requesterId`/`invitedById` without role verification**
   - Location: `apps/web/lib/actions/users.ts` — `inviteUser` (~37), `updateUserRole` (~?), `deactivateUser`, `removeUser`
-  - The functions take the acting-user id as a parameter but never look it up to verify `role in ('org_admin', 'super_admin')`. Any authenticated user can call the action directly (e.g., via the Next.js server-action RPC endpoint) and escalate, demote, or deactivate others.
+  - The functions take the acting-user id as a parameter but never look it up to verify `role in ('instance_admin', 'super_admin')`. Any authenticated user can call the action directly (e.g., via the Next.js server-action RPC endpoint) and escalate, demote, or deactivate others.
   - Fix direction: replace parameter-supplied requester ids with `await auth.api.getSession()` and enforce role at the start of every privileged action.
 
 - [ ] **[C-03] Email verification disabled by default in Better Auth**
   - Location: `apps/web/lib/auth/index.ts:~19` (`requireEmailVerification: false`)
-  - Anyone can register under any email (including executives of a target org), enabling phishing setup, squatting, and spoofed audit trails.
+  - Anyone can register under any email (including executives of a target instance), enabling phishing setup, squatting, and spoofed audit trails.
   - Fix direction: require email verification; ship a verification-email flow before GA.
 
 - [ ] **[C-04] LDAP filter injection via unescaped `{{username}}` substitution**
@@ -52,17 +52,17 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 - [ ] **[C-07] Webhook/notification test-send is SSRF-capable (authenticated)**
   - Location: `apps/web/lib/actions/alerts.ts:~673-720` (`sendTestNotification` and channel creation)
   - Webhook/Slack/Telegram/SMTP fields accept arbitrary URLs/hostnames. `sendTestNotification` reaches them server-side with no SSRF guard, enabling internal-network probing and abuse from any authenticated account.
-  - Fix direction: resolve target host and reject private/reserved IPs; force HTTPS for web hooks; cap size/timeout; rate-limit per org/user.
+  - Fix direction: resolve target host and reject private/reserved IPs; force HTTPS for web hooks; cap size/timeout; rate-limit per instance/user.
 
 - [ ] **[C-08] Missing authentication on *most* server-action read paths**
   - Location: `apps/web/lib/actions/*.ts` — broad pattern. Examples include `agents.ts` (`listPendingAgents`, `listHosts`, `getHost`, `getHostMetrics`, ...), `alerts.ts` (`getAlertRules`, `getNotificationChannels`, ...), `certificates.ts` (`getCertificates`, `getCertificate`, `getCertificateCounts`, `deleteCertificate`), `checks.ts`, `domain-accounts.ts`, `host-groups.ts`, `host-settings.ts`, `notifications.ts`, `service-accounts.ts`, `software-inventory.ts`, `task-runs.ts`.
-  - Functions accept `orgId` as an argument and query the DB without verifying the caller is logged in, let alone a member of that org. Any unauthenticated request that can reach the Next.js action RPC endpoint can pull another org's data by guessing/enumerating org ids.
-  - Fix direction: add `const session = await getRequiredSession(); if (session.user.organisationId !== orgId) throw ...` to every action. Consider removing `orgId` from public parameters and always deriving it from the session.
+  - Functions accept `instanceId` as an argument and query the DB without verifying the caller is logged in, let alone a member of that instance. Any unauthenticated request that can reach the Next.js action RPC endpoint can pull another instance's data by guessing/enumerating instance ids.
+  - Fix direction: add `const session = await getRequiredSession(); if (session.user.instanceId !== instanceId) throw ...` to every action. Consider removing `instanceId` from public parameters and always deriving it from the session.
 
-- [x] **[C-09] `deleteCertificate` (and other destructive actions) have no auth/org check**
+- [x] **[C-09] `deleteCertificate` (and other destructive actions) have no auth/instance check**
   - Location: `apps/web/lib/actions/certificates.ts:~118-137`
-  - Takes `orgId` + `certId` only. An attacker can delete any certificate in any organisation.
-  - Fix direction: session check + confirm the cert belongs to the session's org before deleting; use soft-delete (`deletedAt`) per the universal table convention.
+  - Takes `instanceId` + `certId` only. An attacker can delete any certificate in any instance.
+  - Fix direction: session check + confirm the cert belongs to the session's instance before deleting; use soft-delete (`deletedAt`) per the universal table convention.
 
 - [ ] **[C-10] Agent self-update executes server-supplied binary with no signature verification**
   - Location: `agent/internal/updater/updater.go:~25-100`
@@ -93,7 +93,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [ ] **[H-03] LDAP bind password encryption uses a hardcoded, shared salt**
   - Location: `apps/web/lib/crypto/encrypt.ts:~5-10` (`SALT = 'ct-ops-ldap-encryption-salt'`)
-  - `scryptSync(secret, SALT, 32)` produces the same key for every ciphertext, every config, every customer. If `BETTER_AUTH_SECRET` leaks once, every stored LDAP password (across all orgs, installations) is decryptable.
+  - `scryptSync(secret, SALT, 32)` produces the same key for every ciphertext, every config, every customer. If `BETTER_AUTH_SECRET` leaks once, every stored LDAP password (across all instances, installations) is decryptable.
   - Fix: random per-record salt persisted alongside ciphertext; separate dedicated encryption secret (not reused from auth).
 
 - [ ] **[H-04] LDAP bind password decryption uses `BETTER_AUTH_SECRET` as KDF input**
@@ -181,7 +181,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 - [ ] **[H-21] `direct_access = true` terminal mode grants PTY as root with no extra checks**
   - Location: `agent/internal/terminal/session.go:~82-116`
   - Direct-access mode bypasses the per-user `su` drop.
-  - Fix: require org_admin + explicit per-host opt-in + audit log; prefer per-user sessions by default; require MFA for direct-access sessions.
+  - Fix: require instance_admin + explicit per-host opt-in + audit log; prefer per-user sessions by default; require MFA for direct-access sessions.
 
 - [ ] **[H-22] Task script execution has no sandbox / resource limits**
   - Location: `agent/internal/tasks/script.go:~33-111`
@@ -193,9 +193,9 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
   - A malicious or buggy agent can push huge messages or open unlimited streams until the server OOMs.
   - Fix: set conservative caps (e.g. 50 MB message, 1k streams per connection); add keepalive and stream deadlines.
 
-- [ ] **[H-24] Missing composite index on `host_metrics(organisation_id, host_id, recorded_at)`**
+- [ ] **[H-24] Missing composite index on `host_metrics(instance_id, host_id, recorded_at)`**
   - Location: `apps/web/lib/db/schema/metrics.ts:~6-24`
-  - Time-series queries with tenant filters fall back to full table scans on a hypertable that will hold the bulk of all data; any user can degrade the entire cluster by requesting wide time ranges.
+  - Time-series queries with instance filters fall back to full table scans on a hypertable that will hold the bulk of all data; any user can degrade the entire cluster by requesting wide time ranges.
   - Fix: add the composite index (or TimescaleDB chunk-aware equivalent); cap the time range allowed in user-facing queries.
 
 - [ ] **[H-25] Invite/password-reset/invitation lookups miss rate limits**
@@ -279,7 +279,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [ ] **[M-10] Missing rate limiting on expensive actions**
   - `alerts.sendTestNotification`, `software-inventory.triggerSoftwareScan`, `software-inventory.getSoftwareReport`, `certificates.trackCertificateFromUrl`, `agents.createEnrolmentToken`.
-  - Fix: per-org token-bucket or leaky-bucket limiter.
+  - Fix: per-instance token-bucket or leaky-bucket limiter.
 
 - [ ] **[M-11] Cert-file path validation too permissive**
   - Location: `apps/web/lib/actions/checks.ts:~35-40` (`certFileConfigSchema.filePath`)
@@ -288,7 +288,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [ ] **[M-12] Notification channel configuration (SMTP, webhook) accepts plain HTTP**
   - `apps/web/lib/actions/alerts.ts` — verify URL schema validation, TLS enforcement, and port allowlist.
-  - Fix: require HTTPS (unless explicitly overridden per org); restrict SMTP ports and TLS modes.
+  - Fix: require HTTPS (unless explicitly overridden per instance); restrict SMTP ports and TLS modes.
 
 - [ ] **[M-13] Licence JWT bound only to offline validation; no revocation signal**
   - Location: `apps/web/lib/licence.ts`
@@ -365,7 +365,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [ ] **[M-29] `/api/agent/bundle` autoApprove tokens bypass registration approval**
   - Location: `apps/web/app/api/agent/bundle/route.ts:~26-31`
-  - Compromise of an org_admin account = silent agent enrolment at scale.
+  - Compromise of an instance_admin account = silent agent enrolment at scale.
   - Fix: require separate dual-approval for `autoApprove` tokens; audit-log + email notification on generation.
 
 - [ ] **[M-30] Inventory submission accepts arbitrarily large chunks**
@@ -414,7 +414,7 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 
 - [ ] **[L-08] `id` spread over `parsed.data` in create functions**
   - Examples: `domain-accounts.ts:~140-162, ~185-195`.
-  - If future schemas add security-sensitive fields (role, orgId) they become mass-assignable.
+  - If future schemas add security-sensitive fields (role, instanceId) they become mass-assignable.
   - Fix: destructure explicit fields instead of spreading.
 
 - [ ] **[L-09] Cert-refresh sweeper uses `InsecureSkipVerify: true`**
@@ -444,15 +444,15 @@ Severity key: **C**ritical / **H**igh / **M**edium / **L**ow / **I**nfo.
 - [ ] **[I-05] No SBOM produced per release**
 - [ ] **[I-06] No pen-test scope / engagement doc in repo — add one alongside SECURITY.md**
 - [ ] **[I-07] Mixed query styles (`db.query.X.findMany` vs. `db.select().from(X)`) complicate audits**
-- [ ] **[I-08] Consider Row-Level Security (RLS) in Postgres scoped on `organisation_id`** — defence in depth should any server-side check miss its org filter
+- [ ] **[I-08] Consider Row-Level Security (RLS) in Postgres scoped on `instance_id`** — defence in depth should any server-side check miss its instance filter
 - [ ] **[I-09] Response sanitisation layer** — generic utility for stripping secret-shaped fields before returning
-- [x] **[I-10] Centralised authz helpers** — shared guards now enforce role/org checks and ESLint flags raw `session.user` authz comparisons in web actions
+- [x] **[I-10] Centralised authz helpers** — shared guards now enforce role/instance checks and ESLint flags raw `session.user` authz comparisons in web actions
 
 ---
 
 ## Suggested triage ordering
 
-1. Fix `C-01`, `C-02`, `C-04`, `C-05`, `C-06`, `C-08`, `C-09` before the pen test — these are "anyone can take over / read any org".
+1. Fix `C-01`, `C-02`, `C-04`, `C-05`, `C-06`, `C-08`, `C-09` before the pen test — these are "anyone can take over / read any instance".
 2. Rotate away from the dev licence public key (`C-11`) before any external distribution.
 3. Wire rate limiting + CSRF + security headers (`H-01`, `H-02`, `H-27`) — cheap wins that reduce the overall attack surface.
 4. Implement signed agent updates and sandboxed task execution (`C-10`, `H-22`).

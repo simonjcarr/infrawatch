@@ -59,13 +59,13 @@ export async function checkTerminalAccess(
     return { allowed: false, reason: 'Terminal access requires at minimum engineer role' }
   }
 
-  // 2. Org-level terminal enabled
-  const org = await db.query.instanceSettings.findFirst({
+  // 2. Instance-level terminal enabled
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const orgMeta = parseInstanceMetadata(org?.metadata)
-  if (orgMeta.terminalEnabled === false) {
+  const instanceMeta = parseInstanceMetadata(instance?.metadata)
+  if (instanceMeta.terminalEnabled === false) {
     return { allowed: false, reason: 'Terminal access is disabled for this instance' }
   }
 
@@ -181,23 +181,23 @@ export async function createTerminalSession(
   }
 }
 
-// --- Org-level terminal settings ---
+// --- Instance-level terminal settings ---
 
-export interface OrgTerminalSettings {
+export interface InstanceTerminalSettings {
   terminalEnabled: boolean
   terminalLoggingEnabled: boolean
   terminalDirectAccess: boolean
 }
 
-export async function getOrgTerminalSettings(
+export async function getInstanceTerminalSettings(
   instanceId: string,
-): Promise<OrgTerminalSettings> {
+): Promise<InstanceTerminalSettings> {
   await requireInstanceAccess(instanceId)
-  const org = await db.query.instanceSettings.findFirst({
+  const instance = await db.query.instanceSettings.findFirst({
     where: eq(instanceSettings.id, instanceId),
     columns: { metadata: true },
   })
-  const meta = parseInstanceMetadata(org?.metadata)
+  const meta = parseInstanceMetadata(instance?.metadata)
   return {
     terminalEnabled: meta.terminalEnabled !== false,
     terminalLoggingEnabled: meta.terminalLoggingEnabled === true,
@@ -205,9 +205,9 @@ export async function getOrgTerminalSettings(
   }
 }
 
-export async function updateOrgTerminalSettings(
+export async function updateInstanceTerminalSettings(
   instanceId: string,
-  settings: OrgTerminalSettings,
+  settings: InstanceTerminalSettings,
 ): Promise<{ success: true } | { error: string }> {
   let session
   try {
@@ -217,13 +217,13 @@ export async function updateOrgTerminalSettings(
   }
 
   try {
-    const org = await db.query.instanceSettings.findFirst({
+    const instance = await db.query.instanceSettings.findFirst({
       where: eq(instanceSettings.id, instanceId),
       columns: { id: true, metadata: true },
     })
-    if (!org) return { error: 'Instance not found' }
+    if (!instance) return { error: 'Instance not found' }
 
-    const currentMetadata = parseInstanceMetadata(org.metadata)
+    const currentMetadata = parseInstanceMetadata(instance.metadata)
     const updatedMetadata = {
       ...currentMetadata,
       terminalEnabled: settings.terminalEnabled,
@@ -255,7 +255,7 @@ export async function updateOrgTerminalSettings(
 
     return { success: true }
   } catch (err) {
-    logError('Failed to update org terminal settings:', err)
+    logError('Failed to update instance terminal settings:', err)
     return { error: 'An unexpected error occurred' }
   }
 }

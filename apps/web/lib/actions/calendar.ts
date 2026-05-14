@@ -154,6 +154,7 @@ export interface HostCalendarEventView {
   status: CalendarEventStatus
   category: CalendarEventCategory
   isRecurring: boolean
+  isLinkedToCurrentUser: boolean
 }
 
 type ParsedCalendarInput = Omit<CalendarEventInput, 'startsAt' | 'endsAt' | 'recurrenceRule'> & {
@@ -534,7 +535,7 @@ export async function listCalendarEventsForHost(
   instanceId: string,
   hostId: string,
 ): Promise<{ events: HostCalendarEventView[] } | { error: string }> {
-  await requireInstanceAccess(instanceId)
+  const session = await requireInstanceAccess(instanceId)
   const parsedHostId = z.string().min(1).safeParse(hostId)
   if (!parsedHostId.success) return { error: 'Host is required' }
 
@@ -551,6 +552,7 @@ export async function listCalendarEventsForHost(
         status: calendarEvents.status,
         category: calendarEvents.category,
         recurrenceRule: calendarEvents.recurrenceRule,
+        createdBy: calendarEvents.createdBy,
       })
       .from(calendarEventHosts)
       .innerJoin(
@@ -576,6 +578,19 @@ export async function listCalendarEventsForHost(
       .orderBy(asc(calendarEvents.startsAt))
       .limit(250)
 
+    const eventIds = rows.map((row) => row.id)
+    const participantRows = eventIds.length > 0
+      ? await db.query.calendarEventParticipants.findMany({
+          where: and(
+            eq(calendarEventParticipants.instanceId, instanceId),
+            eq(calendarEventParticipants.userId, session.user.id),
+            inArray(calendarEventParticipants.eventId, eventIds),
+          ),
+          columns: { eventId: true },
+        })
+      : []
+    const currentUserEventIds = new Set(participantRows.map((row) => row.eventId))
+
     return {
       events: rows.map((row) => ({
         id: row.id,
@@ -588,6 +603,7 @@ export async function listCalendarEventsForHost(
         status: row.status,
         category: row.category,
         isRecurring: Boolean(row.recurrenceRule),
+        isLinkedToCurrentUser: row.createdBy === session.user.id || currentUserEventIds.has(row.id),
       })),
     }
   } catch (err) {

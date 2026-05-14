@@ -44,9 +44,10 @@ test('host admin calendar shows only events linked to the current host', async (
       category
     )
     VALUES
-      ('host-calendar-event-1', ${instanceId}, ${userId}, 'Host kernel patch', 'Patch the current host.', '2026-05-20T09:00:00Z', '2026-05-20T10:00:00Z', false, 'UTC', 'confirmed', 'patching'),
-      ('host-calendar-event-2', ${instanceId}, ${userId}, 'Host maintenance window', NULL, '2026-05-22T13:30:00Z', '2026-05-22T15:00:00Z', false, 'UTC', 'planned', 'maintenance'),
-      ('host-calendar-event-other', ${instanceId}, ${userId}, 'Other host outage', NULL, '2026-05-21T09:00:00Z', '2026-05-21T10:00:00Z', false, 'UTC', 'planned', 'maintenance')
+      ('host-calendar-event-1', ${instanceId}, NULL, 'Host kernel patch', 'Patch the current host.', date_trunc('day', NOW()) + interval '9 hours', date_trunc('day', NOW()) + interval '10 hours', false, 'UTC', 'confirmed', 'patching'),
+      ('host-calendar-event-2', ${instanceId}, NULL, 'Host maintenance window', NULL, date_trunc('day', NOW()) + interval '1 day 13 hours 30 minutes', date_trunc('day', NOW()) + interval '1 day 15 hours', false, 'UTC', 'planned', 'maintenance'),
+      ('host-calendar-event-past', ${instanceId}, NULL, 'Past maintenance window', NULL, date_trunc('day', NOW()) - interval '2 days' + interval '8 hours', date_trunc('day', NOW()) - interval '2 days' + interval '9 hours', false, 'UTC', 'completed', 'maintenance'),
+      ('host-calendar-event-other', ${instanceId}, NULL, 'Other host outage', NULL, date_trunc('day', NOW()) + interval '2 days 9 hours', date_trunc('day', NOW()) + interval '2 days 10 hours', false, 'UTC', 'planned', 'maintenance')
   `
 
   await sql`
@@ -54,7 +55,13 @@ test('host admin calendar shows only events linked to the current host', async (
     VALUES
       (${instanceId}, 'host-calendar-event-1', 'host-calendar-1'),
       (${instanceId}, 'host-calendar-event-2', 'host-calendar-1'),
+      (${instanceId}, 'host-calendar-event-past', 'host-calendar-1'),
       (${instanceId}, 'host-calendar-event-other', 'host-calendar-2')
+  `
+
+  await sql`
+    INSERT INTO calendar_event_participants (instance_id, event_id, user_id, role)
+    VALUES (${instanceId}, 'host-calendar-event-1', ${userId}, 'implementer')
   `
 
   await page.goto('/hosts/host-calendar-1')
@@ -69,16 +76,38 @@ test('host admin calendar shows only events linked to the current host', async (
   await expect(firstEventRow).not.toContainText('Patch the current host.')
   await expect(firstEventRow).toContainText('Confirmed')
   await expect(firstEventRow).toContainText('Patching')
-  await expect(page.getByTestId('host-calendar-event-host-calendar-event-2')).toContainText('Host maintenance window')
+  await expect(firstEventRow).toContainText('Linked to you')
+  await expect(firstEventRow).toContainText('Today, 09:00 - 10:00')
+  const secondEventRow = page.getByTestId('host-calendar-event-host-calendar-event-2')
+  await expect(secondEventRow).toContainText('Host maintenance window')
+  await expect(secondEventRow).not.toContainText('Linked to you')
+  await expect(secondEventRow).toContainText('Tomorrow, 13:30 - 15:00')
+  const pastEventRow = page.getByTestId('host-calendar-event-host-calendar-event-past')
+  await expect(pastEventRow).toContainText('Past maintenance window')
+  await expect(pastEventRow).toContainText('Past')
   await expect(page.getByText('Other host outage')).toHaveCount(0)
 
-  await firstEventRow.click()
+  await page.getByTestId('host-calendar-category-filter').click()
+  await page.getByRole('option', { name: 'Patching' }).click()
+  await expect(firstEventRow).toBeVisible()
+  await expect(secondEventRow).toHaveCount(0)
+  await page.getByTestId('host-calendar-category-filter').click()
+  await page.getByRole('option', { name: 'All categories' }).click()
+
+  await page.getByTestId('host-calendar-status-filter').click()
+  await page.getByRole('option', { name: 'Completed' }).click()
+  await expect(pastEventRow).toBeVisible()
+  await expect(firstEventRow).toHaveCount(0)
+
+  await page.getByTestId('host-calendar-status-filter').click()
+  await page.getByRole('option', { name: 'All statuses' }).click()
+  await page.getByTestId('host-calendar-event-host-calendar-event-1').click()
 
   const detailsDialog = page.getByTestId('host-calendar-event-dialog')
   await expect(detailsDialog).toBeVisible()
   await expect(detailsDialog.getByRole('heading', { name: 'Host kernel patch' })).toBeVisible()
   await expect(detailsDialog).toContainText('Patch the current host.')
-  await expect(detailsDialog).toContainText('20 May 2026, 09:00 - 20 May 2026, 10:00')
+  await expect(detailsDialog).toContainText('Today, 09:00 - Today, 10:00')
   await expect(detailsDialog).toContainText('UTC')
   await expect(detailsDialog).toContainText('One-off')
 })

@@ -158,12 +158,7 @@ function HostCalendarEventRow({
       tabIndex={0}
     >
       <TableCell>
-        <div className="space-y-1">
-          <div className="font-medium text-foreground">{event.title}</div>
-          {event.description ? (
-            <div className="line-clamp-2 text-xs text-muted-foreground">{event.description}</div>
-          ) : null}
-        </div>
+        <div className="font-medium text-foreground">{event.title}</div>
       </TableCell>
       <TableCell className="whitespace-nowrap text-sm">{formatEventDate(event)}</TableCell>
       <TableCell>

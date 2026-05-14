@@ -66,6 +66,7 @@ test('host admin calendar shows only events linked to the current host', async (
   await expect(page.getByTestId('host-calendar-tab')).toBeVisible()
   const firstEventRow = page.getByTestId('host-calendar-event-host-calendar-event-1')
   await expect(firstEventRow).toContainText('Host kernel patch', { timeout: 15_000 })
+  await expect(firstEventRow).not.toContainText('Patch the current host.')
   await expect(firstEventRow).toContainText('Confirmed')
   await expect(firstEventRow).toContainText('Patching')
   await expect(page.getByTestId('host-calendar-event-host-calendar-event-2')).toContainText('Host maintenance window')

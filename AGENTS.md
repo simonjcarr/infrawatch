@@ -42,9 +42,13 @@ When the user explicitly asks to publish local work, complete this checklist:
    request clearly asks for a complete merge/release flow.
 7. Confirm any required release has completed and any required container image
    or other artifact has been published.
-8. Remove the task worktree only after its changes have landed on `main`, all
+8. Delete the remote task branch from GitHub after the pull request is fully
+   merged and the complete CI, release, and publication cycle has finished.
+9. Remove the task worktree only after its changes have landed on `main`, all
    required release or publishing steps are complete, and there is no
    uncommitted user work in that worktree.
+10. Delete the local task branch after the worktree has been removed and the
+    branch is no longer checked out anywhere.
 
 If a pull request has errors, failing checks, or merge conflicts, fix the issue
 in a new dedicated worktree and open a replacement pull request. Repeat this
@@ -57,7 +61,7 @@ Use this prompt when you want an agent to publish a local branch:
 Please publish the local branch for this work. Push the branch to GitHub, open a
 pull request with a Conventional Commit title, monitor the checks, and merge it
 when it is green. Then confirm any required release or image publication and
-clean up the task worktree.
+clean up the task worktree and both the remote and local task branches.
 ```
 
 ## Out-of-Scope Findings
@@ -216,19 +220,24 @@ remains outstanding.
 
 ## Completion Cleanup
 
-When published work is complete, remove the dedicated task worktree. Local-only
-tasks may keep their task worktree so the user can inspect, run, or amend the
-local branch before publishing.
+When published work is complete, remove the dedicated task worktree and delete
+the associated local and remote task branches. Local-only tasks may keep their
+task worktree so the user can inspect, run, or amend the local branch before
+publishing.
 
 Cleanup requires both of these outcomes:
 
 - The worktree is unregistered from Git, for example with
   `git worktree remove <path>` from the main repository.
 - The task worktree folder no longer exists on the local disk.
+- The remote task branch is deleted from GitHub after the pull request is fully
+  merged and the complete CI, release, and publication cycle has finished.
+- The local task branch is deleted after no remaining worktree has it checked
+  out.
 
 Do not leave published task worktrees hanging around. Published work that still
-has a registered Git worktree or an on-disk worktree folder is not actually
-finished.
+has a registered Git worktree, an on-disk worktree folder, or leftover local or
+remote task branches is not actually finished.
 
 Only remove a worktree after its changes are committed, pushed, merged into
 `main`, released, and published as appropriate for the task, including
@@ -236,3 +245,10 @@ publication of new container images or other release artifacts where relevant,
 or when the user explicitly asks to discard a local-only worktree. Never delete
 a worktree that contains uncommitted user work or unpublished changes unless the
 user explicitly asks you to discard it.
+
+When asked to publish or clean up local work, inspect existing registered
+worktrees. If an existing task worktree is already pushed, its pull request has
+already been merged, and the required CI, release, and publication cycle is
+complete, remove that worktree and delete the associated local and remote task
+branches. Do not delete branches or worktrees for pushed work that has not
+landed on `main` unless the user explicitly asks to abandon it.

@@ -1,12 +1,20 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, isSameDay, isToday, isTomorrow } from 'date-fns'
 import { CalendarDays, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -23,7 +31,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { listCalendarEventsForHost, type HostCalendarEventView } from '@/lib/actions/calendar'
-import type { CalendarEventCategory, CalendarEventStatus } from '@/lib/db/schema/calendar'
+import {
+  CALENDAR_EVENT_CATEGORIES,
+  CALENDAR_EVENT_STATUSES,
+  type CalendarEventCategory,
+  type CalendarEventStatus,
+} from '@/lib/db/schema/calendar'
 
 const CATEGORY_LABELS: Record<CalendarEventCategory, string> = {
   maintenance: 'Maintenance',
@@ -50,27 +63,99 @@ const STATUS_BADGE_CLASS: Record<CalendarEventStatus, string> = {
   cancelled: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100',
 }
 const HOST_CALENDAR_REFETCH_INTERVAL_MS = 5_000
+const EMPTY_HOST_CALENDAR_EVENTS: HostCalendarEventView[] = []
+type CategoryFilter = CalendarEventCategory | 'all'
+type StatusFilter = CalendarEventStatus | 'all'
+type DateLabel = {
+  text: string
+  isRelative: boolean
+}
+type FormattedEventDate = {
+  text: string
+  title?: string
+}
 
 function safeTestId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-')
 }
 
-function formatEventDate(event: HostCalendarEventView): string {
-  const startsAt = new Date(event.startsAt)
-  const endsAt = new Date(event.endsAt)
-  if (event.allDay) {
-    return format(startsAt, 'd MMM yyyy')
-  }
-  return `${format(startsAt, 'd MMM yyyy, HH:mm')} - ${format(endsAt, 'HH:mm')}`
+function formatDateLabel(date: Date): DateLabel {
+  if (isToday(date)) return { text: 'Today', isRelative: true }
+  if (isTomorrow(date)) return { text: 'Tomorrow', isRelative: true }
+  return { text: format(date, 'd MMM yyyy'), isRelative: false }
 }
 
-function formatEventDateRange(event: HostCalendarEventView): string {
+function formatAbsoluteDate(date: Date): string {
+  return format(date, 'd MMM yyyy')
+}
+
+function formatAbsoluteDateTime(date: Date): string {
+  return format(date, 'd MMM yyyy, HH:mm')
+}
+
+function isPastEvent(event: HostCalendarEventView): boolean {
+  return new Date(event.endsAt).getTime() < Date.now()
+}
+
+function formatEventDate(event: HostCalendarEventView): FormattedEventDate {
   const startsAt = new Date(event.startsAt)
   const endsAt = new Date(event.endsAt)
+  const startLabel = formatDateLabel(startsAt)
+  const endLabel = formatDateLabel(endsAt)
+  const usesRelativeDate = startLabel.isRelative || endLabel.isRelative
   if (event.allDay) {
-    return `${format(startsAt, 'd MMM yyyy')} - ${format(endsAt, 'd MMM yyyy')}`
+    const text = isSameDay(startsAt, endsAt)
+      ? startLabel.text
+      : `${startLabel.text} - ${endLabel.text}`
+    const title = usesRelativeDate
+      ? isSameDay(startsAt, endsAt)
+        ? formatAbsoluteDate(startsAt)
+        : `${formatAbsoluteDate(startsAt)} - ${formatAbsoluteDate(endsAt)}`
+      : undefined
+    return { text, title }
   }
-  return `${format(startsAt, 'd MMM yyyy, HH:mm')} - ${format(endsAt, 'd MMM yyyy, HH:mm')}`
+  if (isSameDay(startsAt, endsAt)) {
+    return {
+      text: `${startLabel.text}, ${format(startsAt, 'HH:mm')} - ${format(endsAt, 'HH:mm')}`,
+      title: usesRelativeDate ? `${formatAbsoluteDateTime(startsAt)} - ${formatAbsoluteDateTime(endsAt)}` : undefined,
+    }
+  }
+  return {
+    text: `${startLabel.text}, ${format(startsAt, 'HH:mm')} - ${endLabel.text}, ${format(endsAt, 'HH:mm')}`,
+    title: usesRelativeDate ? `${formatAbsoluteDateTime(startsAt)} - ${formatAbsoluteDateTime(endsAt)}` : undefined,
+  }
+}
+
+function formatEventDateRange(event: HostCalendarEventView): FormattedEventDate {
+  const startsAt = new Date(event.startsAt)
+  const endsAt = new Date(event.endsAt)
+  const startLabel = formatDateLabel(startsAt)
+  const endLabel = formatDateLabel(endsAt)
+  const usesRelativeDate = startLabel.isRelative || endLabel.isRelative
+  if (event.allDay) {
+    return {
+      text: `${startLabel.text} - ${endLabel.text}`,
+      title: usesRelativeDate ? `${formatAbsoluteDate(startsAt)} - ${formatAbsoluteDate(endsAt)}` : undefined,
+    }
+  }
+  return {
+    text: `${startLabel.text}, ${format(startsAt, 'HH:mm')} - ${endLabel.text}, ${format(endsAt, 'HH:mm')}`,
+    title: usesRelativeDate ? `${formatAbsoluteDateTime(startsAt)} - ${formatAbsoluteDateTime(endsAt)}` : undefined,
+  }
+}
+
+function EventDateText({
+  value,
+  testId,
+}: {
+  value: FormattedEventDate
+  testId: string
+}) {
+  return (
+    <span data-testid={testId} title={value.title}>
+      {value.text}
+    </span>
+  )
 }
 
 function EventDetail({ label, children }: { label: string; children: ReactNode }) {
@@ -89,12 +174,17 @@ function HostCalendarEventDetailsDialog({
   event: HostCalendarEventView | null
   onOpenChange: (open: boolean) => void
 }) {
+  const formattedDateRange = event ? formatEventDateRange(event) : null
+
   return (
     <Dialog open={event != null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" data-testid="host-calendar-event-dialog">
+      <DialogContent
+        className="flex max-h-[calc(100vh-2rem)] max-w-2xl grid-rows-none flex-col overflow-hidden"
+        data-testid="host-calendar-event-dialog"
+      >
         {event ? (
           <>
-            <DialogHeader>
+            <DialogHeader className="shrink-0">
               <div className="flex flex-wrap items-center gap-2 pr-8">
                 <DialogTitle>{event.title}</DialogTitle>
                 <Badge variant="outline" className={STATUS_BADGE_CLASS[event.status]}>
@@ -104,8 +194,11 @@ function HostCalendarEventDetailsDialog({
               <DialogDescription>{CATEGORY_LABELS[event.category]} event</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-5">
-              <div className="rounded-md border bg-background p-4">
+            <div className="min-h-0 flex-1 space-y-5 overflow-hidden">
+              <div
+                className="max-h-[min(22rem,45vh)] overflow-y-auto rounded-md border bg-background p-4"
+                data-testid="host-calendar-event-description"
+              >
                 {event.description ? (
                   <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
                     {event.description}
@@ -116,7 +209,11 @@ function HostCalendarEventDetailsDialog({
               </div>
 
               <dl className="grid gap-4 sm:grid-cols-2">
-                <EventDetail label="Date and time">{formatEventDateRange(event)}</EventDetail>
+                <EventDetail label="Date and time">
+                  {formattedDateRange ? (
+                    <EventDateText value={formattedDateRange} testId="host-calendar-event-detail-date" />
+                  ) : null}
+                </EventDetail>
                 <EventDetail label="Timezone">{event.timezone}</EventDetail>
                 <EventDetail label="Status">{STATUS_LABELS[event.status]}</EventDetail>
                 <EventDetail label="Category">{CATEGORY_LABELS[event.category]}</EventDetail>
@@ -141,11 +238,13 @@ function HostCalendarEventRow({
   onSelect: (event: HostCalendarEventView) => void
 }) {
   const openDetails = () => onSelect(event)
+  const past = isPastEvent(event)
+  const formattedDate = formatEventDate(event)
 
   return (
     <TableRow
       aria-label={`View details for ${event.title}`}
-      className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className={`cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${past ? 'bg-muted/30 text-muted-foreground' : ''} ${event.isLinkedToCurrentUser ? 'border-l-4 border-l-primary' : ''}`}
       data-testid={`host-calendar-event-${safeTestId(event.id)}`}
       onClick={openDetails}
       onKeyDown={(event) => {
@@ -158,14 +257,23 @@ function HostCalendarEventRow({
       tabIndex={0}
     >
       <TableCell>
-        <div className="space-y-1">
-          <div className="font-medium text-foreground">{event.title}</div>
-          {event.description ? (
-            <div className="line-clamp-2 text-xs text-muted-foreground">{event.description}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`font-medium ${past ? 'text-muted-foreground' : 'text-foreground'}`}>{event.title}</span>
+          {event.isLinkedToCurrentUser ? (
+            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/10">
+              Linked to you
+            </Badge>
+          ) : null}
+          {past ? (
+            <Badge variant="outline" className="border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100">
+              Past
+            </Badge>
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="whitespace-nowrap text-sm">{formatEventDate(event)}</TableCell>
+      <TableCell className="whitespace-nowrap text-sm">
+        <EventDateText value={formattedDate} testId="host-calendar-event-date" />
+      </TableCell>
       <TableCell>
         <Badge variant="outline" className={STATUS_BADGE_CLASS[event.status]}>
           {STATUS_LABELS[event.status]}
@@ -183,13 +291,22 @@ function HostCalendarEventRow({
 
 export function HostCalendarTab({ scopeId, hostId }: { scopeId: string; hostId: string }) {
   const [selectedEvent, setSelectedEvent] = useState<HostCalendarEventView | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const { data, isLoading, error } = useQuery({
     queryKey: ['host-calendar-events', scopeId, hostId],
     queryFn: () => listCalendarEventsForHost(scopeId, hostId),
     refetchInterval: HOST_CALENDAR_REFETCH_INTERVAL_MS,
   })
 
-  const events = data && !('error' in data) ? data.events : []
+  const events = data && !('error' in data) ? data.events : EMPTY_HOST_CALENDAR_EVENTS
+  const filteredEvents = useMemo(
+    () => events.filter((event) => (
+      (categoryFilter === 'all' || event.category === categoryFilter) &&
+      (statusFilter === 'all' || event.status === statusFilter)
+    )),
+    [categoryFilter, events, statusFilter],
+  )
   const errorMessage = data && 'error' in data ? data.error : error instanceof Error ? error.message : null
 
   return (
@@ -211,22 +328,62 @@ export function HostCalendarTab({ scopeId, hostId }: { scopeId: string; hostId: 
         ) : events.length === 0 ? (
           <p className="text-sm text-muted-foreground">No calendar events linked to this host.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Event</TableHead>
-                <TableHead>Date and time</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Schedule</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {events.map((event) => (
-                <HostCalendarEventRow key={event.id} event={event} onSelect={setSelectedEvent} />
-              ))}
-            </TableBody>
-          </Table>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="host-calendar-category-filter">Category</Label>
+                <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}>
+                  <SelectTrigger id="host-calendar-category-filter" className="w-44" data-testid="host-calendar-category-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {CALENDAR_EVENT_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {CATEGORY_LABELS[category]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="host-calendar-status-filter">Status</Label>
+                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
+                  <SelectTrigger id="host-calendar-status-filter" className="w-40" data-testid="host-calendar-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {CALENDAR_EVENT_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {STATUS_LABELS[status]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {filteredEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No calendar events match these filters.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Date and time</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Schedule</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEvents.map((event) => (
+                    <HostCalendarEventRow key={event.id} event={event} onSelect={setSelectedEvent} />
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         )}
       </CardContent>
       <HostCalendarEventDetailsDialog

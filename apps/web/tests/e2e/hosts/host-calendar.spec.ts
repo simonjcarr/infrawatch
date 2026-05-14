@@ -44,9 +44,10 @@ test('host admin calendar shows only events linked to the current host', async (
       category
     )
     VALUES
-      ('host-calendar-event-1', ${instanceId}, ${userId}, 'Host kernel patch', 'Patch the current host.', '2026-05-20T09:00:00Z', '2026-05-20T10:00:00Z', false, 'UTC', 'confirmed', 'patching'),
-      ('host-calendar-event-2', ${instanceId}, ${userId}, 'Host maintenance window', NULL, '2026-05-22T13:30:00Z', '2026-05-22T15:00:00Z', false, 'UTC', 'planned', 'maintenance'),
-      ('host-calendar-event-other', ${instanceId}, ${userId}, 'Other host outage', NULL, '2026-05-21T09:00:00Z', '2026-05-21T10:00:00Z', false, 'UTC', 'planned', 'maintenance')
+      ('host-calendar-event-1', ${instanceId}, NULL, 'Host kernel patch', 'Patch the current host.', date_trunc('day', NOW()) + interval '9 hours', date_trunc('day', NOW()) + interval '10 hours', false, 'UTC', 'confirmed', 'patching'),
+      ('host-calendar-event-2', ${instanceId}, NULL, 'Host maintenance window', NULL, date_trunc('day', NOW()) + interval '1 day 13 hours 30 minutes', date_trunc('day', NOW()) + interval '1 day 15 hours', false, 'UTC', 'planned', 'maintenance'),
+      ('host-calendar-event-past', ${instanceId}, NULL, 'Past maintenance window', NULL, date_trunc('day', NOW()) - interval '2 days' + interval '8 hours', date_trunc('day', NOW()) - interval '2 days' + interval '9 hours', false, 'UTC', 'completed', 'maintenance'),
+      ('host-calendar-event-other', ${instanceId}, NULL, 'Other host outage', NULL, date_trunc('day', NOW()) + interval '2 days 9 hours', date_trunc('day', NOW()) + interval '2 days 10 hours', false, 'UTC', 'planned', 'maintenance')
   `
 
   await sql`
@@ -54,7 +55,13 @@ test('host admin calendar shows only events linked to the current host', async (
     VALUES
       (${instanceId}, 'host-calendar-event-1', 'host-calendar-1'),
       (${instanceId}, 'host-calendar-event-2', 'host-calendar-1'),
+      (${instanceId}, 'host-calendar-event-past', 'host-calendar-1'),
       (${instanceId}, 'host-calendar-event-other', 'host-calendar-2')
+  `
+
+  await sql`
+    INSERT INTO calendar_event_participants (instance_id, event_id, user_id, role)
+    VALUES (${instanceId}, 'host-calendar-event-1', ${userId}, 'implementer')
   `
 
   await page.goto('/hosts/host-calendar-1')
@@ -66,20 +73,124 @@ test('host admin calendar shows only events linked to the current host', async (
   await expect(page.getByTestId('host-calendar-tab')).toBeVisible()
   const firstEventRow = page.getByTestId('host-calendar-event-host-calendar-event-1')
   await expect(firstEventRow).toContainText('Host kernel patch', { timeout: 15_000 })
+  await expect(firstEventRow).not.toContainText('Patch the current host.')
   await expect(firstEventRow).toContainText('Confirmed')
   await expect(firstEventRow).toContainText('Patching')
-  await expect(page.getByTestId('host-calendar-event-host-calendar-event-2')).toContainText('Host maintenance window')
+  await expect(firstEventRow).toContainText('Linked to you')
+  await expect(firstEventRow).toContainText('Today, 09:00 - 10:00')
+  await expect(firstEventRow.getByTestId('host-calendar-event-date')).toHaveAttribute(
+    'title',
+    /^\d{1,2} [A-Z][a-z]{2} \d{4}, 09:00 - \d{1,2} [A-Z][a-z]{2} \d{4}, 10:00$/,
+  )
+  const secondEventRow = page.getByTestId('host-calendar-event-host-calendar-event-2')
+  await expect(secondEventRow).toContainText('Host maintenance window')
+  await expect(secondEventRow).not.toContainText('Linked to you')
+  await expect(secondEventRow).toContainText('Tomorrow, 13:30 - 15:00')
+  await expect(secondEventRow.getByTestId('host-calendar-event-date')).toHaveAttribute(
+    'title',
+    /^\d{1,2} [A-Z][a-z]{2} \d{4}, 13:30 - \d{1,2} [A-Z][a-z]{2} \d{4}, 15:00$/,
+  )
+  const pastEventRow = page.getByTestId('host-calendar-event-host-calendar-event-past')
+  await expect(pastEventRow).toContainText('Past maintenance window')
+  await expect(pastEventRow).toContainText('Past')
   await expect(page.getByText('Other host outage')).toHaveCount(0)
 
-  await firstEventRow.click()
+  await page.getByTestId('host-calendar-category-filter').click()
+  await page.getByRole('option', { name: 'Patching' }).click()
+  await expect(firstEventRow).toBeVisible()
+  await expect(secondEventRow).toHaveCount(0)
+  await page.getByTestId('host-calendar-category-filter').click()
+  await page.getByRole('option', { name: 'All categories' }).click()
+
+  await page.getByTestId('host-calendar-status-filter').click()
+  await page.getByRole('option', { name: 'Completed' }).click()
+  await expect(pastEventRow).toBeVisible()
+  await expect(firstEventRow).toHaveCount(0)
+
+  await page.getByTestId('host-calendar-status-filter').click()
+  await page.getByRole('option', { name: 'All statuses' }).click()
+  await page.getByTestId('host-calendar-event-host-calendar-event-1').click()
 
   const detailsDialog = page.getByTestId('host-calendar-event-dialog')
   await expect(detailsDialog).toBeVisible()
   await expect(detailsDialog.getByRole('heading', { name: 'Host kernel patch' })).toBeVisible()
   await expect(detailsDialog).toContainText('Patch the current host.')
-  await expect(detailsDialog).toContainText('20 May 2026, 09:00 - 20 May 2026, 10:00')
+  await expect(detailsDialog).toContainText('Today, 09:00 - Today, 10:00')
+  await expect(detailsDialog.getByTestId('host-calendar-event-detail-date')).toHaveAttribute(
+    'title',
+    /^\d{1,2} [A-Z][a-z]{2} \d{4}, 09:00 - \d{1,2} [A-Z][a-z]{2} \d{4}, 10:00$/,
+  )
   await expect(detailsDialog).toContainText('UTC')
   await expect(detailsDialog).toContainText('One-off')
+})
+
+test('host calendar event dialog keeps long descriptions scrollable', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
+  const longDescription = Array.from({ length: 120 }, (_, index) => `Long description line ${index + 1}`).join('\n')
+
+  await sql`
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
+    VALUES ('host-calendar-long-description', ${instanceId}, 'host-calendar-long-description', 'Host Calendar Long Description', 'Ubuntu 24.04', 'x86_64', '["10.70.0.14"]'::jsonb, 'online', NOW())
+  `
+
+  await sql`
+    INSERT INTO calendar_events (
+      id,
+      instance_id,
+      created_by,
+      title,
+      description,
+      starts_at,
+      ends_at,
+      all_day,
+      timezone,
+      status,
+      category
+    )
+    VALUES (
+      'host-calendar-long-description-event',
+      ${instanceId},
+      ${userId},
+      'Long description change',
+      ${longDescription},
+      date_trunc('day', NOW()) + interval '11 hours',
+      date_trunc('day', NOW()) + interval '12 hours',
+      false,
+      'UTC',
+      'planned',
+      'change'
+    )
+  `
+
+  await sql`
+    INSERT INTO calendar_event_hosts (instance_id, event_id, host_id)
+    VALUES (${instanceId}, 'host-calendar-long-description-event', 'host-calendar-long-description')
+  `
+
+  await page.goto('/hosts/host-calendar-long-description')
+  await expect(page.getByRole('heading', { name: 'Host Calendar Long Description' })).toBeVisible()
+
+  await page.getByTestId('host-parent-tab-admin').click()
+  await page.getByTestId('host-tab-calendar').click()
+  await page.getByTestId('host-calendar-event-host-calendar-long-description-event').click()
+
+  const detailsDialog = page.getByTestId('host-calendar-event-dialog')
+  const description = page.getByTestId('host-calendar-event-description')
+  await expect(detailsDialog).toBeVisible()
+  await expect(description).toContainText('Long description line 120')
+
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  const dialogBox = await detailsDialog.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(dialogBox!.y).toBeGreaterThanOrEqual(0)
+  expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewport!.height)
+
+  const isDescriptionScrollable = await description.evaluate((element) => (
+    element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY !== 'visible'
+  ))
+  expect(isDescriptionScrollable).toBe(true)
 })
 
 test('host admin calendar shows an empty state when no events are linked', async ({ authenticatedPage: page }) => {

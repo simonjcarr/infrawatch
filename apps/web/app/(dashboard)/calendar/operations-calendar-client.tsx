@@ -397,6 +397,13 @@ function eventClassName(event: CalendarEventInstanceView): string[] {
   ].filter(Boolean)
 }
 
+function invalidateCalendarQueries(queryClient: ReturnType<typeof useQueryClient>, instanceId: string): Promise<unknown[]> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] }),
+    queryClient.invalidateQueries({ queryKey: ['host-calendar-events', instanceId] }),
+  ])
+}
+
 export function OperationsCalendarClient({
   instanceId,
   canEdit,
@@ -472,7 +479,7 @@ export function OperationsCalendarClient({
         return
       }
       setDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] })
+      void invalidateCalendarQueries(queryClient, instanceId)
     },
     onError: (err) => {
       setFormError(err instanceof Error ? err.message : 'Failed to save calendar event')
@@ -494,7 +501,7 @@ export function OperationsCalendarClient({
         return
       }
       setDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] })
+      void invalidateCalendarQueries(queryClient, instanceId)
     },
   })
 
@@ -511,7 +518,7 @@ export function OperationsCalendarClient({
       if ('error' in result) {
         throw new Error(result.error)
       }
-      await queryClient.invalidateQueries({ queryKey: ['calendar-events', instanceId] })
+      await invalidateCalendarQueries(queryClient, instanceId)
     },
     [instanceId, queryClient],
   )

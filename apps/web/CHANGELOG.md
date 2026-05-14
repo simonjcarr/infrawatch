@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.151.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.150.1...web/v0.151.0) (2026-05-14)
+
+
+### Features
+
+* **web:** improve host container telemetry views ([#1409](https://github.com/carrtech-dev/ct-ops/issues/1409)) ([b143565](https://github.com/carrtech-dev/ct-ops/commit/b1435654ca1d3a9b2882aa31bbbb16c91ef996fa))
+
+
+### Bug Fixes
+
+* **agents:** show enrolment install URL when viewing tokens ([#1412](https://github.com/carrtech-dev/ct-ops/issues/1412)) ([eb90bd4](https://github.com/carrtech-dev/ct-ops/commit/eb90bd4cbfd759e4d879960992374bd20de4142d))
+* **calendar:** contain operations calendar scrolling ([#1406](https://github.com/carrtech-dev/ct-ops/issues/1406)) ([2235d87](https://github.com/carrtech-dev/ct-ops/commit/2235d8796db15a0ff339476a986ec016c9e4810d))
+
 ## [0.150.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.150.0...web/v0.150.1) (2026-05-13)
 
 

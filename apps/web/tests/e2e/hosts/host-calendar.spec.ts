@@ -112,6 +112,75 @@ test('host admin calendar shows only events linked to the current host', async (
   await expect(detailsDialog).toContainText('One-off')
 })
 
+test('host calendar event dialog keeps long descriptions scrollable', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
+  const longDescription = Array.from({ length: 120 }, (_, index) => `Long description line ${index + 1}`).join('\n')
+
+  await sql`
+    INSERT INTO hosts (id, instance_id, hostname, display_name, os, arch, ip_addresses, status, last_seen_at)
+    VALUES ('host-calendar-long-description', ${instanceId}, 'host-calendar-long-description', 'Host Calendar Long Description', 'Ubuntu 24.04', 'x86_64', '["10.70.0.14"]'::jsonb, 'online', NOW())
+  `
+
+  await sql`
+    INSERT INTO calendar_events (
+      id,
+      instance_id,
+      created_by,
+      title,
+      description,
+      starts_at,
+      ends_at,
+      all_day,
+      timezone,
+      status,
+      category
+    )
+    VALUES (
+      'host-calendar-long-description-event',
+      ${instanceId},
+      ${userId},
+      'Long description change',
+      ${longDescription},
+      date_trunc('day', NOW()) + interval '11 hours',
+      date_trunc('day', NOW()) + interval '12 hours',
+      false,
+      'UTC',
+      'planned',
+      'change'
+    )
+  `
+
+  await sql`
+    INSERT INTO calendar_event_hosts (instance_id, event_id, host_id)
+    VALUES (${instanceId}, 'host-calendar-long-description-event', 'host-calendar-long-description')
+  `
+
+  await page.goto('/hosts/host-calendar-long-description')
+  await expect(page.getByRole('heading', { name: 'Host Calendar Long Description' })).toBeVisible()
+
+  await page.getByTestId('host-parent-tab-admin').click()
+  await page.getByTestId('host-tab-calendar').click()
+  await page.getByTestId('host-calendar-event-host-calendar-long-description-event').click()
+
+  const detailsDialog = page.getByTestId('host-calendar-event-dialog')
+  const description = page.getByTestId('host-calendar-event-description')
+  await expect(detailsDialog).toBeVisible()
+  await expect(description).toContainText('Long description line 120')
+
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  const dialogBox = await detailsDialog.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(dialogBox!.y).toBeGreaterThanOrEqual(0)
+  expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewport!.height)
+
+  const isDescriptionScrollable = await description.evaluate((element) => (
+    element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY !== 'visible'
+  ))
+  expect(isDescriptionScrollable).toBe(true)
+})
+
 test('host admin calendar shows an empty state when no events are linked', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { instanceId } = await getInstanceAndUserIds(sql)

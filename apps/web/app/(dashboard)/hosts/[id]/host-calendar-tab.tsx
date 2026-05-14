@@ -120,10 +120,13 @@ function HostCalendarEventDetailsDialog({
 }) {
   return (
     <Dialog open={event != null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" data-testid="host-calendar-event-dialog">
+      <DialogContent
+        className="flex max-h-[calc(100vh-2rem)] max-w-2xl grid-rows-none flex-col overflow-hidden"
+        data-testid="host-calendar-event-dialog"
+      >
         {event ? (
           <>
-            <DialogHeader>
+            <DialogHeader className="shrink-0">
               <div className="flex flex-wrap items-center gap-2 pr-8">
                 <DialogTitle>{event.title}</DialogTitle>
                 <Badge variant="outline" className={STATUS_BADGE_CLASS[event.status]}>
@@ -133,8 +136,11 @@ function HostCalendarEventDetailsDialog({
               <DialogDescription>{CATEGORY_LABELS[event.category]} event</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-5">
-              <div className="rounded-md border bg-background p-4">
+            <div className="min-h-0 flex-1 space-y-5 overflow-hidden">
+              <div
+                className="max-h-[min(22rem,45vh)] overflow-y-auto rounded-md border bg-background p-4"
+                data-testid="host-calendar-event-description"
+              >
                 {event.description ? (
                   <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
                     {event.description}

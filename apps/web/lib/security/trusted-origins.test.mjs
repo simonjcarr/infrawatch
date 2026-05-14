@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   assertTrustedMutationOrigin,
+  getAllowedDevOrigins,
   getTrustedOriginHosts,
   getTrustedOrigins,
   isTrustedMutationOrigin,
@@ -43,6 +44,31 @@ test('getTrustedOriginHosts keeps the host:port values expected by Next serverAc
     'localhost:3001',
     'proxy.example.com',
   ])
+})
+
+test('getAllowedDevOrigins includes configured public dev hosts', () => {
+  const env = {
+    NODE_ENV: 'development',
+    BETTER_AUTH_URL: 'http://localhost:3100',
+    BETTER_AUTH_TRUSTED_ORIGINS: 'http://192.168.8.215:3100,https://ct-ops-dev.example.test',
+    CT_OPS_DEV_PUBLIC_HOST: '192.168.8.215,tailscale-host.example.ts.net:3100',
+  }
+
+  assert.deepEqual(getAllowedDevOrigins(env), [
+    'localhost:3100',
+    '192.168.8.215:3100',
+    'ct-ops-dev.example.test',
+    '192.168.8.215',
+    'tailscale-host.example.ts.net:3100',
+  ])
+})
+
+test('getAllowedDevOrigins is empty for production builds', () => {
+  assert.deepEqual(
+    getAllowedDevOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: 'https://ct-ops.example.com' }),
+    [],
+  )
+  assert.deepEqual(getAllowedDevOrigins({ NEXT_PHASE: 'phase-production-build' }), [])
 })
 
 test('isTrustedMutationOrigin accepts a trusted Origin header', () => {

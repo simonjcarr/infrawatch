@@ -15,6 +15,24 @@
 
 ## What Has Been Built
 
+### Session 133 — GitHub issue developer-experience fixes
+
+**Focused validation and dev-origin cleanup** (`apps/web/lib/password-manager/api-contract/openapi.json`, `apps/web/lib/password-manager/client.test.mjs`, `apps/web/lib/e2e/route-warmup.mjs`, `apps/web/lib/e2e/route-warmup.test.mjs`, `apps/web/tests/e2e/runner.mjs`, `apps/web/tests/e2e/auth.setup.ts`, `apps/web/lib/security/trusted-origins.ts`, `apps/web/lib/security/trusted-origins.test.mjs`, `apps/web/next.config.ts`)
+- Fixed #1414 by pinning the Password Manager API route contract inside
+  `ct-ops` so the web unit suite no longer depends on a sibling
+  `ct-password-manager` checkout.
+- Fixed #1413 by making focused e2e spec runs skip the broad route warmup by
+  default while still seeding the test instance and auth storage; set
+  `E2E_ROUTE_WARMUP=all` to force the previous full warmup.
+- Fixed #1400 by deriving Next `allowedDevOrigins` from trusted dev origins
+  and `CT_OPS_DEV_PUBLIC_HOST`, while keeping production builds empty.
+
+**Validation**
+- `node --experimental-strip-types --test apps/web/lib/e2e/route-warmup.test.mjs apps/web/lib/security/trusted-origins.test.mjs apps/web/lib/password-manager/client.test.mjs`
+- `pnpm --dir apps/web lint lib/e2e/route-warmup.mjs lib/e2e/route-warmup.test.mjs lib/security/trusted-origins.ts lib/security/trusted-origins.test.mjs lib/password-manager/client.test.mjs tests/e2e/runner.mjs tests/e2e/auth.setup.ts next.config.ts`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web test:unit`
+
 ### Session 132 — Dedicated customer bundle release
 
 **First-class bundle release artifact** (`release-please-config.json`, `.release-please-manifest.json`, `.github/workflows/agent-release.yml`, `.github/workflows/customer-bundle-check.yml`, `install.sh`, `deploy/customer-bundle/upgrade.sh`, `deploy/customer-bundle/start.sh`, `deploy/customer-bundle/README.md`, `apps/docs/docs/deployment/docker-compose.md`, `deploy/scripts/test-agent-release-bundle.sh`, `deploy/scripts/test-install.sh`, `deploy/scripts/test-upgrade.sh`)

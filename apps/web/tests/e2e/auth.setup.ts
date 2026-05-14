@@ -1,4 +1,5 @@
 import { test as setup, type APIRequestContext, type Page } from '@playwright/test'
+import { shouldWarmRoutes } from '../../lib/e2e/route-warmup.mjs'
 import { getStorageStatePath } from './fixtures/auth'
 import { seedInstanceAndUser } from './fixtures/seed'
 
@@ -133,6 +134,11 @@ setup('seed test instance and warm Next routes', async ({ browser, baseURL }) =>
   if (!baseURL) throw new Error('baseURL must be configured')
 
   await seedInstanceAndUser()
+  const storageState = await getStorageStatePath(baseURL)
+
+  if (!shouldWarmRoutes()) {
+    return
+  }
 
   const publicContext = await browser.newContext()
   const publicPage = await publicContext.newPage()
@@ -144,7 +150,6 @@ setup('seed test instance and warm Next routes', async ({ browser, baseURL }) =>
     await publicContext.close()
   }
 
-  const storageState = await getStorageStatePath(baseURL)
   const context = await browser.newContext({ storageState })
   const page = await context.newPage()
 

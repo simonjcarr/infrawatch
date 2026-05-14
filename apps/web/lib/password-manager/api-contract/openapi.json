@@ -1,0 +1,75 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CT Password Manager API route contract",
+    "version": "pinned-for-ct-ops-client-tests"
+  },
+  "paths": {
+    "/audit-events": {
+      "get": {}
+    },
+    "/audit-events/integrity": {
+      "get": {}
+    },
+    "/launch/ct-ops": {
+      "post": {}
+    },
+    "/sessions/logout": {
+      "post": {}
+    },
+    "/sessions/refresh": {
+      "post": {}
+    },
+    "/setup-status": {
+      "get": {}
+    },
+    "/unlock-metadata": {
+      "get": {}
+    },
+    "/user-key": {
+      "get": {},
+      "put": {}
+    },
+    "/vaults": {
+      "get": {},
+      "post": {}
+    },
+    "/vaults/{vaultID}": {
+      "delete": {},
+      "get": {},
+      "patch": {}
+    },
+    "/vaults/{vaultID}/entries": {
+      "get": {},
+      "post": {}
+    },
+    "/vaults/{vaultID}/entries/{entryID}": {
+      "delete": {},
+      "get": {},
+      "patch": {}
+    },
+    "/vaults/{vaultID}/entries/{entryID}/copy-audit": {
+      "post": {}
+    },
+    "/vaults/{vaultID}/entries/{entryID}/reveal-audit": {
+      "post": {}
+    },
+    "/vaults/{vaultID}/export-audit": {
+      "post": {}
+    },
+    "/vaults/{vaultID}/key-epochs": {
+      "post": {}
+    },
+    "/vaults/{vaultID}/member-recipients": {
+      "post": {}
+    },
+    "/vaults/{vaultID}/members": {
+      "get": {},
+      "post": {}
+    },
+    "/vaults/{vaultID}/members/{userID}": {
+      "delete": {},
+      "patch": {}
+    }
+  }
+}

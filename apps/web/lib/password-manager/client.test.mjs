@@ -25,6 +25,15 @@ function loadPinnedContract() {
     return JSON.parse(readFileSync(process.env.PASSWORD_MANAGER_OPENAPI_CONTRACT_PATH, 'utf8'))
   }
 
+  const localContractPath = fileURLToPath(new URL('./api-contract/openapi.json', import.meta.url))
+  try {
+    return JSON.parse(readFileSync(localContractPath, 'utf8'))
+  } catch (error) {
+    if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')) {
+      throw error
+    }
+  }
+
   const currentFilePath = fileURLToPath(import.meta.url)
   let currentDir = path.dirname(currentFilePath)
 

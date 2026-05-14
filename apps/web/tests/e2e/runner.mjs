@@ -17,6 +17,7 @@ import { GenericContainer, Wait } from 'testcontainers'
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import { resolveRouteWarmupMode } from '../../lib/e2e/route-warmup.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const webDir = path.resolve(here, '..', '..')
@@ -80,6 +81,11 @@ async function main() {
     }
 
     const pwArgs = process.argv.slice(2)
+    process.env.E2E_ROUTE_WARMUP = resolveRouteWarmupMode(pwArgs)
+    if (process.env.E2E_ROUTE_WARMUP === 'skip') {
+      console.log('[e2e] skipping route warmup for focused spec run; set E2E_ROUTE_WARMUP=all to force it')
+    }
+
     console.log('[e2e] running: playwright test', pwArgs.join(' '))
     exitCode = await runPlaywright(pwArgs)
   } finally {

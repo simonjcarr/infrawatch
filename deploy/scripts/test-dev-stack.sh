@@ -25,7 +25,7 @@ assert_not_contains() {
 }
 
 run_config_generation_test() {
-  local tmpdir repo_dir before_root_env private_key expected_public actual_public
+  local tmpdir repo_dir before_root_env private_key expected_public actual_public expected_uid expected_gid
 
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/ct-ops-dev-stack-test.XXXXXX")"
   trap 'rm -rf "'"$tmpdir"'"' RETURN
@@ -62,7 +62,11 @@ EOF
   test -f "${repo_dir}/.dev/dev.env"
   test -f "${repo_dir}/apps/web/.env.local"
 
+  expected_uid="$(id -u)"
+  expected_gid="$(id -g)"
   assert_contains "${repo_dir}/.dev/dev.env" "BETTER_AUTH_URL=http://localhost:3000"
+  assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_UID=${expected_uid}"
+  assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_GID=${expected_gid}"
   assert_contains "${repo_dir}/.dev/dev.env" "PASSWORD_MANAGER_SESSION_COOKIE_SECURE=false"
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_TRUST_PROXY_HEADERS=true"
   assert_contains "${repo_dir}/apps/web/.env.local" "BETTER_AUTH_URL=http://localhost:3000"
@@ -138,6 +142,10 @@ run_static_wiring_test() {
   assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "\${CT_OPS_DEV_BIND_ADDR}:\${CT_OPS_DEV_INGEST_GRPC_PORT}:9443"
   assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "127.0.0.1:\${POSTGRES_PORT}:5432"
   assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "host.docker.internal:host-gateway"
+  assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "web-permissions:"
+  assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "user: \"\${CT_OPS_DEV_UID}:\${CT_OPS_DEV_GID}\""
+  assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "chown -R \"\${CT_OPS_DEV_UID}:\${CT_OPS_DEV_GID}\""
+  assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "mkdir -p /tmp/ct-ops-dev-home"
   assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "CT_OPS_DEV_WEB_UPSTREAM: web-dev:3001"
   assert_contains "${REPO_ROOT}/docker-compose.dev-stack.yml" "CT_OPS_DEV_INGEST_UPSTREAM: ingest-dev:8080"
   assert_contains "${REPO_ROOT}/deploy/nginx/dev-stack.conf.template" "location /password-manager-api/"

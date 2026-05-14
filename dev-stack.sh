@@ -326,6 +326,8 @@ ensure_dev_env() {
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_INGEST_GRPC_PORT "$ingest_grpc_port"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_APP_URL "$app_url"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_AGENT_INGEST_ADDRESS "${public_host:-localhost}:${ingest_grpc_port}"
+  upsert_env_var "$DEV_ENV" CT_OPS_DEV_UID "$(id -u)"
+  upsert_env_var "$DEV_ENV" CT_OPS_DEV_GID "$(id -g)"
   if [ -z "$(read_env_var "$DEV_ENV" CT_OPS_DEV_NEXT_FLAGS)" ]; then
     upsert_env_var "$DEV_ENV" CT_OPS_DEV_NEXT_FLAGS "--turbopack"
   fi

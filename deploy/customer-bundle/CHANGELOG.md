@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.19.1...bundle/v0.19.2) (2026-05-14)
+
+
+### Bug Fixes
+
+* **web:** resolve focused validation issues ([59adfef](https://github.com/carrtech-dev/ct-ops/commit/59adfef1b35cd5eff95ee779de9e4fdd4c01057e))
+
 ## [0.19.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.19.0...bundle/v0.19.1) (2026-05-14)
 
 

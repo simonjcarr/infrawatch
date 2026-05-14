@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.151.0...web/v0.151.1) (2026-05-14)
+
+
+### Bug Fixes
+
+* **calendar:** refresh host-linked entries automatically ([#1415](https://github.com/carrtech-dev/ct-ops/issues/1415)) ([76363c7](https://github.com/carrtech-dev/ct-ops/commit/76363c746d362892103abe5857a5c26c38f3caac))
+
 ## [0.151.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.150.1...web/v0.151.0) (2026-05-14)
 
 

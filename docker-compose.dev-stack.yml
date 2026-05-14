@@ -83,14 +83,36 @@ services:
       retries: 12
       start_period: 10s
 
+  web-permissions:
+    image: node:24-bookworm-slim
+    restart: "no"
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - web_node_modules:/workspace/node_modules
+      - web_app_node_modules:/workspace/apps/web/node_modules
+      - pnpm_store:/pnpm/store
+      - web_corepack_cache:/corepack
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        mkdir -p /workspace/apps/web/.next /workspace/node_modules /workspace/apps/web/node_modules /pnpm/store /corepack
+        chown -R "${CT_OPS_DEV_UID}:${CT_OPS_DEV_GID}" /workspace/apps/web/.next /workspace/node_modules /workspace/apps/web/node_modules /pnpm/store /corepack
+
   web-migrate:
     image: node:24-bookworm-slim
     restart: "no"
+    user: "${CT_OPS_DEV_UID}:${CT_OPS_DEV_GID}"
     working_dir: /workspace
     depends_on:
       db:
         condition: service_healthy
+      web-permissions:
+        condition: service_completed_successfully
     environment:
+      COREPACK_HOME: /corepack
+      HOME: /tmp/ct-ops-dev-home
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
@@ -100,25 +122,29 @@ services:
       - web_node_modules:/workspace/node_modules
       - web_app_node_modules:/workspace/apps/web/node_modules
       - pnpm_store:/pnpm/store
+      - web_corepack_cache:/corepack
     command:
       - /bin/sh
       - -lc
       - |
-        corepack enable
+        mkdir -p /tmp/ct-ops-dev-home
         corepack prepare pnpm@10.6.5 --activate
-        pnpm config set store-dir /pnpm/store
-        pnpm install --frozen-lockfile
+        corepack pnpm config set store-dir /pnpm/store
+        corepack pnpm install --frozen-lockfile
         cd apps/web
-        pnpm run db:migrate
+        corepack pnpm run db:migrate
 
   web-dev:
     image: node:24-bookworm-slim
     restart: unless-stopped
+    user: "${CT_OPS_DEV_UID}:${CT_OPS_DEV_GID}"
     working_dir: /workspace
     depends_on:
       web-migrate:
         condition: service_completed_successfully
     environment:
+      COREPACK_HOME: /corepack
+      HOME: /tmp/ct-ops-dev-home
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
@@ -145,16 +171,17 @@ services:
       - web_node_modules:/workspace/node_modules
       - web_app_node_modules:/workspace/apps/web/node_modules
       - pnpm_store:/pnpm/store
+      - web_corepack_cache:/corepack
     command:
       - /bin/sh
       - -lc
       - |
-        corepack enable
+        mkdir -p /tmp/ct-ops-dev-home
         corepack prepare pnpm@10.6.5 --activate
-        pnpm config set store-dir /pnpm/store
-        pnpm install --frozen-lockfile
+        corepack pnpm config set store-dir /pnpm/store
+        corepack pnpm install --frozen-lockfile
         cd apps/web
-        pnpm exec next dev ${CT_OPS_DEV_NEXT_FLAGS} -H 0.0.0.0 -p 3001
+        corepack pnpm exec next dev ${CT_OPS_DEV_NEXT_FLAGS} -H 0.0.0.0 -p 3001
 
   ingest-dev:
     image: golang:1.25
@@ -226,5 +253,6 @@ volumes:
   web_node_modules:
   web_app_node_modules:
   pnpm_store:
+  web_corepack_cache:
   go_build_cache:
   go_mod_cache:

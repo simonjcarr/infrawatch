@@ -66,40 +66,96 @@ const HOST_CALENDAR_REFETCH_INTERVAL_MS = 5_000
 const EMPTY_HOST_CALENDAR_EVENTS: HostCalendarEventView[] = []
 type CategoryFilter = CalendarEventCategory | 'all'
 type StatusFilter = CalendarEventStatus | 'all'
+type DateLabel = {
+  text: string
+  isRelative: boolean
+}
+type FormattedEventDate = {
+  text: string
+  title?: string
+}
 
 function safeTestId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-')
 }
 
-function formatDateLabel(date: Date): string {
-  if (isToday(date)) return 'Today'
-  if (isTomorrow(date)) return 'Tomorrow'
+function formatDateLabel(date: Date): DateLabel {
+  if (isToday(date)) return { text: 'Today', isRelative: true }
+  if (isTomorrow(date)) return { text: 'Tomorrow', isRelative: true }
+  return { text: format(date, 'd MMM yyyy'), isRelative: false }
+}
+
+function formatAbsoluteDate(date: Date): string {
   return format(date, 'd MMM yyyy')
+}
+
+function formatAbsoluteDateTime(date: Date): string {
+  return format(date, 'd MMM yyyy, HH:mm')
 }
 
 function isPastEvent(event: HostCalendarEventView): boolean {
   return new Date(event.endsAt).getTime() < Date.now()
 }
 
-function formatEventDate(event: HostCalendarEventView): string {
+function formatEventDate(event: HostCalendarEventView): FormattedEventDate {
   const startsAt = new Date(event.startsAt)
   const endsAt = new Date(event.endsAt)
+  const startLabel = formatDateLabel(startsAt)
+  const endLabel = formatDateLabel(endsAt)
+  const usesRelativeDate = startLabel.isRelative || endLabel.isRelative
   if (event.allDay) {
-    return formatDateLabel(startsAt)
+    const text = isSameDay(startsAt, endsAt)
+      ? startLabel.text
+      : `${startLabel.text} - ${endLabel.text}`
+    const title = usesRelativeDate
+      ? isSameDay(startsAt, endsAt)
+        ? formatAbsoluteDate(startsAt)
+        : `${formatAbsoluteDate(startsAt)} - ${formatAbsoluteDate(endsAt)}`
+      : undefined
+    return { text, title }
   }
   if (isSameDay(startsAt, endsAt)) {
-    return `${formatDateLabel(startsAt)}, ${format(startsAt, 'HH:mm')} - ${format(endsAt, 'HH:mm')}`
+    return {
+      text: `${startLabel.text}, ${format(startsAt, 'HH:mm')} - ${format(endsAt, 'HH:mm')}`,
+      title: usesRelativeDate ? `${formatAbsoluteDateTime(startsAt)} - ${formatAbsoluteDateTime(endsAt)}` : undefined,
+    }
   }
-  return `${formatDateLabel(startsAt)}, ${format(startsAt, 'HH:mm')} - ${formatDateLabel(endsAt)}, ${format(endsAt, 'HH:mm')}`
+  return {
+    text: `${startLabel.text}, ${format(startsAt, 'HH:mm')} - ${endLabel.text}, ${format(endsAt, 'HH:mm')}`,
+    title: usesRelativeDate ? `${formatAbsoluteDateTime(startsAt)} - ${formatAbsoluteDateTime(endsAt)}` : undefined,
+  }
 }
 
-function formatEventDateRange(event: HostCalendarEventView): string {
+function formatEventDateRange(event: HostCalendarEventView): FormattedEventDate {
   const startsAt = new Date(event.startsAt)
   const endsAt = new Date(event.endsAt)
+  const startLabel = formatDateLabel(startsAt)
+  const endLabel = formatDateLabel(endsAt)
+  const usesRelativeDate = startLabel.isRelative || endLabel.isRelative
   if (event.allDay) {
-    return `${formatDateLabel(startsAt)} - ${formatDateLabel(endsAt)}`
+    return {
+      text: `${startLabel.text} - ${endLabel.text}`,
+      title: usesRelativeDate ? `${formatAbsoluteDate(startsAt)} - ${formatAbsoluteDate(endsAt)}` : undefined,
+    }
   }
-  return `${formatDateLabel(startsAt)}, ${format(startsAt, 'HH:mm')} - ${formatDateLabel(endsAt)}, ${format(endsAt, 'HH:mm')}`
+  return {
+    text: `${startLabel.text}, ${format(startsAt, 'HH:mm')} - ${endLabel.text}, ${format(endsAt, 'HH:mm')}`,
+    title: usesRelativeDate ? `${formatAbsoluteDateTime(startsAt)} - ${formatAbsoluteDateTime(endsAt)}` : undefined,
+  }
+}
+
+function EventDateText({
+  value,
+  testId,
+}: {
+  value: FormattedEventDate
+  testId: string
+}) {
+  return (
+    <span data-testid={testId} title={value.title}>
+      {value.text}
+    </span>
+  )
 }
 
 function EventDetail({ label, children }: { label: string; children: ReactNode }) {
@@ -118,6 +174,8 @@ function HostCalendarEventDetailsDialog({
   event: HostCalendarEventView | null
   onOpenChange: (open: boolean) => void
 }) {
+  const formattedDateRange = event ? formatEventDateRange(event) : null
+
   return (
     <Dialog open={event != null} onOpenChange={onOpenChange}>
       <DialogContent
@@ -151,7 +209,11 @@ function HostCalendarEventDetailsDialog({
               </div>
 
               <dl className="grid gap-4 sm:grid-cols-2">
-                <EventDetail label="Date and time">{formatEventDateRange(event)}</EventDetail>
+                <EventDetail label="Date and time">
+                  {formattedDateRange ? (
+                    <EventDateText value={formattedDateRange} testId="host-calendar-event-detail-date" />
+                  ) : null}
+                </EventDetail>
                 <EventDetail label="Timezone">{event.timezone}</EventDetail>
                 <EventDetail label="Status">{STATUS_LABELS[event.status]}</EventDetail>
                 <EventDetail label="Category">{CATEGORY_LABELS[event.category]}</EventDetail>
@@ -177,6 +239,7 @@ function HostCalendarEventRow({
 }) {
   const openDetails = () => onSelect(event)
   const past = isPastEvent(event)
+  const formattedDate = formatEventDate(event)
 
   return (
     <TableRow
@@ -208,7 +271,9 @@ function HostCalendarEventRow({
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="whitespace-nowrap text-sm">{formatEventDate(event)}</TableCell>
+      <TableCell className="whitespace-nowrap text-sm">
+        <EventDateText value={formattedDate} testId="host-calendar-event-date" />
+      </TableCell>
       <TableCell>
         <Badge variant="outline" className={STATUS_BADGE_CLASS[event.status]}>
           {STATUS_LABELS[event.status]}

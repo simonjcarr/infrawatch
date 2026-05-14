@@ -78,10 +78,18 @@ test('host admin calendar shows only events linked to the current host', async (
   await expect(firstEventRow).toContainText('Patching')
   await expect(firstEventRow).toContainText('Linked to you')
   await expect(firstEventRow).toContainText('Today, 09:00 - 10:00')
+  await expect(firstEventRow.getByTestId('host-calendar-event-date')).toHaveAttribute(
+    'title',
+    /^\d{1,2} [A-Z][a-z]{2} \d{4}, 09:00 - \d{1,2} [A-Z][a-z]{2} \d{4}, 10:00$/,
+  )
   const secondEventRow = page.getByTestId('host-calendar-event-host-calendar-event-2')
   await expect(secondEventRow).toContainText('Host maintenance window')
   await expect(secondEventRow).not.toContainText('Linked to you')
   await expect(secondEventRow).toContainText('Tomorrow, 13:30 - 15:00')
+  await expect(secondEventRow.getByTestId('host-calendar-event-date')).toHaveAttribute(
+    'title',
+    /^\d{1,2} [A-Z][a-z]{2} \d{4}, 13:30 - \d{1,2} [A-Z][a-z]{2} \d{4}, 15:00$/,
+  )
   const pastEventRow = page.getByTestId('host-calendar-event-host-calendar-event-past')
   await expect(pastEventRow).toContainText('Past maintenance window')
   await expect(pastEventRow).toContainText('Past')
@@ -108,6 +116,10 @@ test('host admin calendar shows only events linked to the current host', async (
   await expect(detailsDialog.getByRole('heading', { name: 'Host kernel patch' })).toBeVisible()
   await expect(detailsDialog).toContainText('Patch the current host.')
   await expect(detailsDialog).toContainText('Today, 09:00 - Today, 10:00')
+  await expect(detailsDialog.getByTestId('host-calendar-event-detail-date')).toHaveAttribute(
+    'title',
+    /^\d{1,2} [A-Z][a-z]{2} \d{4}, 09:00 - \d{1,2} [A-Z][a-z]{2} \d{4}, 10:00$/,
+  )
   await expect(detailsDialog).toContainText('UTC')
   await expect(detailsDialog).toContainText('One-off')
 })

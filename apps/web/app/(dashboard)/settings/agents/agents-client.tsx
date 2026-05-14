@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -108,6 +108,7 @@ export function AgentsSettingsClient({
   const [viewToken, setViewToken] = useState<EnrolmentTokenSafe | null>(null)
   const [showBundleDialog, setShowBundleDialog] = useState(false)
   const [tokenTags, setTokenTags] = useState<EditorTag[]>([])
+  const [browserOrigin, setBrowserOrigin] = useState('')
 
   const { data: tokens } = useQuery({
     queryKey: ['enrolment-tokens'],
@@ -167,6 +168,14 @@ export function AgentsSettingsClient({
   })
 
   const onSubmit = handleSubmit((data) => createMutation.mutate(data))
+  const installCommandBaseUrl = appUrl || browserOrigin
+  const viewInstallCommand = viewToken && installCommandBaseUrl
+    ? buildAgentInstallCommand(installCommandBaseUrl, viewToken.skipVerify)
+    : null
+
+  useEffect(() => {
+    setBrowserOrigin(window.location.origin)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -239,6 +248,7 @@ export function AgentsSettingsClient({
                             size="sm"
                             className="h-6 w-6 p-0"
                             onClick={() => setViewToken(token)}
+                            data-testid="agent-enrolment-view"
                           >
                             <Eye className="size-3 text-muted-foreground" />
                           </Button>
@@ -303,6 +313,17 @@ export function AgentsSettingsClient({
                 The full token was shown only once when it was created. To use this token,
                 generate a new install bundle from the Download Agent Bundle dialog.
               </p>
+              {viewInstallCommand && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Install command</p>
+                  <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
+                    <code className="text-xs font-mono flex-1 break-all leading-relaxed" data-testid="agent-enrolment-view-install-command">
+                      {viewInstallCommand}
+                    </code>
+                    <CopyButton text={viewInstallCommand} />
+                  </div>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Token hint</p>
                 <div className="flex items-center gap-2 p-3 bg-muted rounded-md">

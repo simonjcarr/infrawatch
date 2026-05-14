@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.4](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.19.3...bundle/v0.19.4) (2026-05-14)
+
+
+### Bug Fixes
+
+* **dev-stack:** run web containers as local user ([ed83e98](https://github.com/carrtech-dev/ct-ops/commit/ed83e982b19863075a9207c5a3f8582e97408d8f))
+
 ## [0.19.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.19.2...bundle/v0.19.3) (2026-05-14)
 
 

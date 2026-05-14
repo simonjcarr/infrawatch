@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next'
-import { getTrustedOriginHosts } from './lib/security/trusted-origins.ts'
+import { getAllowedDevOrigins, getTrustedOriginHosts } from './lib/security/trusted-origins.ts'
 
 const securityHeaders = [
   // Prevent clickjacking
@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
+  allowedDevOrigins: getAllowedDevOrigins(),
   experimental: {
     serverActions: {
       allowedOrigins: getTrustedOriginHosts(),

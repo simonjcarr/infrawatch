@@ -11,6 +11,18 @@ function normaliseOrigin(value: string): string | null {
   }
 }
 
+function normaliseHost(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  try {
+    const urlValue = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
+    return new URL(urlValue).host
+  } catch {
+    return null
+  }
+}
+
 function getConfiguredAuthUrl(env: EnvLike): string {
   const value = env['BETTER_AUTH_URL']?.trim()
   if (!value && env['NEXT_PHASE'] === PRODUCTION_BUILD_PHASE) {
@@ -53,6 +65,22 @@ export function getTrustedOriginHosts(env: EnvLike = process.env): string[] {
         .map((origin) => new URL(origin).host),
     ),
   )
+}
+
+export function getAllowedDevOrigins(env: EnvLike = process.env): string[] {
+  if (env['NODE_ENV'] === 'production' || env['NEXT_PHASE'] === PRODUCTION_BUILD_PHASE) {
+    return []
+  }
+
+  const configuredHosts = [
+    ...getTrustedOriginHosts(env),
+    ...(env['CT_OPS_DEV_PUBLIC_HOST']
+      ?.split(',')
+      .map(normaliseHost)
+      .filter((value): value is string => value !== null) ?? []),
+  ]
+
+  return Array.from(new Set(configuredHosts))
 }
 
 export function isTrustedMutationOrigin(

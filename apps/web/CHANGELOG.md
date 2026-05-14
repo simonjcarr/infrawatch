@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.152.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.151.4...web/v0.152.0) (2026-05-14)
+
+
+### Features
+
+* **hosts:** improve host calendar event cues ([#1425](https://github.com/carrtech-dev/ct-ops/issues/1425)) ([71d8578](https://github.com/carrtech-dev/ct-ops/commit/71d8578e7e318cb047319d1193c62bba79df0d08))
+* **hosts:** show calendar event details modal ([#1421](https://github.com/carrtech-dev/ct-ops/issues/1421)) ([a23b63e](https://github.com/carrtech-dev/ct-ops/commit/a23b63e99707c539c06c5e84f401a3bc5ec20994))
+
 ## [0.151.4](https://github.com/carrtech-dev/ct-ops/compare/web/v0.151.3...web/v0.151.4) (2026-05-14)
 
 

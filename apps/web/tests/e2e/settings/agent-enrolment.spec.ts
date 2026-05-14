@@ -107,6 +107,50 @@ test('admin can create and revoke an enrolment token from agent settings', async
     .toBeTruthy()
 })
 
+test('admin can view the install URL for an existing enrolment token', async ({ authenticatedPage: page }) => {
+  const sql = getTestDb()
+  const { instanceId, userId } = await getInstanceAndUserIds(sql)
+
+  await sql`
+    INSERT INTO agent_enrolment_tokens (
+      id,
+      instance_id,
+      label,
+      token,
+      created_by_id,
+      auto_approve,
+      skip_verify,
+      max_uses,
+      usage_count,
+      expires_at,
+      metadata
+    )
+    VALUES (
+      'view-existing-token-id',
+      ${instanceId},
+      'View Existing Token',
+      'view-existing-token-value',
+      ${userId},
+      false,
+      false,
+      5,
+      0,
+      NOW() + INTERVAL '14 days',
+      '{}'::jsonb
+    )
+  `
+
+  await page.goto('/settings/agents')
+
+  const tokenRow = page.getByTestId('agent-enrolment-row').filter({ hasText: 'View Existing Token' })
+  await tokenRow.getByTestId('agent-enrolment-view').click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('View Existing Token')
+  await expect(page.getByTestId('agent-enrolment-view-install-command')).toContainText('/api/agent/install')
+  await expect(page.getByTestId('agent-enrolment-view-install-command')).not.toContainText('token=')
+})
+
 test('admin cannot create an auto-approved token without super admin privileges', async ({ authenticatedPage: page }) => {
   const sql = getTestDb()
   const { instanceId } = await getInstanceAndUserIds(sql)

@@ -4,10 +4,10 @@ import { TEST_INSTANCE, TEST_USER } from '../fixtures/seed'
 
 async function getInstanceAndUserIds(sql: ReturnType<typeof getTestDb>): Promise<{ instanceId: string; userId: string }> {
   const rows = await sql<Array<{ instance_id: string; user_id: string }>>`
-    SELECT instanceSettings.id AS instance_id, "user".id AS user_id
+    SELECT instance_settings.id AS instance_id, "user".id AS user_id
     FROM instance_settings
-    JOIN "user" ON "user".instance_id = instanceSettings.id
-    WHERE instanceSettings.slug = ${TEST_INSTANCE.slug}
+    JOIN "user" ON "user".instance_id = instance_settings.id
+    WHERE instance_settings.slug = ${TEST_INSTANCE.slug}
       AND "user".email = ${TEST_USER.email}
     LIMIT 1
   `
@@ -64,11 +64,22 @@ test('host admin calendar shows only events linked to the current host', async (
   await page.getByTestId('host-tab-calendar').click()
 
   await expect(page.getByTestId('host-calendar-tab')).toBeVisible()
-  await expect(page.getByTestId('host-calendar-event-host-calendar-event-1')).toContainText('Host kernel patch')
-  await expect(page.getByTestId('host-calendar-event-host-calendar-event-1')).toContainText('Confirmed')
-  await expect(page.getByTestId('host-calendar-event-host-calendar-event-1')).toContainText('Patching')
+  const firstEventRow = page.getByTestId('host-calendar-event-host-calendar-event-1')
+  await expect(firstEventRow).toContainText('Host kernel patch', { timeout: 15_000 })
+  await expect(firstEventRow).toContainText('Confirmed')
+  await expect(firstEventRow).toContainText('Patching')
   await expect(page.getByTestId('host-calendar-event-host-calendar-event-2')).toContainText('Host maintenance window')
   await expect(page.getByText('Other host outage')).toHaveCount(0)
+
+  await firstEventRow.click()
+
+  const detailsDialog = page.getByTestId('host-calendar-event-dialog')
+  await expect(detailsDialog).toBeVisible()
+  await expect(detailsDialog.getByRole('heading', { name: 'Host kernel patch' })).toBeVisible()
+  await expect(detailsDialog).toContainText('Patch the current host.')
+  await expect(detailsDialog).toContainText('20 May 2026, 09:00 - 20 May 2026, 10:00')
+  await expect(detailsDialog).toContainText('UTC')
+  await expect(detailsDialog).toContainText('One-off')
 })
 
 test('host admin calendar shows an empty state when no events are linked', async ({ authenticatedPage: page }) => {

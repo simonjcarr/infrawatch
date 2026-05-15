@@ -17,6 +17,11 @@ printf '%q ' "$@" >> "$log"
 printf '\n' >> "$log"
 
 case "${1:-}" in
+  network)
+    if [ "${2:-}" = "inspect" ]; then
+      exit 0
+    fi
+    ;;
   ps)
     exit 0
     ;;
@@ -63,6 +68,7 @@ main() {
 AGENT_DOWNLOAD_BASE_URL=http://dev-env-host:3000
 CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=dev-env-host:9443
 CT_OPS_ENROLMENT_TOKEN=dev_env_token
+COMPOSE_PROJECT_NAME=ct-ops-dev-test
 EOF
 
   output="$(
@@ -93,6 +99,11 @@ EOF
     cat "$log" >&2
     exit 1
   fi
+  if ! grep -q -- "--network ct-ops-dev-test_default" "$log"; then
+    echo "expected dev stack Docker network" >&2
+    cat "$log" >&2
+    exit 1
+  fi
   if ! grep -Fq -- "CT_OPS_ENROLMENT_TOKEN=dev_env_token" "$log"; then
     echo "expected enrolment token from dev env" >&2
     cat "$log" >&2
@@ -100,6 +111,11 @@ EOF
   fi
   if ! grep -Fq -- "CT_OPS_AGENT_INSTALL_URL=http://dev-env-host:3000/api/agent/install\\?ingest=dev-env-host%3A9443\\&skip_verify=true" "$log"; then
     echo "expected install URL with encoded ingest address and skip_verify" >&2
+    cat "$log" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "sh -euc tmp=\\\"\\\$\\(mktemp\\)\\\"\\;\\ curl\\ -fsSLk\\ \\\"\\\$CT_OPS_AGENT_INSTALL_URL\\\"\\ -o\\ \\\"\\\$tmp\\\"\\;\\ sh\\ \\\"\\\$tmp\\\"\\;\\ rm\\ -f\\ \\\"\\\$tmp\\\"" "$log"; then
+    echo "expected non-pipeline installer execution" >&2
     cat "$log" >&2
     exit 1
   fi

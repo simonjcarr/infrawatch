@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import json
+import base64
+import hashlib
+import hmac
 import os
 import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+
+
+AUTH_SCHEME = "CT-ServiceToken"
+SIGNATURE_PREFIX = "v1="
+MAX_CLOCK_SKEW_SECONDS = 300
+NONCE_TTL_SECONDS = 600
+_seen_nonces: dict[str, float] = {}
 
 
 def ansible_version() -> str:
@@ -88,6 +99,92 @@ def openapi_payload() -> dict[str, Any]:
             },
         },
     }
+
+
+def _configured_service_token() -> tuple[str, str] | None:
+    token_id = os.environ.get("ANSIBLE_API_SERVICE_TOKEN_ID", "").strip()
+    token_secret = os.environ.get("ANSIBLE_API_SERVICE_TOKEN_SECRET", "")
+    if not token_id and not token_secret:
+        return None
+    if not token_id or len(token_secret.encode("utf-8")) < 32:
+        raise PermissionError("Ansible API service token is not configured correctly")
+    return token_id, token_secret
+
+
+def _header(headers: Any, name: str) -> str:
+    if hasattr(headers, "get"):
+        value = headers.get(name)
+        if value is not None:
+            return str(value)
+        value = headers.get(name.lower())
+        if value is not None:
+            return str(value)
+    lower = name.lower()
+    for key, value in dict(headers).items():
+        if str(key).lower() == lower:
+            return str(value)
+    return ""
+
+
+def _parse_timestamp(value: str) -> float:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _remember_nonce(token_id: str, nonce: str, now: float) -> bool:
+    expired = [key for key, expires_at in _seen_nonces.items() if expires_at <= now]
+    for key in expired:
+        del _seen_nonces[key]
+    key = f"{token_id}:{nonce}"
+    if key in _seen_nonces:
+        return False
+    _seen_nonces[key] = now + NONCE_TTL_SECONDS
+    return True
+
+
+def verify_service_request(method: str, path: str, body: bytes, headers: Any) -> None:
+    token = _configured_service_token()
+    if token is None:
+        return
+    token_id, token_secret = token
+
+    authorization = _header(headers, "authorization")
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0] != AUTH_SCHEME or parts[1] != token_id:
+        raise PermissionError("invalid service token authorization")
+
+    timestamp = _header(headers, "x-ct-timestamp")
+    nonce = _header(headers, "x-ct-nonce")
+    content_hash = _header(headers, "x-ct-content-sha256")
+    signature_header = _header(headers, "x-ct-signature")
+    if not timestamp or not nonce or not content_hash or not signature_header:
+        raise PermissionError("missing service token signature headers")
+
+    try:
+        request_time = _parse_timestamp(timestamp)
+    except Exception as err:
+        raise PermissionError("invalid service token timestamp") from err
+    now = time.time()
+    if abs(now - request_time) > MAX_CLOCK_SKEW_SECONDS:
+        raise PermissionError("service token timestamp is outside the replay window")
+
+    expected_hash = hashlib.sha256(body).hexdigest()
+    if not hmac.compare_digest(content_hash, expected_hash):
+        raise PermissionError("service token content hash does not match")
+
+    if not signature_header.startswith(SIGNATURE_PREFIX):
+        raise PermissionError("invalid service token signature")
+    input_value = "\n".join([method.upper(), path, timestamp, nonce, expected_hash]).encode("utf-8")
+    expected_signature = base64.urlsafe_b64encode(
+        hmac.new(token_secret.encode("utf-8"), input_value, hashlib.sha256).digest()
+    ).decode("ascii").rstrip("=")
+    if not hmac.compare_digest(signature_header[len(SIGNATURE_PREFIX):], expected_signature):
+        raise PermissionError("invalid service token signature")
+
+    if not _remember_nonce(token_id, nonce, now):
+        raise PermissionError("service token nonce has already been used")
 
 
 @dataclass
@@ -301,10 +398,13 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 length = int(self.headers.get("content-length", "0"))
                 body = self.rfile.read(min(length, 1_000_000))
+                verify_service_request("POST", self.path, body, self.headers)
                 payload = json.loads(body.decode("utf-8"))
                 if not isinstance(payload, dict):
                     raise ValueError("request body must be an object")
                 self.write_json(run_ansible_ping(payload))
+            except PermissionError as err:
+                self.write_json({"error": str(err)}, status=401)
             except ValueError as err:
                 self.write_json({"error": str(err)}, status=400)
             except subprocess.TimeoutExpired:

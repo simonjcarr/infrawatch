@@ -1,5 +1,15 @@
 import 'server-only'
 
+import {
+  getModuleConnectionRuntime,
+  getModuleConnectionSummary,
+  saveModuleConnection,
+  type ModuleConnectionInput,
+  type ModuleConnectionRuntime,
+  type ModuleConnectionSummary,
+} from '@/lib/modules/module-connections'
+import { buildSignedModuleRequestHeaders } from '@/lib/modules/service-token'
+
 export interface AnsibleApiHealth {
   ok: boolean
   provider: 'ansible'
@@ -38,14 +48,84 @@ export function getAnsibleApiBaseUrl(): string {
   return (process.env['ANSIBLE_API_URL'] ?? 'http://ansible-api:8080').replace(/\/+$/, '')
 }
 
-export async function checkAnsibleApiHealth(): Promise<AnsibleApiHealth | null> {
+function defaultAnsibleConnection(instanceId: string): ModuleConnectionRuntime {
+  const now = new Date(0)
+  return {
+    id: 'env:ansible-api',
+    instanceId,
+    moduleType: 'ansible',
+    enabled: true,
+    name: 'Primary Ansible API',
+    baseUrl: getAnsibleApiBaseUrl(),
+    contractVersion: 'legacy-env',
+    authMode: 'none',
+    tokenId: null,
+    hasTokenSecret: false,
+    tokenSecret: null,
+    tlsMode: 'insecure',
+    caCertificate: null,
+    serverCertificateSha256: null,
+    timeoutMs: 5000,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+export async function getAnsibleModuleConnectionSummary(
+  instanceId: string,
+): Promise<ModuleConnectionSummary> {
+  const stored = await getModuleConnectionSummary(instanceId, 'ansible')
+  if (stored) return stored
+  const fallback = defaultAnsibleConnection(instanceId)
+  return {
+    ...fallback,
+    hasTokenSecret: false,
+  }
+}
+
+async function getAnsibleModuleConnectionRuntime(instanceId: string): Promise<ModuleConnectionRuntime> {
+  return await getModuleConnectionRuntime(instanceId, 'ansible') ?? defaultAnsibleConnection(instanceId)
+}
+
+export async function saveAnsibleModuleConnection(
+  instanceId: string,
+  input: Omit<ModuleConnectionInput, 'moduleType'>,
+): Promise<ModuleConnectionSummary> {
+  return saveModuleConnection(instanceId, {
+    ...input,
+    moduleType: 'ansible',
+  })
+}
+
+function requestHeaders(connection: ModuleConnectionRuntime, method: string, path: string, body: string | Buffer = '') {
+  if (connection.authMode !== 'service-token-hmac') return {}
+  if (!connection.tokenId || !connection.tokenSecret) {
+    throw new Error('Ansible module connection is missing service-token credentials')
+  }
+  return buildSignedModuleRequestHeaders({
+    method,
+    path,
+    body,
+    token: {
+      id: connection.tokenId,
+      secret: connection.tokenSecret,
+    },
+  })
+}
+
+export async function checkAnsibleApiHealth(instanceId: string): Promise<AnsibleApiHealth | null> {
+  const connection = await getAnsibleModuleConnectionRuntime(instanceId)
+  if (!connection.enabled) return null
+
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 2000)
+  const timeout = setTimeout(() => controller.abort(), Math.min(connection.timeoutMs, 10_000))
 
   try {
-    const response = await fetch(`${getAnsibleApiBaseUrl()}/healthz`, {
+    const path = '/healthz'
+    const response = await fetch(`${connection.baseUrl}${path}`, {
       cache: 'no-store',
       signal: controller.signal,
+      headers: requestHeaders(connection, 'GET', path),
     })
     if (!response.ok) return null
 
@@ -65,18 +145,26 @@ export async function checkAnsibleApiHealth(): Promise<AnsibleApiHealth | null> 
 }
 
 export async function runAnsiblePing(
+  instanceId: string,
   payload: RunAnsiblePingRequest,
 ): Promise<RunAnsiblePingResponse> {
+  const connection = await getAnsibleModuleConnectionRuntime(instanceId)
+  if (!connection.enabled) throw new Error('Ansible module connection is disabled')
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60_000)
+  const timeout = setTimeout(() => controller.abort(), Math.min(Math.max(connection.timeoutMs, 60_000), 120_000))
 
   try {
-    const response = await fetch(`${getAnsibleApiBaseUrl()}/api/v1/runs/ansible-ping`, {
+    const path = '/api/v1/runs/ansible-ping'
+    const body = JSON.stringify(payload)
+    const response = await fetch(`${connection.baseUrl}${path}`, {
       method: 'POST',
       cache: 'no-store',
       signal: controller.signal,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers: {
+        'content-type': 'application/json',
+        ...requestHeaders(connection, 'POST', path, body),
+      },
+      body,
     })
 
     if (!response.ok) {

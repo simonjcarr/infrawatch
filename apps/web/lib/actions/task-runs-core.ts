@@ -300,8 +300,8 @@ async function requireAnsibleAutomationReady(currentScope: string): Promise<{ ok
     return { error: 'Ansible automation is disabled for this instance' }
   }
 
-  const health = await checkAnsibleApiHealth()
-  if (!health) return { error: 'Ansible automation API is unavailable. Run ./start.sh on the host and try again.' }
+  const health = await checkAnsibleApiHealth(currentScope)
+  if (!health) return { error: 'Ansible automation API is unavailable. Check the module connection settings and service health, then try again.' }
 
   return { ok: true }
 }
@@ -329,7 +329,7 @@ async function completeAnsiblePingRun(input: {
     .where(and(eq(taskRuns.id, input.taskRunId), eq(taskRuns.instanceId, input.currentScope), isNull(taskRuns.deletedAt)))
 
   try {
-    const result = await runAnsiblePing({
+    const result = await runAnsiblePing(input.currentScope, {
       credential: { username: input.username, privateKey: input.privateKey },
       hosts: input.inventoryHosts,
     })

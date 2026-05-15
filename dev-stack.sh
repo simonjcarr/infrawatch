@@ -261,7 +261,7 @@ EOF
 }
 
 ensure_dev_env() {
-  local proxy_port next_port postgres_port ingest_http_port ingest_grpc_port app_url pm_image
+  local proxy_port next_port postgres_port ingest_http_port ingest_grpc_port app_url agent_download_base_url agent_container_ingest_address pm_image
   local bind_addr public_host public_enabled trusted_origins
   local private_key public_key keypair_output repaired_public_key
 
@@ -309,11 +309,15 @@ ensure_dev_env() {
       fi
     fi
     app_url="http://${public_host}:${proxy_port}"
+    agent_download_base_url="$app_url"
+    agent_container_ingest_address="${public_host}:${ingest_grpc_port}"
     trusted_origins="http://localhost:${proxy_port},http://127.0.0.1:${proxy_port},${app_url}"
   else
     bind_addr="127.0.0.1"
     public_host=""
     app_url="http://localhost:${proxy_port}"
+    agent_download_base_url="http://dev-proxy"
+    agent_container_ingest_address="ingest-dev:9443"
     trusted_origins="$app_url"
   fi
 
@@ -326,6 +330,7 @@ ensure_dev_env() {
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_INGEST_GRPC_PORT "$ingest_grpc_port"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_APP_URL "$app_url"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_AGENT_INGEST_ADDRESS "${public_host:-localhost}:${ingest_grpc_port}"
+  upsert_env_var "$DEV_ENV" CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS "$agent_container_ingest_address"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_UID "$(id -u)"
   upsert_env_var "$DEV_ENV" CT_OPS_DEV_GID "$(id -g)"
   if [ -z "$(read_env_var "$DEV_ENV" CT_OPS_DEV_NEXT_FLAGS)" ]; then
@@ -350,7 +355,10 @@ ensure_dev_env() {
   upsert_env_var "$DEV_ENV" BETTER_AUTH_TRUSTED_ORIGINS "$trusted_origins"
   upsert_env_var "$DEV_ENV" REQUIRE_EMAIL_VERIFICATION "false"
   upsert_env_var "$DEV_ENV" CT_OPS_TRUST_PROXY_HEADERS "true"
-  upsert_env_var "$DEV_ENV" AGENT_DOWNLOAD_BASE_URL "$app_url"
+  upsert_env_var "$DEV_ENV" AGENT_DOWNLOAD_BASE_URL "$agent_download_base_url"
+  if [ -z "$(read_env_var "$DEV_ENV" CT_OPS_ENROLMENT_TOKEN)" ]; then
+    upsert_env_var "$DEV_ENV" CT_OPS_ENROLMENT_TOKEN ""
+  fi
   upsert_env_var "$DEV_ENV" INGEST_WS_URL ""
 
   if [ -z "$(read_env_var "$DEV_ENV" PASSWORD_MANAGER_DB_PASSWORD)" ]; then

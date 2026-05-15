@@ -27,6 +27,14 @@ The first run creates `.dev/dev.env` and `apps/web/.env.local` with local-only
 secrets and URLs. The root `.env` used by the release/test-server path is not
 modified.
 
+For local Docker agent containers, the generated config sets
+`AGENT_DOWNLOAD_BASE_URL=http://dev-proxy`,
+`CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=ingest-dev:9443`, and an empty
+`CT_OPS_ENROLMENT_TOKEN=` placeholder. Paste a valid token into that placeholder
+before running `deploy/scripts/create-agent-dev-container.sh`. The helper joins
+the dev stack Docker network so these service names resolve inside the test
+container without exposing the dev stack on your LAN.
+
 The `web-migrate` and `web-dev` containers run `pnpm install --frozen-lockfile`
 inside Docker using named volumes for `node_modules`, so Linux container
 dependencies do not overwrite host dependencies. The `ingest-dev` container uses
@@ -83,6 +91,15 @@ Agents must be able to reach `100.x.y.z:9443` and trust the generated CA cert.
 For browser-based agent install bundles, the app will use
 `AGENT_DOWNLOAD_BASE_URL=http://100.x.y.z:3000`, so the remote host must also be
 able to reach port `3000`.
+
+For same-machine Docker agent containers, leave the stack in local mode and run:
+
+```bash
+deploy/scripts/create-agent-dev-container.sh
+```
+
+The helper reads `.dev/dev.env`, creates one long-lived systemd Ubuntu
+container, and runs the normal CT-Ops agent install script inside it.
 
 Switch back to loopback-only mode with:
 

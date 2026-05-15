@@ -65,6 +65,9 @@ EOF
   expected_uid="$(id -u)"
   expected_gid="$(id -g)"
   assert_contains "${repo_dir}/.dev/dev.env" "BETTER_AUTH_URL=http://localhost:3000"
+  assert_contains "${repo_dir}/.dev/dev.env" "AGENT_DOWNLOAD_BASE_URL=http://dev-proxy"
+  assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=ingest-dev:9443"
+  assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_ENROLMENT_TOKEN="
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_UID=${expected_uid}"
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_GID=${expected_gid}"
   assert_contains "${repo_dir}/.dev/dev.env" "PASSWORD_MANAGER_SESSION_COOKIE_SECURE=false"
@@ -122,6 +125,7 @@ run_public_config_generation_test() {
   assert_contains "${repo_dir}/.dev/dev.env" "BETTER_AUTH_URL=http://192.0.2.10:3000"
   assert_contains "${repo_dir}/.dev/dev.env" "AGENT_DOWNLOAD_BASE_URL=http://192.0.2.10:3000"
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_AGENT_INGEST_ADDRESS=192.0.2.10:9443"
+  assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=192.0.2.10:9443"
   assert_contains "${repo_dir}/.dev/dev.env" "BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://192.0.2.10:3000"
   assert_contains "${repo_dir}/apps/web/.env.local" "BETTER_AUTH_URL=http://192.0.2.10:3000"
 
@@ -133,7 +137,9 @@ run_public_config_generation_test() {
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_BIND_ADDR=127.0.0.1"
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_PUBLIC_HOST="
   assert_contains "${repo_dir}/.dev/dev.env" "BETTER_AUTH_URL=http://localhost:3000"
+  assert_contains "${repo_dir}/.dev/dev.env" "AGENT_DOWNLOAD_BASE_URL=http://dev-proxy"
   assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_DEV_AGENT_INGEST_ADDRESS=localhost:9443"
+  assert_contains "${repo_dir}/.dev/dev.env" "CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=ingest-dev:9443"
 }
 
 run_static_wiring_test() {

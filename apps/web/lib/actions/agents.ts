@@ -18,7 +18,7 @@ import {
   listEnrolmentTokens as listEnrolmentTokensCore,
   revokeEnrolmentToken as revokeEnrolmentTokenCore,
   uninstallAndDeleteHost as uninstallAndDeleteHostCore,
-  type EnrolmentTokenSafe,
+  type EnrolmentTokenForAdmin,
   type HeartbeatPoint,
   type HostListParams,
   type HostListResult,
@@ -114,7 +114,7 @@ export async function createEnrolmentToken(
   return createEnrolmentTokenCore(resolveCurrentActionScope(session), input)
 }
 
-export async function listEnrolmentTokens(): Promise<EnrolmentTokenSafe[]> {
+export async function listEnrolmentTokens(): Promise<EnrolmentTokenForAdmin[]> {
   const session = await getRequiredSession()
   const currentScope = resolveOptionalActionScope(session)
   if (!currentScope) return []

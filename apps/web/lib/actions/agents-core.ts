@@ -645,21 +645,21 @@ export async function createEnrolmentToken(
   }
 }
 
-export type EnrolmentTokenSafe = Omit<AgentEnrolmentToken, 'token' | 'tokenHash'> & {
+export type EnrolmentTokenForAdmin = Omit<AgentEnrolmentToken, 'tokenHash'> & {
   tokenHint: string
 }
 
-export async function listEnrolmentTokens(instanceId: string): Promise<EnrolmentTokenSafe[]> {
-  await requireInstanceAccess(instanceId)
+export async function listEnrolmentTokens(instanceId: string): Promise<EnrolmentTokenForAdmin[]> {
+  await requireInstanceAdminAccess(instanceId)
   const rows = await db.query.agentEnrolmentTokens.findMany({
     where: and(
       eq(agentEnrolmentTokens.instanceId, instanceId),
       isNull(agentEnrolmentTokens.deletedAt),
     ),
   })
-  return rows.map(({ token, tokenHash: _hash, ...rest }) => ({
+  return rows.map(({ tokenHash: _hash, ...rest }) => ({
     ...rest,
-    tokenHint: token.slice(-4),
+    tokenHint: rest.token.slice(-4),
   }))
 }
 

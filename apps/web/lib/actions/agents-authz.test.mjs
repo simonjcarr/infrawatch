@@ -30,3 +30,16 @@ test('privileged agent and host mutations require tooling access', () => {
     )
   }
 })
+
+test('listing enrolment tokens requires privileged access because plaintext tokens are returned', () => {
+  const start = agentsSource.lastIndexOf('export async function listEnrolmentTokens')
+  assert.notEqual(start, -1, 'expected listEnrolmentTokens to exist in agents-core.ts')
+  const next = agentsSource.indexOf('\nexport async function ', start + 1)
+  const segment = agentsSource.slice(start, next === -1 ? undefined : next)
+
+  assert.match(
+    segment,
+    /requireInstance(?:Admin|Tooling)Access\(instanceId\)/,
+    'listEnrolmentTokens must require privileged access before returning enrolment token secrets',
+  )
+})

@@ -41,7 +41,7 @@ import {
   revokeEnrolmentToken,
 } from '@/lib/actions/agents'
 import type { AgentEnrolmentToken } from '@/lib/db/schema'
-import type { EnrolmentTokenSafe } from '@/lib/actions/agents-core'
+import type { EnrolmentTokenForAdmin } from '@/lib/actions/agents-core'
 import { TagEditor, type EditorTag } from '@/components/shared/tag-editor'
 import {
   DEFAULT_ENROLMENT_TOKEN_EXPIRY_DAYS,
@@ -60,7 +60,7 @@ const createTokenSchema = z.object({
 type CreateTokenForm = z.infer<typeof createTokenSchema>
 
 interface AgentsSettingsClientProps {
-  initialTokens: EnrolmentTokenSafe[]
+  initialTokens: EnrolmentTokenForAdmin[]
   appUrl: string
 }
 
@@ -84,7 +84,7 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-function tokenStatus(token: EnrolmentTokenSafe): { label: string; className: string } {
+function tokenStatus(token: EnrolmentTokenForAdmin): { label: string; className: string } {
   if (token.deletedAt) {
     return { label: 'Revoked', className: 'bg-red-100 text-red-800 border-red-200' }
   }
@@ -105,7 +105,7 @@ export function AgentsSettingsClient({
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newTokenValue, setNewTokenValue] = useState<string | null>(null)
   const [newInstallCommand, setNewInstallCommand] = useState<string | null>(null)
-  const [viewToken, setViewToken] = useState<EnrolmentTokenSafe | null>(null)
+  const [viewToken, setViewToken] = useState<EnrolmentTokenForAdmin | null>(null)
   const [showBundleDialog, setShowBundleDialog] = useState(false)
   const [tokenTags, setTokenTags] = useState<EditorTag[]>([])
   const [browserOrigin, setBrowserOrigin] = useState('')
@@ -170,7 +170,7 @@ export function AgentsSettingsClient({
   const onSubmit = handleSubmit((data) => createMutation.mutate(data))
   const installCommandBaseUrl = appUrl || browserOrigin
   const viewInstallCommand = viewToken && installCommandBaseUrl
-    ? buildAgentInstallCommand(installCommandBaseUrl, viewToken.skipVerify)
+    ? buildAgentInstallCommand(installCommandBaseUrl, viewToken.skipVerify, viewToken.token)
     : null
 
   useEffect(() => {
@@ -310,8 +310,8 @@ export function AgentsSettingsClient({
           {viewToken && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                The full token was shown only once when it was created. To use this token,
-                generate a new install bundle from the Download Agent Bundle dialog.
+                Use this command on each server you want to enrol. The token is passed through
+                the environment instead of being placed in the installer URL.
               </p>
               {viewInstallCommand && (
                 <div className="space-y-1.5">
@@ -325,9 +325,10 @@ export function AgentsSettingsClient({
                 </div>
               )}
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Token hint</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Raw token</p>
                 <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                  <code className="text-xs font-mono flex-1">········…{viewToken.tokenHint}</code>
+                  <code className="text-xs font-mono flex-1 break-all">{viewToken.token}</code>
+                  <CopyButton text={viewToken.token} />
                 </div>
               </div>
               <DialogFooter>
@@ -527,7 +528,7 @@ type TokenMode = 'create' | 'existing' | 'none'
 interface BundleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  activeTokens: EnrolmentTokenSafe[]
+  activeTokens: EnrolmentTokenForAdmin[]
 }
 
 function BundleDialog({ open, onOpenChange, activeTokens }: BundleDialogProps) {

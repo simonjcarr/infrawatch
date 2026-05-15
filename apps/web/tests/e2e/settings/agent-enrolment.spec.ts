@@ -148,6 +148,8 @@ test('admin can view the install URL for an existing enrolment token', async ({ 
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('View Existing Token')
   await expect(page.getByTestId('agent-enrolment-view-install-command')).toContainText('/api/agent/install')
+  await expect(page.getByTestId('agent-enrolment-view-install-command')).toContainText('CT_OPS_ENROLMENT_TOKEN=')
+  await expect(page.getByTestId('agent-enrolment-view-install-command')).toContainText('view-existing-token-value')
   await expect(page.getByTestId('agent-enrolment-view-install-command')).not.toContainText('token=')
 })
 

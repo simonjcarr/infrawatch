@@ -155,6 +155,8 @@ export interface HostCalendarEventView {
   category: CalendarEventCategory
   isRecurring: boolean
   isLinkedToCurrentUser: boolean
+  hosts: CalendarHostOption[]
+  participants: CalendarParticipantView[]
 }
 
 type ParsedCalendarInput = Omit<CalendarEventInput, 'startsAt' | 'endsAt' | 'recurrenceRule'> & {
@@ -579,17 +581,76 @@ export async function listCalendarEventsForHost(
       .limit(250)
 
     const eventIds = rows.map((row) => row.id)
-    const participantRows = eventIds.length > 0
-      ? await db.query.calendarEventParticipants.findMany({
-          where: and(
-            eq(calendarEventParticipants.instanceId, instanceId),
-            eq(calendarEventParticipants.userId, session.user.id),
-            inArray(calendarEventParticipants.eventId, eventIds),
-          ),
-          columns: { eventId: true },
-        })
-      : []
-    const currentUserEventIds = new Set(participantRows.map((row) => row.eventId))
+    const [hostRows, participantRows] = eventIds.length > 0
+      ? await Promise.all([
+          db
+            .select({
+              eventId: calendarEventHosts.eventId,
+              id: hosts.id,
+              hostname: hosts.hostname,
+              displayName: hosts.displayName,
+              os: hosts.os,
+            })
+            .from(calendarEventHosts)
+            .innerJoin(
+              hosts,
+              and(
+                eq(calendarEventHosts.hostId, hosts.id),
+                eq(hosts.instanceId, instanceId),
+                isNull(hosts.deletedAt),
+              ),
+            )
+            .where(and(
+              eq(calendarEventHosts.instanceId, instanceId),
+              inArray(calendarEventHosts.eventId, eventIds),
+            ))
+            .orderBy(asc(hosts.hostname)),
+          db
+            .select({
+              eventId: calendarEventParticipants.eventId,
+              participantRole: calendarEventParticipants.role,
+              id: users.id,
+              name: users.name,
+              email: users.email,
+              role: users.role,
+            })
+            .from(calendarEventParticipants)
+            .innerJoin(
+              users,
+              and(
+                eq(calendarEventParticipants.userId, users.id),
+                eq(users.instanceId, instanceId),
+                isNull(users.deletedAt),
+              ),
+            )
+            .where(and(
+              eq(calendarEventParticipants.instanceId, instanceId),
+              inArray(calendarEventParticipants.eventId, eventIds),
+            ))
+            .orderBy(asc(users.email)),
+        ])
+      : [[], []]
+    const currentUserEventIds = new Set(
+      participantRows.filter((row) => row.id === session.user.id).map((row) => row.eventId),
+    )
+    const hostsByEvent = new Map<string, CalendarHostOption[]>()
+    for (const row of hostRows) {
+      const list = hostsByEvent.get(row.eventId) ?? []
+      list.push({ id: row.id, hostname: row.hostname, displayName: row.displayName, os: row.os })
+      hostsByEvent.set(row.eventId, list)
+    }
+    const participantsByEvent = new Map<string, CalendarParticipantView[]>()
+    for (const row of participantRows) {
+      const list = participantsByEvent.get(row.eventId) ?? []
+      list.push({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        role: row.role,
+        participantRole: row.participantRole,
+      })
+      participantsByEvent.set(row.eventId, list)
+    }
 
     return {
       events: rows.map((row) => ({
@@ -604,6 +665,8 @@ export async function listCalendarEventsForHost(
         category: row.category,
         isRecurring: Boolean(row.recurrenceRule),
         isLinkedToCurrentUser: row.createdBy === session.user.id || currentUserEventIds.has(row.id),
+        hosts: hostsByEvent.get(row.id) ?? [],
+        participants: participantsByEvent.get(row.id) ?? [],
       })),
     }
   } catch (err) {

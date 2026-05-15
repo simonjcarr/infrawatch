@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.2...bundle/v0.20.3) (2026-05-15)
+
+
+### Bug Fixes
+
+* **password-manager:** align launch assertion tenant claims ([aebc947](https://github.com/carrtech-dev/ct-ops/commit/aebc947c069cb739bfc4ccd2173bef0ee391caa0))
+
 ## [0.20.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.1...bundle/v0.20.2) (2026-05-15)
 
 

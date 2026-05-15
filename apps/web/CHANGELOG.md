@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.152.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.152.1...web/v0.152.2) (2026-05-15)
+
+
+### Bug Fixes
+
+* **password-manager:** align launch assertion tenant claims ([aebc947](https://github.com/carrtech-dev/ct-ops/commit/aebc947c069cb739bfc4ccd2173bef0ee391caa0))
+
 ## [0.152.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.152.0...web/v0.152.1) (2026-05-15)
 
 

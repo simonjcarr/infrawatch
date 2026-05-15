@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.153.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.152.2...web/v0.153.0) (2026-05-15)
+
+
+### Features
+
+* **hosts:** add activity dialog association tabs ([d8ed7dc](https://github.com/carrtech-dev/ct-ops/commit/d8ed7dc8d7c00007bbcabb09ae2f2f7c53c42fd3))
+
 ## [0.152.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.152.1...web/v0.152.2) (2026-05-15)
 
 

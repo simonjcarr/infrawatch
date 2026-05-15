@@ -30,10 +30,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { listCalendarEventsForHost, type HostCalendarEventView } from '@/lib/actions/calendar'
 import {
   CALENDAR_EVENT_CATEGORIES,
   CALENDAR_EVENT_STATUSES,
+  type CalendarParticipantRole,
   type CalendarEventCategory,
   type CalendarEventStatus,
 } from '@/lib/db/schema/calendar'
@@ -62,6 +64,16 @@ const STATUS_BADGE_CLASS: Record<CalendarEventStatus, string> = {
   completed: 'bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-100',
   cancelled: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100',
 }
+
+const PARTICIPANT_ROLE_LABELS: Record<CalendarParticipantRole, string> = {
+  owner: 'Owner',
+  requester: 'Requester',
+  implementer: 'Implementer',
+  approver: 'Approver',
+  reviewer: 'Reviewer',
+  observer: 'Observer',
+}
+
 const HOST_CALENDAR_REFETCH_INTERVAL_MS = 5_000
 const EMPTY_HOST_CALENDAR_EVENTS: HostCalendarEventView[] = []
 type CategoryFilter = CalendarEventCategory | 'all'
@@ -169,9 +181,11 @@ function EventDetail({ label, children }: { label: string; children: ReactNode }
 
 function HostCalendarEventDetailsDialog({
   event,
+  hostId,
   onOpenChange,
 }: {
   event: HostCalendarEventView | null
+  hostId: string
   onOpenChange: (open: boolean) => void
 }) {
   const formattedDateRange = event ? formatEventDateRange(event) : null
@@ -179,7 +193,7 @@ function HostCalendarEventDetailsDialog({
   return (
     <Dialog open={event != null} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[calc(100vh-2rem)] max-w-2xl grid-rows-none flex-col overflow-hidden"
+        className="flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-3xl lg:max-w-4xl"
         data-testid="host-calendar-event-dialog"
       >
         {event ? (
@@ -194,35 +208,107 @@ function HostCalendarEventDetailsDialog({
               <DialogDescription>{CATEGORY_LABELS[event.category]} event</DialogDescription>
             </DialogHeader>
 
-            <div className="min-h-0 flex-1 space-y-5 overflow-hidden">
-              <div
-                className="max-h-[min(22rem,45vh)] overflow-y-auto rounded-md border bg-background p-4"
-                data-testid="host-calendar-event-description"
+            <Tabs defaultValue="details" className="min-h-0 flex-1 overflow-hidden">
+              <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
+                <TabsTrigger value="details">Activity Detail</TabsTrigger>
+                <TabsTrigger value="hosts">Hosts</TabsTrigger>
+                <TabsTrigger value="participants">Participants</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="min-h-0 space-y-5 overflow-y-auto pt-2">
+                <div
+                  className="max-h-[min(22rem,45vh)] overflow-y-auto rounded-md border bg-background p-4"
+                  data-testid="host-calendar-event-description"
+                >
+                  {event.description ? (
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
+                      {event.description}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No description provided.</p>
+                  )}
+                </div>
+
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <EventDetail label="Date and time">
+                    {formattedDateRange ? (
+                      <EventDateText value={formattedDateRange} testId="host-calendar-event-detail-date" />
+                    ) : null}
+                  </EventDetail>
+                  <EventDetail label="Timezone">{event.timezone}</EventDetail>
+                  <EventDetail label="Status">{STATUS_LABELS[event.status]}</EventDetail>
+                  <EventDetail label="Category">{CATEGORY_LABELS[event.category]}</EventDetail>
+                  <EventDetail label="Schedule">
+                    {event.isRecurring ? 'Recurring' : 'One-off'}
+                  </EventDetail>
+                  <EventDetail label="All day">{event.allDay ? 'Yes' : 'No'}</EventDetail>
+                </dl>
+              </TabsContent>
+
+              <TabsContent
+                value="hosts"
+                className="min-h-0 overflow-y-auto pt-2"
+                data-testid="host-calendar-event-hosts-tab"
               >
-                {event.description ? (
-                  <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
-                    {event.description}
+                {event.hosts.length === 0 ? (
+                  <p className="rounded-md border bg-background p-4 text-sm text-muted-foreground">
+                    No hosts are linked to this activity.
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No description provided.</p>
+                  <div className="divide-y overflow-hidden rounded-md border bg-background">
+                    {event.hosts.map((host) => {
+                      const isCurrentHost = host.id === hostId
+                      return (
+                        <div key={host.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">
+                                {host.displayName || host.hostname}
+                              </span>
+                              {isCurrentHost ? (
+                                <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/10">
+                                  Current host
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 break-all text-sm text-muted-foreground">{host.hostname}</p>
+                          </div>
+                          {host.os ? (
+                            <Badge variant="secondary" className="w-fit">{host.os}</Badge>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
-              </div>
+              </TabsContent>
 
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <EventDetail label="Date and time">
-                  {formattedDateRange ? (
-                    <EventDateText value={formattedDateRange} testId="host-calendar-event-detail-date" />
-                  ) : null}
-                </EventDetail>
-                <EventDetail label="Timezone">{event.timezone}</EventDetail>
-                <EventDetail label="Status">{STATUS_LABELS[event.status]}</EventDetail>
-                <EventDetail label="Category">{CATEGORY_LABELS[event.category]}</EventDetail>
-                <EventDetail label="Schedule">
-                  {event.isRecurring ? 'Recurring' : 'One-off'}
-                </EventDetail>
-                <EventDetail label="All day">{event.allDay ? 'Yes' : 'No'}</EventDetail>
-              </dl>
-            </div>
+              <TabsContent
+                value="participants"
+                className="min-h-0 overflow-y-auto pt-2"
+                data-testid="host-calendar-event-participants-tab"
+              >
+                {event.participants.length === 0 ? (
+                  <p className="rounded-md border bg-background p-4 text-sm text-muted-foreground">
+                    No participants are linked to this activity.
+                  </p>
+                ) : (
+                  <div className="divide-y overflow-hidden rounded-md border bg-background">
+                    {event.participants.map((participant) => (
+                      <div key={participant.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground">{participant.name || participant.email}</p>
+                          <p className="mt-1 break-all text-sm text-muted-foreground">{participant.email}</p>
+                        </div>
+                        <Badge variant="outline" className="w-fit">
+                          {PARTICIPANT_ROLE_LABELS[participant.participantRole]}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </>
         ) : null}
       </DialogContent>
@@ -388,6 +474,7 @@ export function HostCalendarTab({ scopeId, hostId }: { scopeId: string; hostId: 
       </CardContent>
       <HostCalendarEventDetailsDialog
         event={selectedEvent}
+        hostId={hostId}
         onOpenChange={(open) => {
           if (!open) setSelectedEvent(null)
         }}

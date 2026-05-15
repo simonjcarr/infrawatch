@@ -30,6 +30,11 @@ test('host admin calendar shows only events linked to the current host', async (
   `
 
   await sql`
+    INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at, instance_id, role, roles, is_active)
+    VALUES ('host-calendar-observer-1', 'Host Calendar Observer', 'host-calendar-observer@example.com', true, NOW(), NOW(), ${instanceId}, 'viewer', '["viewer"]'::jsonb, true)
+  `
+
+  await sql`
     INSERT INTO calendar_events (
       id,
       instance_id,
@@ -54,6 +59,7 @@ test('host admin calendar shows only events linked to the current host', async (
     INSERT INTO calendar_event_hosts (instance_id, event_id, host_id)
     VALUES
       (${instanceId}, 'host-calendar-event-1', 'host-calendar-1'),
+      (${instanceId}, 'host-calendar-event-1', 'host-calendar-2'),
       (${instanceId}, 'host-calendar-event-2', 'host-calendar-1'),
       (${instanceId}, 'host-calendar-event-past', 'host-calendar-1'),
       (${instanceId}, 'host-calendar-event-other', 'host-calendar-2')
@@ -61,7 +67,9 @@ test('host admin calendar shows only events linked to the current host', async (
 
   await sql`
     INSERT INTO calendar_event_participants (instance_id, event_id, user_id, role)
-    VALUES (${instanceId}, 'host-calendar-event-1', ${userId}, 'implementer')
+    VALUES
+      (${instanceId}, 'host-calendar-event-1', ${userId}, 'implementer'),
+      (${instanceId}, 'host-calendar-event-1', 'host-calendar-observer-1', 'observer')
   `
 
   await page.goto('/hosts/host-calendar-1')
@@ -122,6 +130,22 @@ test('host admin calendar shows only events linked to the current host', async (
   )
   await expect(detailsDialog).toContainText('UTC')
   await expect(detailsDialog).toContainText('One-off')
+
+  await detailsDialog.getByRole('tab', { name: 'Hosts' }).click()
+  await expect(detailsDialog.getByTestId('host-calendar-event-hosts-tab')).toContainText('Host Calendar One')
+  await expect(detailsDialog.getByTestId('host-calendar-event-hosts-tab')).toContainText('host-calendar-1')
+  await expect(detailsDialog.getByTestId('host-calendar-event-hosts-tab')).toContainText('Current host')
+  await expect(detailsDialog.getByTestId('host-calendar-event-hosts-tab')).toContainText('Host Calendar Two')
+  await expect(detailsDialog.getByTestId('host-calendar-event-hosts-tab')).toContainText('host-calendar-2')
+
+  await detailsDialog.getByRole('tab', { name: 'Participants' }).click()
+  await expect(detailsDialog.getByTestId('host-calendar-event-participants-tab')).toContainText(TEST_USER.email)
+  await expect(detailsDialog.getByTestId('host-calendar-event-participants-tab')).toContainText('Implementer')
+  await expect(detailsDialog.getByTestId('host-calendar-event-participants-tab')).toContainText('host-calendar-observer@example.com')
+  await expect(detailsDialog.getByTestId('host-calendar-event-participants-tab')).toContainText('Observer')
+
+  await detailsDialog.getByRole('tab', { name: 'Activity Detail' }).click()
+  await expect(detailsDialog.getByTestId('host-calendar-event-description')).toContainText('Patch the current host.')
 })
 
 test('host calendar event dialog keeps long descriptions scrollable', async ({ authenticatedPage: page }) => {

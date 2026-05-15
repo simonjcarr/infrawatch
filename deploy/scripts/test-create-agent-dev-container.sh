@@ -49,23 +49,28 @@ EOF
 }
 
 main() {
-  local tmpdir mockbin log output
+  local tmpdir mockbin log output dev_env
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "'"$tmpdir"'"' EXIT
 
   mockbin="${tmpdir}/mockbin"
   log="${tmpdir}/docker.log"
+  dev_env="${tmpdir}/dev.env"
   mkdir -p "$mockbin"
   make_mock_docker "$mockbin"
 
+  cat > "$dev_env" <<'EOF'
+AGENT_DOWNLOAD_BASE_URL=http://dev-env-host:3000
+CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=dev-env-host:9443
+CT_OPS_ENROLMENT_TOKEN=dev_env_token
+EOF
+
   output="$(
     DOCKER_MOCK_LOG="$log" \
+    CT_OPS_DEV_ENV_FILE="$dev_env" \
     PATH="${mockbin}:/usr/bin:/bin:/usr/sbin:/sbin" \
     "$SCRIPT" \
-      --token tok_test \
-      --name ctops-agent-test \
-      --app-url http://host.docker.internal:3000 \
-      --ingest host.docker.internal:9443
+      --name ctops-agent-test
   )"
 
   if ! grep -q -- "build -t ct-ops-agent-dev:ubuntu-24.04-systemd" "$log"; then
@@ -88,7 +93,12 @@ main() {
     cat "$log" >&2
     exit 1
   fi
-  if ! grep -Fq -- "CT_OPS_AGENT_INSTALL_URL=http://host.docker.internal:3000/api/agent/install\\?ingest=host.docker.internal%3A9443\\&skip_verify=true" "$log"; then
+  if ! grep -Fq -- "CT_OPS_ENROLMENT_TOKEN=dev_env_token" "$log"; then
+    echo "expected enrolment token from dev env" >&2
+    cat "$log" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "CT_OPS_AGENT_INSTALL_URL=http://dev-env-host:3000/api/agent/install\\?ingest=dev-env-host%3A9443\\&skip_verify=true" "$log"; then
     echo "expected install URL with encoded ingest address and skip_verify" >&2
     cat "$log" >&2
     exit 1

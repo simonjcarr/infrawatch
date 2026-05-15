@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.3...bundle/v0.21.0) (2026-05-15)
+
+
+### Features
+
+* **hosts:** add activity dialog association tabs ([d8ed7dc](https://github.com/carrtech-dev/ct-ops/commit/d8ed7dc8d7c00007bbcabb09ae2f2f7c53c42fd3))
+
 ## [0.20.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.2...bundle/v0.20.3) (2026-05-15)
 
 

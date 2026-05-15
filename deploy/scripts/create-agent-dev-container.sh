@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DOCKERFILE="${REPO_ROOT}/deploy/docker/agent-dev-container/Dockerfile"
+DEV_ENV="${CT_OPS_DEV_ENV_FILE:-${REPO_ROOT}/.dev/dev.env}"
 
 IMAGE_TAG="${CT_OPS_AGENT_DEV_IMAGE:-ct-ops-agent-dev:ubuntu-24.04-systemd}"
 APP_URL="${CT_OPS_AGENT_APP_URL:-http://host.docker.internal:3000}"
@@ -49,6 +50,38 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || die "$1 is required"
 }
 
+read_env_var() {
+  local file="$1"
+  local key="$2"
+  [ -f "$file" ] || return 0
+  sed -n "s/^${key}=//p" "$file" | tail -n1
+}
+
+load_dev_env_defaults() {
+  local value
+
+  if [ -z "${CT_OPS_AGENT_APP_URL:-}" ]; then
+    value="$(read_env_var "$DEV_ENV" AGENT_DOWNLOAD_BASE_URL)"
+    if [ -n "$value" ]; then
+      APP_URL="${value%/}"
+    fi
+  fi
+
+  if [ -z "${CT_OPS_AGENT_INGEST_ADDRESS:-}" ]; then
+    value="$(read_env_var "$DEV_ENV" CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS)"
+    if [ -n "$value" ]; then
+      INGEST_ADDRESS="$value"
+    fi
+  fi
+
+  if [ -z "${CT_OPS_ENROLMENT_TOKEN:-}" ]; then
+    value="$(read_env_var "$DEV_ENV" CT_OPS_ENROLMENT_TOKEN)"
+    if [ -n "$value" ]; then
+      ENROLMENT_TOKEN="$value"
+    fi
+  fi
+}
+
 urlencode() {
   local value="$1"
   local i char out=""
@@ -81,6 +114,8 @@ wait_for_systemd() {
   docker logs "$name" >&2 || true
   die "systemd did not become ready in container ${name}"
 }
+
+load_dev_env_defaults
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -130,7 +165,7 @@ done
 require_command docker
 
 if [ "$INSTALL_AGENT" = "true" ] && [ -z "$ENROLMENT_TOKEN" ]; then
-  die "provide an enrolment token with --token or CT_OPS_ENROLMENT_TOKEN"
+  die "provide an enrolment token with --token, CT_OPS_ENROLMENT_TOKEN, or ${DEV_ENV}"
 fi
 
 if docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then

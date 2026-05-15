@@ -28,9 +28,12 @@ secrets and URLs. The root `.env` used by the release/test-server path is not
 modified.
 
 For local Docker agent containers, the generated config sets
-`AGENT_DOWNLOAD_BASE_URL=http://host.docker.internal:3000` and adds an empty
+`AGENT_DOWNLOAD_BASE_URL=http://dev-proxy`,
+`CT_OPS_AGENT_CONTAINER_INGEST_ADDRESS=ingest-dev:9443`, and an empty
 `CT_OPS_ENROLMENT_TOKEN=` placeholder. Paste a valid token into that placeholder
-before running `deploy/scripts/create-agent-dev-container.sh`.
+before running `deploy/scripts/create-agent-dev-container.sh`. The helper joins
+the dev stack Docker network so these service names resolve inside the test
+container without exposing the dev stack on your LAN.
 
 The `web-migrate` and `web-dev` containers run `pnpm install --frozen-lockfile`
 inside Docker using named volumes for `node_modules`, so Linux container

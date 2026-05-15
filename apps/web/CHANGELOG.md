@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.152.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.152.0...web/v0.152.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **agent:** include token in enrollment view command ([370aa08](https://github.com/carrtech-dev/ct-ops/commit/370aa08aadc861636d578de433e36e0f433b024b)), closes [#1426](https://github.com/carrtech-dev/ct-ops/issues/1426)
+
 ## [0.152.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.151.4...web/v0.152.0) (2026-05-14)
 
 

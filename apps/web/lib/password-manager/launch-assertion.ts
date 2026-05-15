@@ -112,7 +112,7 @@ export async function signPasswordManagerLaunchAssertion(
   const payload: Record<string, string> = {
     product: config.product,
     ct_ops_instance_id: config.ctOpsInstanceId,
-    ct_ops_instance_settings_id: assertNonEmptyPrincipalField(principal.instanceId, 'instanceId'),
+    ct_ops_organization_id: assertNonEmptyPrincipalField(principal.instanceId, 'instanceId'),
     ct_ops_user_id: assertNonEmptyPrincipalField(principal.userId, 'userId'),
     email: assertNonEmptyPrincipalField(principal.email, 'email'),
     name: assertNonEmptyPrincipalField(principal.name, 'name'),
@@ -120,7 +120,7 @@ export async function signPasswordManagerLaunchAssertion(
 
   const instanceName = principal.instanceName?.trim()
   if (instanceName) {
-    payload.ct_ops_instance_name = instanceName
+    payload.ct_ops_organization_name = instanceName
   }
 
   return new SignJWT(payload)

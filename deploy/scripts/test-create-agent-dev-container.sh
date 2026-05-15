@@ -89,6 +89,11 @@ EOF
     cat "$log" >&2
     exit 1
   fi
+  if ! grep -q -- "--user root" "$log"; then
+    echo "expected explicit root runtime user for systemd installer test" >&2
+    cat "$log" >&2
+    exit 1
+  fi
   if ! grep -q -- "--add-host host.docker.internal:host-gateway" "$log"; then
     echo "expected host gateway mapping" >&2
     cat "$log" >&2

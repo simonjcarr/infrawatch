@@ -15,6 +15,20 @@
 
 ## What Has Been Built
 
+### Session 134 — Host calendar activity dialog tabs
+
+**Tabbed host activity detail dialog** (`apps/web/app/(dashboard)/hosts/[id]/host-calendar-tab.tsx`, `apps/web/lib/actions/calendar.ts`, `apps/web/tests/e2e/hosts/host-calendar.spec.ts`)
+- Made the Hosts -> Activity -> Calendar event dialog wider with viewport
+  bounds for mobile screens.
+- Split the dialog into Activity Detail, Hosts, and Participants tabs while
+  preserving the existing detail content and long-description scroll behavior.
+- Hydrated host calendar events with linked hosts and participants, including
+  participant role labels and a clear Current host marker in the Hosts tab.
+
+**Validation**
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web test:e2e tests/e2e/hosts/host-calendar.spec.ts`
+
 ### Session 133 — GitHub issue developer-experience fixes
 
 **Focused validation and dev-origin cleanup** (`apps/web/lib/password-manager/api-contract/openapi.json`, `apps/web/lib/password-manager/client.test.mjs`, `apps/web/lib/e2e/route-warmup.mjs`, `apps/web/lib/e2e/route-warmup.test.mjs`, `apps/web/tests/e2e/runner.mjs`, `apps/web/tests/e2e/auth.setup.ts`, `apps/web/lib/security/trusted-origins.ts`, `apps/web/lib/security/trusted-origins.test.mjs`, `apps/web/next.config.ts`)

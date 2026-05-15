@@ -316,8 +316,8 @@ ensure_dev_env() {
     bind_addr="127.0.0.1"
     public_host=""
     app_url="http://localhost:${proxy_port}"
-    agent_download_base_url="http://host.docker.internal:${proxy_port}"
-    agent_container_ingest_address="host.docker.internal:${ingest_grpc_port}"
+    agent_download_base_url="http://dev-proxy"
+    agent_container_ingest_address="ingest-dev:9443"
     trusted_origins="$app_url"
   fi
 

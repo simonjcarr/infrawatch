@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.1...bundle/v0.20.2) (2026-05-15)
+
+
+### Bug Fixes
+
+* **dev:** connect agent containers to dev network ([29807ef](https://github.com/carrtech-dev/ct-ops/commit/29807ef25eb78a601247b8f8ad3baaa5dcf408b2))
+
 ## [0.20.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.0...bundle/v0.20.1) (2026-05-15)
 
 

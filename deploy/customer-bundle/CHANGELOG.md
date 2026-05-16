@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.25.1...bundle/v0.26.0) (2026-05-16)
+
+
+### Features
+
+* **deploy:** add SSH access to agent dev containers ([8bea994](https://github.com/carrtech-dev/ct-ops/commit/8bea994ef8f7b33e7bf5e0ac629ef6766ce15266))
+
 ## [0.25.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.25.0...bundle/v0.25.1) (2026-05-16)
 
 

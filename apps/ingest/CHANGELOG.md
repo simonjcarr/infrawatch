@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.17.0...ingest/v0.17.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **hosts:** clean docker rows on delete ([306848b](https://github.com/carrtech-dev/ct-ops/commit/306848b9ababe0eb1cc4476304255c5446d371c9))
+
 ## [0.17.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.16.0...ingest/v0.17.0) (2026-05-16)
 
 

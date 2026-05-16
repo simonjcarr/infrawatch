@@ -31,6 +31,10 @@ case "${1:-}" in
   run)
     exit 0
     ;;
+  port)
+    echo "127.0.0.1:32768"
+    exit 0
+    ;;
   exec)
     if printf '%s\n' "$*" | grep -q 'test -d /run/systemd/system'; then
       exit 0
@@ -109,8 +113,28 @@ EOF
     cat "$log" >&2
     exit 1
   fi
+  if ! grep -q -- "--publish 127.0.0.1::22" "$log"; then
+    echo "expected sshd port publish on a random loopback host port" >&2
+    cat "$log" >&2
+    exit 1
+  fi
   if ! grep -Fq -- "CT_OPS_ENROLMENT_TOKEN=dev_env_token" "$log"; then
     echo "expected enrolment token from dev env" >&2
+    cat "$log" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "CT_OPS_AGENT_SSH_USERNAME=ssh-user" "$log"; then
+    echo "expected default ssh username" >&2
+    cat "$log" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "CT_OPS_AGENT_SSH_PASSWORD=password" "$log"; then
+    echo "expected default ssh password" >&2
+    cat "$log" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "useradd --create-home --shell /bin/bash" "$log"; then
+    echo "expected ssh user creation" >&2
     cat "$log" >&2
     exit 1
   fi
@@ -126,6 +150,16 @@ EOF
   fi
   if [[ "$output" != *"docker exec -it ctops-agent-test journalctl -u ct-ops-agent -f"* ]]; then
     echo "expected log follow hint" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+  if [[ "$output" != *"SSHD:      127.0.0.1:32768 -> 22/tcp"* ]]; then
+    echo "expected sshd port mapping hint" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+  if [[ "$output" != *"SSH Login: ssh -p 32768 ssh-user@127.0.0.1"* ]]; then
+    echo "expected ssh login hint" >&2
     echo "$output" >&2
     exit 1
   fi

@@ -6,12 +6,14 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    openssh-server \
     sudo \
     systemd \
     systemd-sysv \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
-  && useradd --system --create-home --shell /usr/sbin/nologin ctops-agent
+  && useradd --system --create-home --shell /usr/sbin/nologin ctops-agent \
+  && systemctl enable ssh.service
 
 STOPSIGNAL SIGRTMIN+3
 

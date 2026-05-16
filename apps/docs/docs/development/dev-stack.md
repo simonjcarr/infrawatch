@@ -99,7 +99,11 @@ deploy/scripts/create-agent-dev-container.sh
 ```
 
 The helper reads `.dev/dev.env`, creates one long-lived systemd Ubuntu
-container, and runs the normal CT-Ops agent install script inside it.
+container, publishes the container SSH service on a random loopback host port,
+and runs the normal CT-Ops agent install script inside it. The selected SSH port
+is printed after creation and can also be checked with
+`docker port <container> 22/tcp`. The helper creates an SSH login user named
+`ssh-user` with password `password` by default.
 
 Switch back to loopback-only mode with:
 

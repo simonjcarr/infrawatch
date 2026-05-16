@@ -33,12 +33,9 @@ Administrators enable it from **Settings → Integrations → Automation**. CT-O
 }
 ```
 
-CT-Ops does not start Docker containers from the web app. After enabling or disabling Ansible, an operator must run:
-
-```bash
-./start.sh
-```
-
-The start script reads the database after migrations and starts the optional `ansible-api` Compose profile only when both the flag and provider are enabled.
+CT-Ops does not start Docker containers from the web app or from `./start.sh`.
+Administrators configure the Ansible API URL and optional service-token HMAC
+settings on the same Automation page. The `ansible-api` container can run on
+the CT-Ops host, on a different host, or behind a reverse proxy.
 
 When the API is healthy, administrators can save encrypted SSH private-key credential profiles and run an Ansible ping task from host or host-group task views. CT-Ops stores task state and redacted output in its task history; the Ansible container only executes the requested ping operation.

@@ -57,6 +57,13 @@
       "when": 1778663200000,
       "tag": "0007_instance_role_residue",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778666800000,
+      "tag": "0008_module_connections",
+      "breakpoints": true
     }
   ]
 }

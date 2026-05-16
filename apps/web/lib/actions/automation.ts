@@ -7,7 +7,12 @@ import { requireInstanceAdminAccess } from '@/lib/actions/action-auth'
 import { resolveCurrentActionScope } from '@/lib/actions/action-scope'
 import { getRequiredSession } from '@/lib/auth/session'
 import { writeAuditEvent } from '@/lib/audit/events'
-import { checkAnsibleApiHealth } from '@/lib/automation/ansible-api'
+import {
+  checkAnsibleApiHealth,
+  getAnsibleApiBaseUrl,
+  getAnsibleModuleConnectionSummary,
+  saveAnsibleModuleConnection,
+} from '@/lib/automation/ansible-api'
 import { validateSshPrivateKey } from '@/lib/automation/ansible-runner'
 import {
   buildAutomationSettingsSnapshot,
@@ -20,6 +25,8 @@ import { db } from '@/lib/db'
 import { ansibleCredentialProfiles, instanceSettings, parseInstanceMetadata } from '@/lib/db/schema'
 import { FEATURE_FLAG_REGISTRY } from '@/lib/feature-flags'
 import { logError } from '@/lib/logging'
+import type { ModuleAuthMode, ModuleTlsMode } from '@/lib/db/schema'
+import type { ModuleConnectionSummary } from '@/lib/modules/module-connections'
 
 export interface AutomationSettingsResult {
   provider: 'none' | 'ansible'
@@ -29,6 +36,7 @@ export interface AutomationSettingsResult {
   status: AutomationStatus
   statusMessage: string
   ansibleVersion?: string
+  ansibleConnection: ModuleConnectionSummary
 }
 
 export interface AnsibleCredentialProfileSummary {
@@ -47,6 +55,17 @@ const credentialInputSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120),
   username: z.string().trim().min(1, 'SSH username is required').max(120),
   privateKey: z.string().min(1, 'Private key is required').max(100_000),
+})
+
+const ansibleConnectionInputSchema = z.object({
+  enabled: z.boolean(),
+  name: z.string().trim().min(1, 'Connection name is required').max(120),
+  baseUrl: z.string().trim().min(1, 'Ansible API URL is required').max(2048),
+  authMode: z.enum(['none', 'service-token-hmac']),
+  tokenId: z.string().trim().optional().nullable(),
+  tokenSecret: z.string().optional().nullable(),
+  tlsMode: z.enum(['public-ca', 'private-ca', 'pinned-certificate', 'insecure']),
+  timeoutMs: z.number().int().min(1000).max(120_000).optional().nullable(),
 })
 
 function toCredentialSummary(row: typeof ansibleCredentialProfiles.$inferSelect): AnsibleCredentialProfileSummary {
@@ -69,20 +88,23 @@ export async function getAutomationSettings(): Promise<AutomationSettingsResult>
   })
   const metadata = parseInstanceMetadata(row?.metadata)
   const snapshot = buildAutomationSettingsSnapshot(metadata)
+  const ansibleConnection = await getAnsibleModuleConnectionSummary(instanceId)
 
   if (!isAnsibleAutomationEnabled(snapshot)) {
     return {
       ...snapshot,
+      ansibleConnection,
       ansibleDescription: FEATURE_FLAG_REGISTRY['automation.ansible'].description,
       status: 'disabled',
       statusMessage: 'Ansible automation is disabled for this instance.',
     }
   }
 
-  const health = await checkAnsibleApiHealth()
+  const health = await checkAnsibleApiHealth(instanceId)
   if (health) {
     return {
       ...snapshot,
+      ansibleConnection,
       ansibleDescription: FEATURE_FLAG_REGISTRY['automation.ansible'].description,
       status: 'healthy',
       statusMessage: 'Ansible automation API is healthy.',
@@ -92,9 +114,10 @@ export async function getAutomationSettings(): Promise<AutomationSettingsResult>
 
   return {
     ...snapshot,
+    ansibleConnection,
     ansibleDescription: FEATURE_FLAG_REGISTRY['automation.ansible'].description,
     status: 'unavailable',
-    statusMessage: 'Ansible automation is enabled. Run ./start.sh on the host to start the optional Ansible service.',
+    statusMessage: 'Ansible automation is enabled. Check the configured Ansible API URL, service-token settings, and service health.',
   }
 }
 
@@ -144,11 +167,22 @@ export async function updateAnsibleAutomationSettings(
       ...currentMetadata,
       ...next,
     }
+    const currentConnection = await getAnsibleModuleConnectionSummary(instanceId)
 
     await db
       .update(instanceSettings)
       .set({ metadata, updatedAt: new Date() })
       .where(eq(instanceSettings.id, instanceId))
+
+    await saveAnsibleModuleConnection(instanceId, {
+      enabled: parsedEnabled,
+      name: currentConnection.name,
+      baseUrl: currentConnection.baseUrl || getAnsibleApiBaseUrl(),
+      authMode: currentConnection.authMode,
+      tokenId: currentConnection.tokenId,
+      tlsMode: currentConnection.tlsMode,
+      timeoutMs: currentConnection.timeoutMs,
+    })
 
     await writeAuditEvent(db, {
       instanceId,
@@ -167,6 +201,57 @@ export async function updateAnsibleAutomationSettings(
   } catch (err) {
     logError('Failed to update Ansible automation settings:', err)
     return { error: 'An unexpected error occurred' }
+  }
+}
+
+export async function updateAnsibleModuleConnectionSettings(
+  input: unknown,
+): Promise<{ success: true; connection: ModuleConnectionSummary } | { error: string }> {
+  const parsed = ansibleConnectionInputSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join('; ') }
+
+  let session
+  let instanceId
+  try {
+    session = await getRequiredSession()
+    instanceId = resolveCurrentActionScope(session)
+    await requireInstanceAdminAccess(instanceId)
+  } catch {
+    return { error: 'You do not have permission to update automation settings' }
+  }
+
+  try {
+    const connection = await saveAnsibleModuleConnection(instanceId, {
+      enabled: parsed.data.enabled,
+      name: parsed.data.name,
+      baseUrl: parsed.data.baseUrl,
+      authMode: parsed.data.authMode as ModuleAuthMode,
+      tokenId: parsed.data.tokenId,
+      tokenSecret: parsed.data.tokenSecret,
+      tlsMode: parsed.data.tlsMode as ModuleTlsMode,
+      timeoutMs: parsed.data.timeoutMs,
+    })
+
+    await writeAuditEvent(db, {
+      instanceId,
+      actorUserId: session.user.id,
+      action: 'automation.ansible.connection.updated',
+      targetType: 'module_connection',
+      targetId: connection.id,
+      summary: `Updated Ansible module connection ${connection.name}`,
+      metadata: {
+        moduleType: 'ansible',
+        baseUrl: connection.baseUrl,
+        authMode: connection.authMode,
+        tlsMode: connection.tlsMode,
+        enabled: connection.enabled,
+      },
+    })
+
+    return { success: true, connection }
+  } catch (err) {
+    logError('Failed to update Ansible module connection:', err)
+    return { error: err instanceof Error ? err.message : 'Failed to update Ansible module connection' }
   }
 }
 

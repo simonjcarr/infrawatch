@@ -7,6 +7,7 @@ import { Bot, CheckCircle2, CircleOff, KeyRound, RotateCw, ServerCog, Trash2, XC
 import {
   createAnsibleCredentialProfile,
   deleteAnsibleCredentialProfile,
+  updateAnsibleModuleConnectionSettings,
   updateAnsibleAutomationSettings,
   type AnsibleCredentialProfileSummary,
   type AutomationSettingsResult,
@@ -41,9 +42,18 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
   const [credentialName, setCredentialName] = useState('')
   const [credentialUsername, setCredentialUsername] = useState('')
   const [credentialPrivateKey, setCredentialPrivateKey] = useState('')
+  const [connectionName, setConnectionName] = useState(settings.ansibleConnection.name)
+  const [connectionBaseUrl, setConnectionBaseUrl] = useState(settings.ansibleConnection.baseUrl)
+  const [connectionAuthMode, setConnectionAuthMode] = useState(settings.ansibleConnection.authMode)
+  const [connectionTokenId, setConnectionTokenId] = useState(settings.ansibleConnection.tokenId ?? 'ansible-api')
+  const [connectionTokenSecret, setConnectionTokenSecret] = useState('')
+  const [connectionTlsMode, setConnectionTlsMode] = useState(settings.ansibleConnection.tlsMode)
+  const [connectionTimeoutMs, setConnectionTimeoutMs] = useState(String(settings.ansibleConnection.timeoutMs))
   const [error, setError] = useState<string | null>(null)
   const [credentialError, setCredentialError] = useState<string | null>(null)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [connectionSaved, setConnectionSaved] = useState(false)
   const enabled = settings.ansibleFeatureEnabled && settings.provider === 'ansible'
 
   const mutation = useMutation({
@@ -59,15 +69,52 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
         ...settings,
         ansibleFeatureEnabled: nextEnabled,
         provider: nextEnabled ? 'ansible' : 'none',
+        ansibleConnection: {
+          ...settings.ansibleConnection,
+          enabled: nextEnabled,
+        },
         status: nextEnabled ? 'unavailable' : 'disabled',
         statusMessage: nextEnabled
-          ? 'Ansible automation is enabled. Run ./start.sh on the host to start the optional Ansible service.'
+          ? 'Ansible automation is enabled. Check the configured Ansible API URL, service-token settings, and service health.'
           : 'Ansible automation is disabled for this instance.',
         ansibleVersion: undefined,
       })
       setTimeout(() => setSaved(false), 3000)
     },
     onError: () => setError('An unexpected error occurred'),
+  })
+
+  const saveConnection = useMutation({
+    mutationFn: () => updateAnsibleModuleConnectionSettings({
+      enabled,
+      name: connectionName,
+      baseUrl: connectionBaseUrl,
+      authMode: connectionAuthMode,
+      tokenId: connectionTokenId,
+      tokenSecret: connectionTokenSecret,
+      tlsMode: connectionTlsMode,
+      timeoutMs: Number(connectionTimeoutMs),
+    }),
+    onSuccess: (result) => {
+      if ('error' in result) {
+        setConnectionError(result.error)
+        return
+      }
+      setConnectionError(null)
+      setConnectionTokenSecret('')
+      setConnectionSaved(true)
+      setSettings({
+        ...settings,
+        ansibleConnection: result.connection,
+        status: enabled ? 'unavailable' : settings.status,
+        statusMessage: enabled
+          ? 'Ansible automation is enabled. Check the configured Ansible API URL, service-token settings, and service health.'
+          : settings.statusMessage,
+        ansibleVersion: undefined,
+      })
+      setTimeout(() => setConnectionSaved(false), 3000)
+    },
+    onError: () => setConnectionError('Failed to save Ansible connection'),
   })
 
   const createCredential = useMutation({
@@ -129,7 +176,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
             <div className="space-y-1">
               <Label htmlFor="ansible-automation-enabled">Enable Ansible provider</Label>
               <p className="text-sm text-muted-foreground">
-                Stores the opt-in in the database. The container starts after an operator runs ./start.sh.
+                Stores the opt-in in the database. CT-Ops calls the configured Ansible API; it does not need to run the container itself.
               </p>
             </div>
             <Switch
@@ -150,13 +197,6 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
             </AlertDescription>
           </Alert>
 
-          {enabled && settings.status !== 'healthy' && (
-            <div className="rounded-md border bg-muted/40 p-4 font-mono text-sm">
-              cd /path/to/ct-ops<br />
-              ./start.sh
-            </div>
-          )}
-
           <div className="flex items-center gap-3">
             <Button
               type="button"
@@ -170,6 +210,105 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
             {mutation.isPending && <span className="text-sm text-muted-foreground">Saving...</span>}
             {saved && <span className="text-sm text-green-700">Saved</span>}
             {error && <span className="text-sm text-destructive">{error}</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ServerCog className="h-4 w-4" />
+            Ansible module connection
+          </CardTitle>
+          <CardDescription>
+            Point CT-Ops at a manually deployed Ansible API, on this server or behind a reverse proxy.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ansible-connection-name">Connection name</Label>
+              <Input
+                id="ansible-connection-name"
+                value={connectionName}
+                onChange={(event) => setConnectionName(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ansible-connection-url">Ansible API URL</Label>
+              <Input
+                id="ansible-connection-url"
+                type="url"
+                value={connectionBaseUrl}
+                onChange={(event) => setConnectionBaseUrl(event.target.value)}
+                placeholder="https://ansible-api.example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ansible-auth-mode">Authentication</Label>
+              <select
+                id="ansible-auth-mode"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={connectionAuthMode}
+                onChange={(event) => setConnectionAuthMode(event.target.value as typeof connectionAuthMode)}
+              >
+                <option value="service-token-hmac">Service token HMAC</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ansible-tls-mode">TLS mode</Label>
+              <select
+                id="ansible-tls-mode"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={connectionTlsMode}
+                onChange={(event) => setConnectionTlsMode(event.target.value as typeof connectionTlsMode)}
+              >
+                <option value="public-ca">Public CA</option>
+                <option value="insecure">Insecure HTTP/private network</option>
+              </select>
+            </div>
+            {connectionAuthMode === 'service-token-hmac' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="ansible-token-id">Token ID</Label>
+                  <Input
+                    id="ansible-token-id"
+                    value={connectionTokenId}
+                    onChange={(event) => setConnectionTokenId(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ansible-token-secret">Token secret</Label>
+                  <Input
+                    id="ansible-token-secret"
+                    type="password"
+                    value={connectionTokenSecret}
+                    onChange={(event) => setConnectionTokenSecret(event.target.value)}
+                    placeholder={settings.ansibleConnection.hasTokenSecret ? 'Leave blank to keep existing' : 'Required for HMAC'}
+                  />
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="ansible-timeout">Request timeout ms</Label>
+              <Input
+                id="ansible-timeout"
+                inputMode="numeric"
+                value={connectionTimeoutMs}
+                onChange={(event) => setConnectionTimeoutMs(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button type="button" onClick={() => saveConnection.mutate()} disabled={saveConnection.isPending}>
+              <ServerCog className="h-4 w-4" />
+              Save connection
+            </Button>
+            {saveConnection.isPending && <span className="text-sm text-muted-foreground">Saving...</span>}
+            {connectionSaved && <span className="text-sm text-green-700">Saved</span>}
+            {connectionError && <span className="text-sm text-destructive">{connectionError}</span>}
           </div>
         </CardContent>
       </Card>

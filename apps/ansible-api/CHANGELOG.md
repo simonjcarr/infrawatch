@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/carrtech-dev/ct-ops/compare/ansible-api/v0.3.3...ansible-api/v0.4.0) (2026-05-16)
+
+
+### Features
+
+* **modules:** add module connection contract ([#1439](https://github.com/carrtech-dev/ct-ops/issues/1439)) ([479548a](https://github.com/carrtech-dev/ct-ops/commit/479548a299ee119a3e442eeef677bc165c2c4bbd))
+
 ## [0.3.3](https://github.com/carrtech-dev/ct-ops/compare/ansible-api/v0.3.2...ansible-api/v0.3.3) (2026-05-12)
 
 

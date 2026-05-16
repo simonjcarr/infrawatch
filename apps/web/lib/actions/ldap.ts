@@ -22,6 +22,11 @@ import type { LdapUser, LdapUserDetail } from '@/lib/ldap/client'
 
 export type { LdapConfigurationSafe } from '@/lib/ldap/config-client'
 
+const AD_DEFAULT_USER_SEARCH_FILTER = '(sAMAccountName={{username}})'
+const AD_DEFAULT_USERNAME_ATTRIBUTE = 'sAMAccountName'
+const AD_DEFAULT_EMAIL_ATTRIBUTE = 'mail'
+const AD_DEFAULT_DISPLAY_NAME_ATTRIBUTE = 'displayName'
+
 async function getInstanceInstanceId(): Promise<string> {
   const instanceId = await getDefaultInstanceId()
   if (!instanceId) {
@@ -53,12 +58,12 @@ const createLdapConfigSchema = z.object({
   bindDn: z.string().min(1, 'Bind DN is required'),
   bindPassword: z.string().min(1, 'Bind password is required'),
   userSearchBase: z.string().optional(),
-  userSearchFilter: z.string().default('(uid={{username}})'),
+  userSearchFilter: z.string().default(AD_DEFAULT_USER_SEARCH_FILTER),
   groupSearchBase: z.string().optional(),
   groupSearchFilter: z.string().optional(),
-  usernameAttribute: z.string().default('uid'),
-  emailAttribute: z.string().default('mail'),
-  displayNameAttribute: z.string().default('cn'),
+  usernameAttribute: z.string().default(AD_DEFAULT_USERNAME_ATTRIBUTE),
+  emailAttribute: z.string().default(AD_DEFAULT_EMAIL_ATTRIBUTE),
+  displayNameAttribute: z.string().default(AD_DEFAULT_DISPLAY_NAME_ATTRIBUTE),
   allowLogin: z.boolean().default(false),
 })
 

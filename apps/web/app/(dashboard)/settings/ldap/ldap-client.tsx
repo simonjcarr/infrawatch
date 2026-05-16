@@ -35,6 +35,22 @@ import {
 } from '@/lib/actions/ldap'
 import type { LdapConfigurationSafe } from '@/lib/actions/ldap'
 
+const AD_DEFAULTS = {
+  userSearchFilter: '(sAMAccountName={{username}})',
+  usernameAttribute: 'sAMAccountName',
+  emailAttribute: 'mail',
+  displayNameAttribute: 'displayName',
+}
+
+const AD_PLACEHOLDERS = {
+  host: 'dc01.corp.example.com',
+  baseDn: 'DC=corp,DC=example,DC=com',
+  bindDn: 'CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com',
+  userSearchBase: 'OU=Users',
+  groupSearchBase: 'OU=Groups',
+  groupSearchFilter: '(objectClass=group)',
+}
+
 const EMPTY_FORM = {
   name: '',
   host: '',
@@ -46,12 +62,12 @@ const EMPTY_FORM = {
   bindDn: '',
   bindPassword: '',
   userSearchBase: '',
-  userSearchFilter: '(uid={{username}})',
+  userSearchFilter: AD_DEFAULTS.userSearchFilter,
   groupSearchBase: '',
   groupSearchFilter: '',
-  usernameAttribute: 'uid',
-  emailAttribute: 'mail',
-  displayNameAttribute: 'cn',
+  usernameAttribute: AD_DEFAULTS.usernameAttribute,
+  emailAttribute: AD_DEFAULTS.emailAttribute,
+  displayNameAttribute: AD_DEFAULTS.displayNameAttribute,
   allowLogin: false,
 }
 
@@ -275,7 +291,7 @@ export function LdapSettingsClient({
                   <Input
                     value={addForm.host}
                     onChange={(e) => setAddForm({ ...addForm, host: e.target.value })}
-                    placeholder="ldap.example.com"
+                    placeholder={AD_PLACEHOLDERS.host}
                     data-testid="ldap-settings-add-host"
                   />
                 </div>
@@ -315,7 +331,7 @@ export function LdapSettingsClient({
                 <Input
                   value={addForm.baseDn}
                   onChange={(e) => setAddForm({ ...addForm, baseDn: e.target.value })}
-                  placeholder="dc=example,dc=com"
+                  placeholder={AD_PLACEHOLDERS.baseDn}
                   data-testid="ldap-settings-add-base-dn"
                 />
               </div>
@@ -324,7 +340,7 @@ export function LdapSettingsClient({
                 <Input
                   value={addForm.bindDn}
                   onChange={(e) => setAddForm({ ...addForm, bindDn: e.target.value })}
-                  placeholder="cn=admin,dc=example,dc=com"
+                  placeholder={AD_PLACEHOLDERS.bindDn}
                   data-testid="ldap-settings-add-bind-dn"
                 />
               </div>
@@ -342,7 +358,8 @@ export function LdapSettingsClient({
                 <Input
                   value={addForm.userSearchBase}
                   onChange={(e) => setAddForm({ ...addForm, userSearchBase: e.target.value })}
-                  placeholder="ou=users"
+                  placeholder={AD_PLACEHOLDERS.userSearchBase}
+                  data-testid="ldap-settings-add-user-search-base"
                 />
               </div>
               <div className="space-y-1.5">
@@ -350,7 +367,55 @@ export function LdapSettingsClient({
                 <Input
                   value={addForm.userSearchFilter}
                   onChange={(e) => setAddForm({ ...addForm, userSearchFilter: e.target.value })}
-                  placeholder="(uid={{username}})"
+                  placeholder={AD_DEFAULTS.userSearchFilter}
+                  data-testid="ldap-settings-add-user-filter"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Username Attr</Label>
+                  <Input
+                    value={addForm.usernameAttribute}
+                    onChange={(e) => setAddForm({ ...addForm, usernameAttribute: e.target.value })}
+                    placeholder={AD_DEFAULTS.usernameAttribute}
+                    data-testid="ldap-settings-add-username-attribute"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email Attr</Label>
+                  <Input
+                    value={addForm.emailAttribute}
+                    onChange={(e) => setAddForm({ ...addForm, emailAttribute: e.target.value })}
+                    placeholder={AD_DEFAULTS.emailAttribute}
+                    data-testid="ldap-settings-add-email-attribute"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Display Name Attr</Label>
+                  <Input
+                    value={addForm.displayNameAttribute}
+                    onChange={(e) => setAddForm({ ...addForm, displayNameAttribute: e.target.value })}
+                    placeholder={AD_DEFAULTS.displayNameAttribute}
+                    data-testid="ldap-settings-add-display-name-attribute"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Group Search Base (optional)</Label>
+                <Input
+                  value={addForm.groupSearchBase}
+                  onChange={(e) => setAddForm({ ...addForm, groupSearchBase: e.target.value })}
+                  placeholder={AD_PLACEHOLDERS.groupSearchBase}
+                  data-testid="ldap-settings-add-group-search-base"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Group Search Filter (optional)</Label>
+                <Input
+                  value={addForm.groupSearchFilter}
+                  onChange={(e) => setAddForm({ ...addForm, groupSearchFilter: e.target.value })}
+                  placeholder={AD_PLACEHOLDERS.groupSearchFilter}
+                  data-testid="ldap-settings-add-group-filter"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -513,7 +578,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.host}
                 onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
-                placeholder="ldap.example.com"
+                placeholder={AD_PLACEHOLDERS.host}
                 data-testid="ldap-settings-edit-host"
               />
               </div>
@@ -554,7 +619,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.baseDn}
                 onChange={(e) => setEditForm({ ...editForm, baseDn: e.target.value })}
-                placeholder="dc=example,dc=com"
+                placeholder={AD_PLACEHOLDERS.baseDn}
               />
             </div>
             <div className="space-y-1.5">
@@ -562,7 +627,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.bindDn}
                 onChange={(e) => setEditForm({ ...editForm, bindDn: e.target.value })}
-                placeholder="cn=admin,dc=example,dc=com"
+                placeholder={AD_PLACEHOLDERS.bindDn}
               />
             </div>
             <div className="space-y-1.5">
@@ -579,7 +644,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.userSearchBase}
                 onChange={(e) => setEditForm({ ...editForm, userSearchBase: e.target.value })}
-                placeholder="ou=users"
+                placeholder={AD_PLACEHOLDERS.userSearchBase}
               />
             </div>
             <div className="space-y-1.5">
@@ -587,7 +652,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.userSearchFilter}
                 onChange={(e) => setEditForm({ ...editForm, userSearchFilter: e.target.value })}
-                placeholder="(uid={{username}})"
+                placeholder={AD_DEFAULTS.userSearchFilter}
                 data-testid="ldap-settings-edit-user-filter"
               />
             </div>
@@ -597,6 +662,7 @@ export function LdapSettingsClient({
                 <Input
                   value={editForm.usernameAttribute}
                   onChange={(e) => setEditForm({ ...editForm, usernameAttribute: e.target.value })}
+                  placeholder={AD_DEFAULTS.usernameAttribute}
                 />
               </div>
               <div className="space-y-1.5">
@@ -604,6 +670,7 @@ export function LdapSettingsClient({
                 <Input
                   value={editForm.emailAttribute}
                   onChange={(e) => setEditForm({ ...editForm, emailAttribute: e.target.value })}
+                  placeholder={AD_DEFAULTS.emailAttribute}
                 />
               </div>
               <div className="space-y-1.5">
@@ -611,6 +678,7 @@ export function LdapSettingsClient({
                 <Input
                   value={editForm.displayNameAttribute}
                   onChange={(e) => setEditForm({ ...editForm, displayNameAttribute: e.target.value })}
+                  placeholder={AD_DEFAULTS.displayNameAttribute}
                 />
               </div>
             </div>
@@ -619,7 +687,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.groupSearchBase}
                 onChange={(e) => setEditForm({ ...editForm, groupSearchBase: e.target.value })}
-                placeholder="ou=groups"
+                placeholder={AD_PLACEHOLDERS.groupSearchBase}
               />
             </div>
             <div className="space-y-1.5">
@@ -627,7 +695,7 @@ export function LdapSettingsClient({
               <Input
                 value={editForm.groupSearchFilter}
                 onChange={(e) => setEditForm({ ...editForm, groupSearchFilter: e.target.value })}
-                placeholder="(objectClass=groupOfNames)"
+                placeholder={AD_PLACEHOLDERS.groupSearchFilter}
               />
             </div>
             <div className="flex items-center justify-between">

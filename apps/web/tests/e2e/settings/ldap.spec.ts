@@ -20,11 +20,19 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
   await expect(page.getByTestId('ldap-settings-empty-state')).toBeVisible()
 
   await page.getByTestId('ldap-settings-add-open').click()
+  await expect(page.getByTestId('ldap-settings-add-host')).toHaveAttribute('placeholder', 'dc01.corp.example.com')
+  await expect(page.getByTestId('ldap-settings-add-base-dn')).toHaveAttribute('placeholder', 'DC=corp,DC=example,DC=com')
+  await expect(page.getByTestId('ldap-settings-add-bind-dn')).toHaveAttribute('placeholder', 'CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com')
   await page.getByTestId('ldap-settings-add-name').fill('Corporate AD')
   await page.getByTestId('ldap-settings-add-host').fill('ldap.internal.example')
-  await page.getByTestId('ldap-settings-add-base-dn').fill('dc=internal,dc=example')
-  await page.getByTestId('ldap-settings-add-bind-dn').fill('cn=svc-ldap,dc=internal,dc=example')
+  await page.getByTestId('ldap-settings-add-base-dn').fill('DC=internal,DC=example')
+  await page.getByTestId('ldap-settings-add-bind-dn').fill('CN=svc-ldap,DC=internal,DC=example')
   await page.getByTestId('ldap-settings-add-bind-password').fill('SuperSecret123!')
+  await expect(page.getByTestId('ldap-settings-add-user-filter')).toHaveValue('(sAMAccountName={{username}})')
+  await expect(page.getByTestId('ldap-settings-add-username-attribute')).toHaveValue('sAMAccountName')
+  await page.getByTestId('ldap-settings-add-user-search-base').fill('ou=Staff')
+  await page.getByTestId('ldap-settings-add-group-search-base').fill('ou=Security Groups')
+  await page.getByTestId('ldap-settings-add-group-filter').fill('(objectClass=group)')
   await page.getByTestId('ldap-settings-add-submit').click()
   await expect(page.getByText('Corporate AD')).toBeVisible()
 
@@ -32,11 +40,31 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
     id: string
     host: string
     port: number
+    user_search_base: string | null
+    user_search_filter: string
+    group_search_base: string | null
+    group_search_filter: string | null
+    username_attribute: string
+    email_attribute: string
+    display_name_attribute: string
     allow_login: boolean
     enabled: boolean
     deleted_at: string | null
   }>>`
-    SELECT id, host, port, allow_login, enabled, deleted_at
+    SELECT
+      id,
+      host,
+      port,
+      user_search_base,
+      user_search_filter,
+      group_search_base,
+      group_search_filter,
+      username_attribute,
+      email_attribute,
+      display_name_attribute,
+      allow_login,
+      enabled,
+      deleted_at
     FROM ldap_configurations
     WHERE instance_id = ${instanceId}
       AND name = 'Corporate AD'
@@ -46,6 +74,13 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
   expect(createdRows).toHaveLength(1)
   expect(createdRows[0]?.host).toBe('ldap.internal.example')
   expect(createdRows[0]?.port).toBe(389)
+  expect(createdRows[0]?.user_search_base).toBe('ou=Staff')
+  expect(createdRows[0]?.user_search_filter).toBe('(sAMAccountName={{username}})')
+  expect(createdRows[0]?.group_search_base).toBe('ou=Security Groups')
+  expect(createdRows[0]?.group_search_filter).toBe('(objectClass=group)')
+  expect(createdRows[0]?.username_attribute).toBe('sAMAccountName')
+  expect(createdRows[0]?.email_attribute).toBe('mail')
+  expect(createdRows[0]?.display_name_attribute).toBe('displayName')
   expect(createdRows[0]?.allow_login).toBe(false)
   expect(createdRows[0]?.enabled).toBe(true)
   expect(createdRows[0]?.deleted_at).toBeNull()

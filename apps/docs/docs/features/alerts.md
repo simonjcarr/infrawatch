@@ -46,10 +46,10 @@ When an alert instance is created or transitions state, a **notification** is ge
 
 ## Global Metric Defaults
 
-Global alert defaults are metric threshold rules that are cloned onto new hosts
-when an agent is approved.
+Global alert defaults are metric threshold templates. They are not evaluated for
+any host until an administrator applies them to that host.
 
-Administrators can also reapply those defaults later:
+Administrators can apply those defaults when needed:
 - On a host's **Alerts** tab, **Use Metric Defaults** replaces that host's
   host-level metric threshold rules with the current global defaults.
 - On **Administration → Monitoring**, **Apply to Hosts** replaces host-level

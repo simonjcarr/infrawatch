@@ -911,14 +911,14 @@ export function AlertsTab({ scopeId, hostId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Global default rules (read-only) — these also apply to this host */}
+      {/* Global default rules (read-only) — templates available for this host */}
       <Card>
         <CardHeader>
           <div>
-            <CardTitle className="text-base">Instance-wide Default Rules</CardTitle>
+            <CardTitle className="text-base">Global Metric Defaults</CardTitle>
             <CardDescription className="mt-1">
-              These rules apply to <strong>all hosts</strong> in your instance and are
-              evaluated in addition to the host-specific rules above.{' '}
+              These defaults are not evaluated for this host until you apply them with{' '}
+              <strong>Use Metric Defaults</strong>.{' '}
               <a href="/settings/monitoring" className="underline underline-offset-2">
                 Manage in Administration → Monitoring
               </a>
@@ -929,7 +929,7 @@ export function AlertsTab({ scopeId, hostId }: Props) {
         <CardContent>
           {globalDefaults.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No instance-wide default rules configured.
+              No global metric defaults configured.
             </p>
           ) : (
             <Table>

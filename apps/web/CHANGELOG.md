@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.158.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.157.1...web/v0.158.0) (2026-05-16)
+
+
+### Features
+
+* **terminal:** support custom SSH ports ([36872a6](https://github.com/carrtech-dev/ct-ops/commit/36872a6de32ace904af5ee3832767f6da6f9ada2))
+
 ## [0.157.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.157.0...web/v0.157.1) (2026-05-16)
 
 

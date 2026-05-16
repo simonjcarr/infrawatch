@@ -267,8 +267,8 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
       <div>
         <h1 className="text-2xl font-semibold tracking-tight" data-testid="settings-alert-defaults-heading">Global Alert Defaults</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          These metric alert rules are automatically applied to every new host when an agent is approved.
-          After a host is added you can remove individual rules from the host&apos;s Alerts tab.
+          These metric alert rules are templates. Apply them to selected hosts when you want those hosts
+          to use the current defaults.
         </p>
       </div>
 
@@ -317,7 +317,7 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
               <Bell className="size-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">No global alert defaults configured.</p>
               <p className="text-xs text-muted-foreground">
-                Add defaults above and they&apos;ll be applied to each new host automatically.
+                Add defaults above, then use Apply to Hosts when you want hosts to adopt them.
               </p>
             </div>
           ) : (
@@ -361,8 +361,8 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
       <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
         <Info className="size-4 mt-0.5 shrink-0" />
         <p>
-          Changes to global defaults are applied automatically to newly approved hosts.
-          Use Apply to Hosts to replace existing host-level metric rules with these defaults.
+          Global defaults are not evaluated directly on hosts. Use Apply to Hosts to replace
+          existing host-level metric rules with these defaults.
         </p>
       </div>
 

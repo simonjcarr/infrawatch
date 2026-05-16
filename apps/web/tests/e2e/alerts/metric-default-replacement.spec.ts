@@ -135,6 +135,7 @@ test('admin can replace one host metric alerts with global metric defaults', asy
   await expect(page.getByTestId('host-alert-rules-card')).toBeVisible()
   await expect(page.getByText('Old Host A CPU')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Default CPU')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('host-alert-rules-card')).not.toContainText('Default CPU')
 
   await page.getByTestId('host-alerts-replace-metrics-with-defaults').click()
 

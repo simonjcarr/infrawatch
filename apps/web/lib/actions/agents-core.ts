@@ -41,7 +41,6 @@ import {
 import { eq, and, isNull, gt, gte, lte, asc, desc, sql, inArray, ilike, or, count } from 'drizzle-orm'
 import type { Agent, AgentEnrolmentToken, Host, HostDockerStatus, HostMetric } from '@/lib/db/schema'
 import { HOST_HIGH_USAGE_THRESHOLD, HOST_STALE_MINUTES } from '@/lib/db/schema/hosts'
-import { applyGlobalDefaultsToHost } from '@/lib/actions/alerts'
 import { escapeLikePattern } from '@/lib/utils'
 import { getInstanceDefaultCollectionSettings } from '@/lib/actions/host-settings'
 import { triggerAgentUninstall, getTaskRun } from '@/lib/actions/task-runs-core'
@@ -185,13 +184,11 @@ export async function approveAgent(
       })
     })
 
-    // Apply defaults to the associated host (best-effort, outside transaction)
+    // Apply host setup defaults and tag policy to the associated host (best-effort, outside transaction)
     const host = await db.query.hosts.findFirst({
       where: and(eq(hosts.agentId, agentId), eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
     })
     if (host) {
-      await applyGlobalDefaultsToHost(instanceId, host.id)
-
       // Apply instance default collection settings + drain any pendingTags the
       // ingest handler stashed at register time. pendingTags already represent
       // the (token → CLI) merge on the ingest side; here we layer instance defaults

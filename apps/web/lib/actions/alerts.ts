@@ -263,35 +263,6 @@ export async function deleteGlobalAlertDefault(
   return { success: true }
 }
 
-export async function applyGlobalDefaultsToHost(
-  instanceId: string,
-  hostId: string,
-): Promise<void> {
-  await requireInstanceAdminAccess(instanceId)
-  const defaults = await db.query.alertRules.findMany({
-    where: and(
-      eq(alertRules.instanceId, instanceId),
-      isNull(alertRules.deletedAt),
-      eq(alertRules.isGlobalDefault, true),
-    ),
-    orderBy: alertRules.createdAt,
-  })
-  if (defaults.length === 0) return
-
-  await db.insert(alertRules).values(
-    defaults.map((rule) => ({
-      instanceId: instanceId,
-      hostId,
-      name: rule.name,
-      conditionType: rule.conditionType,
-      config: rule.config,
-      severity: rule.severity,
-      enabled: rule.enabled,
-      isGlobalDefault: false,
-    })),
-  )
-}
-
 type MetricDefaultsReplacementResult = {
   success: true
   deletedCount: number

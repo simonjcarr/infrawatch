@@ -12,6 +12,9 @@ INGEST_ADDRESS="${CT_OPS_AGENT_INGEST_ADDRESS:-ingest-dev:9443}"
 CONTAINER_NAME="${CT_OPS_AGENT_CONTAINER_NAME:-ctops-agent-$(date -u +%Y%m%d%H%M%S)-${RANDOM}}"
 ENROLMENT_TOKEN="${CT_OPS_ENROLMENT_TOKEN:-}"
 DOCKER_NETWORK="${CT_OPS_AGENT_DOCKER_NETWORK:-}"
+SSH_BIND_ADDRESS="${CT_OPS_AGENT_SSH_BIND_ADDRESS:-127.0.0.1}"
+SSH_USERNAME="${CT_OPS_AGENT_SSH_USERNAME:-ssh-user}"
+SSH_PASSWORD="${CT_OPS_AGENT_SSH_PASSWORD:-password}"
 SKIP_VERIFY="true"
 INSTALL_AGENT="true"
 
@@ -33,6 +36,12 @@ Options:
                          Default: ${IMAGE_TAG}
   --network NAME         Docker network containing the dev stack.
                          Default: COMPOSE_PROJECT_NAME_default from ${DEV_ENV}
+  --ssh-bind-address IP  Host interface for the random SSH port publish.
+                         Default: ${SSH_BIND_ADDRESS}
+  --ssh-user USER        SSH login user to create in the container.
+                         Default: ${SSH_USERNAME}
+  --ssh-password PASS    Password for the SSH login user.
+                         Default: ${SSH_PASSWORD}
   --no-skip-verify       Do not request TLS skip verification in the install script.
   --no-install           Create the container but do not run the agent installer.
   -h, --help             Show this help.
@@ -125,6 +134,23 @@ wait_for_systemd() {
   die "systemd did not become ready in container ${name}"
 }
 
+configure_ssh_user() {
+  local name="$1"
+  local username="$2"
+  local password="$3"
+
+  docker exec \
+    -e CT_OPS_AGENT_SSH_USERNAME="$username" \
+    -e CT_OPS_AGENT_SSH_PASSWORD="$password" \
+    "$name" \
+    sh -euc '
+      if ! id "$CT_OPS_AGENT_SSH_USERNAME" >/dev/null 2>&1; then
+        useradd --create-home --shell /bin/bash "$CT_OPS_AGENT_SSH_USERNAME"
+      fi
+      printf "%s:%s\n" "$CT_OPS_AGENT_SSH_USERNAME" "$CT_OPS_AGENT_SSH_PASSWORD" | chpasswd
+    '
+}
+
 load_dev_env_defaults
 
 while [ "$#" -gt 0 ]; do
@@ -157,6 +183,21 @@ while [ "$#" -gt 0 ]; do
     --network)
       [ "$#" -ge 2 ] || die "--network requires a value"
       DOCKER_NETWORK="$2"
+      shift 2
+      ;;
+    --ssh-bind-address)
+      [ "$#" -ge 2 ] || die "--ssh-bind-address requires a value"
+      SSH_BIND_ADDRESS="$2"
+      shift 2
+      ;;
+    --ssh-user)
+      [ "$#" -ge 2 ] || die "--ssh-user requires a value"
+      SSH_USERNAME="$2"
+      shift 2
+      ;;
+    --ssh-password)
+      [ "$#" -ge 2 ] || die "--ssh-password requires a value"
+      SSH_PASSWORD="$2"
       shift 2
       ;;
     --no-skip-verify)
@@ -204,6 +245,7 @@ docker_run_args=(
   --cgroupns=host
   --restart unless-stopped
   --add-host host.docker.internal:host-gateway
+  --publish "${SSH_BIND_ADDRESS}::22"
   --tmpfs /run
   --tmpfs /run/lock
   --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
@@ -215,6 +257,8 @@ docker_run_args+=("$IMAGE_TAG")
 docker run "${docker_run_args[@]}" >/dev/null
 
 wait_for_systemd "$CONTAINER_NAME"
+configure_ssh_user "$CONTAINER_NAME" "$SSH_USERNAME" "$SSH_PASSWORD"
+ssh_endpoint="$(docker port "$CONTAINER_NAME" 22/tcp 2>/dev/null | head -n1 || true)"
 
 if [ "$INSTALL_AGENT" = "true" ]; then
   install_url="${APP_URL}/api/agent/install?ingest=$(urlencode "$INGEST_ADDRESS")"
@@ -233,5 +277,11 @@ fi
 
 echo ""
 echo "Container: ${CONTAINER_NAME}"
+if [ -n "$ssh_endpoint" ]; then
+  echo "SSHD:      ${ssh_endpoint} -> 22/tcp"
+  echo "SSH Login: ssh -p ${ssh_endpoint##*:} ${SSH_USERNAME}@${ssh_endpoint%:*}"
+else
+  echo "SSHD:      docker port ${CONTAINER_NAME} 22/tcp"
+fi
 echo "Status:    docker exec -it ${CONTAINER_NAME} systemctl status ct-ops-agent"
 echo "Logs:      docker exec -it ${CONTAINER_NAME} journalctl -u ct-ops-agent -f"

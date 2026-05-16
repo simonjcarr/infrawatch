@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.157.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.157.0...web/v0.157.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **ldap:** align add form with AD defaults ([d1deb2b](https://github.com/carrtech-dev/ct-ops/commit/d1deb2bf2571a1ecd2e34a28d792bf777b7a2d0a))
+
 ## [0.157.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.156.0...web/v0.157.0) (2026-05-16)
 
 

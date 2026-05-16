@@ -457,6 +457,7 @@ export function PasswordManagerClientShell({
   const [setupPending, setSetupPending] = useState(false)
   const [unlockPending, setUnlockPending] = useState(false)
   const [refreshPending, setRefreshPending] = useState(false)
+  const [vaultRefreshPending, setVaultRefreshPending] = useState(false)
   const [logoutPending, setLogoutPending] = useState(false)
   const [statusNotice, setStatusNotice] = useState<string | null>(null)
   const [vaultsPending, setVaultsPending] = useState(false)
@@ -1435,6 +1436,118 @@ export function PasswordManagerClientShell({
     }
   }
 
+  async function handleRefreshVault() {
+    if (vaultRefreshPending || workspacePending || state.view !== 'unlocked' || !state.activeKeyPair) {
+      return
+    }
+
+    const requestedVaultId = workspaceState.selectedVaultId
+    const requestedEntryId = workspaceState.selectedEntryId
+    setVaultRefreshPending(true)
+    setVaultsPending(true)
+    setEntriesPending(Boolean(requestedVaultId))
+    setMembersPending(Boolean(requestedVaultId))
+    setWorkspaceError(null)
+    setStatusNotice(null)
+    try {
+      const vaultResponse = await client.listVaults()
+      const decryptedVaultResults = await mapPasswordManagerCryptoBatchSettled(
+        vaultResponse.vaults,
+        PASSWORD_MANAGER_CRYPTO_BATCH_SIZE,
+        async (record) => {
+          const vaultKey = await unwrapVaultKeyEnvelope(
+            record.wrapped_vault_key_envelope as unknown as PasswordManagerWrappedVaultKeyEnvelope,
+            state.activeKeyPair!.privateKey as CryptoKey,
+          )
+          const metadata = await decryptVaultMetadata(
+            record.encrypted_metadata as unknown as PasswordManagerEncryptedPayloadEnvelope,
+            vaultKey,
+          )
+          upsertVaultEpochKey(vaultKeyCacheRef.current, record.id, record.current_key_epoch, vaultKey)
+          return createVaultSummary(record, metadata)
+        },
+      )
+      const decryptedVaults = decryptedVaultResults.fulfilled.map((result) => result.value)
+
+      for (const failedVault of decryptedVaultResults.rejected) {
+        vaultKeyCacheRef.current.delete(failedVault.input.id)
+      }
+
+      const visibleVaultIds = new Set(decryptedVaults.map((vault) => vault.id))
+      for (const vaultId of [...vaultKeyCacheRef.current.keys()]) {
+        if (!visibleVaultIds.has(vaultId)) {
+          vaultKeyCacheRef.current.delete(vaultId)
+        }
+      }
+
+      setVaults(decryptedVaults)
+      const refreshedVault =
+        decryptedVaults.find((vault) => vault.id === requestedVaultId) ?? decryptedVaults[0] ?? null
+      workspaceDispatch({
+        type: 'workspace-loaded',
+        hasVaults: decryptedVaults.length > 0,
+        preferredVaultId: refreshedVault?.id ?? null,
+      })
+
+      if (decryptedVaultResults.rejected.length > 0) {
+        const skippedVaultIds = decryptedVaultResults.rejected.map((result) => result.input.id)
+        logPasswordManagerWarning('[password-manager] skipped undecryptable vault records', decryptedVaultResults.rejected[0]?.reason, {
+          ...scopeMetadata,
+          skippedVaultIds,
+        })
+        setWorkspaceError(
+          decryptedVaults.length > 0
+            ? 'Some Password Manager vaults could not be decrypted and were skipped. Refresh or rotate access for the affected vaults.'
+            : 'Password Manager vaults exist, but none could be decrypted with this unlock profile. You can create a new vault or relaunch after access is rotated.',
+        )
+      }
+
+      if (!refreshedVault) {
+        setEntries([])
+        setMembers([])
+        setStatusNotice('Password Manager vault list refreshed.')
+        return
+      }
+
+      const [entriesResponse, membersResponse] = await Promise.all([
+        client.listEntries(refreshedVault.id),
+        client.listMembers(refreshedVault.id),
+      ])
+      const decryptedEntries = await mapPasswordManagerCryptoBatch(
+        entriesResponse.entries,
+        PASSWORD_MANAGER_CRYPTO_BATCH_SIZE,
+        async (record) => {
+          const vaultKey = readVaultEpochKey(vaultKeyCacheRef.current, record.vault_id, record.key_epoch)
+          if (!vaultKey) {
+            throw new Error('The required vault key epoch is no longer available in browser memory. Rotate or relaunch.')
+          }
+          return createEntrySummary(
+            record,
+            await decryptEntryPayload<PasswordManagerEntryPayload>(
+              record.encrypted_payload as unknown as PasswordManagerEncryptedPayloadEnvelope,
+              vaultKey,
+            ),
+          )
+        },
+      )
+
+      setEntries(decryptedEntries)
+      setMembers(sortMembers(membersResponse.members))
+      setMemberRoleEdits(Object.fromEntries(membersResponse.members.map((member) => [member.user_id, member.role])))
+      if (!decryptedEntries.find((entry) => entry.id === requestedEntryId)) {
+        workspaceDispatch({ type: 'entry-selected', entryId: decryptedEntries[0]?.id ?? null })
+      }
+      setStatusNotice(`Vault refreshed from the server for ${refreshedVault.metadata.name}.`)
+    } catch (error) {
+      handleWorkspaceActionError(error, 'Password Manager vault could not be refreshed safely.')
+    } finally {
+      setVaultRefreshPending(false)
+      setVaultsPending(false)
+      setEntriesPending(false)
+      setMembersPending(false)
+    }
+  }
+
   async function handleLogout() {
     if (logoutPending) {
       return
@@ -1785,14 +1898,41 @@ export function PasswordManagerClientShell({
         idempotencyKey: rotationRequest.idempotencyKey,
       })
       upsertVaultEpochKey(vaultKeyCacheRef.current, rotationRequest.vaultId, rotated.epoch, rotationRequest.vaultKey)
+      const rotatedVaultMetadata =
+        selectedVault.id === rotationRequest.vaultId ? selectedVault.metadata : null
+      const rotatedVaultRecord = rotatedVaultMetadata
+        ? await client.updateVault({
+            vaultId: rotationRequest.vaultId,
+            encryptedMetadata: toClientPayload(
+              await createEncryptedVaultMetadata(rotatedVaultMetadata, rotationRequest.vaultKey),
+            ) as never,
+          })
+        : null
+      const rotatedEntries = await mapPasswordManagerCryptoBatch(
+        entries.filter((entry) => entry.vaultId === rotationRequest.vaultId),
+        PASSWORD_MANAGER_CRYPTO_BATCH_SIZE,
+        async (entry) => {
+          const encryptedPayload = await createEncryptedEntryPayload(entry.payload, rotationRequest.vaultKey)
+          const updated = await client.updateEntry({
+            vaultId: rotationRequest.vaultId,
+            entryId: entry.id,
+            encryptedPayload: toClientPayload(encryptedPayload) as never,
+            keyEpoch: rotated.epoch,
+          })
+          return createEntrySummary(updated, entry.payload)
+        },
+      )
+      const rotatedEntriesById = new Map(rotatedEntries.map((entry) => [entry.id, entry]))
       setVaults((current) =>
         current.map((vault) =>
           vault.id === rotationRequest.vaultId
-            ? {
-                ...vault,
-                currentKeyEpoch: rotated.epoch,
-                updatedAt: rotated.created_at,
-              }
+            ? rotatedVaultRecord && rotatedVaultMetadata
+              ? createVaultSummary(rotatedVaultRecord, rotatedVaultMetadata)
+              : {
+                  ...vault,
+                  currentKeyEpoch: rotated.epoch,
+                  updatedAt: rotated.created_at,
+                }
             : vault,
         ),
       )
@@ -1805,6 +1945,7 @@ export function PasswordManagerClientShell({
           ),
         ),
       )
+      setEntries((current) => current.map((entry) => rotatedEntriesById.get(entry.id) ?? entry))
       pendingRotationRef.current = null
       setRotationPrompt(null)
       setStatusNotice('Vault key rotated safely for the current active members.')
@@ -2336,6 +2477,7 @@ export function PasswordManagerClientShell({
           onAuditFilterChange={(key, value) => setAuditFilters((current) => ({ ...current, [key]: value }))}
           onLoadMoreAuditEvents={() => loadAuditEvents(auditNextCursor)}
           onRefreshAuditEvents={() => loadAuditEvents()}
+          onRefreshVault={handleRefreshVault}
           onDeleteEntry={handleEntryDelete}
           onDeleteVault={handleVaultDelete}
           onEntryFilterChange={setEntryFilter}
@@ -2400,8 +2542,9 @@ export function PasswordManagerClientShell({
           selectedVault={selectedVault}
           vaults={filteredVaults}
           vaultsPending={vaultsPending}
+          vaultRefreshPending={vaultRefreshPending}
           workspaceError={workspaceError}
-          workspacePending={workspacePending}
+          workspacePending={workspacePending || vaultRefreshPending}
           workspaceState={workspaceState}
         />
       ) : null}
@@ -2901,6 +3044,7 @@ function PasswordManagerWorkspace({
   onAuditFilterChange,
   onLoadMoreAuditEvents,
   onRefreshAuditEvents,
+  onRefreshVault,
   onDeleteEntry,
   onDeleteVault,
   onEntryFilterChange,
@@ -2944,6 +3088,7 @@ function PasswordManagerWorkspace({
   selectedVault,
   vaults,
   vaultsPending,
+  vaultRefreshPending,
   workspaceError,
   workspacePending,
   workspaceState,
@@ -2994,6 +3139,7 @@ function PasswordManagerWorkspace({
   onAuditFilterChange: (key: keyof PasswordManagerAuditFilters, value: string) => void
   onLoadMoreAuditEvents: () => void
   onRefreshAuditEvents: () => void
+  onRefreshVault: () => Promise<void>
   onDeleteEntry: () => Promise<void>
   onDeleteVault: (unlockPassword: string) => Promise<boolean>
   onEntryFilterChange: (value: string) => void
@@ -3037,6 +3183,7 @@ function PasswordManagerWorkspace({
   selectedVault: PasswordManagerVaultSummary | null
   vaults: PasswordManagerVaultSummary[]
   vaultsPending: boolean
+  vaultRefreshPending: boolean
   workspaceError: string | null
   workspacePending: boolean
   workspaceState: PasswordManagerWorkspaceState
@@ -3309,6 +3456,15 @@ function PasswordManagerWorkspace({
           <Button variant="outline" onClick={() => setCreateVaultDialogOpen(true)}>
             <Plus className="mr-2 size-4" />
             Create vault
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void onRefreshVault()}
+            disabled={vaultRefreshPending || workspacePending || vaultsPending}
+            data-testid="password-manager-refresh-vault"
+          >
+            <RefreshCcw className="mr-2 size-4" />
+            {vaultRefreshPending ? 'Refreshing...' : 'Refresh vault'}
           </Button>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, Info, Plus, Trash2 } from 'lucide-react'
+import { Bell, Info, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -37,6 +37,7 @@ import {
   getGlobalAlertDefaults,
   createGlobalAlertDefault,
   deleteGlobalAlertDefault,
+  replaceAllHostMetricAlertsWithGlobalDefaults,
 } from '@/lib/actions/alerts'
 import type { AlertRule, AlertSeverity } from '@/lib/db/schema'
 
@@ -224,6 +225,8 @@ interface GlobalAlertsClientProps {
 
 export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [replaceAllMessage, setReplaceAllMessage] = useState<string | null>(null)
+  const [replaceAllError, setReplaceAllError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: defaults = initialDefaults } = useQuery({
@@ -237,6 +240,28 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['global-alert-defaults'] }),
   })
 
+  const replaceAllMutation = useMutation({
+    mutationFn: async () => {
+      const result = await replaceAllHostMetricAlertsWithGlobalDefaults()
+      if ('error' in result) throw new Error(result.error)
+      return result
+    },
+    onMutate: () => {
+      setReplaceAllError(null)
+      setReplaceAllMessage(null)
+    },
+    onSuccess: (result) => {
+      setReplaceAllMessage(
+        `Updated ${result.hostCount} host${result.hostCount === 1 ? '' : 's'} with ${result.createdCount} metric default rule${result.createdCount === 1 ? '' : 's'}.`,
+      )
+    },
+    onError: (error) => {
+      setReplaceAllError(
+        error instanceof Error ? error.message : 'Failed to replace host metric alert rules',
+      )
+    },
+  })
+
   return (
     <div className="space-y-6 p-6 max-w-4xl">
       <div>
@@ -248,7 +273,7 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between pb-3">
+        <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <Bell className="size-4" />
@@ -259,12 +284,34 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
               Check-based rules must be configured per host since they reference host-specific checks.
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="settings-alert-defaults-add">
-            <Plus className="size-4 mr-1" />
-            Add Default
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => replaceAllMutation.mutate()}
+              disabled={replaceAllMutation.isPending}
+              data-testid="settings-alert-defaults-replace-all-host-metrics"
+            >
+              <RotateCcw className="size-4 mr-1" />
+              Apply to Hosts
+            </Button>
+            <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="settings-alert-defaults-add">
+              <Plus className="size-4 mr-1" />
+              Add Default
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
+          {replaceAllError != null && (
+            <p className="text-sm text-red-600 pb-3" data-testid="settings-alert-defaults-replace-error">
+              {replaceAllError}
+            </p>
+          )}
+          {replaceAllMessage != null && (
+            <p className="text-sm text-green-700 pb-3" data-testid="settings-alert-defaults-replace-success">
+              {replaceAllMessage}
+            </p>
+          )}
           {defaults.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" data-testid="settings-alert-defaults-empty">
               <Bell className="size-8 text-muted-foreground/40" />
@@ -314,8 +361,8 @@ export function GlobalAlertsClient({ initialDefaults }: GlobalAlertsClientProps)
       <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
         <Info className="size-4 mt-0.5 shrink-0" />
         <p>
-          Changes to global defaults only affect newly approved hosts. Existing hosts are not modified.
-          To update alert rules on existing hosts, go to the host&apos;s Alerts tab.
+          Changes to global defaults are applied automatically to newly approved hosts.
+          Use Apply to Hosts to replace existing host-level metric rules with these defaults.
         </p>
       </div>
 

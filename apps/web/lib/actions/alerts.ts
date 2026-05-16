@@ -19,7 +19,7 @@ const testNotificationLimiter = createRateLimiter({
 })
 import { db } from '@/lib/db'
 import { alertRules, alertInstances, notificationChannels, alertSilences, hosts } from '@/lib/db/schema'
-import { eq, and, isNull, desc, inArray, sql, lte, gte, count } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull, desc, inArray, sql, lte, gte, count } from 'drizzle-orm'
 import type {
   AlertRule,
   AlertInstance,
@@ -290,6 +290,178 @@ export async function applyGlobalDefaultsToHost(
       isGlobalDefault: false,
     })),
   )
+}
+
+type MetricDefaultsReplacementResult = {
+  success: true
+  deletedCount: number
+  createdCount: number
+  hostCount: number
+}
+
+function cloneMetricDefaultsForHost(
+  defaults: AlertRule[],
+  instanceId: string,
+  hostId: string,
+) {
+  return defaults.map((rule) => ({
+    instanceId: instanceId,
+    hostId,
+    name: rule.name,
+    conditionType: rule.conditionType,
+    config: rule.config,
+    severity: rule.severity,
+    enabled: rule.enabled,
+    isGlobalDefault: false,
+  }))
+}
+
+export async function replaceHostMetricAlertsWithGlobalDefaults(
+  hostId: string,
+): Promise<MetricDefaultsReplacementResult | { error: string }> {
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceAdminAccess(instanceId)
+  const parsed = z.string().min(1).safeParse(hostId)
+  if (!parsed.success) return { error: 'Invalid host' }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const now = new Date()
+      const [existingHost] = await tx
+        .select({ id: hosts.id })
+        .from(hosts)
+        .where(and(
+          eq(hosts.id, parsed.data),
+          eq(hosts.instanceId, instanceId),
+          isNull(hosts.deletedAt),
+        ))
+        .for('update')
+        .limit(1)
+
+      if (!existingHost) return { error: 'Host not found' }
+
+      const defaults = await tx.query.alertRules.findMany({
+        where: and(
+          eq(alertRules.instanceId, instanceId),
+          isNull(alertRules.deletedAt),
+          eq(alertRules.isGlobalDefault, true),
+          eq(alertRules.conditionType, 'metric_threshold'),
+        ),
+        orderBy: alertRules.createdAt,
+      })
+
+      const deletedRows = await tx
+        .update(alertRules)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(
+          eq(alertRules.instanceId, instanceId),
+          eq(alertRules.hostId, existingHost.id),
+          eq(alertRules.conditionType, 'metric_threshold'),
+          eq(alertRules.isGlobalDefault, false),
+          isNull(alertRules.deletedAt),
+        ))
+        .returning({ id: alertRules.id })
+
+      if (defaults.length > 0) {
+        await tx.insert(alertRules).values(
+          cloneMetricDefaultsForHost(defaults, instanceId, existingHost.id),
+        )
+      }
+
+      await writeAuditEvent(tx, {
+        instanceId: instanceId,
+        actorUserId: session.user.id,
+        action: 'alert_rule.metric_defaults_replaced',
+        targetType: 'host',
+        targetId: existingHost.id,
+        summary: 'Replaced host metric alert rules from global defaults',
+        metadata: {
+          hostId: existingHost.id,
+          deletedCount: deletedRows.length,
+          createdCount: defaults.length,
+        },
+      })
+
+      return {
+        success: true,
+        deletedCount: deletedRows.length,
+        createdCount: defaults.length,
+        hostCount: 1,
+      }
+    })
+  } catch {
+    return { error: 'Failed to replace host metric alerts' }
+  }
+}
+
+export async function replaceAllHostMetricAlertsWithGlobalDefaults(): Promise<
+  MetricDefaultsReplacementResult | { error: string }
+> {
+  const instanceId = await resolveCurrentAlertScope()
+  const session = await requireInstanceAdminAccess(instanceId)
+
+  try {
+    return await db.transaction(async (tx) => {
+      const now = new Date()
+      const defaults = await tx.query.alertRules.findMany({
+        where: and(
+          eq(alertRules.instanceId, instanceId),
+          isNull(alertRules.deletedAt),
+          eq(alertRules.isGlobalDefault, true),
+          eq(alertRules.conditionType, 'metric_threshold'),
+        ),
+        orderBy: alertRules.createdAt,
+      })
+      const hostRows = await tx.query.hosts.findMany({
+        columns: { id: true },
+        where: and(eq(hosts.instanceId, instanceId), isNull(hosts.deletedAt)),
+        orderBy: hosts.createdAt,
+      })
+
+      const deletedRows = await tx
+        .update(alertRules)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(
+          eq(alertRules.instanceId, instanceId),
+          isNotNull(alertRules.hostId),
+          eq(alertRules.conditionType, 'metric_threshold'),
+          eq(alertRules.isGlobalDefault, false),
+          isNull(alertRules.deletedAt),
+        ))
+        .returning({ id: alertRules.id })
+
+      if (defaults.length > 0 && hostRows.length > 0) {
+        await tx.insert(alertRules).values(
+          hostRows.flatMap((host) => cloneMetricDefaultsForHost(defaults, instanceId, host.id)),
+        )
+      }
+
+      const createdCount = defaults.length * hostRows.length
+
+      await writeAuditEvent(tx, {
+        instanceId: instanceId,
+        actorUserId: session.user.id,
+        action: 'alert_rule.metric_defaults_replaced_all_hosts',
+        targetType: 'instance',
+        targetId: instanceId,
+        summary: 'Replaced host metric alert rules from global defaults for all hosts',
+        metadata: {
+          deletedCount: deletedRows.length,
+          createdCount,
+          hostCount: hostRows.length,
+        },
+      })
+
+      return {
+        success: true,
+        deletedCount: deletedRows.length,
+        createdCount,
+        hostCount: hostRows.length,
+      }
+    })
+  } catch {
+    return { error: 'Failed to replace host metric alerts' }
+  }
 }
 
 export async function createAlertRule(

@@ -126,8 +126,7 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	authMsg.Password = ""
 	if err != nil {
 		slog.Warn("terminal ws: SSH connection failed", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
-		reason := "ssh authentication failed"
-		message := "SSH authentication failed"
+		reason, message := terminalSSHFailureDetails(err)
 		if errors.Is(err, queries.ErrSSHHostKeyNotTrusted) || errors.Is(err, queries.ErrSSHHostKeyMismatch) {
 			reason = "ssh host key verification failed"
 			message = "SSH host key verification failed"
@@ -373,6 +372,13 @@ func terminalSSHPort(port uint32) (string, error) {
 func isSSHAuthenticationFailure(err error) bool {
 	var authErr *ssh.ServerAuthError
 	return errors.As(err, &authErr)
+}
+
+func terminalSSHFailureDetails(err error) (reason string, message string) {
+	if isSSHAuthenticationFailure(err) {
+		return "ssh authentication failed", "SSH authentication failed"
+	}
+	return "ssh connection failed", "SSH connection failed"
 }
 
 func writeWS(ctx context.Context, conn *websocket.Conn, msg wsMessage) error {

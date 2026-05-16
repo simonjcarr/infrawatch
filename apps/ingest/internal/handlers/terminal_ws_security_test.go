@@ -90,6 +90,18 @@ func TestIsSSHAuthenticationFailure(t *testing.T) {
 	}
 }
 
+func TestTerminalSSHFailureDetails(t *testing.T) {
+	reason, message := terminalSSHFailureDetails(&ssh.ServerAuthError{})
+	if reason != "ssh authentication failed" || message != "SSH authentication failed" {
+		t.Fatalf("terminalSSHFailureDetails(auth) = %q, %q", reason, message)
+	}
+
+	reason, message = terminalSSHFailureDetails(errors.New("dial tcp: lookup host.example.test: no such host"))
+	if reason != "ssh connection failed" || message != "SSH connection failed" {
+		t.Fatalf("terminalSSHFailureDetails(network) = %q, %q", reason, message)
+	}
+}
+
 func TestInsecureSkipVerifyTrueAllowlist(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

@@ -36,4 +36,18 @@ test('deleteHost performs a hard delete and clears agent dependants before delet
     pendingDelete < agentDelete,
     'pending CSR rows must be deleted before the agent row to avoid FK rollback',
   )
+
+  for (const table of [
+    'dockerContainerMetrics',
+    'dockerContainerLifecycleEvents',
+    'dockerContainers',
+    'dockerTelemetryBatches',
+    'hostDockerStatus',
+  ]) {
+    assert.match(
+      segment,
+      new RegExp(`\\.delete\\(${table}\\)`),
+      `deleteHost must delete ${table} rows before deleting the host`,
+    )
+  }
 })

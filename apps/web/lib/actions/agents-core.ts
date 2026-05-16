@@ -12,6 +12,10 @@ import {
   revokedCertificates,
   hosts,
   hostDockerStatus,
+  dockerContainers,
+  dockerContainerLifecycleEvents,
+  dockerContainerMetrics,
+  dockerTelemetryBatches,
   hostMetrics,
   hostGroupMembers,
   checks,
@@ -1230,6 +1234,25 @@ export async function deleteHost(
       await tx
         .delete(hostMetrics)
         .where(and(eq(hostMetrics.hostId, hostId), eq(hostMetrics.instanceId, instanceId)))
+
+      // 12a. Docker inventory/telemetry rows reference both the host and, for
+      //      per-container data, docker_containers rows. Delete child tables
+      //      first so hosts with Docker telemetry can still be removed.
+      await tx
+        .delete(dockerContainerMetrics)
+        .where(and(eq(dockerContainerMetrics.hostId, hostId), eq(dockerContainerMetrics.instanceId, instanceId)))
+      await tx
+        .delete(dockerContainerLifecycleEvents)
+        .where(and(eq(dockerContainerLifecycleEvents.hostId, hostId), eq(dockerContainerLifecycleEvents.instanceId, instanceId)))
+      await tx
+        .delete(dockerContainers)
+        .where(and(eq(dockerContainers.hostId, hostId), eq(dockerContainers.instanceId, instanceId)))
+      await tx
+        .delete(dockerTelemetryBatches)
+        .where(and(eq(dockerTelemetryBatches.hostId, hostId), eq(dockerTelemetryBatches.instanceId, instanceId)))
+      await tx
+        .delete(hostDockerStatus)
+        .where(and(eq(hostDockerStatus.hostId, hostId), eq(hostDockerStatus.instanceId, instanceId)))
 
       // 13. Resource tags
       await tx

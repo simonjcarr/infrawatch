@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
 interface AutomationSettingsClientProps {
@@ -27,6 +28,21 @@ interface AutomationSettingsClientProps {
 }
 
 const ANSIBLE_API_IMAGE = 'ghcr.io/carrtech-dev/ct-ops/ansible-api:latest'
+const ANSIBLE_TOKEN_COMMAND = 'openssl rand -base64 48'
+const ANSIBLE_ENV_SNIPPET = [
+  'ANSIBLE_API_SERVICE_TOKEN_ID=ansible-api',
+  'ANSIBLE_API_SERVICE_TOKEN_SECRET=<generated value>',
+].join('\n')
+const ANSIBLE_COMPOSE_COMMAND = 'docker compose -f docker-compose.single.yml --profile ansible up -d ansible-api'
+const ANSIBLE_HEALTH_COMMAND = 'docker compose -f docker-compose.single.yml ps ansible-api'
+const ANSIBLE_DOCKER_RUN_COMMAND = [
+  'docker run -d --name ct-ops-ansible-api \\',
+  '  --restart unless-stopped \\',
+  '  -p 127.0.0.1:8080:8080 \\',
+  '  -e ANSIBLE_API_SERVICE_TOKEN_ID=ansible-api \\',
+  '  -e ANSIBLE_API_SERVICE_TOKEN_SECRET="$ANSIBLE_API_SERVICE_TOKEN_SECRET" \\',
+  `  ${ANSIBLE_API_IMAGE}`,
+].join('\n')
 
 function statusBadge(settings: AutomationSettingsResult) {
   if (settings.status === 'healthy') {
@@ -202,6 +218,78 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                 Pull the latest Ansible API image from{' '}
                 <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{ANSIBLE_API_IMAGE}</code>.
               </p>
+              <details className="rounded-md border bg-background/70 px-3 py-2">
+                <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+                  Run the Ansible container
+                </summary>
+                <Tabs defaultValue="bundled" className="mt-3">
+                  <TabsList className="h-auto flex-wrap justify-start">
+                    <TabsTrigger value="bundled">Bundled Compose</TabsTrigger>
+                    <TabsTrigger value="separate">Separate Server</TabsTrigger>
+                    <TabsTrigger value="auth">Auth & TLS</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="bundled" className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                      Use this path when the Ansible API container runs from the CT-Ops Compose file on the same host.
+                    </p>
+                    <p>
+                      Add matching service-token values to the CT-Ops <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">.env</code> file:
+                    </p>
+                    <pre className="overflow-x-auto whitespace-pre rounded-md bg-muted p-3 text-xs text-foreground">
+                      <code>{ANSIBLE_ENV_SNIPPET}</code>
+                    </pre>
+                    <p>
+                      Start only the optional Ansible profile, then confirm it is healthy:
+                    </p>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs text-foreground">
+                      <code>{ANSIBLE_COMPOSE_COMMAND}</code>
+                    </pre>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs text-foreground">
+                      <code>{ANSIBLE_HEALTH_COMMAND}</code>
+                    </pre>
+                    <p>
+                      In this UI, use <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://ansible-api:8080</code>, set Authentication to Service token HMAC, enter the same token ID and secret, and set TLS mode to Insecure HTTP/private network.
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="separate" className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                      Use this path when the Ansible API runs on a different server reachable from CT-Ops.
+                    </p>
+                    <p>
+                      On the Ansible server, set the service-token environment variables and run the image behind a private network or reverse proxy:
+                    </p>
+                    <pre className="overflow-x-auto whitespace-pre rounded-md bg-muted p-3 text-xs text-foreground">
+                      <code>{ANSIBLE_DOCKER_RUN_COMMAND}</code>
+                    </pre>
+                    <p>
+                      The example binds to loopback for a reverse proxy on that server. If CT-Ops reaches the container directly over a private network, publish the port on a protected interface and allow inbound traffic only from the CT-Ops host.
+                    </p>
+                    <p>
+                      Do not set <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_ID</code> or <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_SECRET</code> in the CT-Ops Compose file for this setup. Configure this UI with the Ansible server URL, matching token ID and secret, and the appropriate TLS mode.
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="auth" className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                      A service token is a shared HMAC secret. Generate a new secret yourself, put the same token ID and secret on the Ansible API container and in the Ansible module connection form on this page, and CT-Ops will sign each module request.
+                    </p>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs text-foreground">
+                      <code>{ANSIBLE_TOKEN_COMMAND}</code>
+                    </pre>
+                    <p>
+                      Use the generated value as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_SECRET</code>. The token ID can stay <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ansible-api</code>. After saving the secret in the Ansible module connection form, CT-Ops stores it encrypted and only lets you replace it.
+                    </p>
+                    <p>
+                      Authentication set to None means CT-Ops sends unsigned requests. It will work only when the Ansible API container does not have <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_ID</code> or <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_SECRET</code> configured.
+                    </p>
+                    <p>
+                      Authentication does not control encryption. Use an <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">https://</code> URL for encrypted transport, or <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://</code> only on a trusted private network with TLS mode set to Insecure HTTP/private network.
+                    </p>
+                  </TabsContent>
+                </Tabs>
+              </details>
             </AlertDescription>
           </Alert>
 

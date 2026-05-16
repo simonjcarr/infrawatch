@@ -77,6 +77,7 @@ export function CommandPaletteProvider({ userRole, children }: CommandPalettePro
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (typeof event.key !== 'string') return
       const isPaletteCombo =
         event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey
       if (isPaletteCombo) {

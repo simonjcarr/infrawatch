@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.24.0...bundle/v0.25.0) (2026-05-16)
+
+
+### Features
+
+* **password-manager:** refresh unlocked vault entries ([525f7ee](https://github.com/carrtech-dev/ct-ops/commit/525f7ee16ed962579e9e211b87183b3213bb5db5))
+
 ## [0.24.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.23.0...bundle/v0.24.0) (2026-05-16)
 
 

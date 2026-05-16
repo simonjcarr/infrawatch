@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.157.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.156.0...web/v0.157.0) (2026-05-16)
+
+
+### Features
+
+* **password-manager:** refresh unlocked vault entries ([525f7ee](https://github.com/carrtech-dev/ct-ops/commit/525f7ee16ed962579e9e211b87183b3213bb5db5))
+
 ## [0.156.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.155.0...web/v0.156.0) (2026-05-16)
 
 

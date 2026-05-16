@@ -27,8 +27,8 @@ When an alert instance is created or transitions state, a **notification** is ge
 
 ## Creating Alert Rules
 
-1. Navigate to **Alerts → Rules**
-2. Click **New Rule**
+1. Open a host and select **Monitoring → Alerts**
+2. Click **Add Rule**
 3. Configure:
 
 | Field | Description |
@@ -43,6 +43,20 @@ When an alert instance is created or transitions state, a **notification** is ge
 | **Channels** | Which notification channels to route to |
 
 4. Click **Save**
+
+## Global Metric Defaults
+
+Global alert defaults are metric threshold templates. They are not evaluated for
+any host until an administrator applies them to that host.
+
+Administrators can apply those defaults when needed:
+- On a host's **Alerts** tab, **Use Metric Defaults** replaces that host's
+  host-level metric threshold rules with the current global defaults.
+- On **Administration → Monitoring**, **Apply to Hosts** replaces host-level
+  metric threshold rules across all hosts with the current global defaults.
+
+These actions only replace metric threshold rules. Check, certificate, Docker,
+silence, and notification settings are left unchanged.
 
 ---
 

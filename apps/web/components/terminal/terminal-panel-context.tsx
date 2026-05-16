@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { createId } from '@paralleldrive/cuid2'
 import { clearTerminalPasswordForTab } from '@/lib/terminal/tab-state'
+import { normaliseTerminalSshPort } from '@/lib/terminal/ssh-port'
 
 export type TerminalTabColor =
   | 'slate'
@@ -21,6 +22,7 @@ export interface TerminalSessionBinding {
   hostId: string
   hostname: string
   username: string
+  port: number
   password?: string
   directAccess: false
 }
@@ -58,6 +60,7 @@ interface TerminalPanelActions {
     hostId: string
     hostname: string
     username: string
+    port: number
     password: string
     directAccess: false
   }) => void
@@ -192,6 +195,7 @@ function isValidBinding(value: unknown): value is TerminalSessionBinding {
     typeof b.hostId === 'string' &&
     typeof b.hostname === 'string' &&
     typeof b.username === 'string' &&
+    (b.port === undefined || (typeof b.port === 'number' && Number.isFinite(b.port))) &&
     b.directAccess === false
   )
 }
@@ -236,7 +240,10 @@ function loadPersistedState(): TerminalPanelState | null {
 
     const tabs: TerminalTabInfo[] = parsed.tabs.map((t) => ({
       id: createId(),
-      binding: t.binding,
+      binding: {
+        ...t.binding,
+        port: normaliseTerminalSshPort(t.binding.port),
+      },
       color: t.color,
       label: t.label,
       paneTree: t.paneTree,
@@ -326,6 +333,7 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
       hostId: string
       hostname: string
       username: string
+      port: number
       password: string
       directAccess: false
     }) => {
@@ -333,7 +341,7 @@ export function TerminalPanelProvider({ children }: { children: React.ReactNode 
       const paneId = createId()
       const tab: TerminalTabInfo = {
         id: tabId,
-        binding: { ...params },
+        binding: { ...params, port: normaliseTerminalSshPort(params.port) },
         color: null,
         label: null,
         paneTree: { type: 'leaf', id: paneId },

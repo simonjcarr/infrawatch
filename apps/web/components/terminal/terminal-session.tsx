@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react'
 import { createTerminalSession } from '@/lib/actions/terminal'
+import { getTerminalSshPortStorageKey } from '@/lib/terminal/ssh-port'
 import type { TerminalSessionBinding } from './terminal-panel-context'
 
 export type TerminalSessionStatus = 'connecting' | 'connected' | 'error' | 'closed'
@@ -164,7 +165,7 @@ export function TerminalSession({
           return
         }
 
-        term.writeln(`\x1b[90mConnecting to ${binding.hostname} as ${binding.username} over SSH...\x1b[0m`)
+        term.writeln(`\x1b[90mConnecting to ${binding.hostname}:${binding.port} as ${binding.username} over SSH...\x1b[0m`)
 
         const result = await createTerminalSession(
           binding.hostId,
@@ -216,6 +217,7 @@ export function TerminalSession({
               type: 'auth',
               token: result.websocketToken,
               password: binding.password,
+              port: binding.port,
             }))
             ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
           }
@@ -228,6 +230,11 @@ export function TerminalSession({
             if (msg.type === 'ssh_connected' || msg.type === 'agent_connected') {
               sshDidConnect = true
               clearTimeout(waitingTimer)
+              try {
+                localStorage.setItem(getTerminalSshPortStorageKey(binding.hostId), String(binding.port))
+              } catch {
+                // localStorage may be unavailable
+              }
               updateStatus('connected')
               term.writeln('\x1b[32mSSH connected. Starting shell...\x1b[0m\r\n')
             } else if (msg.type === 'output' && msg.data) {

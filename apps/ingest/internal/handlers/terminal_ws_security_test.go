@@ -55,6 +55,32 @@ func TestTerminalRemoteAddrNormalisesHostPort(t *testing.T) {
 	}
 }
 
+func TestTerminalSSHPortDefaultsToTwentyTwo(t *testing.T) {
+	got, err := terminalSSHPort(0)
+	if err != nil {
+		t.Fatalf("terminalSSHPort(0) error = %v", err)
+	}
+	if got != "22" {
+		t.Fatalf("terminalSSHPort(0) = %q, want 22", got)
+	}
+}
+
+func TestTerminalSSHPortAllowsCustomPort(t *testing.T) {
+	got, err := terminalSSHPort(2222)
+	if err != nil {
+		t.Fatalf("terminalSSHPort(2222) error = %v", err)
+	}
+	if got != "2222" {
+		t.Fatalf("terminalSSHPort(2222) = %q, want 2222", got)
+	}
+}
+
+func TestTerminalSSHPortRejectsOutOfRangePort(t *testing.T) {
+	if _, err := terminalSSHPort(65536); err == nil {
+		t.Fatal("expected terminalSSHPort(65536) to reject the port")
+	}
+}
+
 func TestIsSSHAuthenticationFailure(t *testing.T) {
 	if !isSSHAuthenticationFailure(&ssh.ServerAuthError{}) {
 		t.Fatal("expected ssh.ServerAuthError to count as an authentication failure")

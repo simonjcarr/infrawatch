@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { formatDistanceToNow, format } from 'date-fns'
-import { Bell, Plus, Trash2, VolumeX, VolumeOff } from 'lucide-react'
+import { format } from 'date-fns'
+import { Bell, Plus, RotateCcw, Trash2, VolumeX, VolumeOff } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -41,6 +41,7 @@ import {
   createAlertRule,
   updateAlertRule,
   deleteAlertRule,
+  replaceHostMetricAlertsWithGlobalDefaults,
   getAlertInstances,
   getActiveSilencesForHost,
   createSilence,
@@ -49,7 +50,7 @@ import {
 import { getChecksWithHistory } from '@/lib/actions/checks'
 import { getCertificates } from '@/lib/actions/certificates'
 import { getHostDockerContainers } from '@/lib/actions/docker-containers'
-import type { AlertRule, AlertSeverity, AlertSilence } from '@/lib/db/schema'
+import type { AlertRule, AlertSeverity } from '@/lib/db/schema'
 
 // ─── Form schema (flat — validation applied per conditionType in onSubmit) ─────
 
@@ -159,13 +160,11 @@ const silenceFormSchema = z.object({
 type SilenceFormValues = z.infer<typeof silenceFormSchema>
 
 function AddSilenceDialog({
-  scopeId,
   hostId,
   open,
   onOpenChange,
   onSuccess,
 }: {
-  scopeId: string
   hostId: string
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -719,6 +718,7 @@ export function AlertsTab({ scopeId, hostId }: Props) {
   const qc = useQueryClient()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [addSilenceOpen, setAddSilenceOpen] = useState(false)
+  const [replaceMetricDefaultsError, setReplaceMetricDefaultsError] = useState<string | null>(null)
 
   const { data: allRules = [] } = useQuery({
     queryKey: ['alert-rules', scopeId, hostId],
@@ -755,6 +755,21 @@ export function AlertsTab({ scopeId, hostId }: Props) {
   const deleteMutation = useMutation({
     mutationFn: (ruleId: string) => deleteAlertRule(ruleId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] }),
+  })
+
+  const replaceMetricDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      const result = await replaceHostMetricAlertsWithGlobalDefaults(hostId)
+      if ('error' in result) throw new Error(result.error)
+      return result
+    },
+    onMutate: () => setReplaceMetricDefaultsError(null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] }),
+    onError: (error) => {
+      setReplaceMetricDefaultsError(
+        error instanceof Error ? error.message : 'Failed to replace metric alert rules',
+      )
+    },
   })
 
   const deleteSilenceMutation = useMutation({
@@ -810,13 +825,23 @@ export function AlertsTab({ scopeId, hostId }: Props) {
       )}
 
       {/* Host-specific rules */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
+      <Card data-testid="host-alert-rules-card">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="text-base">Alert Rules</CardTitle>
             <CardDescription className="mt-1">Rules that apply specifically to this host</CardDescription>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => replaceMetricDefaultsMutation.mutate()}
+              disabled={replaceMetricDefaultsMutation.isPending}
+              data-testid="host-alerts-replace-metrics-with-defaults"
+            >
+              <RotateCcw className="size-3.5 mr-1" />
+              Use Metric Defaults
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setAddSilenceOpen(true)}>
               <VolumeX className="size-3.5 mr-1" />
               Silence Host
@@ -828,6 +853,11 @@ export function AlertsTab({ scopeId, hostId }: Props) {
           </div>
         </CardHeader>
         <CardContent>
+          {replaceMetricDefaultsError != null && (
+            <p className="text-sm text-red-600 pb-3" data-testid="host-alerts-replace-metrics-error">
+              {replaceMetricDefaultsError}
+            </p>
+          )}
           {hostRules.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               No rules for this host yet. Add one to start alerting.
@@ -881,14 +911,14 @@ export function AlertsTab({ scopeId, hostId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Global default rules (read-only) — these also apply to this host */}
+      {/* Global default rules (read-only) — templates available for this host */}
       <Card>
         <CardHeader>
           <div>
-            <CardTitle className="text-base">Instance-wide Default Rules</CardTitle>
+            <CardTitle className="text-base">Global Metric Defaults</CardTitle>
             <CardDescription className="mt-1">
-              These rules apply to <strong>all hosts</strong> in your instance and are
-              evaluated in addition to the host-specific rules above.{' '}
+              These defaults are not evaluated for this host until you apply them with{' '}
+              <strong>Use Metric Defaults</strong>.{' '}
               <a href="/settings/monitoring" className="underline underline-offset-2">
                 Manage in Administration → Monitoring
               </a>
@@ -899,7 +929,7 @@ export function AlertsTab({ scopeId, hostId }: Props) {
         <CardContent>
           {globalDefaults.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No instance-wide default rules configured.
+              No global metric defaults configured.
             </p>
           ) : (
             <Table>
@@ -940,7 +970,6 @@ export function AlertsTab({ scopeId, hostId }: Props) {
         onSuccess={() => qc.invalidateQueries({ queryKey: ['alert-rules', scopeId, hostId] })}
       />
       <AddSilenceDialog
-        scopeId={scopeId}
         hostId={hostId}
         open={addSilenceOpen}
         onOpenChange={setAddSilenceOpen}

@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +52,7 @@ type wsMessage struct {
 	Code     int32  `json:"exit_code,omitempty"`
 	Token    string `json:"token,omitempty"`
 	Password string `json:"password,omitempty"`
+	Port     uint32 `json:"port,omitempty"`
 }
 
 func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +86,12 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		conn.Close(websocket.StatusPolicyViolation, "invalid authentication")
 		return
 	}
+	sshPort, err := terminalSSHPort(authMsg.Port)
+	if err != nil {
+		writeWS(ctx, conn, wsMessage{Type: "error", Msg: "Invalid SSH port"})
+		conn.Close(websocket.StatusPolicyViolation, "invalid port")
+		return
+	}
 
 	tokenSum := sha256.Sum256([]byte(authMsg.Token))
 	info, err := queries.ValidateAndActivateTerminalSession(ctx, h.pool, sessionID, hex.EncodeToString(tokenSum[:]))
@@ -113,8 +121,8 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("terminal ws: opening SSH session", "session_id", sessionID, "host_id", info.HostID, "username", info.Username)
-	sshClient, sshSession, stdin, stdout, err := h.openSSHSession(ctx, info.HostID, info.Host, info.Username, authMsg.Password)
+	slog.Info("terminal ws: opening SSH session", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "port", sshPort)
+	sshClient, sshSession, stdin, stdout, err := h.openSSHSession(ctx, info.HostID, info.Host, info.Username, authMsg.Password, sshPort)
 	authMsg.Password = ""
 	if err != nil {
 		slog.Warn("terminal ws: SSH connection failed", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
@@ -261,7 +269,7 @@ func terminalWSAcceptOptions(trustedOrigins []string) (*websocket.AcceptOptions,
 	}, nil
 }
 
-func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, username, password string) (*ssh.Client, *ssh.Session, io.WriteCloser, io.Reader, error) {
+func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, username, password, port string) (*ssh.Client, *ssh.Session, io.WriteCloser, io.Reader, error) {
 	config := &ssh.ClientConfig{
 		User: username,
 		Auth: []ssh.AuthMethod{
@@ -280,7 +288,7 @@ func (h *TerminalWSHandler) openSSHSession(ctx context.Context, hostID, host, us
 		Timeout: 30 * time.Second,
 	}
 
-	address := net.JoinHostPort(host, "22")
+	address := net.JoinHostPort(host, port)
 	type dialResult struct {
 		client *ssh.Client
 		err    error
@@ -350,6 +358,16 @@ func terminalRemoteAddr(remoteAddr string) string {
 		return host
 	}
 	return remoteAddr
+}
+
+func terminalSSHPort(port uint32) (string, error) {
+	if port == 0 {
+		return "22", nil
+	}
+	if port > 65535 {
+		return "", fmt.Errorf("SSH port %d is out of range", port)
+	}
+	return strconv.FormatUint(uint64(port), 10), nil
 }
 
 func isSSHAuthenticationFailure(err error) bool {

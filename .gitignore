@@ -60,3 +60,4 @@ deploy/scripts/licence-*-private.pem
 
 # Claude Code local config
 .claude/
+.worktrees

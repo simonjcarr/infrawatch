@@ -18,6 +18,12 @@ import { Badge } from '@/components/ui/badge'
 import { listHosts } from '@/lib/actions/agents'
 import { checkTerminalAccess } from '@/lib/actions/terminal'
 import { useSession } from '@/lib/auth/client'
+import {
+  DEFAULT_TERMINAL_SSH_PORT,
+  getTerminalSshPortStorageKey,
+  normaliseTerminalSshPort,
+  parseTerminalSshPort,
+} from '@/lib/terminal/ssh-port'
 import { useTerminalPanel } from './terminal-panel-context'
 
 interface Props {
@@ -34,6 +40,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
   const { data: session } = useSession()
   const [typedUsername, setTypedUsername] = useState<string | null>(null)
   const [password, setPassword] = useState('')
+  const [portInput, setPortInput] = useState(String(DEFAULT_TERMINAL_SSH_PORT))
 
   const { data: hosts = [], isLoading } = useQuery({
     queryKey: ['hosts'],
@@ -101,6 +108,19 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
 
   const username = typedUsername ?? savedUsername
 
+  const readSavedPortInput = (hostId: string) => {
+    try {
+      return String(normaliseTerminalSshPort(localStorage.getItem(getTerminalSshPortStorageKey(hostId))))
+    } catch {
+      return String(DEFAULT_TERMINAL_SSH_PORT)
+    }
+  }
+
+  const handleSelectHost = (hostId: string) => {
+    setSelectedHostId(hostId)
+    setPortInput(readSavedPortInput(hostId))
+  }
+
   const handleConnect = async () => {
     if (!selectedHost) return
 
@@ -115,6 +135,11 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
     }
     if (!password) {
       setError('Password is required for SSH terminal access')
+      return
+    }
+    const parsedPort = parseTerminalSshPort(portInput)
+    if (!parsedPort.ok) {
+      setError(parsedPort.error)
       return
     }
 
@@ -134,6 +159,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
       hostId: selectedHost.id,
       hostname: selectedHost.displayName ?? selectedHost.hostname,
       username: username.trim(),
+      port: parsedPort.port,
       password,
       directAccess: false,
     })
@@ -143,6 +169,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
     setSelectedHostId(null)
     setTypedUsername(null)
     setPassword('')
+    setPortInput(String(DEFAULT_TERMINAL_SSH_PORT))
     setError(null)
     setConnecting(false)
     onOpenChange(false)
@@ -152,6 +179,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
     setSelectedHostId(null)
     setTypedUsername(null)
     setPassword('')
+    setPortInput(String(DEFAULT_TERMINAL_SSH_PORT))
     setError(null)
   }
 
@@ -161,6 +189,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
       setSelectedHostId(null)
       setTypedUsername(null)
       setPassword('')
+      setPortInput(String(DEFAULT_TERMINAL_SSH_PORT))
       setError(null)
     }
     onOpenChange(nextOpen)
@@ -210,7 +239,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
                     <button
                       key={host.id}
                       className="flex items-center gap-3 w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
-                      onClick={() => setSelectedHostId(host.id)}
+                      onClick={() => handleSelectHost(host.id)}
                     >
                       <Server className="size-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -276,6 +305,27 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="host-selector-port" className="text-sm font-medium">
+                    SSH Port
+                  </Label>
+                  <Input
+                    id="host-selector-port"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    step={1}
+                    inputMode="numeric"
+                    value={portInput}
+                    onChange={(e) => {
+                      setPortInput(e.target.value)
+                      setError(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && username.trim() && password && portInput.trim()) handleConnect()
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="host-selector-password" className="text-sm font-medium">
                     <KeyRound className="size-3.5 inline mr-1.5" />
                     Password
@@ -290,7 +340,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
                     }}
                     autoComplete="current-password"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && username.trim() && password) handleConnect()
+                      if (e.key === 'Enter' && username.trim() && password && portInput.trim()) handleConnect()
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -317,7 +367,7 @@ export function HostSelectorDialog({ open, onOpenChange }: Props) {
           {selectedHostId && terminalAccess?.allowed && (
             <Button
               onClick={handleConnect}
-              disabled={connecting || !username.trim() || !password}
+              disabled={connecting || !username.trim() || !password || !portInput.trim()}
             >
               {connecting ? (
                 <Loader2 className="size-4 mr-1.5 animate-spin" />

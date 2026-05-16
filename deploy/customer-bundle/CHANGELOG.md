@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.22.0...bundle/v0.23.0) (2026-05-16)
+
+
+### Features
+
+* **web:** show Ansible API image path ([#1441](https://github.com/carrtech-dev/ct-ops/issues/1441)) ([bd6ae19](https://github.com/carrtech-dev/ct-ops/commit/bd6ae190dd80ee75c0084484a1abb75308d9fa49))
+
 ## [0.22.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.21.0...bundle/v0.22.0) (2026-05-16)
 
 

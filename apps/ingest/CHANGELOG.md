@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.16.0...ingest/v0.17.0) (2026-05-16)
+
+
+### Features
+
+* **terminal:** support custom SSH ports ([36872a6](https://github.com/carrtech-dev/ct-ops/commit/36872a6de32ace904af5ee3832767f6da6f9ada2))
+
 ## [0.16.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.15.1...ingest/v0.16.0) (2026-05-13)
 
 

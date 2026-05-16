@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.26.0...bundle/v0.27.0) (2026-05-16)
+
+
+### Features
+
+* **terminal:** support custom SSH ports ([36872a6](https://github.com/carrtech-dev/ct-ops/commit/36872a6de32ace904af5ee3832767f6da6f9ada2))
+
 ## [0.26.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.25.1...bundle/v0.26.0) (2026-05-16)
 
 

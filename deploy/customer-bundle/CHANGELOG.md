@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.21.0...bundle/v0.22.0) (2026-05-16)
+
+
+### Features
+
+* **modules:** add module connection contract ([#1439](https://github.com/carrtech-dev/ct-ops/issues/1439)) ([479548a](https://github.com/carrtech-dev/ct-ops/commit/479548a299ee119a3e442eeef677bc165c2c4bbd))
+
 ## [0.21.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.3...bundle/v0.21.0) (2026-05-15)
 
 

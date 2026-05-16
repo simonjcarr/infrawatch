@@ -1,7 +1,7 @@
 {
-  ".": "0.21.0",
+  ".": "0.22.0",
   "agent": "0.38.1",
-  "apps/web": "0.153.0",
+  "apps/web": "0.154.0",
   "apps/ingest": "0.16.0",
-  "apps/ansible-api": "0.3.3"
+  "apps/ansible-api": "0.4.0"
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.23.0...bundle/v0.24.0) (2026-05-16)
+
+
+### Features
+
+* **web:** add Ansible automation runbook ([afd64cd](https://github.com/carrtech-dev/ct-ops/commit/afd64cdfd02b11c99a244b20ddcca2e64339d59d))
+
 ## [0.23.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.22.0...bundle/v0.23.0) (2026-05-16)
 
 

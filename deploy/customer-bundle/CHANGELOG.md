@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.22.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.21.0...bundle/v0.22.0) (2026-05-16)
+
+
+### Features
+
+* **modules:** add module connection contract ([#1439](https://github.com/carrtech-dev/ct-ops/issues/1439)) ([479548a](https://github.com/carrtech-dev/ct-ops/commit/479548a299ee119a3e442eeef677bc165c2c4bbd))
+
+## [0.21.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.3...bundle/v0.21.0) (2026-05-15)
+
+
+### Features
+
+* **hosts:** add activity dialog association tabs ([d8ed7dc](https://github.com/carrtech-dev/ct-ops/commit/d8ed7dc8d7c00007bbcabb09ae2f2f7c53c42fd3))
+
+## [0.20.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.2...bundle/v0.20.3) (2026-05-15)
+
+
+### Bug Fixes
+
+* **password-manager:** align launch assertion tenant claims ([aebc947](https://github.com/carrtech-dev/ct-ops/commit/aebc947c069cb739bfc4ccd2173bef0ee391caa0))
+
+## [0.20.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.1...bundle/v0.20.2) (2026-05-15)
+
+
+### Bug Fixes
+
+* **dev:** connect agent containers to dev network ([29807ef](https://github.com/carrtech-dev/ct-ops/commit/29807ef25eb78a601247b8f8ad3baaa5dcf408b2))
+
+## [0.20.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.20.0...bundle/v0.20.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **agent:** include token in enrollment view command ([370aa08](https://github.com/carrtech-dev/ct-ops/commit/370aa08aadc861636d578de433e36e0f433b024b)), closes [#1426](https://github.com/carrtech-dev/ct-ops/issues/1426)
+
 ## [0.20.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.19.4...bundle/v0.20.0) (2026-05-14)
 
 

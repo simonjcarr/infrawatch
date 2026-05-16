@@ -15,6 +15,26 @@
 
 ## What Has Been Built
 
+### Session 135 — Module connection contract framework
+
+**External module contract and Ansible conversion** (`apps/web/lib/modules/*`, `apps/web/lib/db/schema/module-connections.ts`, `apps/web/lib/automation/ansible-api.ts`, `apps/ansible-api/server.py`)
+- Added a generic `module_connections` contract for optional modules with base
+  URL, contract version, auth mode, service-token metadata, TLS mode, timeout,
+  enabled state, and encrypted token secret storage.
+- Converted CT-Ops Ansible calls to resolve the configured module connection
+  instead of assuming the bundled `ansible-api` container URL, while retaining
+  the legacy `ANSIBLE_API_URL` fallback for existing installs.
+- Added service-token HMAC signing from CT-Ops to Ansible and optional HMAC
+  verification in `ansible-api` when `ANSIBLE_API_SERVICE_TOKEN_ID` and
+  `ANSIBLE_API_SERVICE_TOKEN_SECRET` are set.
+- Removed start-script database probing that auto-started the Ansible Compose
+  profile; Ansible is now treated as a manually run module that can live on the
+  same host, a different host, or behind a reverse proxy.
+
+**Validation**
+- `node --experimental-strip-types --test apps/web/lib/modules/*.test.mjs`
+- `python -m unittest tests/test_contract.py` from `apps/ansible-api`
+
 ### Session 134 — Host calendar activity dialog tabs
 
 **Tabbed host activity detail dialog** (`apps/web/app/(dashboard)/hosts/[id]/host-calendar-tab.tsx`, `apps/web/lib/actions/calendar.ts`, `apps/web/tests/e2e/hosts/host-calendar.spec.ts`)

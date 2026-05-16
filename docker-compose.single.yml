@@ -226,6 +226,9 @@ services:
     build:
       context: apps/ansible-api
       dockerfile: Dockerfile
+    environment:
+      ANSIBLE_API_SERVICE_TOKEN_ID: ${ANSIBLE_API_SERVICE_TOKEN_ID:-}
+      ANSIBLE_API_SERVICE_TOKEN_SECRET: ${ANSIBLE_API_SERVICE_TOKEN_SECRET:-}
     profiles:
       - ansible
     restart: unless-stopped

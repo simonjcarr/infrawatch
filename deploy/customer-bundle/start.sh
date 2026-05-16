@@ -143,35 +143,6 @@ validate_password_manager_image_pin() {
   fi
 }
 
-should_start_ansible_profile() {
-  local instance_id="${CT_OPS_INSTANCE_ID:-ct-ops-dev}"
-  local postgres_user="${POSTGRES_USER:-ctops}"
-  local postgres_db="${POSTGRES_DB:-ctops}"
-  local enabled
-
-  if ! enabled="$(docker compose exec -T db psql \
-    -U "$postgres_user" \
-    -d "$postgres_db" \
-    -At \
-    -v ON_ERROR_STOP=1 \
-    -v instance_id="$instance_id" 2>/dev/null <<'SQL'
-SELECT CASE WHEN EXISTS (
-      SELECT 1
-      FROM instance_settings
-      WHERE id = :'instance_id'
-        AND COALESCE(metadata->'featureFlags'->>'automation.ansible', 'false') = 'true'
-        AND COALESCE(metadata->'automationSettings'->>'provider', 'none') = 'ansible'
-    ) THEN 'true' ELSE 'false' END;
-SQL
-  )"; then
-    echo "ERROR: could not read Ansible automation setting from the CT-Ops database." >&2
-    echo "Check the db container logs, then re-run ./start.sh." >&2
-    exit 1
-  fi
-
-  [ "$enabled" = "true" ]
-}
-
 require_openssl() {
   local purpose="$1"
   if ! command -v openssl >/dev/null 2>&1; then
@@ -745,27 +716,8 @@ start_stack() {
     exit 1
   fi
 
-  local -a compose_profile_args=()
-  if should_start_ansible_profile; then
-    echo "Ansible automation is enabled; starting optional ansible-api service."
-    compose_profile_args=(--profile ansible)
-    if [ ! -f "images.tar.gz" ]; then
-      if ! docker compose --profile ansible pull ansible-api; then
-        echo "" >&2
-        echo "ERROR: failed to pull the optional Ansible API image from GHCR." >&2
-        exit 1
-      fi
-    fi
-  fi
-
   echo "Starting CT-Ops..."
-  if ! {
-    if [ ${#compose_profile_args[@]} -gt 0 ]; then
-      docker compose "${compose_profile_args[@]}" up -d
-    else
-      docker compose up -d
-    fi
-  }; then
+  if ! docker compose up -d; then
     echo "" >&2
     echo "ERROR: 'docker compose up' failed." >&2
     echo "Recent logs (last 50 lines per service):" >&2

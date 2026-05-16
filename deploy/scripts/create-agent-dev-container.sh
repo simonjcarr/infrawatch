@@ -199,6 +199,7 @@ docker_run_args=(
   -d
   --name "$CONTAINER_NAME"
   --hostname "$CONTAINER_NAME"
+  --user root
   --privileged
   --cgroupns=host
   --restart unless-stopped

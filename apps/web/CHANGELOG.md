@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.158.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.158.0...web/v0.158.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **hosts:** clean docker rows on delete ([306848b](https://github.com/carrtech-dev/ct-ops/commit/306848b9ababe0eb1cc4476304255c5446d371c9))
+
+## [0.158.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.157.1...web/v0.158.0) (2026-05-16)
+
+
+### Features
+
+* **terminal:** support custom SSH ports ([36872a6](https://github.com/carrtech-dev/ct-ops/commit/36872a6de32ace904af5ee3832767f6da6f9ada2))
+
+## [0.157.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.157.0...web/v0.157.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **ldap:** align add form with AD defaults ([d1deb2b](https://github.com/carrtech-dev/ct-ops/commit/d1deb2bf2571a1ecd2e34a28d792bf777b7a2d0a))
+
+## [0.157.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.156.0...web/v0.157.0) (2026-05-16)
+
+
+### Features
+
+* **password-manager:** refresh unlocked vault entries ([525f7ee](https://github.com/carrtech-dev/ct-ops/commit/525f7ee16ed962579e9e211b87183b3213bb5db5))
+
 ## [0.156.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.155.0...web/v0.156.0) (2026-05-16)
 
 

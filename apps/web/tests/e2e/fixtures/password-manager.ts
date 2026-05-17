@@ -48,6 +48,7 @@ interface PasswordManagerMockState {
 export interface PasswordManagerMockController {
   getMemberEnvelope(userId: string): PasswordManagerMemberEnvelope
   failNextRefreshWithSessionExpiry(): void
+  copyEntryAsExternalUpdate(vaultId: string, sourceEntryId: string, targetEntryId?: string): string
   setVaultRole(vaultId: string, role: string): void
   switchAuthenticatedInstance(): Promise<void>
   launchAssertions(): string[]
@@ -623,6 +624,9 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
           member.wrapped_vault_key_envelope,
           readRecordJsonValue(current, 'wrapped_vault_key_envelope', {}),
         )
+        if (member.user_id === state.currentUserId) {
+          vault.record.wrapped_vault_key_envelope = current.wrapped_vault_key_envelope
+        }
         current.key_epoch = epoch
         current.updated_at = nowIso()
       }
@@ -659,6 +663,29 @@ export async function createPasswordManagerMock(context: BrowserContext): Promis
     },
     failNextRefreshWithSessionExpiry() {
       state.failNextRefresh = true
+    },
+    copyEntryAsExternalUpdate(vaultId: string, sourceEntryId: string, targetEntryId?: string) {
+      const vault = state.vaults.get(vaultId)
+      if (!vault) {
+        throw new Error(`Password Manager mock vault not found: ${vaultId}`)
+      }
+      const source = vault.entries.get(sourceEntryId)
+      if (!source) {
+        throw new Error(`Password Manager mock entry not found: ${sourceEntryId}`)
+      }
+
+      const id = targetEntryId ?? `entry-${vault.nextEntryNumber++}`
+      const current = vault.entries.get(id)
+      const timestamp = nowIso()
+      const record = {
+        ...source,
+        id,
+        vault_id: vaultId,
+        created_at: readRecordStringValue(current ?? source, 'created_at', timestamp),
+        updated_at: timestamp,
+      }
+      vault.entries.set(id, record)
+      return id
     },
     setVaultRole(vaultId: string, role: string) {
       const vault = state.vaults.get(vaultId)

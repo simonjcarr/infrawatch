@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.27.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.1...bundle/v0.27.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **terminal:** prefer host IP for SSH sessions ([1388ea3](https://github.com/carrtech-dev/ct-ops/commit/1388ea324256baef3865d948e4b638611c8653df))
+
+## [0.27.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.0...bundle/v0.27.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **hosts:** clean docker rows on delete ([306848b](https://github.com/carrtech-dev/ct-ops/commit/306848b9ababe0eb1cc4476304255c5446d371c9))
+
+## [0.27.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.26.0...bundle/v0.27.0) (2026-05-16)
+
+
+### Features
+
+* **terminal:** support custom SSH ports ([36872a6](https://github.com/carrtech-dev/ct-ops/commit/36872a6de32ace904af5ee3832767f6da6f9ada2))
+
+## [0.26.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.25.1...bundle/v0.26.0) (2026-05-16)
+
+
+### Features
+
+* **deploy:** add SSH access to agent dev containers ([8bea994](https://github.com/carrtech-dev/ct-ops/commit/8bea994ef8f7b33e7bf5e0ac629ef6766ce15266))
+
+## [0.25.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.25.0...bundle/v0.25.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **ldap:** align add form with AD defaults ([d1deb2b](https://github.com/carrtech-dev/ct-ops/commit/d1deb2bf2571a1ecd2e34a28d792bf777b7a2d0a))
+
+## [0.25.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.24.0...bundle/v0.25.0) (2026-05-16)
+
+
+### Features
+
+* **password-manager:** refresh unlocked vault entries ([525f7ee](https://github.com/carrtech-dev/ct-ops/commit/525f7ee16ed962579e9e211b87183b3213bb5db5))
+
 ## [0.24.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.23.0...bundle/v0.24.0) (2026-05-16)
 
 

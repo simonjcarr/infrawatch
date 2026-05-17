@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.17.2](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.17.1...ingest/v0.17.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **terminal:** prefer host IP for SSH sessions ([1388ea3](https://github.com/carrtech-dev/ct-ops/commit/1388ea324256baef3865d948e4b638611c8653df))
+
+## [0.17.1](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.17.0...ingest/v0.17.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **hosts:** clean docker rows on delete ([306848b](https://github.com/carrtech-dev/ct-ops/commit/306848b9ababe0eb1cc4476304255c5446d371c9))
+
+## [0.17.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.16.0...ingest/v0.17.0) (2026-05-16)
+
+
+### Features
+
+* **terminal:** support custom SSH ports ([36872a6](https://github.com/carrtech-dev/ct-ops/commit/36872a6de32ace904af5ee3832767f6da6f9ada2))
+
 ## [0.16.0](https://github.com/carrtech-dev/ct-ops/compare/ingest/v0.15.1...ingest/v0.16.0) (2026-05-13)
 
 

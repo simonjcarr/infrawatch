@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/coder/websocket"
@@ -126,8 +127,7 @@ func (h *TerminalWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	authMsg.Password = ""
 	if err != nil {
 		slog.Warn("terminal ws: SSH connection failed", "session_id", sessionID, "host_id", info.HostID, "username", info.Username, "err", err)
-		reason := "ssh authentication failed"
-		message := "SSH authentication failed"
+		reason, message := terminalSSHFailureDetails(err)
 		if errors.Is(err, queries.ErrSSHHostKeyNotTrusted) || errors.Is(err, queries.ErrSSHHostKeyMismatch) {
 			reason = "ssh host key verification failed"
 			message = "SSH host key verification failed"
@@ -373,6 +373,33 @@ func terminalSSHPort(port uint32) (string, error) {
 func isSSHAuthenticationFailure(err error) bool {
 	var authErr *ssh.ServerAuthError
 	return errors.As(err, &authErr)
+}
+
+func terminalSSHFailureDetails(err error) (reason string, message string) {
+	if isSSHAuthenticationFailure(err) {
+		return "ssh authentication failed", "SSH authentication failed"
+	}
+
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) || strings.Contains(strings.ToLower(err.Error()), "no such host") {
+		return "ssh connection failed", "SSH connection failed: host name could not be resolved"
+	}
+
+	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, syscall.ETIMEDOUT) ||
+		(errors.As(err, &netErr) && netErr.Timeout()) {
+		return "ssh connection failed", "SSH connection failed: connection timed out"
+	}
+
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return "ssh connection failed", "SSH connection failed: connection refused"
+	}
+	if errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) {
+		return "ssh connection failed", "SSH connection failed: host is unreachable"
+	}
+
+	return "ssh connection failed", "SSH connection failed"
 }
 
 func writeWS(ctx context.Context, conn *websocket.Conn, msg wsMessage) error {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.2...bundle/v0.27.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* **settings:** improve LDAP certificate editing ([44e5492](https://github.com/carrtech-dev/ct-ops/commit/44e5492d1e41637e56b51695a20369876073ea65))
+
 ## [0.27.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.1...bundle/v0.27.2) (2026-05-17)
 
 

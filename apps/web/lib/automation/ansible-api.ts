@@ -9,6 +9,7 @@ import {
   type ModuleConnectionSummary,
 } from '@/lib/modules/module-connections'
 import { buildSignedModuleRequestHeaders } from '@/lib/modules/service-token'
+import { buildAnsiblePairingConnectionInput, ANSIBLE_PAIRING_TIMEOUT_MS } from './ansible-pairing-core'
 
 export interface AnsibleApiHealth {
   ok: boolean
@@ -42,6 +43,12 @@ export interface RunAnsiblePingResponse {
   ok: boolean
   elapsedMs: number
   hosts: RunAnsiblePingHostResult[]
+}
+
+export interface PairAnsibleApiInput {
+  baseUrl: string
+  username: string
+  password: string
 }
 
 export function getAnsibleApiBaseUrl(): string {
@@ -95,6 +102,48 @@ export async function saveAnsibleModuleConnection(
     ...input,
     moduleType: 'ansible',
   })
+}
+
+export async function pairAnsibleApi(
+  instanceId: string,
+  input: PairAnsibleApiInput,
+): Promise<ModuleConnectionSummary> {
+  const baseUrl = input.baseUrl.trim().replace(/\/+$/, '')
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), ANSIBLE_PAIRING_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/pairing/claim`, {
+      method: 'POST',
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        username: input.username,
+        password: input.password,
+      }),
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok) {
+      const message = typeof data?.error === 'string' ? data.error : `Ansible API returned ${response.status}`
+      throw new Error(message)
+    }
+    if (
+      data?.ok !== true ||
+      typeof data.tokenId !== 'string' ||
+      typeof data.tokenSecret !== 'string'
+    ) {
+      throw new Error('Invalid Ansible pairing response')
+    }
+
+    return saveAnsibleModuleConnection(instanceId, buildAnsiblePairingConnectionInput({
+      baseUrl,
+      tokenId: data.tokenId,
+      tokenSecret: data.tokenSecret,
+    }))
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function requestHeaders(connection: ModuleConnectionRuntime, method: string, path: string, body: string | Buffer = '') {

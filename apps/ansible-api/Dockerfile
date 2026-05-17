@@ -2,7 +2,9 @@ FROM python:3.13-alpine
 
 RUN apk add --no-cache ansible openssh-client \
   && addgroup -S ansible \
-  && adduser -S -G ansible ansible
+  && adduser -S -G ansible ansible \
+  && mkdir -p /var/lib/ct-ops/ansible-api \
+  && chown -R ansible:ansible /var/lib/ct-ops
 
 WORKDIR /app
 COPY server.py /app/server.py

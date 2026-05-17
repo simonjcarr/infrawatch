@@ -34,8 +34,11 @@ Administrators enable it from **Settings → Integrations → Automation**. CT-O
 ```
 
 CT-Ops does not start Docker containers from the web app or from `./start.sh`.
-Administrators configure the Ansible API URL and optional service-token HMAC
-settings on the same Automation page. The `ansible-api` container can run on
-the CT-Ops host, on a different host, or behind a reverse proxy.
+Administrators pair the Ansible API URL with the initial username and password
+configured on the `ansible-api` container. The container then generates a
+service-token secret for ongoing signed requests; CT-Ops stores that generated
+secret encrypted and does not retain the initial password. The `ansible-api`
+container can run on the CT-Ops host, on a different host, or behind a reverse
+proxy.
 
 When the API is healthy, administrators can save encrypted SSH private-key credential profiles and run an Ansible ping task from host or host-group task views. CT-Ops stores task state and redacted output in its task history; the Ansible container only executes the requested ping operation.

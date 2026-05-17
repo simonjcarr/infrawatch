@@ -5,8 +5,10 @@ import base64
 import hashlib
 import hmac
 import os
+import secrets
 import subprocess
 import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -19,6 +21,12 @@ SIGNATURE_PREFIX = "v1="
 MAX_CLOCK_SKEW_SECONDS = 300
 NONCE_TTL_SECONDS = 600
 _seen_nonces: dict[str, float] = {}
+PAIRING_RATE_LIMIT_WINDOW_SECONDS = 300
+PAIRING_RATE_LIMIT_ATTEMPTS = 10
+DEFAULT_SERVICE_TOKEN_FILE = "/var/lib/ct-ops/ansible-api/service-token.json"
+DEFAULT_SERVICE_TOKEN_ID = "ansible-api"
+_pairing_lock = threading.Lock()
+_pairing_attempts: dict[str, list[float]] = {}
 
 
 def ansible_version() -> str:
@@ -58,6 +66,7 @@ def capabilities_payload() -> dict[str, Any]:
             "streamingLogs": False,
             "jobCancel": False,
             "dryRun": False,
+            "pairing": True,
         },
     }
 
@@ -97,11 +106,25 @@ def openapi_payload() -> dict[str, Any]:
                     },
                 },
             },
+            "/api/v1/pairing/claim": {
+                "post": {
+                    "summary": "Exchange initial pairing credentials for a CT-Ops service token",
+                    "responses": {
+                        "200": {"description": "Generated service-token credentials"},
+                        "401": {"description": "Invalid pairing credentials"},
+                        "409": {"description": "Ansible API token is managed by environment variables"},
+                    },
+                },
+            },
         },
     }
 
 
-def _configured_service_token() -> tuple[str, str] | None:
+def _service_token_file() -> str:
+    return os.environ.get("ANSIBLE_API_SERVICE_TOKEN_FILE", DEFAULT_SERVICE_TOKEN_FILE).strip()
+
+
+def _configured_env_service_token() -> tuple[str, str] | None:
     token_id = os.environ.get("ANSIBLE_API_SERVICE_TOKEN_ID", "").strip()
     token_secret = os.environ.get("ANSIBLE_API_SERVICE_TOKEN_SECRET", "")
     if not token_id and not token_secret:
@@ -109,6 +132,101 @@ def _configured_service_token() -> tuple[str, str] | None:
     if not token_id or len(token_secret.encode("utf-8")) < 32:
         raise PermissionError("Ansible API service token is not configured correctly")
     return token_id, token_secret
+
+
+def _load_service_token_file() -> tuple[str, str] | None:
+    token_file = _service_token_file()
+    if not token_file or not os.path.exists(token_file):
+        return None
+    try:
+        with open(token_file, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except Exception as err:
+        raise PermissionError("Ansible API service token file is not readable") from err
+
+    token_id = str(payload.get("tokenId", "")).strip()
+    token_secret = str(payload.get("tokenSecret", ""))
+    if not token_id or len(token_secret.encode("utf-8")) < 32:
+        raise PermissionError("Ansible API service token file is not configured correctly")
+    return token_id, token_secret
+
+
+def _configured_service_token() -> tuple[str, str] | None:
+    return _configured_env_service_token() or _load_service_token_file()
+
+
+def _write_service_token_file(token_id: str, token_secret: str) -> None:
+    token_file = _service_token_file()
+    if not token_file:
+        raise PermissionError("Ansible API service token file is not configured")
+    directory = os.path.dirname(token_file)
+    if directory:
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+    payload = {
+        "tokenId": token_id,
+        "tokenSecret": token_secret,
+        "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    fd, tmp_path = tempfile.mkstemp(prefix=".service-token-", dir=directory or None)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, sort_keys=True)
+            handle.write("\n")
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, token_file)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _pairing_credentials() -> tuple[str, str]:
+    username = os.environ.get("ANSIBLE_API_PAIRING_USERNAME", "").strip()
+    password = os.environ.get("ANSIBLE_API_PAIRING_PASSWORD", "")
+    if not username or not password:
+        raise PermissionError("Ansible API pairing is not configured")
+    return username, password
+
+
+def _check_pairing_rate_limit(client_id: str | None) -> None:
+    key = client_id or "local"
+    now = time.time()
+    cutoff = now - PAIRING_RATE_LIMIT_WINDOW_SECONDS
+    attempts = [value for value in _pairing_attempts.get(key, []) if value >= cutoff]
+    if len(attempts) >= PAIRING_RATE_LIMIT_ATTEMPTS:
+        _pairing_attempts[key] = attempts
+        raise PermissionError("too many pairing attempts")
+    attempts.append(now)
+    _pairing_attempts[key] = attempts
+
+
+def claim_pairing_token(payload: dict[str, Any], client_id: str | None = None) -> dict[str, Any]:
+    if _configured_env_service_token() is not None:
+        raise PermissionError("Ansible API service token is managed by environment variables")
+
+    configured_username, configured_password = _pairing_credentials()
+    _check_pairing_rate_limit(client_id)
+
+    username = payload.get("username")
+    password = payload.get("password")
+    if not isinstance(username, str) or not isinstance(password, str):
+        raise ValueError("username and password are required")
+    if not hmac.compare_digest(username, configured_username) or not hmac.compare_digest(password, configured_password):
+        raise PermissionError("invalid pairing credentials")
+
+    with _pairing_lock:
+        if _configured_env_service_token() is not None:
+            raise PermissionError("Ansible API service token is managed by environment variables")
+        token_id = DEFAULT_SERVICE_TOKEN_ID
+        token_secret = secrets.token_urlsafe(48)
+        _write_service_token_file(token_id, token_secret)
+        return {
+            "ok": True,
+            "tokenId": token_id,
+            "tokenSecret": token_secret,
+        }
 
 
 def _header(headers: Any, name: str) -> str:
@@ -394,6 +512,32 @@ class Handler(BaseHTTPRequestHandler):
         self.write_json({"error": "not_found"}, status=404)
 
     def do_POST(self) -> None:
+        if self.path == "/api/v1/pairing/claim":
+            try:
+                length = int(self.headers.get("content-length", "0"))
+                body = self.rfile.read(min(length, 65_536))
+                payload = json.loads(body.decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("request body must be an object")
+                client_id = self.client_address[0] if self.client_address else None
+                self.write_json(claim_pairing_token(payload, client_id=client_id))
+            except ValueError as err:
+                self.write_json({"error": str(err)}, status=400)
+            except PermissionError as err:
+                message = str(err)
+                if "managed by environment" in message:
+                    status = 409
+                elif "not configured" in message:
+                    status = 503
+                elif "too many" in message:
+                    status = 429
+                else:
+                    status = 401
+                self.write_json({"error": message}, status=status)
+            except Exception:
+                self.write_json({"error": "pairing failed"}, status=500)
+            return
+
         if self.path == "/api/v1/runs/ansible-ping":
             try:
                 length = int(self.headers.get("content-length", "0"))

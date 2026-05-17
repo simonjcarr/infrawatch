@@ -11,6 +11,7 @@ import {
   checkAnsibleApiHealth,
   getAnsibleApiBaseUrl,
   getAnsibleModuleConnectionSummary,
+  pairAnsibleApi,
   saveAnsibleModuleConnection,
 } from '@/lib/automation/ansible-api'
 import { validateSshPrivateKey } from '@/lib/automation/ansible-runner'
@@ -68,6 +69,19 @@ const ansibleConnectionInputSchema = z.object({
   timeoutMs: z.number().int().min(1000).max(120_000).optional().nullable(),
 })
 
+const ansiblePairingInputSchema = z.object({
+  baseUrl: z.string().trim().min(1, 'Ansible API URL is required').max(2048).refine((value) => {
+    try {
+      const url = new URL(value)
+      return url.protocol === 'http:' || url.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }, 'Ansible API URL must be an absolute http(s) URL'),
+  username: z.string().trim().min(1, 'Username is required').max(120),
+  password: z.string().min(1, 'Password is required').max(1024),
+})
+
 function toCredentialSummary(row: typeof ansibleCredentialProfiles.$inferSelect): AnsibleCredentialProfileSummary {
   return {
     id: row.id,
@@ -117,7 +131,7 @@ export async function getAutomationSettings(): Promise<AutomationSettingsResult>
     ansibleConnection,
     ansibleDescription: FEATURE_FLAG_REGISTRY['automation.ansible'].description,
     status: 'unavailable',
-    statusMessage: 'Ansible automation is enabled. Check the configured Ansible API URL, service-token settings, and service health.',
+    statusMessage: 'Ansible automation is enabled. Pair the Ansible API connection and check service health.',
   }
 }
 
@@ -252,6 +266,48 @@ export async function updateAnsibleModuleConnectionSettings(
   } catch (err) {
     logError('Failed to update Ansible module connection:', err)
     return { error: err instanceof Error ? err.message : 'Failed to update Ansible module connection' }
+  }
+}
+
+export async function pairAnsibleModuleConnection(
+  input: unknown,
+): Promise<{ success: true; connection: ModuleConnectionSummary } | { error: string }> {
+  const parsed = ansiblePairingInputSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join('; ') }
+
+  let session
+  let instanceId
+  try {
+    session = await getRequiredSession()
+    instanceId = resolveCurrentActionScope(session)
+    await requireInstanceAdminAccess(instanceId)
+  } catch {
+    return { error: 'You do not have permission to update automation settings' }
+  }
+
+  try {
+    const connection = await pairAnsibleApi(instanceId, parsed.data)
+
+    await writeAuditEvent(db, {
+      instanceId,
+      actorUserId: session.user.id,
+      action: 'automation.ansible.connection.paired',
+      targetType: 'module_connection',
+      targetId: connection.id,
+      summary: `Paired Ansible module connection ${connection.name}`,
+      metadata: {
+        moduleType: 'ansible',
+        baseUrl: connection.baseUrl,
+        authMode: connection.authMode,
+        tlsMode: connection.tlsMode,
+        enabled: connection.enabled,
+      },
+    })
+
+    return { success: true, connection }
+  } catch (err) {
+    logError('Failed to pair Ansible module connection:', err)
+    return { error: err instanceof Error ? err.message : 'Failed to pair Ansible module connection' }
   }
 }
 

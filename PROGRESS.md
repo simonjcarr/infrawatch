@@ -15,6 +15,32 @@
 
 ## What Has Been Built
 
+### Session 136 — Simplified Ansible pairing
+
+**URL, username, password Ansible setup** (`apps/ansible-api/server.py`, `apps/web/lib/automation/ansible-api.ts`, `apps/web/lib/actions/automation.ts`, `apps/web/app/(dashboard)/settings/integrations/automation/automation-settings-client.tsx`, `docker-compose.single.yml`)
+- Added an Ansible API pairing endpoint that accepts initial environment-backed
+  credentials, generates a service-token secret, persists it in the Ansible API
+  data volume, and uses it for ongoing HMAC verification.
+- Allowed later rotation by re-pairing with the same initial credentials; static
+  legacy `ANSIBLE_API_SERVICE_TOKEN_*` environment variables remain supported
+  but are treated as externally managed.
+- Simplified the CT-Ops automation settings screen so admins pair an Ansible
+  connection with only URL, username, and password. CT-Ops stores the generated
+  service secret encrypted and clears the initial password after pairing.
+- Added bundled compose/start-script defaults for `ANSIBLE_API_PAIRING_USERNAME`
+  and generated `ANSIBLE_API_PAIRING_PASSWORD`, plus persistent Ansible token
+  storage and updated docs/tests.
+
+**Validation**
+- `python3 -m unittest tests/test_contract.py` from `apps/ansible-api`
+- `node --experimental-strip-types --test lib/automation/ansible-pairing-core.test.mjs lib/automation/ansible-ui-gating.test.mjs lib/actions/mutation-authz.test.mjs` from `apps/web`
+- `pnpm --dir apps/web type-check`
+- `pnpm --dir apps/web db:validate`
+- `pnpm --dir apps/web lint 'app/(dashboard)/settings/integrations/automation/automation-settings-client.tsx' lib/actions/automation.ts lib/automation/ansible-api.ts lib/automation/ansible-pairing-core.ts lib/automation/ansible-pairing-core.test.mjs lib/automation/ansible-ui-gating.test.mjs lib/actions/mutation-authz.test.mjs tests/e2e/settings/automation.spec.ts`
+- `pnpm --dir apps/web test:unit`
+- `pnpm --dir apps/web test:e2e tests/e2e/settings/automation.spec.ts`
+- `bash deploy/scripts/test-ansible-profile-wiring.sh`
+
 ### Session 135 — Module connection contract framework
 
 **External module contract and Ansible conversion** (`apps/web/lib/modules/*`, `apps/web/lib/db/schema/module-connections.ts`, `apps/web/lib/automation/ansible-api.ts`, `apps/ansible-api/server.py`)

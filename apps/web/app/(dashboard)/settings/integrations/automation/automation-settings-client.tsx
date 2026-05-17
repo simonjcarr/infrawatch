@@ -7,7 +7,7 @@ import { Bot, CheckCircle2, CircleOff, KeyRound, RotateCw, ServerCog, Trash2, XC
 import {
   createAnsibleCredentialProfile,
   deleteAnsibleCredentialProfile,
-  updateAnsibleModuleConnectionSettings,
+  pairAnsibleModuleConnection,
   updateAnsibleAutomationSettings,
   type AnsibleCredentialProfileSummary,
   type AutomationSettingsResult,
@@ -28,10 +28,9 @@ interface AutomationSettingsClientProps {
 }
 
 const ANSIBLE_API_IMAGE = 'ghcr.io/carrtech-dev/ct-ops/ansible-api:latest'
-const ANSIBLE_TOKEN_COMMAND = 'openssl rand -base64 48'
 const ANSIBLE_ENV_SNIPPET = [
-  'ANSIBLE_API_SERVICE_TOKEN_ID=ansible-api',
-  'ANSIBLE_API_SERVICE_TOKEN_SECRET=<generated value>',
+  'ANSIBLE_API_PAIRING_USERNAME=ctops',
+  'ANSIBLE_API_PAIRING_PASSWORD=<initial password>',
 ].join('\n')
 const ANSIBLE_COMPOSE_COMMAND = 'docker compose -f docker-compose.single.yml --profile ansible up -d ansible-api'
 const ANSIBLE_HEALTH_COMMAND = 'docker compose -f docker-compose.single.yml ps ansible-api'
@@ -39,8 +38,9 @@ const ANSIBLE_DOCKER_RUN_COMMAND = [
   'docker run -d --name ct-ops-ansible-api \\',
   '  --restart unless-stopped \\',
   '  -p 127.0.0.1:8080:8080 \\',
-  '  -e ANSIBLE_API_SERVICE_TOKEN_ID=ansible-api \\',
-  '  -e ANSIBLE_API_SERVICE_TOKEN_SECRET="$ANSIBLE_API_SERVICE_TOKEN_SECRET" \\',
+  '  -e ANSIBLE_API_PAIRING_USERNAME=ctops \\',
+  '  -e ANSIBLE_API_PAIRING_PASSWORD="$ANSIBLE_API_PAIRING_PASSWORD" \\',
+  '  -v ct-ops-ansible-api-data:/var/lib/ct-ops/ansible-api \\',
   `  ${ANSIBLE_API_IMAGE}`,
 ].join('\n')
 
@@ -60,13 +60,9 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
   const [credentialName, setCredentialName] = useState('')
   const [credentialUsername, setCredentialUsername] = useState('')
   const [credentialPrivateKey, setCredentialPrivateKey] = useState('')
-  const [connectionName, setConnectionName] = useState(settings.ansibleConnection.name)
   const [connectionBaseUrl, setConnectionBaseUrl] = useState(settings.ansibleConnection.baseUrl)
-  const [connectionAuthMode, setConnectionAuthMode] = useState(settings.ansibleConnection.authMode)
-  const [connectionTokenId, setConnectionTokenId] = useState(settings.ansibleConnection.tokenId ?? 'ansible-api')
-  const [connectionTokenSecret, setConnectionTokenSecret] = useState('')
-  const [connectionTlsMode, setConnectionTlsMode] = useState(settings.ansibleConnection.tlsMode)
-  const [connectionTimeoutMs, setConnectionTimeoutMs] = useState(String(settings.ansibleConnection.timeoutMs))
+  const [pairingUsername, setPairingUsername] = useState('ctops')
+  const [pairingPassword, setPairingPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [credentialError, setCredentialError] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -93,7 +89,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
         },
         status: nextEnabled ? 'unavailable' : 'disabled',
         statusMessage: nextEnabled
-          ? 'Ansible automation is enabled. Check the configured Ansible API URL, service-token settings, and service health.'
+          ? 'Ansible automation is enabled. Pair the Ansible API connection and check service health.'
           : 'Ansible automation is disabled for this instance.',
         ansibleVersion: undefined,
       })
@@ -102,16 +98,11 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
     onError: () => setError('An unexpected error occurred'),
   })
 
-  const saveConnection = useMutation({
-    mutationFn: () => updateAnsibleModuleConnectionSettings({
-      enabled,
-      name: connectionName,
+  const pairConnection = useMutation({
+    mutationFn: () => pairAnsibleModuleConnection({
       baseUrl: connectionBaseUrl,
-      authMode: connectionAuthMode,
-      tokenId: connectionTokenId,
-      tokenSecret: connectionTokenSecret,
-      tlsMode: connectionTlsMode,
-      timeoutMs: Number(connectionTimeoutMs),
+      username: pairingUsername,
+      password: pairingPassword,
     }),
     onSuccess: (result) => {
       if ('error' in result) {
@@ -119,20 +110,20 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
         return
       }
       setConnectionError(null)
-      setConnectionTokenSecret('')
+      setPairingPassword('')
       setConnectionSaved(true)
       setSettings({
         ...settings,
         ansibleConnection: result.connection,
         status: enabled ? 'unavailable' : settings.status,
         statusMessage: enabled
-          ? 'Ansible automation is enabled. Check the configured Ansible API URL, service-token settings, and service health.'
+          ? 'Ansible automation connection is paired. Refresh status to confirm service health.'
           : settings.statusMessage,
         ansibleVersion: undefined,
       })
       setTimeout(() => setConnectionSaved(false), 3000)
     },
-    onError: () => setConnectionError('Failed to save Ansible connection'),
+    onError: () => setConnectionError('Failed to pair Ansible connection'),
   })
 
   const createCredential = useMutation({
@@ -226,7 +217,6 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                   <TabsList className="h-auto flex-wrap justify-start">
                     <TabsTrigger value="bundled">Bundled Compose</TabsTrigger>
                     <TabsTrigger value="separate">Separate Server</TabsTrigger>
-                    <TabsTrigger value="auth">Auth & TLS</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="bundled" className="space-y-3 text-sm text-muted-foreground">
@@ -234,7 +224,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                       Use this path when the Ansible API container runs from the CT-Ops Compose file on the same host.
                     </p>
                     <p>
-                      Add matching service-token values to the CT-Ops <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">.env</code> file:
+                      Add initial pairing credentials to the CT-Ops <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">.env</code> file:
                     </p>
                     <pre className="overflow-x-auto whitespace-pre rounded-md bg-muted p-3 text-xs text-foreground">
                       <code>{ANSIBLE_ENV_SNIPPET}</code>
@@ -249,7 +239,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                       <code>{ANSIBLE_HEALTH_COMMAND}</code>
                     </pre>
                     <p>
-                      In this UI, use <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://ansible-api:8080</code>, set Authentication to Service token HMAC, enter the same token ID and secret, and set TLS mode to Insecure HTTP/private network.
+                      In this UI, use <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://ansible-api:8080</code> and the initial pairing credentials. CT-Ops stores only the generated service secret after pairing.
                     </p>
                   </TabsContent>
 
@@ -258,7 +248,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                       Use this path when the Ansible API runs on a different server reachable from CT-Ops.
                     </p>
                     <p>
-                      On the Ansible server, set the service-token environment variables and run the image behind a private network or reverse proxy:
+                      On the Ansible server, set the initial pairing environment variables and run the image behind a private network or reverse proxy:
                     </p>
                     <pre className="overflow-x-auto whitespace-pre rounded-md bg-muted p-3 text-xs text-foreground">
                       <code>{ANSIBLE_DOCKER_RUN_COMMAND}</code>
@@ -267,25 +257,7 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                       The example binds to loopback for a reverse proxy on that server. If CT-Ops reaches the container directly over a private network, publish the port on a protected interface and allow inbound traffic only from the CT-Ops host.
                     </p>
                     <p>
-                      Do not set <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_ID</code> or <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_SECRET</code> in the CT-Ops Compose file for this setup. Configure this UI with the Ansible server URL, matching token ID and secret, and the appropriate TLS mode.
-                    </p>
-                  </TabsContent>
-
-                  <TabsContent value="auth" className="space-y-3 text-sm text-muted-foreground">
-                    <p>
-                      A service token is a shared HMAC secret. Generate a new secret yourself, put the same token ID and secret on the Ansible API container and in the Ansible module connection form on this page, and CT-Ops will sign each module request.
-                    </p>
-                    <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs text-foreground">
-                      <code>{ANSIBLE_TOKEN_COMMAND}</code>
-                    </pre>
-                    <p>
-                      Use the generated value as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_SECRET</code>. The token ID can stay <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ansible-api</code>. After saving the secret in the Ansible module connection form, CT-Ops stores it encrypted and only lets you replace it.
-                    </p>
-                    <p>
-                      Authentication set to None means CT-Ops sends unsigned requests. It will work only when the Ansible API container does not have <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_ID</code> or <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ANSIBLE_API_SERVICE_TOKEN_SECRET</code> configured.
-                    </p>
-                    <p>
-                      Authentication does not control encryption. Use an <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">https://</code> URL for encrypted transport, or <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://</code> only on a trusted private network with TLS mode set to Insecure HTTP/private network.
+                      Keep the generated token file on persistent storage. If it is deleted, reset the CT-Ops connection by pairing again with the initial credentials.
                     </p>
                   </TabsContent>
                 </Tabs>
@@ -318,23 +290,16 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
               Ansible module connection
             </CardTitle>
             <CardDescription>
-              Point CT-Ops at a manually deployed Ansible API, on this server or behind a reverse proxy.
+              Connect with the initial username and password from the Ansible container environment. CT-Ops stores the generated service secret, not this password.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="ansible-connection-name">Connection name</Label>
-                <Input
-                  id="ansible-connection-name"
-                  value={connectionName}
-                  onChange={(event) => setConnectionName(event.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="ansible-connection-url">Ansible API URL</Label>
                 <Input
                   id="ansible-connection-url"
+                  data-testid="ansible-pairing-url"
                   type="url"
                   value={connectionBaseUrl}
                   onChange={(event) => setConnectionBaseUrl(event.target.value)}
@@ -342,68 +307,41 @@ export function AutomationSettingsClient({ initialSettings, initialCredentialPro
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ansible-auth-mode">Authentication</Label>
-                <select
-                  id="ansible-auth-mode"
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={connectionAuthMode}
-                  onChange={(event) => setConnectionAuthMode(event.target.value as typeof connectionAuthMode)}
-                >
-                  <option value="service-token-hmac">Service token HMAC</option>
-                  <option value="none">None</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ansible-tls-mode">TLS mode</Label>
-                <select
-                  id="ansible-tls-mode"
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={connectionTlsMode}
-                  onChange={(event) => setConnectionTlsMode(event.target.value as typeof connectionTlsMode)}
-                >
-                  <option value="public-ca">Public CA</option>
-                  <option value="insecure">Insecure HTTP/private network</option>
-                </select>
-              </div>
-              {connectionAuthMode === 'service-token-hmac' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="ansible-token-id">Token ID</Label>
-                    <Input
-                      id="ansible-token-id"
-                      value={connectionTokenId}
-                      onChange={(event) => setConnectionTokenId(event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ansible-token-secret">Token secret</Label>
-                    <Input
-                      id="ansible-token-secret"
-                      type="password"
-                      value={connectionTokenSecret}
-                      onChange={(event) => setConnectionTokenSecret(event.target.value)}
-                      placeholder={settings.ansibleConnection.hasTokenSecret ? 'Leave blank to keep existing' : 'Required for HMAC'}
-                    />
-                  </div>
-                </>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="ansible-timeout">Request timeout ms</Label>
+                <Label htmlFor="ansible-pairing-username">Initial username</Label>
                 <Input
-                  id="ansible-timeout"
-                  inputMode="numeric"
-                  value={connectionTimeoutMs}
-                  onChange={(event) => setConnectionTimeoutMs(event.target.value)}
+                  id="ansible-pairing-username"
+                  data-testid="ansible-pairing-username"
+                  value={pairingUsername}
+                  onChange={(event) => setPairingUsername(event.target.value)}
+                  autoComplete="username"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="ansible-pairing-password">Initial password</Label>
+                <Input
+                  id="ansible-pairing-password"
+                  data-testid="ansible-pairing-password"
+                  type="password"
+                  value={pairingPassword}
+                  onChange={(event) => setPairingPassword(event.target.value)}
+                  autoComplete="current-password"
                 />
               </div>
             </div>
 
+            {settings.ansibleConnection.hasTokenSecret && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                Paired with <span className="font-medium text-foreground">{settings.ansibleConnection.baseUrl}</span>.
+                Re-pairing with the initial credentials rotates the generated service secret.
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
-              <Button type="button" onClick={() => saveConnection.mutate()} disabled={saveConnection.isPending}>
+              <Button type="button" onClick={() => pairConnection.mutate()} disabled={pairConnection.isPending}>
                 <ServerCog className="h-4 w-4" />
-                Save connection
+                Pair connection
               </Button>
-              {saveConnection.isPending && <span className="text-sm text-muted-foreground">Saving...</span>}
+              {pairConnection.isPending && <span className="text-sm text-muted-foreground">Pairing...</span>}
               {connectionSaved && <span className="text-sm text-green-700">Saved</span>}
               {connectionError && <span className="text-sm text-destructive">{connectionError}</span>}
             </div>

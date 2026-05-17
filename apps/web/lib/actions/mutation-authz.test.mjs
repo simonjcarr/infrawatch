@@ -57,6 +57,7 @@ const adminGuardedActions = [
   ['alerts.ts', 'replaceHostMetricAlertsWithGlobalDefaults'],
   ['alerts.ts', 'replaceAllHostMetricAlertsWithGlobalDefaults'],
   ['automation.ts', 'updateAnsibleAutomationSettings'],
+  ['automation.ts', 'pairAnsibleModuleConnection'],
   ['automation.ts', 'createAnsibleCredentialProfile'],
   ['automation.ts', 'deleteAnsibleCredentialProfile'],
   ['host-settings.ts', 'updateInstanceDefaultCollectionSettings'],

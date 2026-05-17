@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test'
 import { getTestDb } from '../fixtures/db'
 import { TEST_INSTANCE } from '../fixtures/seed'
 
+const ADD_PASTED_CA = '-----BEGIN CERTIFICATE-----\nADD_PASTED_CA\n-----END CERTIFICATE-----'
 const FIRST_EDIT_CA = '-----BEGIN CERTIFICATE-----\nFIRST_EDIT_CA\n-----END CERTIFICATE-----'
 const REPLACEMENT_EDIT_CA = '-----BEGIN CERTIFICATE-----\nREPLACEMENT_EDIT_CA\n-----END CERTIFICATE-----'
 
@@ -41,6 +42,8 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
   await page.getByTestId('ldap-settings-add-base-dn').fill('DC=internal,DC=example')
   await page.getByTestId('ldap-settings-add-bind-dn').fill('CN=svc-ldap,DC=internal,DC=example')
   await page.getByTestId('ldap-settings-add-bind-password').fill('SuperSecret123!')
+  await page.getByTestId('ldap-settings-add-use-starttls').click()
+  await page.getByTestId('ldap-settings-add-ca-preview').fill(ADD_PASTED_CA)
   await expect(page.getByTestId('ldap-settings-add-user-filter')).toHaveValue('(sAMAccountName={{username}})')
   await expect(page.getByTestId('ldap-settings-add-username-attribute')).toHaveValue('sAMAccountName')
   await page.getByTestId('ldap-settings-add-user-search-base').fill('ou=Staff')
@@ -107,6 +110,7 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
 
   await page.getByTestId(`ldap-config-edit-${configId}`).click()
   await expectLdapDialogWide(page)
+  await expect(page.getByTestId('ldap-settings-edit-ca-preview')).toHaveValue(ADD_PASTED_CA)
   await page.getByTestId('ldap-settings-edit-use-tls').click()
   await page.getByTestId('ldap-settings-edit-ca-file').setInputFiles({
     name: 'first-edit-ca.pem',
@@ -125,17 +129,12 @@ test('admin can create, edit, toggle, and delete an LDAP configuration', async (
   await page.getByTestId(`ldap-config-edit-${configId}`).click()
   await expect(page.getByTestId('ldap-settings-edit-ca-preview')).toContainText('FIRST_EDIT_CA')
   await expect(page.getByRole('button', { name: 'Replace Certificate (.pem, .crt)' })).toBeVisible()
-  await page.getByTestId('ldap-settings-edit-ca-file').setInputFiles({
-    name: 'replacement-edit-ca.pem',
-    mimeType: 'application/x-pem-file',
-    buffer: Buffer.from(REPLACEMENT_EDIT_CA),
-  })
-  await expect(page.getByTestId('ldap-settings-edit-ca-preview')).toContainText('REPLACEMENT_EDIT_CA')
+  await page.getByTestId('ldap-settings-edit-ca-preview').fill(REPLACEMENT_EDIT_CA)
+  await expect(page.getByTestId('ldap-settings-edit-ca-preview')).toHaveValue(REPLACEMENT_EDIT_CA)
   await page.getByTestId('ldap-settings-edit-save').click()
 
   await page.getByTestId(`ldap-config-edit-${configId}`).click()
-  await expect(page.getByTestId('ldap-settings-edit-ca-preview')).toContainText('REPLACEMENT_EDIT_CA')
-  await expect(page.getByTestId('ldap-settings-edit-ca-preview')).not.toContainText('FIRST_EDIT_CA')
+  await expect(page.getByTestId('ldap-settings-edit-ca-preview')).toHaveValue(REPLACEMENT_EDIT_CA)
   await page.keyboard.press('Escape')
 
   await page.getByTestId(`ldap-config-enabled-${configId}`).click()

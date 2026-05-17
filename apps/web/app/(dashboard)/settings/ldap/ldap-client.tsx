@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
@@ -96,56 +97,43 @@ function CertificateUpload({
     e.target.value = ''
   }
 
-  if (value) {
-    return (
-      <div className="space-y-1.5">
-        <Label>TLS Certificate (CA)</Label>
-        <input ref={fileInputRef} type="file" accept=".pem,.crt,.cer,.cert" className="hidden" onChange={handleFileUpload} data-testid={inputTestId} />
-        <div
-          className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all overflow-y-auto max-h-24 text-muted-foreground relative"
-          data-testid={previewTestId}
-        >
-          {value}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute top-1 right-1 size-6 p-0 text-muted-foreground hover:text-destructive"
-            onClick={() => onChange('')}
-          >
-            <X className="size-3.5" />
-          </Button>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="size-4 mr-1.5" />
-          Replace Certificate (.pem, .crt)
-        </Button>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-1.5">
       <Label>TLS Certificate (CA)</Label>
       <input ref={fileInputRef} type="file" accept=".pem,.crt,.cer,.cert" className="hidden" onChange={handleFileUpload} data-testid={inputTestId} />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Upload className="size-4 mr-1.5" />
-        Upload Certificate (.pem, .crt)
-      </Button>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Paste PEM CA certificate"
+        className="max-h-40 min-h-24 resize-y font-mono text-xs"
+        data-testid={previewTestId}
+      />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="size-4 mr-1.5" />
+          {value ? 'Replace Certificate (.pem, .crt)' : 'Upload Certificate (.pem, .crt)'}
+        </Button>
+        {value && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => onChange('')}
+            aria-label="Clear certificate"
+          >
+            <X className="size-3.5" />
+          </Button>
+        )}
+      </div>
       <p className="text-xs text-muted-foreground">
-        Upload a CA certificate when the LDAP server uses a private CA. Otherwise TLS connections use the platform trust store to verify the server identity.
+        Paste or upload a CA certificate when the LDAP server uses a private CA. Otherwise TLS connections use the platform trust store to verify the server identity.
       </p>
     </div>
   )

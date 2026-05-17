@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.158.2",
+  "version": "0.159.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",

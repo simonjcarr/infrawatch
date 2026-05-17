@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/coder/websocket"
@@ -378,6 +379,26 @@ func terminalSSHFailureDetails(err error) (reason string, message string) {
 	if isSSHAuthenticationFailure(err) {
 		return "ssh authentication failed", "SSH authentication failed"
 	}
+
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) || strings.Contains(strings.ToLower(err.Error()), "no such host") {
+		return "ssh connection failed", "SSH connection failed: host name could not be resolved"
+	}
+
+	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, syscall.ETIMEDOUT) ||
+		(errors.As(err, &netErr) && netErr.Timeout()) {
+		return "ssh connection failed", "SSH connection failed: connection timed out"
+	}
+
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return "ssh connection failed", "SSH connection failed: connection refused"
+	}
+	if errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) {
+		return "ssh connection failed", "SSH connection failed: host is unreachable"
+	}
+
 	return "ssh connection failed", "SSH connection failed"
 }
 

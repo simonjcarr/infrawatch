@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.2](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.1...bundle/v0.27.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **terminal:** prefer host IP for SSH sessions ([1388ea3](https://github.com/carrtech-dev/ct-ops/commit/1388ea324256baef3865d948e4b638611c8653df))
+
 ## [0.27.1](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.0...bundle/v0.27.1) (2026-05-16)
 
 

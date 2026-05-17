@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.158.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.158.1...web/v0.158.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **settings:** improve LDAP certificate editing ([44e5492](https://github.com/carrtech-dev/ct-ops/commit/44e5492d1e41637e56b51695a20369876073ea65))
+
 ## [0.158.1](https://github.com/carrtech-dev/ct-ops/compare/web/v0.158.0...web/v0.158.1) (2026-05-16)
 
 

@@ -227,8 +227,13 @@ services:
       context: apps/ansible-api
       dockerfile: Dockerfile
     environment:
+      ANSIBLE_API_PAIRING_USERNAME: ${ANSIBLE_API_PAIRING_USERNAME:-ctops}
+      ANSIBLE_API_PAIRING_PASSWORD: ${ANSIBLE_API_PAIRING_PASSWORD:-}
+      ANSIBLE_API_SERVICE_TOKEN_FILE: /var/lib/ct-ops/ansible-api/service-token.json
       ANSIBLE_API_SERVICE_TOKEN_ID: ${ANSIBLE_API_SERVICE_TOKEN_ID:-}
       ANSIBLE_API_SERVICE_TOKEN_SECRET: ${ANSIBLE_API_SERVICE_TOKEN_SECRET:-}
+    volumes:
+      - ansible_api_data:/var/lib/ct-ops/ansible-api
     profiles:
       - ansible
     restart: unless-stopped
@@ -306,3 +311,4 @@ volumes:
   password_manager_db_data:
   ingest_data:
   agent_dist:
+  ansible_api_data:

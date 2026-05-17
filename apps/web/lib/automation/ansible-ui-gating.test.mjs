@@ -40,3 +40,14 @@ test('automation settings hide Ansible credential management while disabled', ()
   assert.match(settingsClient, /const enabled = settings\.ansibleFeatureEnabled && settings\.provider === 'ansible'/)
   assert.match(settingsClient, /\{enabled && \([\s\S]*Ansible SSH credentials/)
 })
+
+test('automation settings use the simplified Ansible pairing action', () => {
+  const settingsClient = source('app/(dashboard)/settings/integrations/automation/automation-settings-client.tsx')
+
+  assert.match(settingsClient, /pairAnsibleModuleConnection/)
+  assert.match(settingsClient, /data-testid="ansible-pairing-url"/)
+  assert.match(settingsClient, /data-testid="ansible-pairing-username"/)
+  assert.match(settingsClient, /data-testid="ansible-pairing-password"/)
+  assert.doesNotMatch(settingsClient, /id="ansible-auth-mode"/)
+  assert.doesNotMatch(settingsClient, /id="ansible-token-secret"/)
+})

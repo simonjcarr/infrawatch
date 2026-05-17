@@ -130,9 +130,10 @@ The remaining ports are bound to `127.0.0.1` only, so `web:3000`, `ingest:8080`,
 
 The optional `ansible-api` service is not published to the host and CT-Ops does
 not start it automatically. Run the Ansible module yourself, then configure its
-URL and service-token settings in **Settings → Integrations → Automation**. The
-web app never mounts the Docker socket and does not orchestrate module
-containers.
+URL plus the initial pairing username and password in **Settings → Integrations
+→ Automation**. The Ansible API generates the service-token secret used for
+ongoing signed requests and stores it in its persistent data volume. The web app
+never mounts the Docker socket and does not orchestrate module containers.
 
 When installing inside a VM, LXC, or Incus instance that sits behind a NAT or
 private bridge, forward the external HTTPS port and `9443` to the instance.

@@ -2,6 +2,7 @@ import json
 import hashlib
 import hmac
 import base64
+import tempfile
 import unittest
 from unittest import mock
 
@@ -42,6 +43,63 @@ class AnsibleApiContractTests(unittest.TestCase):
     def test_verify_service_request_allows_unsigned_when_no_token_configured(self):
         with mock.patch.dict(server.os.environ, {}, clear=True):
             self.assertIsNone(server.verify_service_request("POST", "/api/v1/runs/ansible-ping", b"{}", {}))
+
+    def test_pairing_claim_requires_configured_initial_credentials(self):
+        with mock.patch.dict(server.os.environ, {}, clear=True):
+            with self.assertRaisesRegex(PermissionError, "not configured"):
+                server.claim_pairing_token({"username": "ctops", "password": "secret"})
+
+    def test_pairing_claim_generates_persisted_service_token(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            token_file = f"{tmpdir}/service-token.json"
+            with mock.patch.dict(server.os.environ, {
+                "ANSIBLE_API_PAIRING_USERNAME": "ctops",
+                "ANSIBLE_API_PAIRING_PASSWORD": "initial password",
+                "ANSIBLE_API_SERVICE_TOKEN_FILE": token_file,
+            }, clear=True):
+                payload = server.claim_pairing_token({
+                    "username": "ctops",
+                    "password": "initial password",
+                })
+
+                self.assertEqual(payload["ok"], True)
+                self.assertEqual(payload["tokenId"], "ansible-api")
+                self.assertGreaterEqual(len(payload["tokenSecret"]), 32)
+                configured = server._configured_service_token()
+                self.assertEqual(configured, ("ansible-api", payload["tokenSecret"]))
+
+    def test_pairing_claim_rotates_existing_generated_service_token(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            token_file = f"{tmpdir}/service-token.json"
+            with mock.patch.dict(server.os.environ, {
+                "ANSIBLE_API_PAIRING_USERNAME": "ctops",
+                "ANSIBLE_API_PAIRING_PASSWORD": "initial password",
+                "ANSIBLE_API_SERVICE_TOKEN_FILE": token_file,
+            }, clear=True):
+                first = server.claim_pairing_token({
+                    "username": "ctops",
+                    "password": "initial password",
+                })
+                second = server.claim_pairing_token({
+                    "username": "ctops",
+                    "password": "initial password",
+                })
+
+                self.assertNotEqual(first["tokenSecret"], second["tokenSecret"])
+                self.assertEqual(server._configured_service_token(), ("ansible-api", second["tokenSecret"]))
+
+    def test_pairing_claim_rejects_static_environment_service_token(self):
+        with mock.patch.dict(server.os.environ, {
+            "ANSIBLE_API_PAIRING_USERNAME": "ctops",
+            "ANSIBLE_API_PAIRING_PASSWORD": "initial password",
+            "ANSIBLE_API_SERVICE_TOKEN_ID": "ansible-api",
+            "ANSIBLE_API_SERVICE_TOKEN_SECRET": "ansible signing secret with enough entropy",
+        }, clear=True):
+            with self.assertRaisesRegex(PermissionError, "managed by environment"):
+                server.claim_pairing_token({
+                    "username": "ctops",
+                    "password": "initial password",
+                })
 
     def test_verify_service_request_accepts_valid_hmac_token(self):
         body = b'{"ok":true}'

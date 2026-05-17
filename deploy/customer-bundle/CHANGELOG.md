@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.3...bundle/v0.28.0) (2026-05-17)
+
+
+### Features
+
+* **ansible:** add simple pairing flow ([79d8e20](https://github.com/carrtech-dev/ct-ops/commit/79d8e203a514097ba24b72d741fb6fdbcd2be32e))
+
 ## [0.27.3](https://github.com/carrtech-dev/ct-ops/compare/bundle/v0.27.2...bundle/v0.27.3) (2026-05-17)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.159.0](https://github.com/carrtech-dev/ct-ops/compare/web/v0.158.2...web/v0.159.0) (2026-05-17)
+
+
+### Features
+
+* **ansible:** add simple pairing flow ([79d8e20](https://github.com/carrtech-dev/ct-ops/commit/79d8e203a514097ba24b72d741fb6fdbcd2be32e))
+
 ## [0.158.2](https://github.com/carrtech-dev/ct-ops/compare/web/v0.158.1...web/v0.158.2) (2026-05-17)
 
 

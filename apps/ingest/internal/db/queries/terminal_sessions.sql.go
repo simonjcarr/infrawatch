@@ -52,23 +52,53 @@ func ValidateAndActivateTerminalSession(ctx context.Context, pool *pgxpool.Pool,
 		  AND h.deleted_at        IS NULL
 			RETURNING ts.instance_id, ts.host_id,
 		          ts.user_id,
-		          COALESCE(NULLIF(h.hostname, ''), h.ip_addresses->>0) AS host,
+		          COALESCE(h.hostname, '') AS hostname,
+		          COALESCE(h.ip_addresses, '[]'::jsonb)::text AS ip_addresses,
 		          COALESCE(ts.username, '') AS username,
 		          COALESCE((o.metadata->>'terminalLoggingEnabled')::boolean, false) AS logging_enabled
 	`
 	var info TerminalSessionInfo
+	var hostname string
+	var rawIPAddresses string
 	err := pool.QueryRow(ctx, q, sessionID, tokenHash).Scan(
 		&info.InstanceID,
 		&info.HostID,
 		&info.UserID,
-		&info.Host,
+		&hostname,
+		&rawIPAddresses,
 		&info.Username,
 		&info.LoggingEnabled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("terminal session not found or expired: %w", err)
 	}
+	info.Host = terminalSSHTarget(hostname, terminalIPAddressesFromJSON(rawIPAddresses))
 	return &info, nil
+}
+
+func terminalIPAddressesFromJSON(raw string) []string {
+	var ips []string
+	if err := json.Unmarshal([]byte(raw), &ips); err != nil {
+		return nil
+	}
+	return ips
+}
+
+func terminalSSHTarget(hostname string, ipAddresses []string) string {
+	if useful := FilterHostIdentityIPs(ipAddresses); len(useful) > 0 {
+		return useful[0]
+	}
+
+	if hostname = strings.TrimSpace(hostname); hostname != "" {
+		return hostname
+	}
+
+	for _, ip := range ipAddresses {
+		if ip = strings.TrimSpace(ip); ip != "" {
+			return ip
+		}
+	}
+	return ""
 }
 
 const (

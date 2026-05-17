@@ -74,9 +74,13 @@ const EMPTY_FORM = {
 function CertificateUpload({
   value,
   onChange,
+  inputTestId,
+  previewTestId,
 }: {
   value: string
   onChange: (cert: string) => void
+  inputTestId?: string
+  previewTestId?: string
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -96,7 +100,11 @@ function CertificateUpload({
     return (
       <div className="space-y-1.5">
         <Label>TLS Certificate (CA)</Label>
-        <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all overflow-y-auto max-h-24 text-muted-foreground relative">
+        <input ref={fileInputRef} type="file" accept=".pem,.crt,.cer,.cert" className="hidden" onChange={handleFileUpload} data-testid={inputTestId} />
+        <div
+          className="rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all overflow-y-auto max-h-24 text-muted-foreground relative"
+          data-testid={previewTestId}
+        >
           {value}
           <Button
             type="button"
@@ -108,6 +116,16 @@ function CertificateUpload({
             <X className="size-3.5" />
           </Button>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="size-4 mr-1.5" />
+          Replace Certificate (.pem, .crt)
+        </Button>
       </div>
     )
   }
@@ -115,7 +133,7 @@ function CertificateUpload({
   return (
     <div className="space-y-1.5">
       <Label>TLS Certificate (CA)</Label>
-      <input ref={fileInputRef} type="file" accept=".pem,.crt,.cer,.cert" className="hidden" onChange={handleFileUpload} />
+      <input ref={fileInputRef} type="file" accept=".pem,.crt,.cer,.cert" className="hidden" onChange={handleFileUpload} data-testid={inputTestId} />
       <Button
         type="button"
         variant="outline"
@@ -268,7 +286,7 @@ export function LdapSettingsClient({
               Add Configuration
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-x-hidden overflow-y-auto">
+          <DialogContent className="max-w-[calc(100%-1rem)] sm:max-w-2xl max-h-[80vh] overflow-x-hidden overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add LDAP Configuration</DialogTitle>
               <DialogDescription>
@@ -309,6 +327,7 @@ export function LdapSettingsClient({
                   <Switch
                     checked={addForm.useTls}
                     onCheckedChange={(checked) => setAddForm({ ...addForm, useTls: checked, port: checked ? 636 : 389 })}
+                    data-testid="ldap-settings-add-use-tls"
                   />
                   Use TLS (LDAPS)
                 </label>
@@ -316,6 +335,7 @@ export function LdapSettingsClient({
                   <Switch
                     checked={addForm.useStartTls}
                     onCheckedChange={(checked) => setAddForm({ ...addForm, useStartTls: checked })}
+                    data-testid="ldap-settings-add-use-starttls"
                   />
                   Use STARTTLS
                 </label>
@@ -324,6 +344,8 @@ export function LdapSettingsClient({
                 <CertificateUpload
                   value={addForm.tlsCertificate}
                   onChange={(cert) => setAddForm({ ...addForm, tlsCertificate: cert })}
+                  inputTestId="ldap-settings-add-ca-file"
+                  previewTestId="ldap-settings-add-ca-preview"
                 />
               )}
               <div className="space-y-1.5">
@@ -556,7 +578,7 @@ export function LdapSettingsClient({
 
       {/* Edit LDAP Configuration Dialog */}
       <Dialog open={editingConfig !== null} onOpenChange={(open) => { if (!open) setEditingConfig(null) }}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-x-hidden overflow-y-auto">
+        <DialogContent className="max-w-[calc(100%-1rem)] sm:max-w-2xl max-h-[80vh] overflow-x-hidden overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit LDAP Configuration</DialogTitle>
             <DialogDescription>
@@ -597,6 +619,7 @@ export function LdapSettingsClient({
                 <Switch
                   checked={editForm.useTls}
                   onCheckedChange={(checked) => setEditForm({ ...editForm, useTls: checked, port: checked ? 636 : 389 })}
+                  data-testid="ldap-settings-edit-use-tls"
                 />
                 Use TLS (LDAPS)
               </label>
@@ -604,6 +627,7 @@ export function LdapSettingsClient({
                 <Switch
                   checked={editForm.useStartTls}
                   onCheckedChange={(checked) => setEditForm({ ...editForm, useStartTls: checked })}
+                  data-testid="ldap-settings-edit-use-starttls"
                 />
                 Use STARTTLS
               </label>
@@ -612,6 +636,8 @@ export function LdapSettingsClient({
               <CertificateUpload
                 value={editForm.tlsCertificate}
                 onChange={(cert) => setEditForm({ ...editForm, tlsCertificate: cert })}
+                inputTestId="ldap-settings-edit-ca-file"
+                previewTestId="ldap-settings-edit-ca-preview"
               />
             )}
             <div className="space-y-1.5">

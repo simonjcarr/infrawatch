@@ -89,6 +89,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: agent/go.mod
+          cache: false
           cache-dependency-path: |
             agent/go.sum
             go.work.sum

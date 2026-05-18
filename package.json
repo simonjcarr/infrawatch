@@ -16,7 +16,7 @@
     "pnpm": ">=10.0.0"
   },
   "devDependencies": {
-    "turbo": "^2.9.12"
+    "turbo": "^2.9.14"
   },
   "pnpm": {
     "overrides": {
